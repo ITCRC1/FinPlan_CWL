@@ -10,7 +10,13 @@ name: pruebas
 
 on:
   push:
-    branches: [master]
+    # ⚠️ `main` Y `master`. Decía solo `master` y la rama del repo es `main`, así
+    # que el workflow no se disparó NUNCA: durante semanas el badge no estuvo
+    # rojo, estuvo ausente, y eso se lee igual que «no hay nada que reportar».
+    # Es el mismo modo de falla que este archivo dice venir a resolver — una
+    # prueba que nadie ejecuta no protege nada— pero un nivel más arriba.
+    # Van las dos por si alguna rama vieja sigue en uso.
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
