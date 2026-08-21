@@ -1,0 +1,19 @@
+﻿{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\\\FinPlan_CWL\\\\frontend",
+      "port": 3000
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "uvicorn",
+      "runtimeArgs": ["app.main:app", "--reload", "--port", "8000"],
+      "cwd": "C:\\\\FinPlan_CWL\\\\backend",
+      "port": 8000
+    }
+  ]
+}

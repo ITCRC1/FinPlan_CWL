@@ -1,0 +1,639 @@
+{
+ "_nota": [
+  "LINEAS QUE UN ESCENARIO DEBE TRAER CON DATO para ser comparable.",
+  "",
+  "Es una LISTA y no una regla: se produjo una vez desde el historico",
+  "(ver scripts/generar_lineas_obligatorias.py) y desde ahi manda la",
+  "lista. Se puede editar a mano: borrar lo que ya no aplica, agregar",
+  "lo que se sabe que va. Nadie tiene que adivinar el criterio.",
+  "",
+  "AVISA, NO BLOQUEA. Un presupuesto en construccion tiene lineas",
+  "vacias con todo derecho; el aviso dice cuales y cuanto valen en el",
+  "historico, para saber que cargar y en que orden.",
+  "",
+  "`referencia_usd` es el ultimo ano ACTUAL COMPLETO — no un promedio.",
+  "Se regenera con `python -m scripts.generar_lineas_obligatorias`."
+ ],
+ "generado": "2026-08-16",
+ "criterio": {
+  "umbral_anual_usd": 5000.0,
+  "anos_historicos": [
+   "2024",
+   "2025",
+   "2026"
+  ],
+  "meses_con_dato": {
+   "2024": 12,
+   "2025": 12,
+   "2026": 5
+  },
+  "regla": [
+   "1. line_type MAPPED o MAPPED_REVIEW (donde ENTRA el dato).",
+   "2. >= 5,000 USD/anio en 2 o mas anios ACTUAL.",
+   "3. distinta de cero en el ACTUAL mas reciente (2026)."
+  ]
+ },
+ "lineas": [
+  {
+   "line_code": "REV_ROOMS",
+   "nombre": "Rooms Revenue",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0110",
+    "0115",
+    "0116"
+   ],
+   "reglas_de_mapeo": 3,
+   "historico": {
+    "2024": 1195622.03,
+    "2025": 1641914.57,
+    "2026": 1706130.1
+   },
+   "referencia_usd": 1641914.57,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_ADMIN",
+   "nombre": "Administrations",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "Planilla · OPEX",
+   "pantalla": "/payroll",
+   "departamentos": [
+    "0180",
+    "0181",
+    "0184"
+   ],
+   "reglas_de_mapeo": 88,
+   "historico": {
+    "2024": 339220.8,
+    "2025": 634578.54,
+    "2026": 314107.93
+   },
+   "referencia_usd": 634578.54,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OPEX_ROOMS",
+   "nombre": "Rooms",
+   "seccion": "OPERATING EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0110",
+    "0115",
+    "0116"
+   ],
+   "reglas_de_mapeo": 144,
+   "historico": {
+    "2024": 354327.21,
+    "2025": 525953.31,
+    "2026": 321123.93
+   },
+   "referencia_usd": 525953.31,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_SALES_MARKETING",
+   "nombre": "Sales & Marketing",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0190"
+   ],
+   "reglas_de_mapeo": 50,
+   "historico": {
+    "2024": 291582.51,
+    "2025": 481388.18,
+    "2026": 289357.58
+   },
+   "referencia_usd": 481388.18,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_FB",
+   "nombre": "F&B Food",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 416064.39,
+    "2025": 445824.79,
+    "2026": 433613.39
+   },
+   "referencia_usd": 445824.79,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_MAINTENANCE",
+   "nombre": "Maintenance",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0200"
+   ],
+   "reglas_de_mapeo": 50,
+   "historico": {
+    "2024": 501749.81,
+    "2025": 390009.82,
+    "2026": 153026.18
+   },
+   "referencia_usd": 390009.82,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_TOURS",
+   "nombre": "Tours",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0150"
+   ],
+   "reglas_de_mapeo": 4,
+   "historico": {
+    "2024": 186552.73,
+    "2025": 350672.36,
+    "2026": 512220.56
+   },
+   "referencia_usd": 350672.36,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OPEX_FB",
+   "nombre": "F&B",
+   "seccion": "OPERATING EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 55,
+   "historico": {
+    "2024": 454443.07,
+    "2025": 307929.44,
+    "2026": 202283.09
+   },
+   "referencia_usd": 307929.44,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_UTILITIES",
+   "nombre": "Utilities",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "OPEX · Repartos",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0210"
+   ],
+   "reglas_de_mapeo": 37,
+   "historico": {
+    "2024": 257376.98,
+    "2025": 275927.29,
+    "2026": 155957.98
+   },
+   "referencia_usd": 275927.29,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "CAPITAL_RESERVE",
+   "nombre": "CAPITAL RESERVE",
+   "seccion": "CAPITAL",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 0.0,
+    "2025": 221403.14,
+    "2026": 177804.33
+   },
+   "referencia_usd": 221403.14,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OPEX_TOURS",
+   "nombre": "Tours",
+   "seccion": "OPERATING EXPENSES",
+   "donde_se_carga": "Planilla · OPEX",
+   "pantalla": "/payroll",
+   "departamentos": [
+    "0150"
+   ],
+   "reglas_de_mapeo": 32,
+   "historico": {
+    "2024": 215673.49,
+    "2025": 216466.76,
+    "2026": 142067.62
+   },
+   "referencia_usd": 216466.76,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "DEPRECIATION",
+   "nombre": "DEPRECIATION",
+   "seccion": "DEPRECIATION",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 171394.3,
+    "2025": 191773.58,
+    "2026": 244946.33
+   },
+   "referencia_usd": 191773.58,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COS_FB_FOOD",
+   "nombre": "F&B Food Cost",
+   "seccion": "COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 3,
+   "historico": {
+    "2024": 0.0,
+    "2025": 155051.38,
+    "2026": 140750.53
+   },
+   "referencia_usd": 155051.38,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_FB_BEV",
+   "nombre": "F&B Beverage",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 4,
+   "historico": {
+    "2024": 0.0,
+    "2025": 152072.57,
+    "2026": 145897.45
+   },
+   "referencia_usd": 152072.57,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_TRANSPORTATION",
+   "nombre": "Transportation",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0152"
+   ],
+   "reglas_de_mapeo": 4,
+   "historico": {
+    "2024": 64448.17,
+    "2025": 145442.6,
+    "2026": 175944.52
+   },
+   "referencia_usd": 145442.6,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OPEX_TRANSPORTATION",
+   "nombre": "Transportation",
+   "seccion": "OPERATING EXPENSES",
+   "donde_se_carga": "Planilla · OPEX",
+   "pantalla": "/payroll",
+   "departamentos": [
+    "0152"
+   ],
+   "reglas_de_mapeo": 31,
+   "historico": {
+    "2024": 171716.87,
+    "2025": 128558.49,
+    "2026": 51468.11
+   },
+   "referencia_usd": 128558.49,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_SUSTAINABILITY",
+   "nombre": "Sustainability Fee",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "280"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 13594.12,
+    "2025": 112923.75,
+    "2026": 140668.79
+   },
+   "referencia_usd": 112923.75,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COH_CAFETERIA",
+   "nombre": "Cafetería Cost",
+   "seccion": "OVERHEAD COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0220"
+   ],
+   "reglas_de_mapeo": 2,
+   "historico": {
+    "2024": 0.0,
+    "2025": 111934.26,
+    "2026": 56012.38
+   },
+   "referencia_usd": 111934.26,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_CAFETERIA",
+   "nombre": "Cafeteria",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0220"
+   ],
+   "reglas_de_mapeo": 46,
+   "historico": {
+    "2024": 0.0,
+    "2025": -111478.59,
+    "2026": -56012.38
+   },
+   "referencia_usd": -111478.59,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OTHER_EXPENSES",
+   "nombre": "OTHER EXPENSES",
+   "seccion": "OWNER / NON-OP EXPENSES",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 0.0,
+    "2025": 109407.69,
+    "2026": 22276.82
+   },
+   "referencia_usd": 109407.69,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "MGMT_FEE_3",
+   "nombre": "MANAGEMENT FEES (3%)",
+   "seccion": "OWNER / NON-OP EXPENSES",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250",
+    "260"
+   ],
+   "reglas_de_mapeo": 2,
+   "historico": {
+    "2024": 93842.27,
+    "2025": 107086.8,
+    "2026": 105066.78
+   },
+   "referencia_usd": 107086.8,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COS_TOURS",
+   "nombre": "Tours Cost",
+   "seccion": "COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0150"
+   ],
+   "reglas_de_mapeo": 2,
+   "historico": {
+    "2024": 0.0,
+    "2025": 97280.71,
+    "2026": 123084.94
+   },
+   "referencia_usd": 97280.71,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COS_TRANSPORTATION",
+   "nombre": "Transportation Cost",
+   "seccion": "COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0152"
+   ],
+   "reglas_de_mapeo": 3,
+   "historico": {
+    "2024": 0.0,
+    "2025": 46631.67,
+    "2026": 44390.0
+   },
+   "referencia_usd": 46631.67,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OH_INFORMATION_SYSTEM",
+   "nombre": "Information System",
+   "seccion": "OVERHEAD EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0230"
+   ],
+   "reglas_de_mapeo": 49,
+   "historico": {
+    "2024": 15967.21,
+    "2025": 40974.95,
+    "2026": 20568.05
+   },
+   "referencia_usd": 40974.95,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COS_FB_BEV",
+   "nombre": "F&B Beverage Cost",
+   "seccion": "COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 6,
+   "historico": {
+    "2024": 0.0,
+    "2025": 39630.24,
+    "2026": 47916.89
+   },
+   "referencia_usd": 39630.24,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "PROPERTY_INSURANCE",
+   "nombre": "PROPERTIES INSURANCE",
+   "seccion": "OWNER / NON-OP EXPENSES",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 45754.5,
+    "2025": 38582.52,
+    "2026": 19751.81
+   },
+   "referencia_usd": 38582.52,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "OPEX_SPA",
+   "nombre": "SPA",
+   "seccion": "OPERATING EXPENSES",
+   "donde_se_carga": "OPEX · Planilla",
+   "pantalla": "/opex",
+   "departamentos": [
+    "0140"
+   ],
+   "reglas_de_mapeo": 53,
+   "historico": {
+    "2024": 37634.15,
+    "2025": 35448.13,
+    "2026": 20805.05
+   },
+   "referencia_usd": 35448.13,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_FB_MISC",
+   "nombre": "F&B Miscellaneous",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0120"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 0.0,
+    "2025": 33723.04,
+    "2026": 7951.68
+   },
+   "referencia_usd": 33723.04,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_SPA",
+   "nombre": "SPA",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0140"
+   ],
+   "reglas_de_mapeo": 5,
+   "historico": {
+    "2024": 18187.7,
+    "2025": 28001.93,
+    "2026": 35115.86
+   },
+   "referencia_usd": 28001.93,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "RENT",
+   "nombre": "RENT",
+   "seccion": "OWNER / NON-OP EXPENSES",
+   "donde_se_carga": "Below GOP / No operativo",
+   "pantalla": "/nonop",
+   "departamentos": [
+    "0250"
+   ],
+   "reglas_de_mapeo": 1,
+   "historico": {
+    "2024": 6362.04,
+    "2025": 22764.91,
+    "2026": 8501.81
+   },
+   "referencia_usd": 22764.91,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_RETAIL",
+   "nombre": "Gift Shop",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "0165"
+   ],
+   "reglas_de_mapeo": 4,
+   "historico": {
+    "2024": 9342.0,
+    "2025": 22333.59,
+    "2026": 23600.04
+   },
+   "referencia_usd": 22333.59,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "COS_RETAIL",
+   "nombre": "Gift Shop Cost",
+   "seccion": "COST OF SALES",
+   "donde_se_carga": "Costos",
+   "pantalla": "/costs",
+   "departamentos": [
+    "0165"
+   ],
+   "reglas_de_mapeo": 6,
+   "historico": {
+    "2024": 0.0,
+    "2025": 14213.82,
+    "2026": 17403.21
+   },
+   "referencia_usd": 14213.82,
+   "referencia_anio": 2025
+  },
+  {
+   "line_code": "REV_MISC_OTHER",
+   "nombre": "Other / Misc Revenue",
+   "seccion": "REVENUES",
+   "donde_se_carga": "Ingresos",
+   "pantalla": "/revenue",
+   "departamentos": [
+    "280"
+   ],
+   "reglas_de_mapeo": 9,
+   "historico": {
+    "2024": 0.0,
+    "2025": 5666.01,
+    "2026": 108931.26
+   },
+   "referencia_usd": 5666.01,
+   "referencia_anio": 2025
+  }
+ ]
+}

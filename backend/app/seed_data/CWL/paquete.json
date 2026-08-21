@@ -1,0 +1,22 @@
+{
+  "FOOD": {
+    "rate_per_pax_night": "108.0000",
+    "is_commissionable": true,
+    "bev_food_ratio": "0.3400"
+  },
+  "ACTIVITIES": {
+    "rate_per_pax_night": "101.0000",
+    "is_commissionable": true,
+    "bev_food_ratio": null
+  },
+  "TRANSPORT": {
+    "rate_per_pax_night": "35.0000",
+    "is_commissionable": true,
+    "bev_food_ratio": null
+  },
+  "SUSTAINABILITY": {
+    "rate_per_pax_night": "28.0000",
+    "is_commissionable": false,
+    "bev_food_ratio": null
+  }
+}

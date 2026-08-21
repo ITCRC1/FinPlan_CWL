@@ -1,0 +1,3580 @@
+{
+ "_nota": [
+  "El ORDEN de la plantilla del Detalle, tal como lo mando el owner",
+  "(ORDEN PARA EL UPLOAD.xlsx, 2026-08-14).",
+  "",
+  "Es una LISTA y no una regla: el orden de las clases cambia segun el",
+  "departamento (Rooms no tiene costo; en Tours el costo va DESPUES de",
+  "planilla). No hay regla que produzca eso.",
+  "",
+  "Se regenera con `python -m scripts.generar_orden_plantilla <xlsx>`.",
+  "Lo que no este en esta lista sale despues, por departamento y cuenta."
+ ],
+ "orden": [
+  {
+   "dept_code": "0110",
+   "cuenta": "4000",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7080",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7085",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7090",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7095",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7245",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7250",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7255",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7350",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7485",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7525",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7530",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0110",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4110",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4120",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4125",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4130",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4131",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "4132",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5101",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5102",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5103",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5150",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5151",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5152",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5153",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5154",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5155",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5161",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5162",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5163",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5164",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "5165",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7025",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7060",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7080",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7140",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7195",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7235",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7275",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7295",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7300",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7350",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7365",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7375",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7385",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7460",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7485",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7525",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7530",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0120",
+   "cuenta": "7695",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "4201",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "4202",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "4203",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "4250",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "4212",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "5300",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "5301",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7005",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7010",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7260",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7350",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7365",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7525",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7530",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7555",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0140",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "4400",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "4401",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "4402",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "4403",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "6031",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "5350",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "5351",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0150",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "4301",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "4302",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "4303",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "4304",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5203",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5204",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5205",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5206",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5207",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "5208",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0165",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "4400",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "4401",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "4402",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "4403",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "5350",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "5351",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "5352",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0152",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "4500",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "4501",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "4502",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "5500",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "5501",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0155",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "4600",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "4601",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "4602",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "5600",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "5601",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0156",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0162",
+   "cuenta": "4700",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0162",
+   "cuenta": "4701",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0162",
+   "cuenta": "4702",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0162",
+   "cuenta": "5603",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "4500",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "4501",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "4502",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "4503",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "5360",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "5361",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "5362",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "5363",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0205",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4800",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4810",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4820",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4830",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4840",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4850",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4860",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4870",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4880",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "280",
+   "cuenta": "4890",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7015",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7020",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7045",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7050",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7115",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7120",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7145",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7225",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7270",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7325",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7355",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7390",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7465",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7485",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7495",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7510",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7535",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7540",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7545",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0180",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7000",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7075",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7135",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7190",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7205",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7210",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7280",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7360",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7370",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7435",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7440",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7445",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7475",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7485",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7500",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7660",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0190",
+   "cuenta": "7715",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7030",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7070",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7155",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7165",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7170",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7180",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7200",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7215",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7240",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7265",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7290",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7315",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7340",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7345",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7455",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7480",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7555",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7700",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0200",
+   "cuenta": "7705",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "5700",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "5701",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "5702",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "5703",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "5704",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7410",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7415",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7560",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7565",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7570",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7575",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7580",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7585",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7590",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7595",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7600",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7605",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7610",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7615",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7620",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7625",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7630",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7635",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7640",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0230",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7055",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7160",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7230",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7395",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7420",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7550",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0210",
+   "cuenta": "7710",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7100",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7320",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0161",
+   "cuenta": "4900",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "5700",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "5701",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7060",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7140",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7195",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7235",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7275",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7295",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7300",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7350",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7460",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "7695",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0220",
+   "cuenta": "4901",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6000",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6001",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6002",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6003",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6010",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6020",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6021",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6022",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6023",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6024",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6025",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6026",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6027",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6028",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6029",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "6030",
+   "clase": "Payroll"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "5700",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "5701",
+   "clase": "Cost"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7060",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7065",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7105",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7110",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7125",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7140",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7150",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7175",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7185",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7195",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7235",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7275",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7295",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7300",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7310",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7335",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7350",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7380",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7400",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7460",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7490",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7665",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7670",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7675",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7680",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7685",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "7695",
+   "clase": "Opex"
+  },
+  {
+   "dept_code": "0181",
+   "cuenta": "4901",
+   "clase": "Revenue"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8000",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8005",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8015",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8035",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8030",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8045",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8020",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8040",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8025",
+   "clase": "BelowGOP"
+  },
+  {
+   "dept_code": "0250",
+   "cuenta": "8060",
+   "clase": "BelowGOP"
+  }
+ ]
+}

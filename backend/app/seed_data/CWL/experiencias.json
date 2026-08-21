@@ -1,0 +1,334 @@
+[
+  {
+    "name": "Classic Experience Package",
+    "nights": 3,
+    "days": 4,
+    "items": [
+      {
+        "inclusion": "Lodging",
+        "unit": "per room/night",
+        "unit_price": null,
+        "enabled": true,
+        "notes": "",
+        "category": "",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": ""
+      },
+      {
+        "inclusion": "Full Pension (Meals)",
+        "unit": "per pax/night",
+        "unit_price": "126",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Sustainability Fee",
+        "unit": "per pax/night",
+        "unit_price": "0",
+        "enabled": true,
+        "notes": "Per pax per night",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Transport Sierpe/Drake <-> CWL",
+        "unit": "per pax/stay",
+        "unit_price": "150",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Natural juices / coffee / tea",
+        "unit": "per pax/day",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "Lunch & dinner",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Tour San Pedrillo",
+        "unit": "per pax/stay",
+        "unit_price": "168",
+        "enabled": true,
+        "notes": "",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Tour a Cano",
+        "unit": "per pax/stay",
+        "unit_price": "174",
+        "enabled": true,
+        "notes": "Add tour cost per pax",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      }
+    ],
+    "es_base": true
+  },
+  {
+    "name": "VIP Experience Package",
+    "nights": 4,
+    "days": 5,
+    "items": [
+      {
+        "inclusion": "Lodging",
+        "unit": "per room/night",
+        "unit_price": null,
+        "enabled": true,
+        "notes": "",
+        "category": "",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": ""
+      },
+      {
+        "inclusion": "Full Pension (Meals)",
+        "unit": "per pax/night",
+        "unit_price": "126",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Sustainability Fee",
+        "unit": "per pax/night",
+        "unit_price": "0",
+        "enabled": true,
+        "notes": "Per pax per night",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Transport Sierpe/Drake <-> CWL",
+        "unit": "per pax/stay",
+        "unit_price": "150",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Natural juices / coffee / tea",
+        "unit": "per pax/day",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "Lunch & dinner",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Tour San Pedrillo",
+        "unit": "per pax/stay",
+        "unit_price": "168",
+        "enabled": true,
+        "notes": "",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Tour a Cano",
+        "unit": "per pax/stay",
+        "unit_price": "174",
+        "enabled": true,
+        "notes": "Add tour cost per pax",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Cena Privada (setting especial y un menu especial)",
+        "unit": "per pax/dinner",
+        "unit_price": "50",
+        "enabled": false,
+        "notes": "",
+        "category": "",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": ""
+      },
+      {
+        "inclusion": "Claro del Bosque Experience",
+        "unit": "per pax/excursion",
+        "unit_price": "60",
+        "enabled": false,
+        "notes": "",
+        "category": "",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": ""
+      },
+      {
+        "inclusion": "Welcome gift (1 iman por habitacion????)",
+        "unit": "per pax",
+        "unit_price": "2",
+        "enabled": false,
+        "notes": "",
+        "category": "",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": ""
+      }
+    ],
+    "es_base": false
+  },
+  {
+    "name": "Grupo NH 2027 - Inclusions Master (Pre-Tax)",
+    "nights": 3,
+    "days": 4,
+    "items": [
+      {
+        "inclusion": "Full Pension (Meals)",
+        "unit": "per pax/night",
+        "unit_price": "126",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Sustainability Fee",
+        "unit": "per pax/night",
+        "unit_price": "0",
+        "enabled": true,
+        "notes": "Per pax per night",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax*nights"
+      },
+      {
+        "inclusion": "Transport Sierpe/Drake <-> CWL",
+        "unit": "per pax/stay",
+        "unit_price": "150",
+        "enabled": true,
+        "notes": "",
+        "category": "Basic",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Natural juices / coffee / tea",
+        "unit": "per pax/stay",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "Lunch & dinner",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Tour San Pedrillo",
+        "unit": "per pax/stay",
+        "unit_price": "168",
+        "enabled": true,
+        "notes": "",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Preferred seating meals",
+        "unit": "flat/group",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = 1"
+      },
+      {
+        "inclusion": "Cooler for San Pedrillo",
+        "unit": "per pax/stay",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "1 per pax",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Sundowner @ Inspiration Point",
+        "unit": "flat/group",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "Drinks excluded",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = 1"
+      },
+      {
+        "inclusion": "Extra guide for PCN walks",
+        "unit": "flat/group",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = 1"
+      },
+      {
+        "inclusion": "Tour a Cano",
+        "unit": "per pax/stay",
+        "unit_price": "174",
+        "enabled": true,
+        "notes": "Add tour cost per pax",
+        "category": "Add-On",
+        "qty_mult_single": "1",
+        "qty_mult_double": "1",
+        "info": "Base qty = pax"
+      },
+      {
+        "inclusion": "Optional extra boat (Pargo arriba/abajo)",
+        "unit": "flat/service",
+        "unit_price": "0",
+        "enabled": false,
+        "notes": "Taxes excluded",
+        "category": "Optional",
+        "qty_mult_single": "0",
+        "qty_mult_double": "0",
+        "info": "Base qty = 1; set mult=1 when used"
+      }
+    ],
+    "es_base": false
+  }
+]

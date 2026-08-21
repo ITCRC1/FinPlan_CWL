@@ -1,0 +1,42 @@
+{
+  "_nota": [
+    "Las reasignaciones de salario que hace la operacion de Corcovado: UN",
+    "renglon por destino. Es lo que propone el boton «Armar plantilla» de",
+    "Allocations → Salary; no es lo guardado, que vive en",
+    "`salary_allocation_config` por escenario.",
+    "",
+    "Estaba escrita a mano en `frontend/app/allocations/salary/page.tsx`",
+    "(TEMPLATE). Son puestos y departamentos de Corcovado: en otra propiedad no",
+    "existe ninguno, y sin este archivo el boton avisa que no hay plantilla.",
+    "",
+    "POR PUESTO Y NO POR CODIGO. Antes listaba codigos (508, 598, 604...) que",
+    "eran los de la planilla 2026; al cargar el head count 2027 pasaron a",
+    "0113-04, 0150-02, 0152-01... y las cinco reglas quedaron apuntando al vacio",
+    "sin que nada lo dijera. `legacy` es el codigo viejo, de respaldo para abrir",
+    "escenarios anteriores.",
+    "",
+    "`fte` es cuantos FTE del puesto se mueven a ESE destino.",
+    "",
+    "ROOM ATTENDANT decia 2,00 y quedo en 1,00 (2026-08-16). No fue un criterio",
+    "nuevo: el 2,00 venia de la planilla 2026, donde UNA posicion (508 CAMARERO)",
+    "cargaba varios FTE y «2» queria decir «dos camareras». En el head count 2027",
+    "cada camarera es su propia posicion —0113-03 a 0113-15, 1,0000 FTE cada una—",
+    "asi que un 2,00 reasignaba el DOBLE del salario de la posicion elegida. La",
+    "regla guardada en BUDGET Working 2027 ya movia 1,00: la plantilla era la",
+    "desactualizada. Los otros ocho renglones ya coincidian con lo guardado.",
+    "",
+    "El cocinero supervisor del 0122 estuvo en esta lista y el owner lo quito",
+    "del escenario: no se reasigna."
+  ],
+  "reasignaciones": [
+    {"name": "ROOM ATTENDANT",   "legacy": "508", "source": "0113", "target": "0220", "fte": 1.00},
+    {"name": "ADVENTURE GUIDE",  "legacy": "608", "source": "0150", "target": "0183", "fte": 0.50},
+    {"name": "ADVENTURE GUIDE",  "legacy": "608", "source": "0150", "target": "0152", "fte": 0.50},
+    {"name": "BOAT CAPTAIN",     "legacy": "604", "source": "0150", "target": "0183", "fte": 0.50},
+    {"name": "BOAT CAPTAIN",     "legacy": "604", "source": "0150", "target": "0152", "fte": 0.50},
+    {"name": "DRIVER",           "legacy": "612", "source": "0152", "target": "0183", "fte": 1.00},
+    {"name": "PROPERTY SUPPORT", "legacy": "598", "source": "0200", "target": "0150", "fte": 0.34},
+    {"name": "PROPERTY SUPPORT", "legacy": "598", "source": "0200", "target": "0152", "fte": 0.33},
+    {"name": "PROPERTY SUPPORT", "legacy": "598", "source": "0200", "target": "0183", "fte": 0.33}
+  ]
+}

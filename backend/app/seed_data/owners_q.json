@@ -1,0 +1,1665 @@
+{
+ "report_lines": [
+  {
+   "report_key": "owners_q",
+   "row_no": 9,
+   "report_code": "STAT_ROOMS_AVAILABLE",
+   "label": "Rooms Available",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "dias_periodo * habitaciones_disponibles",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "int",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 10,
+   "report_code": "STAT_ROOMS_OCCUPIED",
+   "label": "Rooms Occupied",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "room_nights vendidas",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "int",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 11,
+   "report_code": "STAT_ADR",
+   "label": "ADR ($) ",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "SUM(REV_ROOMS) / f10  (excluye REV_ROOMS_OTHER — ver D1)",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 12,
+   "report_code": "STAT_OCC",
+   "label": "Occ%",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "f10 / f9",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "pct",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 13,
+   "report_code": "STAT_REVPAR",
+   "label": "RevPar ($) ",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "f16 / f9",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 14,
+   "report_code": "STAT_TOTAL_REVPAR",
+   "label": "Total RevPar",
+   "indent": 1,
+   "line_type": "STAT",
+   "nature": "stat",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "f21 / f9",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 15,
+   "report_code": "HDR_OPERATING_REVENUE",
+   "label": "OPERATING REVENUE",
+   "indent": 1,
+   "line_type": "HEADER",
+   "nature": "header",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 16,
+   "report_code": "REV_ROOMS_TOTAL",
+   "label": "ROOMS REVENUE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [
+    "REV_ROOMS",
+    "REV_ROOMS_OTHER"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 17,
+   "report_code": "REV_FB_TOTAL",
+   "label": "FOOD & BEVERAGE REVENUE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [
+    "REV_FB",
+    "REV_FB_BEV",
+    "REV_FB_MISC",
+    "REV_PRIVATE_BAR"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 18,
+   "report_code": "REV_OOD_TOTAL",
+   "label": "OTHER OPERATED DEPTS REVENUE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [
+    "REV_SPA",
+    "REV_TOURS",
+    "REV_TIENDA",
+    "REV_RETAIL",
+    "REV_TRANSPORTATION",
+    "REV_LAUNDRY",
+    "REV_CLUB",
+    "REV_INNOCEANA",
+    "REV_CROWTHER_LAB",
+    "REV_AREC",
+    "REV_CLARO_HUERTA"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 19,
+   "report_code": "REV_MISC_TOTAL",
+   "label": "MISCELLANEOUS INCOME",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [
+    "REV_MISC_OTHER",
+    "REV_SUSTAINABILITY"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "+ residual de naturaleza Revenue sin regla activa",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 20,
+   "report_code": "REV_FAIR_TRADE",
+   "label": "(Less) FAIR TRADE PRICING",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "sin reglas en CWL -> 0",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 21,
+   "report_code": "TOT_OPERATING_REVENUE",
+   "label": "TOTAL OPERATING REVENUE",
+   "indent": 1,
+   "line_type": "SUBTOTAL",
+   "nature": "revenue",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "REV_ROOMS_TOTAL",
+     "sign": 1
+    },
+    {
+     "code": "REV_FB_TOTAL",
+     "sign": 1
+    },
+    {
+     "code": "REV_OOD_TOTAL",
+     "sign": 1
+    },
+    {
+     "code": "REV_MISC_TOTAL",
+     "sign": 1
+    },
+    {
+     "code": "REV_FAIR_TRADE",
+     "sign": 1
+    }
+   ],
+   "formula_nota": "f16+f17+f18+f19+f20",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 22,
+   "report_code": "HDR_DEPARTMENTAL_EXPENSES",
+   "label": "DEPARTMENTAL EXPENSES",
+   "indent": 1,
+   "line_type": "HEADER",
+   "nature": "header",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 23,
+   "report_code": "EXP_ROOMS",
+   "label": "ROOMS EXPENSES",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OPEX_ROOMS"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 24,
+   "report_code": "EXP_FB",
+   "label": "FOOD & BEVERAGE EXPENSES",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OPEX_FB",
+    "COS_FB_FOOD",
+    "COS_FB_BEV",
+    "COS_FB_MISC",
+    "OPEX_PRIVATE_BAR",
+    "COS_PRIVATE_BAR"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 25,
+   "report_code": "EXP_OOD",
+   "label": "OTHER OPERATED DEPTS EXPENSE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OPEX_SPA",
+    "COS_SPA",
+    "OPEX_TOURS",
+    "COS_TOURS",
+    "OPEX_TIENDA",
+    "COS_TIENDA",
+    "OPEX_RETAIL",
+    "COS_RETAIL",
+    "OPEX_TRANSPORTATION",
+    "COS_TRANSPORTATION",
+    "OPEX_LAUNDRY",
+    "COS_LAUNDRY",
+    "OPEX_CLUB",
+    "COS_CLUB",
+    "OPEX_INNOCEANA",
+    "COS_INNOCEANA",
+    "OPEX_CROWTHER_LAB",
+    "COS_CROWTHER_LAB"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 26,
+   "report_code": "TOT_DEPARTMENTAL_EXPENSES",
+   "label": "TOTAL DEPARTMENTAL EXPENSES",
+   "indent": 1,
+   "line_type": "SUBTOTAL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "EXP_ROOMS",
+     "sign": 1
+    },
+    {
+     "code": "EXP_FB",
+     "sign": 1
+    },
+    {
+     "code": "EXP_OOD",
+     "sign": 1
+    }
+   ],
+   "formula_nota": "f23+f24+f25",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 27,
+   "report_code": "TOT_DEPARTMENTAL_PROFIT",
+   "label": "TOTAL DEPARTMENTAL PROFIT",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "TOT_OPERATING_REVENUE",
+     "sign": 1
+    },
+    {
+     "code": "TOT_DEPARTMENTAL_EXPENSES",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f21-f26",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 28,
+   "report_code": "HDR_UNDISTRIBUTED",
+   "label": "UNDISTRIBUTED OPERATING EXPENSES",
+   "indent": 1,
+   "line_type": "HEADER",
+   "nature": "header",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 29,
+   "report_code": "UND_AG",
+   "label": "A&G EXPENSES (excl CC & ESDG)",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_ADMIN",
+    "OH_CAFETERIA",
+    "COH_CAFETERIA",
+    "OH_LAUNDRY",
+    "OH_AREC",
+    "COH_AREC",
+    "OH_CLARO_HUERTA",
+    "COH_CLARO_HUERTA"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "excluye OH_CC_COMMISSIONS desde v2 del mapping",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 30,
+   "report_code": "UND_CC_COMMISSIONS",
+   "label": "CREDIT CARD COMMISSIONS",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_CC_COMMISSIONS"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "linea nueva: cuenta 7120 depto 180 — ver D9",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 31,
+   "report_code": "UND_ESDG",
+   "label": "EVERY STAY DOES GOOD",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "programa SCP no aplicable a CWL -> 0",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 32,
+   "report_code": "UND_IT",
+   "label": "INFORMATION & TECHNOLOGY",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_INFORMATION_SYSTEM",
+    "COH_INFORMATION_SYSTEM"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 33,
+   "report_code": "UND_SALES_MARKETING",
+   "label": "SALES & MARKETING EXPENSES",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_SALES_MARKETING"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 34,
+   "report_code": "UND_POM",
+   "label": "PROPERTY OPERATIONS & MAINTENANCE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_MAINTENANCE"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 35,
+   "report_code": "UND_UTILITIES",
+   "label": "UTILITIES EXPENSE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OH_UTILITIES"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 36,
+   "report_code": "UND_MISC",
+   "label": "MISCELLANEOUS EXPENSE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "residual de naturaleza Expense sin regla activa",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 37,
+   "report_code": "TOT_UNDISTRIBUTED",
+   "label": "TOTAL UNDISTRIBUTED OPERATING EXPENSES",
+   "indent": 1,
+   "line_type": "SUBTOTAL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "UND_AG",
+     "sign": 1
+    },
+    {
+     "code": "UND_CC_COMMISSIONS",
+     "sign": 1
+    },
+    {
+     "code": "UND_ESDG",
+     "sign": 1
+    },
+    {
+     "code": "UND_IT",
+     "sign": 1
+    },
+    {
+     "code": "UND_SALES_MARKETING",
+     "sign": 1
+    },
+    {
+     "code": "UND_POM",
+     "sign": 1
+    },
+    {
+     "code": "UND_UTILITIES",
+     "sign": 1
+    },
+    {
+     "code": "UND_MISC",
+     "sign": 1
+    }
+   ],
+   "formula_nota": "f29+f30+f31+f32+f33+f34+f35+f36",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 38,
+   "report_code": "GOP",
+   "label": "GROSS OPERATING PROFIT",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "TOT_DEPARTMENTAL_PROFIT",
+     "sign": 1
+    },
+    {
+     "code": "TOT_UNDISTRIBUTED",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f27-f37",
+   "nota": "",
+   "estilo": {
+    "resalte": "total",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 39,
+   "report_code": "MANAGEMENT_FEES",
+   "label": "MANAGEMENT FEES",
+   "indent": 1,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "MGMT_FEE_3",
+    "MGMT_FEE_5_ROYALTIES"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "MGMT_FEE_5_ROYALTIES inactiva (Estado=NO)",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 40,
+   "report_code": "INCOME_BEFORE_NONOP",
+   "label": "INCOME BEFORE NON-OP INC & EXP",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "GOP",
+     "sign": 1
+    },
+    {
+     "code": "MANAGEMENT_FEES",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f38-f39",
+   "nota": "",
+   "estilo": {
+    "resalte": "total",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 41,
+   "report_code": "NONOP_INCOME",
+   "label": "NON-OP INCOME",
+   "indent": 1,
+   "line_type": "DETAIL",
+   "nature": "revenue",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "sin reglas -> 0",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 42,
+   "report_code": "HDR_NONOP_EXPENSES",
+   "label": "NON-OP EXPENSES",
+   "indent": 1,
+   "line_type": "HEADER",
+   "nature": "header",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 43,
+   "report_code": "NONOP_RENT",
+   "label": "RENT EXPENSE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "RENT",
+    "LEASINGS_RENTS"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "ver D6 y hallazgo cuenta 8030",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 44,
+   "report_code": "NONOP_PROPERTY_TAXES",
+   "label": "PROPERTY AND OTHER TAXES",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "sin reglas -> 0",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 45,
+   "report_code": "NONOP_INSURANCE",
+   "label": "INSURANCE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "PROPERTY_INSURANCE"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 46,
+   "report_code": "NONOP_OTHER",
+   "label": "OTHER NON OP EXPENSE",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "OTHER_EXPENSES"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "D7 RESUELTO: FINANCIAL_LOSSES se fue a la fila 52. Queda OTHER_EXPENSES.",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 47,
+   "report_code": "TOT_NONOP_EXPENSES",
+   "label": "TOTAL NON-OP EXPENSES",
+   "indent": 1,
+   "line_type": "SUBTOTAL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "NONOP_RENT",
+     "sign": 1
+    },
+    {
+     "code": "NONOP_PROPERTY_TAXES",
+     "sign": 1
+    },
+    {
+     "code": "NONOP_INSURANCE",
+     "sign": 1
+    },
+    {
+     "code": "NONOP_OTHER",
+     "sign": 1
+    }
+   ],
+   "formula_nota": "f43+f44+f45+f46",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 48,
+   "report_code": "EBITDA",
+   "label": "EBITDA",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "INCOME_BEFORE_NONOP",
+     "sign": 1
+    },
+    {
+     "code": "NONOP_INCOME",
+     "sign": 1
+    },
+    {
+     "code": "TOT_NONOP_EXPENSES",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f40+f41-f47",
+   "nota": "",
+   "estilo": {
+    "resalte": "total",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "thin",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 49,
+   "report_code": "OWNER_EXPENSES_CAPITAL",
+   "label": "OWNER EXPENSES (Capital 4%)",
+   "indent": 1,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "CAPITAL_RESERVE"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 50,
+   "report_code": "ASSET_PROJECT_MGMT_FEES",
+   "label": "ASSET/PROJECT MGMT FEES",
+   "indent": 1,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "sin reglas -> 0",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 51,
+   "report_code": "ADJUSTED_EBITDA",
+   "label": "Total ADJUSTED EBITDA",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "EBITDA",
+     "sign": 1
+    },
+    {
+     "code": "OWNER_EXPENSES_CAPITAL",
+     "sign": -1
+    },
+    {
+     "code": "ASSET_PROJECT_MGMT_FEES",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f48-f49-f50",
+   "nota": "",
+   "estilo": {
+    "resalte": "total",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "double",
+    "sangria_espacios": 2,
+    "alto": 16.5
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 52,
+   "report_code": "INTEREST_EXPENSE",
+   "label": "INTEREST EXPENSE",
+   "indent": 1,
+   "line_type": "DETAIL",
+   "nature": "signed",
+   "lineas_pl": [
+    "BANK_INTEREST",
+    "FINANCIAL_LOSSES"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "con signo natural; NUNCA se invierte. D7 RESUELTO: incluye FINANCIAL_LOSSES (diferencial cambiario) — verificado contra el fixture en PTD y YTD de la columna Prior Year.",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "double",
+    "bottom": "thin",
+    "sangria_espacios": 2,
+    "alto": 16.5
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 53,
+   "report_code": "HDR_DA",
+   "label": "DEPRECIATION & AMORTIZATION EXPENSE",
+   "indent": 1,
+   "line_type": "HEADER",
+   "nature": "header",
+   "lineas_pl": [],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 54,
+   "report_code": "DEPRECIATION",
+   "label": "Depreciation",
+   "indent": 2,
+   "line_type": "DETAIL",
+   "nature": "expense",
+   "lineas_pl": [
+    "DEPRECIATION"
+   ],
+   "operandos": [],
+   "formula_nota": "",
+   "nota": "",
+   "estilo": {
+    "resalte": "",
+    "formato": "money",
+    "top": "",
+    "bottom": "",
+    "sangria_espacios": 4,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 55,
+   "report_code": "TOT_DA",
+   "label": "Total DEPRECIATION & AMORTIZATION EXPENSE",
+   "indent": 1,
+   "line_type": "SUBTOTAL",
+   "nature": "expense",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "DEPRECIATION",
+     "sign": 1
+    }
+   ],
+   "formula_nota": "f54",
+   "nota": "",
+   "estilo": {
+    "resalte": "subtotal",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "thin",
+    "sangria_espacios": 2,
+    "alto": 15.75
+   }
+  },
+  {
+   "report_key": "owners_q",
+   "row_no": 56,
+   "report_code": "NET_INCOME_BEFORE_TAXES",
+   "label": "Total NET INCOME BEFORE TAXES",
+   "indent": 1,
+   "line_type": "CALC",
+   "nature": "profit",
+   "lineas_pl": [],
+   "operandos": [
+    {
+     "code": "ADJUSTED_EBITDA",
+     "sign": 1
+    },
+    {
+     "code": "INTEREST_EXPENSE",
+     "sign": 1
+    },
+    {
+     "code": "TOT_DA",
+     "sign": -1
+    }
+   ],
+   "formula_nota": "f51+f52-f55",
+   "nota": "",
+   "estilo": {
+    "resalte": "total",
+    "formato": "money",
+    "top": "thin",
+    "bottom": "double",
+    "sangria_espacios": 2,
+    "alto": 16.5
+   }
+  }
+ ],
+ "report_line_mapping": [
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_ROOMS",
+   "report_code": "REV_ROOMS_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_ROOMS_OTHER",
+   "report_code": "REV_ROOMS_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_FB",
+   "report_code": "REV_FB_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_FB_BEV",
+   "report_code": "REV_FB_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_FB_MISC",
+   "report_code": "REV_FB_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_PRIVATE_BAR",
+   "report_code": "REV_FB_TOTAL",
+   "nota": "MEDIA — D2"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_AREC",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_CLARO_HUERTA",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_CLUB",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_CROWTHER_LAB",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_INNOCEANA",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_LAUNDRY",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_RETAIL",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_SPA",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_TIENDA",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_TOURS",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_TRANSPORTATION",
+   "report_code": "REV_OOD_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_MISC_OTHER",
+   "report_code": "REV_MISC_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "REV_SUSTAINABILITY",
+   "report_code": "REV_MISC_TOTAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_ROOMS",
+   "report_code": "EXP_ROOMS",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_FB_BEV",
+   "report_code": "EXP_FB",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_FB_FOOD",
+   "report_code": "EXP_FB",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_FB_MISC",
+   "report_code": "EXP_FB",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_PRIVATE_BAR",
+   "report_code": "EXP_FB",
+   "nota": "MEDIA — D2"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_FB",
+   "report_code": "EXP_FB",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_PRIVATE_BAR",
+   "report_code": "EXP_FB",
+   "nota": "MEDIA — D2"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_CLUB",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_CROWTHER_LAB",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_INNOCEANA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_LAUNDRY",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_RETAIL",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_SPA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_TIENDA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_TOURS",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COS_TRANSPORTATION",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_CLUB",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_CROWTHER_LAB",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_INNOCEANA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_LAUNDRY",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_RETAIL",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_SPA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_TIENDA",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_TOURS",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OPEX_TRANSPORTATION",
+   "report_code": "EXP_OOD",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COH_AREC",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COH_CAFETERIA",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D4"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COH_CLARO_HUERTA",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_ADMIN",
+   "report_code": "UND_AG",
+   "nota": "ALTA (v2: se le quita la cuenta 7120)"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_AREC",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_CAFETERIA",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D4"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_CLARO_HUERTA",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D3"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_LAUNDRY",
+   "report_code": "UND_AG",
+   "nota": "MEDIA — D5"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_CC_COMMISSIONS",
+   "report_code": "UND_CC_COMMISSIONS",
+   "nota": "NUEVA v2 — cuenta 7120 depto 180 (D9 resuelto)"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "COH_INFORMATION_SYSTEM",
+   "report_code": "UND_IT",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_INFORMATION_SYSTEM",
+   "report_code": "UND_IT",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_SALES_MARKETING",
+   "report_code": "UND_SALES_MARKETING",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_MAINTENANCE",
+   "report_code": "UND_POM",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OH_UTILITIES",
+   "report_code": "UND_UTILITIES",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "MGMT_FEE_3",
+   "report_code": "MANAGEMENT_FEES",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "MGMT_FEE_5_ROYALTIES",
+   "report_code": "MANAGEMENT_FEES",
+   "nota": "ALTA (regla inactiva)"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "LEASINGS_RENTS",
+   "report_code": "NONOP_RENT",
+   "nota": "MEDIA — D6"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "RENT",
+   "report_code": "NONOP_RENT",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "PROPERTY_INSURANCE",
+   "report_code": "NONOP_INSURANCE",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "FINANCIAL_LOSSES",
+   "report_code": "INTEREST_EXPENSE",
+   "nota": "D7 RESUELTO por evidencia numerica: fila 52, no 46"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "OTHER_EXPENSES",
+   "report_code": "NONOP_OTHER",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "CAPITAL_RESERVE",
+   "report_code": "OWNER_EXPENSES_CAPITAL",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "BANK_INTEREST",
+   "report_code": "INTEREST_EXPENSE",
+   "nota": "ALTA"
+  },
+  {
+   "report_key": "owners_q",
+   "linea_pl": "DEPRECIATION",
+   "report_code": "DEPRECIATION",
+   "nota": "ALTA"
+  }
+ ]
+}

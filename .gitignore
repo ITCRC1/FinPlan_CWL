@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+
+# Alembic (keep versions, ignore cache)
+backend/alembic/__pycache__/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Data files — originals stay in data/raw
+data/processed/
+
+# Excel temp
+~$*.xlsx
+
+# Plantillas de salarios generadas a mano (nunca fueron parte del build)
+salarios_*.xlsx
+cantidades_*.xlsx
+
+# IDE
+.vscode/
+.idea/
+
+.vercel
+
+# Backups
+*.bak
+.next-check/
+
+# Salida de las verificaciones independientes (se regenera al correrlas)
+backend/scripts/_verif_salida.json

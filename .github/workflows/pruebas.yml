@@ -1,0 +1,73 @@
+# Las pruebas se corren solas en cada push.
+#
+# Por qué existe (2026-08-14): `revenue_api` usó `HOTEL_ID` sin importarlo y el
+# error vivió un día entero en producción rompiendo dos pantallas — con las 836
+# pruebas en verde, porque nadie las corrió después del push. Una prueba que
+# nadie ejecuta no protege nada.
+#
+# No toca la base ni despliega: Railway y Vercel siguen igual. Esto solo mira.
+name: pruebas
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: backend · pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: instalar dependencias
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Sin DATABASE_URL: `app/db.py` trae un default y las pruebas que sí
+      # necesitan base están marcadas y se saltan solas. Poner una falsa haría
+      # que fallaran por conexión en vez de saltarse.
+      - name: pruebas
+        working-directory: backend
+        run: python -m pytest -q
+
+  frontend:
+    name: frontend · tipos y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 / npm 11 — el mismo con el que se escribio `package-lock.json`.
+      # Con Node 20 (npm 10) `npm ci` falla con «Missing: @swc/helpers@0.5.23 from
+      # lock file»: npm 10 y npm 11 resuelven distinto un peer OPCIONAL de
+      # @swc/core, asi que el mismo lockfile es valido para uno e invalido para el
+      # otro. El lockfile no esta mal — `npm ci` pasa limpio en local.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      # El typecheck primero: es rápido y da el error entendible. El build
+      # después, porque atrapa lo que el typecheck no ve (imports que no
+      # resuelven, páginas que revientan al pre-renderizar).
+      - name: typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: build
+        working-directory: frontend
+        run: npm run build

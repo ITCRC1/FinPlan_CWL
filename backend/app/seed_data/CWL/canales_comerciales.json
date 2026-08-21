@@ -1,0 +1,83 @@
+{
+  "_nota": [
+    "Los canales comerciales y su comision, tal como el owner los mando",
+    "(2026-08-14) desde su app de Compensacion.",
+    "",
+    "`entrada` dice POR DONDE entro la reserva — lo unico que Opera puede saber.",
+    "Vacio significa que ese canal describe QUIEN la trajo, y eso el PMS no lo",
+    "registra: una reserva con market code DIR puede haber entrado por telefono,",
+    "haberla traido la ejecutiva o venir de CRC, y el codigo es el mismo.",
+    "",
+    "Por eso no se deriva del market code. Derivarlo seria adivinar quien vendio,",
+    "y eso paga comisiones equivocadas mientras el total sigue cuadrando.",
+    "",
+    "`mix_pct` es el mix BASE: el que aplica cuando nadie dijo otra cosa, y el que hace que un escenario nuevo nazca bien. La excepcion por escenario o por mes vive en `canal_mix_escenario`. La suma tiene que dar 1.",
+    "",
+    "`rueda_a` dice a que canal de COMISION rueda cada sub-canal. Es explicito a proposito: antes se deducia de `entrada` con un diccionario en el codigo que tenia DIRECT de default, asi que un canal nuevo rodaba a DIRECT en silencio — 9,27% de comision en vez del 30% de TA, o sea ingreso de MAS."
+  ],
+  "canales": [
+    {
+      "code": "B2B",
+      "nombre": "B2B — agency / DMC / TO",
+      "comision_pct": 0.3,
+      "entrada": "Travel Agent",
+      "orden": 1,
+      "mix_pct": 0.55,
+      "rueda_a": "TA"
+    },
+    {
+      "code": "DIR_WEB",
+      "nombre": "Direct — website / booking engine",
+      "comision_pct": 0.1,
+      "entrada": "Website",
+      "orden": 2,
+      "mix_pct": 0.15,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "DIR_TEL",
+      "nombre": "Direct — phone / email / social",
+      "comision_pct": 0.07,
+      "entrada": "Direct Client",
+      "orden": 3,
+      "mix_pct": 0.1,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "CRC_DIRECT",
+      "nombre": "Costa Rica Collection direct",
+      "comision_pct": 0.1,
+      "entrada": "",
+      "orden": 4,
+      "mix_pct": 0.07,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "DIR_GROUPS",
+      "nombre": "Direct groups",
+      "comision_pct": 0.1,
+      "entrada": "",
+      "orden": 5,
+      "mix_pct": 0.06,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "EXEC_DIRECT",
+      "nombre": "Executive personal direct",
+      "comision_pct": 0.1,
+      "entrada": "",
+      "orden": 6,
+      "mix_pct": 0.03,
+      "rueda_a": "DIRECT"
+    },
+    {
+      "code": "OTA",
+      "nombre": "OTA",
+      "comision_pct": 0.0,
+      "entrada": "OTA",
+      "orden": 7,
+      "mix_pct": 0.04,
+      "rueda_a": "OTA"
+    }
+  ]
+}

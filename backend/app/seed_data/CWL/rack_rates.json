@@ -1,0 +1,890 @@
+{
+  "_nota": [
+    "Tarifario RACK de referencia para negociar grupos.",
+    "",
+    "Decision del owner (2026-08-19): «la realidad debe ser Forecast 2026»,",
+    "y «toma 2027 como validos en una tabla de rack rates y yo los edito».",
+    "Estos 96 valores son una COPIA del Budget Working 2027 —el unico",
+    "escenario que tiene tarifario— para arrancar con algo real. Se editan en",
+    "la pantalla del modulo y el seed NO los pisa.",
+    "",
+    "⚠️ Esta tabla NO mueve ningun P&L, y es a proposito. El modulo mide costo",
+    "por unidad fisica; el precio entra solo como TECHO de la negociacion",
+    "(spec §1: ningun piso puede depender del precio). Si estas tarifas",
+    "vivieran en `rate_cards` del escenario, editarlas moveria el ingreso del",
+    "Forecast 2026 —la base validada del modulo— y el piso se movereia solo.",
+    "",
+    "⚠️ La llave es `room_type_code`, no el nombre: el codigo es fijo por",
+    "categoria y el nombre es una etiqueta que se puede renombrar.",
+    "",
+    "⚠️ El rack CAMBIA mes a mes (7 valores distintos por tipo) y baja en",
+    "temporada baja justo cuando el piso sube. Por eso son 12 columnas y no",
+    "tres temporadas: promediarlas taparia exactamente el mes que duele."
+  ],
+  "tarifas": [
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 1,
+      "rack": "839.5200",
+      "neto": "669.1000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 2,
+      "rack": "825.0000",
+      "neto": "657.5200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 3,
+      "rack": "825.0000",
+      "neto": "657.5200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 4,
+      "rack": "737.5000",
+      "neto": "587.7900",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 5,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 6,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 7,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 8,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 9,
+      "rack": "600.0000",
+      "neto": "478.2000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 10,
+      "rack": "600.0000",
+      "neto": "478.2000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 11,
+      "rack": "625.0000",
+      "neto": "498.1200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL01",
+      "nombre": "Deluxe King",
+      "orden": 1,
+      "mes": 12,
+      "rack": "775.8100",
+      "neto": "618.3200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 1,
+      "rack": "839.5200",
+      "neto": "669.1000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 2,
+      "rack": "825.0000",
+      "neto": "657.5200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 3,
+      "rack": "825.0000",
+      "neto": "657.5200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 4,
+      "rack": "737.5000",
+      "neto": "587.7900",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 5,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 6,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 7,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 8,
+      "rack": "650.0000",
+      "neto": "518.0500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 9,
+      "rack": "600.0000",
+      "neto": "478.2000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 10,
+      "rack": "600.0000",
+      "neto": "478.2000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 11,
+      "rack": "625.0000",
+      "neto": "498.1200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI02",
+      "nombre": "Carate Double",
+      "orden": 2,
+      "mes": 12,
+      "rack": "775.8100",
+      "neto": "618.3200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 1,
+      "rack": "596.1300",
+      "neto": "475.1200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 2,
+      "rack": "585.0000",
+      "neto": "466.2400",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 3,
+      "rack": "585.0000",
+      "neto": "466.2400",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 4,
+      "rack": "517.5000",
+      "neto": "412.4500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 5,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 6,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 7,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 8,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 9,
+      "rack": "400.0000",
+      "neto": "318.8000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 10,
+      "rack": "400.0000",
+      "neto": "318.8000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 11,
+      "rack": "425.0000",
+      "neto": "338.7200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "PO03",
+      "nombre": "Agujas Queen",
+      "orden": 3,
+      "mes": 12,
+      "rack": "546.7700",
+      "neto": "435.7800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 1,
+      "rack": "596.1300",
+      "neto": "475.1200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 2,
+      "rack": "585.0000",
+      "neto": "466.2400",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 3,
+      "rack": "585.0000",
+      "neto": "466.2400",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 4,
+      "rack": "517.5000",
+      "neto": "412.4500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 5,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 6,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 7,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 8,
+      "rack": "450.0000",
+      "neto": "358.6500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 9,
+      "rack": "400.0000",
+      "neto": "318.8000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 10,
+      "rack": "400.0000",
+      "neto": "318.8000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 11,
+      "rack": "425.0000",
+      "neto": "338.7200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "RO04",
+      "nombre": "Sirena Suites",
+      "orden": 4,
+      "mes": 12,
+      "rack": "546.7700",
+      "neto": "435.7800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 1,
+      "rack": "1219.3500",
+      "neto": "971.8200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 2,
+      "rack": "1200.0000",
+      "neto": "956.4000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 3,
+      "rack": "1200.0000",
+      "neto": "956.4000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 4,
+      "rack": "1125.0000",
+      "neto": "896.6200",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 5,
+      "rack": "1050.0000",
+      "neto": "836.8500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 6,
+      "rack": "1050.0000",
+      "neto": "836.8500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 7,
+      "rack": "1050.0000",
+      "neto": "836.8500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 8,
+      "rack": "1050.0000",
+      "neto": "836.8500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 9,
+      "rack": "850.0000",
+      "neto": "677.4500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 10,
+      "rack": "850.0000",
+      "neto": "677.4500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 11,
+      "rack": "950.0000",
+      "neto": "757.1500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BI05",
+      "nombre": "Treehouse",
+      "orden": 5,
+      "mes": 12,
+      "rack": "1185.4800",
+      "neto": "944.8300",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 1,
+      "rack": "1516.9400",
+      "neto": "1209.0000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 2,
+      "rack": "1500.0000",
+      "neto": "1195.5000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 3,
+      "rack": "1500.0000",
+      "neto": "1195.5000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 4,
+      "rack": "1437.5000",
+      "neto": "1145.6900",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 5,
+      "rack": "1375.0000",
+      "neto": "1095.8800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 6,
+      "rack": "1375.0000",
+      "neto": "1095.8800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 7,
+      "rack": "1375.0000",
+      "neto": "1095.8800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 8,
+      "rack": "1375.0000",
+      "neto": "1095.8800",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 9,
+      "rack": "1150.0000",
+      "neto": "916.5500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 10,
+      "rack": "1150.0000",
+      "neto": "916.5500",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 11,
+      "rack": "1262.5000",
+      "neto": "1006.2100",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "BL06",
+      "nombre": "5 Elements",
+      "orden": 6,
+      "mes": 12,
+      "rack": "1491.1300",
+      "neto": "1188.4300",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 1,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 2,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 3,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 4,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 5,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 6,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 7,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 8,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 9,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 10,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 11,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH07",
+      "nombre": "Nueva categoría",
+      "orden": 7,
+      "mes": 12,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 1,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 2,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 3,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 4,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 5,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 6,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 7,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 8,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 9,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 10,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 11,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    },
+    {
+      "room_type_code": "SH08",
+      "nombre": "Residencia",
+      "orden": 8,
+      "mes": 12,
+      "rack": "1700.0000",
+      "neto": "1354.9000",
+      "pax": "1.8000"
+    }
+  ]
+}

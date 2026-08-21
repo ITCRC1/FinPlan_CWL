@@ -1,0 +1,17 @@
+[
+  {
+    "channel": "TA",
+    "mix_pct": "0.600000",
+    "commission_pct": "0.280000"
+  },
+  {
+    "channel": "OTA",
+    "mix_pct": "0.050000",
+    "commission_pct": "0.200000"
+  },
+  {
+    "channel": "DIRECT",
+    "mix_pct": "0.350000",
+    "commission_pct": "0.000000"
+  }
+]

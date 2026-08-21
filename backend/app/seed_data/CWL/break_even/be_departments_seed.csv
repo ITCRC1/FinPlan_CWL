@@ -1,0 +1,23 @@
+slug,name,display_order,generates_revenue,dept_codes,status
+rooms,Rooms,1,true,"0110,0115,0116",active
+fb,F&B,2,true,0120,active
+spa,Spa,3,true,0140,active
+tours,Tours,4,true,0150,active
+gift-shop,Gift Shop,5,true,0165,active
+transportation,Transportation,6,true,0152,active
+innoceana,Innoceana,7,true,0155,active
+laundry,Laundry,8,true,"0161,0162",active
+ag,A&G,9,false,"0180,0181,0184",active
+sales-marketing,Sales & Marketing,10,false,0190,active
+maintenance,Maintenance,11,false,0200,active
+information-system,Information System,12,false,0230,active
+utility,Utility,13,false,0210,active
+property-expenses,Property Expenses,14,false,0250,active
+private-bar,Private Bar,15,true,0121,pending_classification
+tienda,Tienda,16,true,0151,pending_classification
+crowther-lab,Crowther Lab,17,true,0156,pending_classification
+claro-huerta,Claro Huerta,18,true,0205,pending_classification
+cafeteria,Cafetería,19,false,0220,pending_classification
+club-madresal,Club Madresal,20,true,260,pending_classification
+area-recreativa,Área Recreativa,21,true,270,pending_classification
+miscelaneos,Misceláneos,22,true,280,pending_classification

@@ -1,0 +1,36 @@
+{
+  "_nota": [
+    "Las tarifas que usa el boton «Llenar desde drivers» del Revenue Checkbook.",
+    "Estaban escritas a mano en el frontend (DEFAULT_DRIVER_RATES en",
+    "`frontend/app/revenue/checkbook/page.tsx`) y son el producto de Corcovado:",
+    "el traslado Sierpe/Drake y los tours de San Pedrillo e Isla del Cano. Una",
+    "propiedad sin este archivo abre la pantalla sin tarifas, que es la verdad.",
+    "",
+    "⚠️ NO SON LAS TARIFAS DEL MOTOR. El P&L calcula el paquete con",
+    "`package_configs` (FOOD 108, ACTIVITIES 101, TRANSPORT 35, SUSTAINABILITY",
+    "28, por pax/noche). Estas salen del menu de Experiencias — Full Pension 126,",
+    "San Pedrillo 168 + Cano 174 = 342 por pax/estadia, traslado 150 por",
+    "pax/estadia, fee 30,97. Los dos numeros existen y no dicen lo mismo.",
+    "",
+    "Hoy no mueve un centavo: los 20 escenarios corren con `revenue_source =",
+    "drivers`, o sea que el P&L NO lee el checkbook. Pero apretar el boton,",
+    "Guardar y cambiar la fuente a Checkbook sube el ingreso ~$272.500 en Budget",
+    "Working 2027. Se dejan tal como estaban: cambiarlas es decision del owner,",
+    "no un efecto de mudar el archivo.",
+    "",
+    "`retail_pct` e `innoceana_pct` no tienen casa en la base: REV_RETAIL y",
+    "REV_INNOCEANA se digitan en `revenue_other`. Hoy la base va en 0,83% y",
+    "0,35% del ingreso neto de habitaciones, no en 1,2% y 0,5%."
+  ],
+  "tarifas": {
+    "food": 126,
+    "tours": 342,
+    "transport": 150,
+    "nights_per_stay": 3,
+    "bev_ratio": 34,
+    "retail_pct": 1.2,
+    "innoceana_pct": 0.5,
+    "sust_rate": 30.97,
+    "sust_non_pay": 10
+  }
+}

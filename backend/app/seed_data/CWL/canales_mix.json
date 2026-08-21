@@ -1,0 +1,29 @@
+{
+  "_nota": [
+    "Los canales del reporte de Channel Mix (Market Set del PMS), tal como",
+    "Corcovado los lee. Estaban escritos a mano en `app/models/channel_mix.py`",
+    "(CWL_CHANNELS) y `revenue_api` se los servia a cualquier propiedad.",
+    "",
+    "⚠️ EL NOMBRE ES LA LLAVE Y NO SE MUEVE. Se guarda tal cual en",
+    "`channel_mix_entries.channel`, y el PUT de la grilla escribe POR POSICION.",
+    "Renombrar o reordenar aca deja las noches ya guardadas colgando de un canal",
+    "que ya no existe, o —peor— se las corre al de al lado, y el total del mes",
+    "sigue cuadrando. Agregar al FINAL es seguro; renombrar y reordenar no.",
+    "",
+    "Por eso los endpoints NO se limitan a esta lista: le suman los canales que",
+    "el escenario ya tenga guardados en la base. Si alguien edita este archivo,",
+    "lo viejo se sigue VIENDO en vez de desaparecer sin aviso — que es como esta",
+    "app llego a mostrar 22 departamentos con 38 en la base.",
+    "",
+    "Son CUATRO y los KPI groups de Opera (`market_codes.canal`) son CINCO: aca",
+    "«Direct Client» y «Website» van juntos y «INHOUSE» cae en «Other /",
+    "In-House». Es una agrupacion del owner, no una derivacion — por eso es una",
+    "lista y no se calcula."
+  ],
+  "canales": [
+    "Travel Agency",
+    "Direct Client + Website",
+    "OTA",
+    "Other / In-House"
+  ]
+}

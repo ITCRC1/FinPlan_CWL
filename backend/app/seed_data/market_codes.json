@@ -1,0 +1,28 @@
+{
+  "_nota": [
+    "Los market codes de Opera, tal como el owner los mando (2026-08-14) desde su",
+    "pantalla de Market Codes Mapping.",
+    "",
+    "El CODIGO es la llave y no se mueve. El nombre y el canal se editan en la app.",
+    "",
+    "CORP y GRP vienen SIN canal a proposito: asi los tiene el owner hoy. No se",
+    "adivinan — un market code en el canal equivocado manda noches al lugar",
+    "equivocado y el total sigue cuadrando igual, que es la forma de fallar que",
+    "no avisa. Se muestran vacios y la pantalla los reporta."
+  ],
+  "codigos": [
+    {"code": "BAR",     "nombre": "Best Available Rate",     "canal": "Direct Client", "orden": 1},
+    {"code": "COM",     "nombre": "Complimentary / Courtesy", "canal": "Direct Client", "orden": 2},
+    {"code": "CORP",    "nombre": "Corporativo",              "canal": "",              "orden": 3},
+    {"code": "DIR",     "nombre": "Direct Reservation",       "canal": "Direct Client", "orden": 4},
+    {"code": "FNF",     "nombre": "Friends & Family",         "canal": "Direct Client", "orden": 5},
+    {"code": "GRP",     "nombre": "Grupo",                    "canal": "",              "orden": 6},
+    {"code": "INHOUSE", "nombre": "In-House Guest",           "canal": "INHOUSE",       "orden": 7},
+    {"code": "OTA",     "nombre": "Online Travel Agency",     "canal": "OTA",           "orden": 8},
+    {"code": "SOC",     "nombre": "Social / Special Offer",   "canal": "Direct Client", "orden": 9},
+    {"code": "TA",      "nombre": "Travel Agent",             "canal": "Travel Agent",  "orden": 10},
+    {"code": "TAFIT",   "nombre": "Travel Agent FIT",         "canal": "Travel Agent",  "orden": 11},
+    {"code": "TAGP",    "nombre": "Travel Agent Group",       "canal": "Travel Agent",  "orden": 12},
+    {"code": "WEB",     "nombre": "Website",                  "canal": "Website",       "orden": 13}
+  ]
+}

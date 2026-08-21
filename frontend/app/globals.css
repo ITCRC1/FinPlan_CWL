@@ -1,0 +1,616 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══ TEMAS ═══════════════════════════════════════════════════════════════
+   Owner, 2026-08-19: «no sé qué tan cansado sea estar viendo negro en el
+   fondo… vigilando que si cambia fondo también deben cambiar los colores de
+   las letras».
+
+   Cuatro paletas COMPLETAS. No se cambia el fondo y se deja el resto: cada
+   una trae sus textos, sus bordes y —lo que más se pasa por alto— su verde y
+   su rojo. El #26A69A del tema oscuro sobre un fondo claro queda por debajo
+   del mínimo legible, y las variaciones de la tabla son justo lo que se lee
+   todo el día.
+
+   `:root` = Lino, el que abre por defecto. Una propiedad clonada nueva no
+   necesita configurar nada. Las otras tres son `[data-tema]`, que le gana a
+   `:root` por especificidad sin depender del orden.
+
+   ⚠️ El tema se resuelve en el SERVIDOR (`app/layout.tsx` lee la cookie
+   `finplan_tema`). Aplicarlo con JS después de montar daría un parpadeo en
+   cada carga. Ver `lib/tema.ts`.
+
+   Los acentos NO cambian por tema: son botones de color con texto blanco
+   fijado, y funcionan igual sobre claro y sobre oscuro.
+   ═════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg-base:        #F6F4F1;
+  --bg-surface:     #FDFCFA;
+  --bg-elevated:    #EDEAE5;
+  --hover-velo:     rgba(0, 0, 0, 0.048);
+  --bg-input:       #FDFCFA;
+  --bg-header:      #FDFCFA;
+  --border-subtle:  #E6E2DC;
+  --border-medium:  #D2CDC5;
+  --border-focus:   #2453C4;
+  --text-primary:   #23201C;
+  --text-secondary: #635C53;
+  --text-disabled:  #A29A8F;
+  --text-inverse:   #FDFCFA;
+  --brand:          #2453C4;
+  --brand-hover:    #1C43A5;
+  --positive:       #146B5C;
+  --negative:       #B93A2E;
+  --warning:        #9C6412;
+  --neutral:        #635C53;
+    --nav-bg:         #1F1B16;
+  --nav-borde:      #332C24;
+  --nav-accent:     #8FB0FF;
+  --nav-chip-bg:    #2453C4;
+  --nav-chip-fg:    #FFFFFF;
+--nav-fg:         #CDC6BC;
+  --nav-fg-strong:  #FFFFFF;
+  --nav-fg-dim:     #968D80;
+
+  /* Los controles NATIVOS del navegador —barras de desplazamiento, el
+     desplegable que abre un <select>, el calendario de un <input date>— no
+     miran estos tokens: miran `color-scheme`. Sin declararlo, un tema claro
+     abre con barras oscuras y desplegables negros. */
+  color-scheme: light;
+
+  /* Acentos — iguales en las cuatro paletas (llevan texto blanco propio) */
+  --accent-excel:   #1a6b3c;
+  --accent-xml:     #7b3fb8;
+  --accent-total:   #1b2c57;
+  --accent-budget:  #4472C4;
+}
+
+[data-tema="lino"] {
+  color-scheme: light;
+  --bg-base:        #F6F4F1;
+  --bg-surface:     #FDFCFA;
+  --bg-elevated:    #EDEAE5;
+  --hover-velo:     rgba(0, 0, 0, 0.048);
+  --bg-input:       #FDFCFA;
+  --bg-header:      #FDFCFA;
+  --border-subtle:  #E6E2DC;
+  --border-medium:  #D2CDC5;
+  --border-focus:   #2453C4;
+  --text-primary:   #23201C;
+  --text-secondary: #635C53;
+  --text-disabled:  #A29A8F;
+  --text-inverse:   #FDFCFA;
+  --brand:          #2453C4;
+  --brand-hover:    #1C43A5;
+  --positive:       #146B5C;
+  --negative:       #B93A2E;
+  --warning:        #9C6412;
+  --neutral:        #635C53;
+    --nav-bg:         #1F1B16;
+  --nav-borde:      #332C24;
+  --nav-accent:     #8FB0FF;
+  --nav-chip-bg:    #2453C4;
+  --nav-chip-fg:    #FFFFFF;
+--nav-fg:         #CDC6BC;
+  --nav-fg-strong:  #FFFFFF;
+  --nav-fg-dim:     #968D80;
+}
+
+[data-tema="papel"] {
+  color-scheme: light;
+  --bg-base:        #F4F6F8;
+  --bg-surface:     #FFFFFF;
+  --bg-elevated:    #ECEFF3;
+  --hover-velo:     rgba(0, 0, 0, 0.045);
+  --bg-input:       #FFFFFF;
+  --bg-header:      #FFFFFF;
+  --border-subtle:  #E2E6EC;
+  --border-medium:  #CBD2DC;
+  --border-focus:   #1E4FD8;
+  --text-primary:   #1B2230;
+  --text-secondary: #5C6675;
+  --text-disabled:  #99A1AE;
+  --text-inverse:   #FFFFFF;
+  --brand:          #1E4FD8;
+  --brand-hover:    #1740B8;
+  --positive:       #0F7A6C;
+  --negative:       #C62F2B;
+  --warning:        #B26A00;
+  --neutral:        #5C6675;
+    --nav-bg:         #151A23;
+  --nav-borde:      #242C39;
+  --nav-accent:     #8FB0FF;
+  --nav-chip-bg:    #1E4FD8;
+  --nav-chip-fg:    #FFFFFF;
+--nav-fg:         #BCC4D0;
+  --nav-fg-strong:  #FFFFFF;
+  --nav-fg-dim:     #858E9C;
+}
+
+[data-tema="grafito"] {
+  color-scheme: dark;
+  --bg-base:        #1C2029;
+  --bg-surface:     #232833;
+  --bg-elevated:    #2D3340;
+  --hover-velo:     rgba(255, 255, 255, 0.055);
+  --bg-input:       #1A1E27;
+  --bg-header:      #171B23;
+  --border-subtle:  #2B303B;
+  --border-medium:  #3A4150;
+  --border-focus:   #4C82F7;
+  --text-primary:   #C6CBD4;
+  --text-secondary: #8B93A1;
+  --text-disabled:  #5A616E;
+  --text-inverse:   #1C2029;
+  --brand:          #4C82F7;
+  --brand-hover:    #6B99FF;
+  --positive:       #3FB6A8;
+  --negative:       #F0736F;
+  --warning:        #E8A33D;
+  --neutral:        #8B93A1;
+    --nav-bg:         #171B23;
+  --nav-borde:      #2B303B;
+  --nav-accent:     #4C82F7;
+  --nav-chip-bg:    #2F62D9;
+  --nav-chip-fg:    #FFFFFF;
+--nav-fg:         #B9C0CC;
+  --nav-fg-strong:  #FFFFFF;
+  --nav-fg-dim:     #8B93A1;
+}
+
+/* «Contraste alto» = el tema oscuro original, con UNA desviación deliberada.
+   El gris secundario era #787B86, que sobre este fondo da 4.24:1 — por debajo
+   del mínimo de 4.5 para texto normal. Es la letra de los rótulos y de las
+   líneas de comparación bajo cada KPI: lo que más se entrecierra los ojos para
+   leer. Subido a #7E828E (4.66:1), el ajuste más chico que cruza el umbral.
+   Lo encontró `tests/test_temas.py`, no una revisión a ojo. */
+/* ⚠️ Segunda desviación del original, por el mismo motivo que el gris
+   secundario: el «CWL» del logo y el subrayado del tab activo iban en #2962FF,
+   que sobre la barra da 3.85:1. El logo es de 14px en negrita — texto NORMAL
+   para la norma, no texto grande—, así que el mínimo es 4.5. Subido a #3B76FF
+   (4.69:1), el ajuste más chico que lo cruza. Lo encontró `test_temas.py`. */
+[data-tema="hoy"] {
+  color-scheme: dark;
+  --bg-base:        #131722;
+  --bg-surface:     #1E2130;
+  --bg-elevated:    #2A2E3F;
+  --hover-velo:     rgba(255, 255, 255, 0.06);
+  --bg-input:       #1A1D2E;
+  --bg-header:      #0F1118;
+  --border-subtle:  #2A2E3F;
+  --border-medium:  #363B52;
+  --border-focus:   #2962FF;
+  --text-primary:   #D1D4DC;
+  --text-secondary: #7E828E;   /* era #787B86 — ver nota */
+  --text-disabled:  #4C505E;
+  --text-inverse:   #131722;
+  --brand:          #2962FF;
+  --brand-hover:    #1E53E5;
+  --positive:       #26A69A;
+  --negative:       #EF5350;
+  --warning:        #F59E0B;
+  --neutral:        #7E828E;   /* idem */
+    --nav-bg:         #0F1118;
+  --nav-borde:      #2A2E3F;
+  --nav-accent:     #3B76FF;   /* era #2962FF — ver nota */
+  --nav-chip-bg:    #2962FF;
+  --nav-chip-fg:    #FFFFFF;
+--nav-fg:         #B2B5BE;
+  --nav-fg-strong:  #FFFFFF;
+  --nav-fg-dim:     #8A8E9A;
+}
+
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* All financial numbers use monospace + tabular digits */
+.mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Variance colors */
+.var-positive { color: var(--positive); }
+.var-negative { color: var(--negative); }
+.var-warning  { color: var(--warning); }
+.var-neutral  { color: var(--neutral); }
+
+/* Dense table base */
+.fin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.fin-table th {
+  background: var(--bg-header);
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-medium);
+  white-space: nowrap;
+}
+.fin-table th:first-child { text-align: left; }
+.fin-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: right;
+  white-space: nowrap;
+}
+.fin-table td:first-child { text-align: left; color: var(--text-secondary); }
+.fin-table tr:nth-child(even) td { background: var(--bg-surface); }
+.fin-table tr:nth-child(odd)  td { background: var(--bg-base); }
+/* ⚠️ El hover de fila NO se pinta con `background`, y esa es toda la gracia.
+   Ver «respuesta al cursor» más abajo: hay 73 filas que fijan su fondo EN
+   LÍNEA, y un estilo en línea le gana a cualquier regla de esta hoja. Con
+   `background` el resaltado no aparecería justo en las tablas más trabajadas
+   —las que marcan totales, variaciones y filas en rojo— y nadie lo notaría,
+   porque en las otras se ve bien. El velo va abajo, para las 86 a la vez. */
+.fin-table tr.total td {
+  background: var(--bg-elevated);
+  font-weight: 600;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-medium);
+}
+
+/* Editable input cell inside table */
+.fin-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border-medium);
+  color: var(--text-primary);
+  font-size: 12px;
+  width: 80px;
+  padding: 3px 6px;
+  text-align: right;
+  border-radius: 3px;
+  outline: none;
+}
+.fin-input:focus { border-color: var(--border-focus); }
+/* Ocultar las flechitas (spinner) de los inputs numéricos */
+.fin-input[type="number"]::-webkit-outer-spin-button,
+.fin-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.fin-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Cuadros financieros: header (y 1ª columna ya sticky por página) fijos al hacer
+   scroll. El contenedor scrollea internamente (max-height) para que el thead se
+   pegue a su tope. La 1ª columna usa position:sticky;left:0 por celda en cada página. */
+/* Header sticky por DEFECTO en toda tabla. Como el nav es sticky (44px), las
+   tablas que scrollean con la página pegan su header justo debajo del nav. */
+/* `top` sale de la MISMA variable que el alto del nav. Estaba clavado en 44px,
+   y el dia que el nav crecio a 48/52/56 el encabezado quedo 12px arriba de
+   donde debia: se montaba sobre la primera fila de toda tabla de la app. */
+thead th { position: sticky; top: var(--nav-h); z-index: 2; background: var(--bg-header); }
+/* Cuadros con contenedor scrolleable propio: el header se pega al TOPE del
+   contenedor (no del viewport). La 1ª columna ya es sticky por página. */
+/* Contenedor que solo scrollea en HORIZONTAL. `overflow-x: auto` lo convierte
+   igual en contexto de scroll en los dos ejes (la spec fuerza `overflow-y` a
+   auto), asi que el thead deja de resolver contra el viewport y resuelve contra
+   el contenedor: `top: var(--nav-h)` lo empuja 44px HACIA ABAJO dentro de la
+   caja y tapa la primera fila. Pasa aunque nadie scrollee.
+   Esto lo pega al tope del contenedor SIN meterle max-height ni scroll vertical,
+   que es lo que lo diferencia de `.fin-sticky`. */
+.fin-scroll-x { overflow-x: auto; }
+.fin-scroll-x thead th { top: 0; }
+
+/* Barra de scroll horizontal ESPEJO, para pegarla ARRIBA de una grilla ancha.
+
+   La grilla de Owners Q tiene 33 columnas y 48 filas: su barra propia queda al
+   pie y hay que recorrer el reporte entero para llegar a ella.
+
+   DOS COSAS QUE COSTARON TRES VUELTAS, las dos por dar por hecho que «está en
+   el DOM» es «se ve»:
+
+   1. El alto. La primera versión tenía el contenedor de 1px —solo el
+      espaciador que le da el largo— y el navegador no tenía dónde dibujar la
+      barra.
+
+   2. El CONTRASTE. Después tenía alto, pero el pulgar iba en `--border-medium`
+      (#363B52) sobre una pista `--bg-surface` (#1E2130): dos tonos casi
+      iguales, y encima con 2px de borde que se comían 4 de los 11px del
+      pulgar. Se dibujaba y seguía leyéndose como espacio vacío.
+
+   Por eso el pulgar va en un color de TEXTO, no de borde: tiene que verse
+   contra el fondo oscuro sin que haya que buscarlo. */
+.fin-scroll-espejo {
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 16px;
+  background: var(--bg-base);
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-secondary) var(--bg-base);
+}
+.fin-scroll-espejo::-webkit-scrollbar { height: 12px; }
+.fin-scroll-espejo::-webkit-scrollbar-track {
+  background: var(--bg-base);
+  border-radius: 6px;
+}
+.fin-scroll-espejo::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 6px;
+}
+.fin-scroll-espejo::-webkit-scrollbar-thumb:hover { background: var(--text-primary); }
+
+.fin-sticky { overflow: auto; max-height: calc(100vh - 150px); }
+.fin-sticky thead th { top: 0; z-index: 3; }
+.fin-sticky thead th:first-child { z-index: 4; }
+@media print {
+  /* ⚠️ Los DOS envoltorios de scroll, no solo `.fin-sticky`.
+     Al soltar los topes de ancho (2026-08-19) hubo que envolver cuatro tablas
+     que empujaban el body — tres en `month-end/pl` y una en `pl/full`— en
+     `.fin-scroll-x`. Esa clase no estaba acá, así que al imprimir la tabla se
+     habría CORTADO en el ancho de la hoja en vez de salir entera: un
+     contenedor con `overflow: auto` recorta lo que no entra, y en papel no hay
+     dónde scrollear. `pl/full` además imprime dentro de un
+     `position: absolute; inset: 0`, donde el corte es seguro. */
+  .fin-sticky, .fin-scroll-x { max-height: none; overflow: visible; }
+  thead th { position: static; }
+}
+
+/* ── Impresión: todo el dashboard en UNA hoja Letter (horizontal) ── */
+@media print {
+  @page { size: letter landscape; margin: 0.4in; }
+
+  /* fondo blanco en la hoja; las tarjetas conservan su color oscuro */
+  html, body { background: #fff !important; }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ocultar navegación y controles interactivos */
+  nav, .no-print { display: none !important; }
+
+  /* el <main> no aporta padding ni alto mínimo al imprimir */
+  main { padding: 0 !important; min-height: 0 !important; }
+
+  /* escalar el dashboard para que quepa a lo ancho de la hoja */
+  .print-dashboard {
+    width: 1600px !important;
+    max-width: none !important;
+    padding: 0 !important;
+    zoom: 0.6;
+  }
+
+  /* no partir tarjetas/tablas entre páginas */
+  .print-dashboard > div,
+  .print-dashboard table { break-inside: avoid; }
+}
+
+
+/* La barra de navegación mide 44px y NUNCA debe partirse en dos líneas: los
+   rótulos en inglés son más largos que en español y hacían envolver medio
+   header. Si no entran, este contenedor scrollea de lado — que es feo pero
+   deja todo alcanzable, a diferencia de envolver, que rompe la barra. */
+/* ── Tamaño de la barra de navegación ────────────────────────────────────────
+   La barra estaba calibrada para ACHICARSE —esconde el logo, la fecha y el chip
+   del hotel para que los 11 tabs entren en pantallas angostas— pero nunca crecía
+   cuando sobraba ancho. En un monitor grande quedaba media barra vacía con letra
+   de 12.5px (owner, 2026-08-14).
+
+   Ahora escala en cuatro escalones. Las medidas viven acá y no en el componente
+   para que crezcan JUNTAS: si la letra sube y el alto no, los tabs se ven
+   apretados contra el borde. */
+:root {
+  --nav-h: 44px;
+  --nav-fs: 12.5px;
+  --nav-px: 5px;
+  --nav-logo-fs: 14px;
+  --nav-item-fs: 13px;
+
+}
+/* ⚠️ CADA UMBRAL ES EL ANCHO QUE ESA MEDIDA NECESITA — medido, no elegido.
+   La idea era correcta —la barra crece cuando hay pantalla— pero los umbrales
+   estaban 300-400px por debajo de lo que cada tamaño pide, asi que el escalon
+   PROVOCABA el desborde que venia a evitar. Con doce tabs, medido sobre la
+   fuente real de la app y con el bloque derecho completo:
+
+     fs13.5 px10 necesita 1827px  y entraba en  1440  → se pasaba por 387
+     fs15   px14 necesita 2029px  y entraba en  1700  → se pasaba por 329
+     fs16   px18 necesita 2171px  y entraba en  2000  → se pasaba por 171
+
+   El sintoma: el ultimo tab de la fila queda partido a la mitad —el owner lo
+   reporto como «Master Data» convertido en «M»— y como el scrollbar esta
+   oculto, no hay nada que diga que se puede correr. Cruzar 1700 en un monitor
+   de 1750 dejaba la barra PEOR que a 1699.
+
+   Ahora cada escalon entra recien cuando su medida cabe, con ~25px de aire.
+   Si se agrega un tab mas, estos numeros se vuelven a medir: no son gustos.
+   Lo vigila `test_la_barra_no_crece_antes_de_que_quepa`.
+
+   RE-MEDIDO 2026-08-19 al agregar el tab COST (spec `COSTOS_GRUPOS.md` §5).
+   Medido sobre la barra REAL en produccion, clonando un tab de grupo con su
+   caret y sumando el ancho de los hijos —no el scrollWidth, que con
+   `flex: 1 1 auto` devuelve el ancho del contenedor y no el del contenido:
+
+       fs13.5/px8   12 tabs 1109 -> 13 tabs 1169   (+60)
+       fs15/px9     12 tabs 1217 -> 13 tabs 1282   (+65)
+       fs16/px11    12 tabs 1322 -> 13 tabs 1393   (+71)
+
+   Los tres umbrales viejos (1800/1940/2060) quedaban POR DEBAJO de lo que el
+   tab trece necesita. Sin re-medir, agregar Cost habria devuelto la barra al
+   mismo defecto del «Master Data» convertido en «M». */
+@media (min-width: 1860px) {
+  :root { --nav-h: 48px; --nav-fs: 13.5px; --nav-px: 8px;
+          --nav-logo-fs: 15px; --nav-item-fs: 13.5px; }
+}
+@media (min-width: 1990px) {
+  :root { --nav-h: 52px; --nav-fs: 15px; --nav-px: 9px;
+          --nav-logo-fs: 17px; --nav-item-fs: 14.5px; }
+}
+@media (min-width: 2115px) {
+  :root { --nav-h: 56px; --nav-fs: 16px; --nav-px: 11px;
+          --nav-logo-fs: 18px; --nav-item-fs: 15px; }
+}
+
+.nav-scroll {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;         /* Firefox */
+  -ms-overflow-style: none;      /* Edge viejo */
+}
+.nav-scroll::-webkit-scrollbar { display: none; }
+/* ⚠️ La senal de que la fila sigue. Sin esto, un tab cortado es INDISTINGUIBLE
+   de un tab que no existe: el scrollbar esta oculto y el corte cae justo en el
+   borde, asi que «Master Data» se leia como «M» y el owner concluyo —bien— que
+   no tenia acceso a lo que venia despues.
+
+   El degradado va SIEMPRE, no solo al desbordar, y por eso no necesita JS:
+   cuando los tabs entran, sobra espacio a la derecha y el mask se aplica sobre
+   fondo vacio, donde no se ve nada. Solo aparece cuando hay algo que tapar,
+   que es exactamente cuando hace falta. */
+.nav-scroll {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.nav-nowrap { white-space: nowrap; }
+
+/* ═══ EL panel del menu ═══════════════════════════════════════════════════
+   Owner, 2026-08-19: «suavizar el movimiento».
+
+   Antes cada tab traia SU panel: pasar de uno a otro era desmontar uno y
+   montar otro, y eso no se puede animar — parpadea por definicion. Ahora es
+   uno solo que persiste, asi que cambiar de seccion mueve una caja que ya
+   existe. De ahi salen las dos reglas de abajo.
+
+   ⚠️ La caja se anima en left/top/width/height y NUNCA en opacity. Animar
+   la opacidad al cambiar de seccion reintroduce exactamente el parpadeo que
+   esto viene a sacar: la opacidad solo se toca al abrir desde cero.
+
+   Los 220ms y la curva son los del prototipo que mando el owner. */
+.nav-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  transition:
+    left   220ms cubic-bezier(.2, .8, .2, 1),
+    top    220ms cubic-bezier(.2, .8, .2, 1),
+    width  220ms cubic-bezier(.2, .8, .2, 1),
+    height 220ms cubic-bezier(.2, .8, .2, 1);
+}
+/* Solo al abrir desde cero. */
+.nav-panel-entra { animation: nav-panel-in 160ms ease-out both; }
+@keyframes nav-panel-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* El interior va ABSOLUTO a proposito: si fuera estatico, la caja tomaria su
+   tamano y medirlo para darselo a la caja seria circular. Su animacion es el
+   cruce del contenido al cambiar de seccion — se dispara sola porque React lo
+   remonta al cambiar la key. */
+.nav-panel-int { max-height: 78vh; overflow-y: auto; animation: nav-int-in 120ms ease-out both; }
+@keyframes nav-int-in { from { opacity: 0; } }
+
+/* ═══ RESPUESTA AL CURSOR ═════════════════════════════════════════════════
+   Que toda superficie responda igual: se toca y responde, no se prenden y
+   apagan celdas sueltas.
+
+   ⚠️ **UNA sola implementación, y en CSS.** Medido antes de escribirla: hay
+   **86 tablas escritas a mano** y NINGÚN componente de tabla compartido. Con
+   un componente habría que migrar 86 pantallas; con una regla acá, las 86
+   responden sin tocar una sola.
+
+   De esas 86, solo 44 usaban `.fin-table` y respondían al cursor. **Las otras
+   42 no respondían a nada.**
+
+   ⚠️ **Por qué un VELO y no un `background`.** 73 filas fijan su fondo EN
+   LÍNEA —totales, variaciones, filas marcadas en rojo— y un estilo en línea le
+   gana a esta hoja. Una regla de `background` habría funcionado en las tablas
+   simples y NO en las más trabajadas, que son justo las que más se miran. El
+   `box-shadow` se superpone al fondo en vez de reemplazarlo, así que llega a
+   las 86 y encima respeta el rayado de `.fin-table` en vez de borrarlo.
+
+   Los 120ms son fricción, no adorno: sin ellos la banda salta de fila en fila
+   y se siente digital; con ellos se desplaza y se siente una superficie.
+   Pasando ~300ms deja de ser fricción y es lag.
+
+   No se toca `thead`: el encabezado no es una fila de datos. */
+.pag tbody tr:hover > td {
+  box-shadow: inset 0 0 0 9999px var(--hover-velo);
+  transition: box-shadow 120ms ease-out;
+}
+
+/* En táctil no hay cursor: un hover simulado se queda pegado en la última fila
+   tocada y confunde más que ayudar. */
+@media (hover: none) {
+  .pag tbody tr:hover > td { box-shadow: none; }
+}
+
+/* La entrada de cada pantalla: el final del gesto que empieza en el menu.
+   Sube apenas y se funde — no es un efecto, es hacer que la pantalla llegue
+   en la misma direccion en que venia el movimiento.
+
+   Corta a proposito: 180ms. Una transicion de pantalla se ve DIEZ veces por
+   minuto en esta app; lo que a la primera se ve elegante, a la decima estorba. */
+.pag-entra { animation: pag-in 180ms cubic-bezier(0, 0, .2, 1) both; }
+@keyframes pag-in { from { opacity: 0; transform: translateY(8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel, .nav-panel-entra, .nav-panel-int, .pag-entra,
+  .pag tbody tr:hover > td {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+
+/* Adornos del bloque derecho, en el orden en que se sacrifican: la fecha
+   primero, despues el chip del hotel, despues el logo.
+
+   ⚠️ Sus umbrales tambien estaban bajos, por el mismo error que los escalones:
+   cada pieza volvia ANTES de que la barra tuviera ancho para ella, y al volver
+   empujaba el ultimo tab fuera del borde. Medido con doce tabs a fs12.5/px5:
+
+     sin fecha ni chip  necesita 1460px   → el logo vuelve en 1480
+     sin fecha          necesita 1528px   → el chip vuelve en 1560
+     completo           necesita 1631px   → la fecha vuelve en 1680
+
+   Son doce tabs, no once: el comentario viejo se quedo en «los 11 tabs». */
+.nav-fecha { display: none; }
+@media (min-width: 1680px) { .nav-fecha { display: inline; } }
+.nav-logo { display: none; }
+@media (min-width: 1480px) { .nav-logo { display: inline; } }
+.nav-hotel { display: none; }
+@media (min-width: 1560px) { .nav-hotel { display: block; } }
+
+/* ═══ ANCHO DE PÁGINA ═════════════════════════════════════════════════════
+   Owner, 2026-08-19: *«que aprovechemos el ancho de la pantalla… que quede
+   todo centrado y el espacio sea aprovechable»*.
+
+   Eran DOS problemas distintos, y el segundo es el que se veía:
+
+   1. **El tope era chico** para tablas de doce meses (`month-end/pl` en 1600,
+      `pl/full` en 1280, `reports/summary` en 980).
+   2. **Nada estaba centrado.** Sin `margin: 0 auto`, todo el sobrante se
+      apila a la DERECHA. En una pantalla ancha eso deja un hueco enorme de un
+      solo lado, que es lo que el owner marcó.
+
+   Había **29 topes distintos** entre 320 y 1820, elegidos de a uno. Estas tres
+   clases son el vocabulario: una pantalla elige cuál es, no cuántos píxeles
+   mide. Así dos pantallas del mismo tipo no pueden volver a separarse.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.pag         { width: 100%; margin-inline: auto; }
+/* Tablas densas: doce meses, o varias columnas de comparación. Sin tope: el
+   dato manda. La tabla scrollea DENTRO de su contenedor, nunca el body. */
+.pag-ancha   { max-width: none; }
+/* Lo general: cuadros, gráficos, listas. Un tope alto para que no se estire
+   sin sentido en un monitor de 2560. */
+.pag-media   { max-width: 1720px; }
+/* Formularios y texto seguido. Acá un ancho MENOR es mejor: una línea de 200
+   caracteres no se lee. */
+.pag-lectura { max-width: 960px; }

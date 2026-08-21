@@ -1,0 +1,565 @@
+{
+ "_nota": [
+  "Catálogo de cuentas estadísticas (clase 9). Es la LISTA DE VERDAD.",
+  "",
+  "Vive en git y se siembra en cada arranque, igual que mapping_pl.json. NO se",
+  "lee de la tabla `accounts`: esa tabla está VACÍA en producción (verificado",
+  "2026-08-14, 0 filas) — el catálogo contable de 9,292 cuentas 9xxx que",
+  "describe CLAUDE.md §18 nunca se importó. Depender de él dejaría la",
+  "estadística sin llave.",
+  "",
+  "Los códigos salen de CLAUDE.md §18.1: los rangos documentados se respetan",
+  "tal cual (9000 segmentos, 9110-9132 covers, 9201-9216 spa, 9400-9403 tours,",
+  "9500-9503 transporte, 9600-9603 Innoceana, 9700-9702 kilos, 9980-9985",
+  "horas). Lo que se agrega nuevo va en huecos de esos mismos rangos.",
+  "",
+  "CAMPOS:",
+  "  code        el número de cuenta, 4 dígitos",
+  "  grupo       el rango al que pertenece (para agrupar en pantalla)",
+  "  nombre_es   / nombre_en",
+  "  unidad      qué se está contando",
+  "  dims        dimensiones que ESTA cuenta acepta. La carga rechaza",
+  "              cualquier otra: una cuenta de kilos con un código de canal",
+  "              adentro es un error de digitación, no un dato.",
+  "  agrega      SUM  = el año es la suma de los doce meses",
+  "              FIN  = el año es el saldo de diciembre (conteos de padrón)",
+  "",
+  "ACÁ NO ENTRA DINERO (owner, 2026-08-14). Solo cantidades.",
+  "",
+  "La primera versión traía tres cuentas de venta de habitaciones —por canal,",
+  "por país y por segmento— con la regla de que tenían que cuadrar contra",
+  "REV_ROOMS. El owner las descartó: la plata la reporta el P&L y punto.",
+  "",
+  "Es la decisión correcta y cierra el riesgo de raíz. Una venta abierta por",
+  "canal es la MISMA plata de REV_ROOMS partida de otra forma; el día que la",
+  "suma no diera igual habría dos verdades sobre el mismo dinero y ninguna",
+  "avisaría — que es como aparecieron los $40,613 y los $71,556. Cuadrarlas",
+  "con una prueba era mitigar el riesgo; no tenerlas lo elimina.",
+  "",
+  "`leer_catalogo` RECHAZA cualquier cuenta en dólares o marcada `dinero`.",
+  "Si algún día se quiere abrir la venta por canal, el lugar es el P&L, no acá.",
+  "  legado      campo de `scenario_stats` que esta cuenta ya alimentaba.",
+  "  deptos      OPCIONAL. En que departamentos vive esta cuenta. Sin esto, una cuenta con dimension DEPT genera fila para los 38 departamentos y el archivo se llena de combinaciones imposibles: covers de Mantenimiento, kilos de Ventas. Las de planilla NO lo llevan: ahi el universo son los departamentos que tienen gente, que sale de la propia planilla del escenario.",
+  "NO HAY 9984 'Horas de provision de vacaciones' (owner, 2026-08-14). CLAUDE.md §18.4 la lista, pero la provision de vacaciones es PLATA, no horas: lo que se cuenta son las horas TOMADAS (9985). Una cuenta de horas que nadie puede contar solo genera una fila vacia en cada archivo.",
+  "              Se mantiene para no mover nada de lo que ya se reporta.",
+  "",
+  "La 9000 y la 9001 se abren SOLO por segmento desde el 18-ago-2026. Tenian ademas ROOMTYPE, pero su fuente —el res_statistics1 de Opera por market code— no trae tipo de habitacion: la cuenta prometia un desglose que el dato no tiene. Si algun dia hay un reporte que cruce segmento con tipo de habitacion, se agregan cuentas nuevas para eso y estas no se tocan."
+ ],
+ "dimensiones": {
+  "DEPT": "Departamento (0110, 0120, …) — el catálogo de departamentos",
+  "POSITION": "Código de posición de planilla (0111-01)",
+  "ROOMTYPE": "Código fijo de tipo de habitación (BL01, BI02, …)",
+  "CHANNEL": "Canal de venta",
+  "COUNTRY": "País de procedencia",
+  "SEGMENT": "Segmento de mercado / market code (001-017, CLAUDE.md §18.2)",
+  "_OUTLET": "NO SE USA. El punto de venta YA ES un departamento en este sistema (0121 Private Bar, 0122 Cocina, 0123 Restaurante), asi que abrir los covers por departamento ya da el corte por outlet. Una dimension extra para lo mismo obliga a decidir dos veces donde va cada cover."
+ },
+ "cuentas": [
+  {
+   "code": "9000",
+   "grupo": "9000",
+   "nombre_es": "Noches ocupadas por segmento de mercado",
+   "nombre_en": "Room nights by market segment",
+   "unidad": "nights",
+   "dims": [
+    "SEGMENT"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9001",
+   "grupo": "9000",
+   "nombre_es": "Pax por segmento de mercado",
+   "nombre_en": "Guests by market segment",
+   "unidad": "pax",
+   "dims": [
+    "SEGMENT"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9010",
+   "grupo": "9000",
+   "nombre_es": "Habitaciones disponibles",
+   "nombre_en": "Rooms available",
+   "unidad": "rooms",
+   "dims": [],
+   "agrega": "SUM",
+   "legado": "rooms_available"
+  },
+  {
+   "code": "9020",
+   "grupo": "9000",
+   "nombre_es": "Habitaciones ocupadas",
+   "nombre_en": "Rooms occupied",
+   "unidad": "rooms",
+   "dims": [],
+   "agrega": "SUM",
+   "legado": "rooms_occupied"
+  },
+  {
+   "code": "9060",
+   "grupo": "9000",
+   "nombre_es": "Huéspedes",
+   "nombre_en": "Guests",
+   "unidad": "pax",
+   "dims": [],
+   "agrega": "SUM",
+   "legado": "guests"
+  },
+  {
+   "code": "9030",
+   "grupo": "9000",
+   "nombre_es": "Noches disponibles por tipo de habitación",
+   "nombre_en": "Nights available by room type",
+   "unidad": "nights",
+   "dims": [
+    "ROOMTYPE"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9040",
+   "grupo": "9000",
+   "nombre_es": "Noches ocupadas por tipo de habitación",
+   "nombre_en": "Nights occupied by room type",
+   "unidad": "nights",
+   "dims": [
+    "ROOMTYPE"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9050",
+   "grupo": "9000",
+   "nombre_es": "Pax por tipo de habitación",
+   "nombre_en": "Guests by room type",
+   "unidad": "pax",
+   "dims": [
+    "ROOMTYPE"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9070",
+   "grupo": "9000",
+   "nombre_es": "Habitaciones ocupadas por canal",
+   "nombre_en": "Rooms occupied by channel",
+   "unidad": "rooms",
+   "dims": [
+    "CHANNEL"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9071",
+   "grupo": "9000",
+   "nombre_es": "Pax por canal",
+   "nombre_en": "Guests by channel",
+   "unidad": "pax",
+   "dims": [
+    "CHANNEL"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9080",
+   "grupo": "9000",
+   "nombre_es": "Habitaciones ocupadas por país",
+   "nombre_en": "Rooms occupied by country",
+   "unidad": "rooms",
+   "dims": [
+    "COUNTRY"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9081",
+   "grupo": "9000",
+   "nombre_es": "Pax por país",
+   "nombre_en": "Guests by country",
+   "unidad": "pax",
+   "dims": [
+    "COUNTRY"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9110",
+   "grupo": "9110",
+   "nombre_es": "Covers desayuno",
+   "nombre_en": "Breakfast covers",
+   "unidad": "covers",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120",
+    "0121",
+    "0122",
+    "0123"
+   ]
+  },
+  {
+   "code": "9120",
+   "grupo": "9110",
+   "nombre_es": "Covers almuerzo",
+   "nombre_en": "Lunch covers",
+   "unidad": "covers",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120",
+    "0121",
+    "0122",
+    "0123"
+   ]
+  },
+  {
+   "code": "9130",
+   "grupo": "9110",
+   "nombre_es": "Covers cena",
+   "nombre_en": "Dinner covers",
+   "unidad": "covers",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120",
+    "0121",
+    "0122",
+    "0123"
+   ]
+  },
+  {
+   "code": "9131",
+   "grupo": "9110",
+   "nombre_es": "Covers otros servicios",
+   "nombre_en": "Other service covers",
+   "unidad": "covers",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120",
+    "0121",
+    "0122",
+    "0123"
+   ]
+  },
+  {
+   "code": "9132",
+   "grupo": "9110",
+   "nombre_es": "Clientes atendidos A&B",
+   "nombre_en": "F&B customers served",
+   "unidad": "count",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120",
+    "0121",
+    "0122",
+    "0123"
+   ]
+  },
+  {
+   "code": "9201",
+   "grupo": "9201",
+   "nombre_es": "Tratamientos de spa",
+   "nombre_en": "Spa treatments",
+   "unidad": "treatments",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0140"
+   ]
+  },
+  {
+   "code": "9210",
+   "grupo": "9201",
+   "nombre_es": "Personas atendidas en spa",
+   "nombre_en": "Spa guests served",
+   "unidad": "pax",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0140"
+   ]
+  },
+  {
+   "code": "9400",
+   "grupo": "9400",
+   "nombre_es": "Tours realizados",
+   "nombre_en": "Tours operated",
+   "unidad": "count",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0150"
+   ]
+  },
+  {
+   "code": "9401",
+   "grupo": "9400",
+   "nombre_es": "Pax de tours",
+   "nombre_en": "Tour guests",
+   "unidad": "pax",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0150"
+   ]
+  },
+  {
+   "code": "9500",
+   "grupo": "9500",
+   "nombre_es": "Clientes de transporte terrestre",
+   "nombre_en": "Ground transport guests",
+   "unidad": "pax",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0152"
+   ]
+  },
+  {
+   "code": "9501",
+   "grupo": "9500",
+   "nombre_es": "Clientes de bote",
+   "nombre_en": "Boat guests",
+   "unidad": "pax",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0152"
+   ]
+  },
+  {
+   "code": "9502",
+   "grupo": "9500",
+   "nombre_es": "Viajes de bote",
+   "nombre_en": "Boat trips",
+   "unidad": "trips",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0152"
+   ]
+  },
+  {
+   "code": "9600",
+   "grupo": "9600",
+   "nombre_es": "Lecciones Innoceana",
+   "nombre_en": "Innoceana lessons",
+   "unidad": "count",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0155"
+   ]
+  },
+  {
+   "code": "9601",
+   "grupo": "9600",
+   "nombre_es": "Pax Innoceana",
+   "nombre_en": "Innoceana guests",
+   "unidad": "pax",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0155"
+   ]
+  },
+  {
+   "code": "9700",
+   "grupo": "9700",
+   "nombre_es": "Kilos lavados Habitaciones",
+   "nombre_en": "Kilos washed Rooms",
+   "unidad": "kilos",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0110"
+   ]
+  },
+  {
+   "code": "9701",
+   "grupo": "9700",
+   "nombre_es": "Kilos lavados A&B",
+   "nombre_en": "Kilos washed F&B",
+   "unidad": "kilos",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0120"
+   ]
+  },
+  {
+   "code": "9702",
+   "grupo": "9700",
+   "nombre_es": "Kilos lavados Spa",
+   "nombre_en": "Kilos washed Spa",
+   "unidad": "kilos",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0140"
+   ]
+  },
+  {
+   "code": "9703",
+   "grupo": "9700",
+   "nombre_es": "Kilos de uniformes",
+   "nombre_en": "Kilos washed uniforms",
+   "unidad": "kilos",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0161"
+   ]
+  },
+  {
+   "code": "9704",
+   "grupo": "9700",
+   "nombre_es": "Kilos de ropa de huéspedes",
+   "nombre_en": "Kilos washed guest laundry",
+   "unidad": "kilos",
+   "dims": [
+    "DEPT"
+   ],
+   "agrega": "SUM",
+   "deptos": [
+    "0162"
+   ]
+  },
+  {
+   "code": "9900",
+   "grupo": "9900",
+   "nombre_es": "Headcount",
+   "nombre_en": "Headcount",
+   "unidad": "count",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "FIN"
+  },
+  {
+   "code": "9901",
+   "grupo": "9900",
+   "nombre_es": "FTE",
+   "nombre_en": "FTE",
+   "unidad": "fte",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9980",
+   "grupo": "9980",
+   "nombre_es": "Horas regulares",
+   "nombre_en": "Regular hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9981",
+   "grupo": "9980",
+   "nombre_es": "Horas extras",
+   "nombre_en": "Overtime hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9982",
+   "grupo": "9980",
+   "nombre_es": "Horas de día libre laborado",
+   "nombre_en": "Worked day-off hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9983",
+   "grupo": "9980",
+   "nombre_es": "Horas feriados laborados",
+   "nombre_en": "Worked holiday hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9985",
+   "grupo": "9980",
+   "nombre_es": "Horas de vacaciones tomadas",
+   "nombre_en": "Vacation taken hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  },
+  {
+   "code": "9986",
+   "grupo": "9980",
+   "nombre_es": "Horas de incapacidad",
+   "nombre_en": "Sick leave hours",
+   "unidad": "hours",
+   "dims": [
+    "DEPT",
+    "POSITION"
+   ],
+   "agrega": "SUM"
+  }
+ ]
+}
