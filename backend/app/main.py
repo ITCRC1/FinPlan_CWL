@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -66,9 +68,27 @@ app = FastAPI(
     version="0.2.0",
 )
 
+# Orígenes que pueden hablarle a esta API desde el navegador.
+#
+# `CORS_ORIGINS` es una lista separada por comas con la URL EXACTA del frontend
+# de ESTA propiedad. Se agregó al mover el frontend de Vercel a Railway: los
+# dominios de Railway son `*.up.railway.app`, que el regex de abajo no cubre, y
+# sin esto el navegador bloquea cada llamada aunque el backend responda bien.
+#
+# ⚠️ **Es una lista exacta y no un comodín `*.up.railway.app`, a propósito.**
+# Con `allow_credentials=True`, un comodín deja que CUALQUIER app alojada en ese
+# dominio compartido —de cualquier persona— haga peticiones con la cookie de
+# sesión de quien la abra. El regex de Vercel ya arrastra ese problema; no hay
+# por qué repetirlo con Railway ahora que cada propiedad tiene su propia URL.
+_ORIGENES = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002", "https://finplan-cwl.vercel.app"],
+    allow_origins=[
+        "http://localhost:3000", "http://localhost:3002",
+        "https://finplan-cwl.vercel.app",
+        *_ORIGENES,
+    ],
     # Allow any Vercel deployment (production + preview URLs) for this project.
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,

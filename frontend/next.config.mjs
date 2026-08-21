@@ -17,14 +17,23 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 //
 // `NEXT_PUBLIC_*` se congela en tiempo de compilación, así que este es el
 // momento de avisar: mejor que el deploy falle a que salga roto y mudo.
-// Solo aplica en Vercel — un `npm run build` local sigue funcionando igual.
-if (process.env.VERCEL && !process.env.NEXT_PUBLIC_API_URL) {
+// Un `npm run build` local sigue funcionando igual.
+//
+// ⚠️ **La guarda mira Vercel Y Railway.** Miraba solo `process.env.VERCEL`, y
+// al mudar el frontend a Railway eso la volvía letra muerta: `VERCEL` no existe
+// ahí, así que el build pasaba limpio y la app salía a producción pidiéndole
+// datos a `http://localhost:8000/api` — es decir, a la máquina de quien la
+// abriera. Exactamente la caída del 2026-08-13 que documenta el comentario de
+// arriba, pero ahora sin nada que la detuviera.
+const ES_DESPLIEGUE = Boolean(process.env.VERCEL || process.env.RAILWAY_ENVIRONMENT);
+
+if (ES_DESPLIEGUE && !process.env.NEXT_PUBLIC_API_URL) {
   throw new Error(
     "Falta NEXT_PUBLIC_API_URL. Sin ella la app sale a producción apuntando a "
     + "http://localhost:8000/api y todo muere con «Failed to fetch».\n"
-    + "Cargala en el proyecto de Vercel de ESTA propiedad:\n"
-    + "  vercel env add NEXT_PUBLIC_API_URL production\n"
-    + "  → https://<backend-de-esta-propiedad>/api",
+    + "Cargala en las Variables del servicio de frontend de ESTA propiedad,\n"
+    + "ANTES del build (NEXT_PUBLIC_* se hornea al compilar, no al arrancar):\n"
+    + "  NEXT_PUBLIC_API_URL = https://<backend-de-esta-propiedad>/api",
   );
 }
 
