@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FinPlan">
+  <!-- Favicon de FinPlan. Reemplaza al `favicon.ico` que traía la plantilla de
+       Next.js, que era el logotipo de Next/Vercel y no decía nada del producto.
+
+       Se ve a 16 px: por eso es UNA forma y nada más. Tres barras ascendentes
+       leen como gráfico y como perfil de edificio a la vez, que es justo lo que
+       es esto. Cualquier detalle más fino desaparece a ese tamaño.
+
+       El azul es el color de marca del sistema de diseño (CLAUDE.md §26.1,
+       token `brand`). El fondo sólido es a propósito: la barra de pestañas del
+       navegador es clara u oscura según el sistema de cada quien, y un mark sin
+       fondo desaparece en una de las dos. -->
+  <rect width="64" height="64" rx="14" fill="#2962FF"/>
+  <g fill="#FFFFFF">
+    <rect x="14" y="35" width="10" height="12" rx="2.5"/>
+    <rect x="27" y="27" width="10" height="20" rx="2.5"/>
+    <rect x="40" y="19" width="10" height="28" rx="2.5"/>
+  </g>
+</svg>
