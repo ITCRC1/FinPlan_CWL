@@ -20,7 +20,15 @@ from app.errores import ErrorApi
 from app.models.user import User
 
 SECRET = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-TOKEN_TTL = 60 * 60 * 24 * 7   # 7 días
+# Vida del token: 10 minutos. Es corto A PROPÓSITO y NO significa que a quien
+# esté trabajando lo saquen cada 10 minutos: el frontend renueva el token
+# mientras haya actividad (`components/AuthGate.tsx`), así que lo que se corta a
+# los 10 minutos es la INACTIVIDAD.
+#
+# ⚠️ Si se cambia este número hay que cambiar `TTL_MS` en `AuthGate.tsx`. Si el
+# front creyera que la vida es más larga de lo que es, renovaría tarde y sacaría
+# a gente que está escribiendo. Lo blinda `tests/test_sesion_por_inactividad.py`.
+TOKEN_TTL = 60 * 10   # 10 minutos (ver nota de arriba)
 PBKDF2_ITERS = 200_000
 
 

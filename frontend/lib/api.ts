@@ -48,6 +48,37 @@ export function dlUrl(path: string): string {
   return `${BASE}${path}${s ? `?${s}` : ""}`;
 }
 
+/**
+ * Cambia el token por uno nuevo. La llama el latido de `AuthGate` mientras haya
+ * actividad — es lo que convierte los 10 minutos de `TOKEN_TTL` en 10 minutos
+ * de INACTIVIDAD y no en un cierre por reloj a mitad del trabajo.
+ *
+ * No pasa por `apiFetch` a propósito: ese redirige a `/login` ante cualquier
+ * 401, y acá un 401 es un caso NORMAL —el token ya venció— que el llamador
+ * resuelve solo. Devuelve `false` en vez de arrastrar a nadie fuera de la
+ * pantalla en la que está.
+ */
+export async function refrescarSesion(): Promise<boolean> {
+  const t = getToken();
+  if (!t) return false;
+  try {
+    const res = await fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) return false;
+    const { token } = (await res.json()) as { token: string };
+    if (!token) return false;
+    setToken(token);
+    return true;
+  } catch {
+    // Sin red no se renueva, pero tampoco se cierra la sesión: el token que hay
+    // sigue sirviendo hasta que venza, y un corte de wifi de 20 segundos no
+    // tiene por qué costarle a nadie lo que estaba escribiendo.
+    return false;
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {

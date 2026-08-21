@@ -96,6 +96,22 @@ async def login(body: LoginBody, db: AsyncSession = Depends(get_db)):
     return await _session_payload(db, user, token)
 
 
+@router.post("/refresh")
+async def refresh(user: User = Depends(get_current_user)):
+    """Cambia un token válido por uno nuevo. Es lo que hace que la sesión se
+    corte por INACTIVIDAD y no por reloj.
+
+    `TOKEN_TTL` son 10 minutos. Sin este endpoint, ese número sacaría a la gente
+    a mitad de cargar un checkbook de 12 meses —y sin refresh no hay nada que
+    salve lo no guardado—. Con él, el frontend renueva mientras haya actividad
+    (`components/AuthGate.tsx`) y el token solo caduca si nadie tocó nada.
+
+    Pide un token que TODAVÍA sirva: renovar es prolongar una sesión viva, no
+    resucitar una vencida. Quien llega tarde vuelve a entrar por `/login`.
+    """
+    return {"token": create_access_token(user.id, user.role, user.email)}
+
+
 @router.get("/me")
 async def me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return {**_user_dict(user),
