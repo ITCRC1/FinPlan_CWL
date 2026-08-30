@@ -1309,4 +1309,43 @@ def actual_pl_from_lines(amounts: dict[str, Decimal]) -> list[PLLineResult]:
                     ln.amount_usd = derived
                     ln.is_calculated = True
                     break
+
+    # `OPERATING_PROFIT = SUM(PROFIT_*)`, pero esta plantilla no emite ni una
+    # `OPPROFIT_*`. Si el resumen importado tampoco trae su propio total de
+    # utilidad operativa, la linea sale en CERO — y un cero publicado no se
+    # distingue de una utilidad de cero: el consumidor lo lee como dato y
+    # arrastra el error por toda la cascada de abajo.
+    #
+    # Medido en produccion el 2026-08-30 (FORECAST April, corte=4, source_mode
+    # `imported`): `month/7` publicaba 0,00 y el YTD quedaba CONGELADO en el mes
+    # del corte. Los meses <= corte vienen del ACTUAL enlazado —que si trae el
+    # total— y los de despues los produce este escenario, que no lo trae.
+    #
+    # Se deriva con la identidad que define el propio reporte y que vigila
+    # `tests/test_profit_lines_completas.py`:
+    #     OPERATING_PROFIT = TOTAL_REVENUES - TOTAL_OPERATING_EXPENSES
+    # Mismo criterio que `TOTAL_NON_OP` aca arriba: solo cuando el resumen NO
+    # trajo la cifra, marcada `is_calculated`, y sin tocar los totales que si
+    # vinieron. Nunca pisa un valor almacenado que no sea cero.
+    _OP = ("TOTAL_OP_PROFIT", "OPERATING_PROFIT")
+    guardado = next((c for c in _OP if c in amounts), None)
+    if guardado is None or _d(amounts[guardado]) == ZERO:
+        rev_c = next((c for c in ("TOTAL_REVENUES",) if c in amounts), None)
+        opex_c = next((c for c in ("TOTAL_OPEXP", "TOTAL_OPERATING_EXPENSES")
+                       if c in amounts), None)
+        if rev_c and opex_c:
+            op = _d(amounts[rev_c]) - _d(amounts[opex_c])
+        else:
+            # Sin los dos totales de arriba, el otro camino a la misma cifra:
+            # GOP = utilidad operativa - overhead.
+            gop_c2 = next((c for c in ("GOP", "TOTAL_GOP") if c in amounts), None)
+            ovh_c = next((c for c in ("TOTAL_OVERHEAD", "TOTAL_OVERHEAD_EXPENSES")
+                          if c in amounts), None)
+            op = (_d(amounts[gop_c2]) + _d(amounts[ovh_c])
+                  if gop_c2 and ovh_c else None)
+        if op is not None and op != ZERO:
+            for ln in out:
+                if ln.line_code in _OP:
+                    ln.amount_usd = op
+                    ln.is_calculated = True
     return out
