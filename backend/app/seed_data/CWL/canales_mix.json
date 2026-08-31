@@ -20,10 +20,16 @@
     "In-House». Es una agrupacion del owner, no una derivacion — por eso es una",
     "lista y no se calcula."
   ],
+  "_nota_grupos_directos": [
+    "«Grupos Directos» se agrego el 2026-08-30, AL FINAL, que es lo unico seguro",
+    "segun la nota de arriba: la grilla escribe por posicion y meterlo en medio",
+    "habria corrido las noches ya guardadas al canal de al lado."
+  ],
   "canales": [
     "Travel Agency",
     "Direct Client + Website",
     "OTA",
-    "Other / In-House"
+    "Other / In-House",
+    "Grupos Directos"
   ]
 }

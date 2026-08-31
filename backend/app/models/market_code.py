@@ -39,7 +39,12 @@ from app.db import Base
 
 #: Los canales (KPI groups). Es la lista canónica desde 2026-08-14: sale del PMS
 #: y es la que el owner ya usa para leer su negocio.
-CANALES = ("Travel Agent", "Direct Client", "Website", "OTA", "INHOUSE")
+#:
+#: ⚠️ «Grupos Directos» NO sale del PMS: lo agregó el owner (2026-08-30) porque
+#: el grupo directo es otro concepto y quiere verlo aparte. `TAGP` ya cubre el
+#: grupo que llega por agencia; `GRP` es el que no, y hasta hoy no tenía canal.
+CANALES = ("Travel Agent", "Direct Client", "Website", "OTA", "INHOUSE",
+           "Grupos Directos")
 
 #: A qué canal de COMISIÓN rueda cada uno. Es el puente con el modelo que mueve
 #: plata (`SalesChannelConfig`), que solo distingue tres.
@@ -53,7 +58,41 @@ CANAL_A_COMISION = {
     "Direct Client": "DIRECT",
     "Website": "DIRECT",
     "INHOUSE": "DIRECT",
+    # El grupo directo no paga comisión de intermediario: por eso es «directo».
+    # Es lo que ya dice el mixer del owner, donde «Direct groups» rueda a DIRECT
+    # (ver docs/MIXER_DE_CANALES.md).
+    "Grupos Directos": "DIRECT",
 }
+
+
+#: El canal del PMS (KPI group) → la fila del reporte de Channel Mix.
+#:
+#: **Por qué existe (2026-08-30).** Son DOS vocabularios para lo mismo: los KPI
+#: groups salen del PMS y la lista del mix es la agrupación del owner
+#: (`seed_data/<HOTEL_ID>/canales_mix.json`). El importador del XML guardaba el
+#: KPI group CRUDO en `channel_mix_entries.channel`, así que las noches
+#: importadas caían en filas nuevas —«Travel Agent»— mientras las de siempre
+#: —«Travel Agency»— se quedaban en cero. El total del mes seguía cuadrando y la
+#: plata estaba en el renglón de al lado: la forma de fallar que no avisa.
+#: Medido en producción con la carga de junio 2026.
+#:
+#: Dos KPI groups caen en la misma fila («Direct Client» y «Website»), que es la
+#: agrupación que el owner ya usaba. Lo que no esté acá pasa DERECHO con su
+#: propio nombre: otra propiedad con otras filas de mix sigue funcionando igual
+#: que antes de este cambio.
+CANAL_A_MIX = {
+    "Travel Agent": "Travel Agency",
+    "Direct Client": "Direct Client + Website",
+    "Website": "Direct Client + Website",
+    "OTA": "OTA",
+    "INHOUSE": "Other / In-House",
+    "Grupos Directos": "Grupos Directos",
+}
+
+
+def canal_del_mix(canal: str) -> str:
+    """La fila del reporte de mix a la que va este canal del PMS."""
+    return CANAL_A_MIX.get(canal, canal)
 
 
 class MarketCode(Base):

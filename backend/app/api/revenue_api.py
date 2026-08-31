@@ -2088,7 +2088,7 @@ async def import_channel_xml(
     `sin_canal` y **no se cargan**: el total del mix lo dice.
     """
     from app.importers.opera_country_stats import parse_stats_por_codigo
-    from app.models.market_code import MarketCode
+    from app.models.market_code import MarketCode, canal_del_mix
 
     scenario = await _get_scenario_or_404(scenario_id, db)
     crudo = parse_stats_por_codigo(await file.read())
@@ -2130,7 +2130,15 @@ async def import_channel_xml(
                        meses=', '.join(_MES_CORTO[m - 1] for m in disponibles))
     del_mes = {k: v for k, v in del_anio.items() if k[1] == month}
 
-    # market code → canal, con la tabla del owner.
+    # market code → canal del PMS → FILA DEL MIX, con la tabla del owner.
+    #
+    # ⚠️ La traducción del final no es cosmética. Hasta el 2026-08-30 acá se
+    # guardaba el canal del PMS CRUDO («Travel Agent»), pero la fila que el
+    # reporte ya tenía —y que la grilla editable escribe— es la del mix
+    # («Travel Agency»). Las noches importadas caían en filas NUEVAS y las de
+    # siempre se quedaban en cero, con el total del mes cuadrando igual. Se vio
+    # al cargar junio 2026: sólo `OTA` parecía actualizarse, porque es el único
+    # nombre que coincide en los dos vocabularios. Ver `CANAL_A_MIX`.
     canal_de = {c.code.strip().upper(): (c.canal or "").strip()
                 for c in (await db.execute(select(MarketCode))).scalars().all()}
     por_canal: dict[str, dict] = {}
@@ -2138,7 +2146,7 @@ async def import_channel_xml(
     for (_a, _m, code), v in del_mes.items():
         canal = canal_de.get(code.strip().upper(), "")
         destino = por_canal if canal else sin_canal
-        clave = canal or code
+        clave = canal_del_mix(canal) if canal else code
         acc = destino.setdefault(clave, {"rooms": 0.0, "pax": 0.0})
         acc["rooms"] += v["rooms"]
         acc["pax"] += v["pax"]

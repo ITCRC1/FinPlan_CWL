@@ -18,6 +18,9 @@ const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","
 const TYPE_LABEL: Record<string,string> = { ACTUAL:"Actual", BUDGET:"Budget", FORECAST:"Forecast" };
 const ICONS: Record<string,string> = {
   "Travel Agency": "👥", "Direct Client + Website": "💻", "OTA": "🌐", "Other / In-House": "🏨",
+  // Fila nueva del mix (2026-08-30): el grupo que NO llega por agencia. Los que
+  // sí llegan viven en TAGP, dentro de Travel Agency.
+  "Grupos Directos": "🎟️",
 };
 function scnLabel(s: Scenario) {
   const t = TYPE_LABEL[s.type] ?? s.type;
