@@ -4357,6 +4357,8 @@
         "titulo": "Pre-close history",
         "que": "Each month's rounds: who uploaded what, and when."
       }
-    }
+    },
+    "pasado": "Passed to Final with {n} open findings, which are recorded.",
+    "bajarEstaHoja": "Download this sheet"
   }
 }

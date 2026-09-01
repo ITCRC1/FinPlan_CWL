@@ -4806,8 +4806,12 @@ export async function descartarPrecierre(id: string): Promise<{ estado: string }
   return res.json();
 }
 
-/** Las cuatro descargas. Todas editables: valores, no formulas. */
-export const descargasPrecierre = (id: string) => ({
+/** Las cuatro descargas. Todas editables: valores, no formulas.
+ *
+ * El nombre sigue la convencion de la app para los helpers de descarga
+ * (`...ExcelUrl`), que es por lo que `test_todo_baja_a_excel` reconoce que una
+ * pantalla deja bajar lo que muestra. */
+export const precierreExcelUrl = (id: string) => ({
   detalle: dlUrl(`/precierre/${id}/detalle.xlsx`),
   hoja: dlUrl(`/precierre/${id}/hoja.xlsx`),
   filas: dlUrl(`/precierre/${id}/filas.xlsx`),

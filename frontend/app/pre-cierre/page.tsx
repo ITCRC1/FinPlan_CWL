@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
-  descargasPrecierre, descartarPrecierre, hallazgosPrecierre, listarPrecierres,
+  precierreExcelUrl, descartarPrecierre, hallazgosPrecierre, listarPrecierres,
   pasarPrecierreAFinal, subirPrecierre, verPrecierre,
   type PrecierreFilaHoja, type PrecierreHallazgo, type PrecierreResumen,
 } from "@/lib/api";
@@ -125,7 +125,7 @@ export default function PreCierrePage() {
   }
 
   const criticos = hallazgos.filter(h => h.gravedad === "critico").length;
-  const dl = id ? descargasPrecierre(id) : null;
+  const dl = id ? precierreExcelUrl(id) : null;
 
   return (
     <main style={{ padding: "24px 28px", maxWidth: 1180, margin: "0 auto" }}>
@@ -199,7 +199,9 @@ export default function PreCierrePage() {
               setUmbralMonto={setUmbralMonto} setUmbralPct={setUmbralPct}
               abierto={abierto} setAbierto={setAbierto} t={t} />
           )}
-          {pestana === "hoja" && <Hoja filas={hoja} t={t} />}
+          {pestana === "hoja" && dl && (
+            <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t} />
+          )}
           {pestana === "descargas" && dl && <Descargas dl={dl} t={t} />}
 
           {/* ── Pasar a Final ─────────────────────────────────────────────── */}
@@ -332,14 +334,26 @@ function Hallazgos({ hallazgos, sinRevisar, comparativos, umbralMonto, umbralPct
 
 /* ── La hoja de revisión ───────────────────────────────────────────────────── */
 
-function Hoja({ filas, t }: {
-  filas: PrecierreFilaHoja[]; t: ReturnType<typeof useTranslations>;
+function Hoja({ filas, hojaExcelUrl, t }: {
+  filas: PrecierreFilaHoja[]; hojaExcelUrl: string;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
-    <div style={{ ...caja, overflowX: "auto" }}>
-      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
-        {t("hojaAyuda")}
-      </p>
+    // `fin-scroll-x`: la convención de la app para un contenedor que scrollea
+    // en horizontal. Sin ella el encabezado pegajoso se corre 44px y tapa la
+    // primera fila — no da error, el dato está bien, y sólo se nota mirando.
+    <div className="fin-scroll-x" style={{ ...caja, overflowX: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between",
+                    alignItems: "baseline", marginBottom: 10, gap: 12 }}>
+        <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          {t("hojaAyuda")}
+        </p>
+        {/* La descarga va ACÁ, junto al cuadro. Mandar al usuario a otra
+            pestaña para bajar lo que está mirando es una pestaña de más. */}
+        <a href={hojaExcelUrl} style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+          {t("bajarEstaHoja")}
+        </a>
+      </div>
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
         <tbody>
           {filas.map(f => {
@@ -366,7 +380,7 @@ function Hoja({ filas, t }: {
 /* ── Descargas ─────────────────────────────────────────────────────────────── */
 
 function Descargas({ dl, t }: {
-  dl: ReturnType<typeof descargasPrecierre>;
+  dl: ReturnType<typeof precierreExcelUrl>;
   t: ReturnType<typeof useTranslations>;
 }) {
   const items: [keyof typeof dl, string][] = [

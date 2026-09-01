@@ -4357,6 +4357,8 @@
         "titulo": "Historial de pre-cierres",
         "que": "Las vueltas de cada mes: quién subió qué y cuándo."
       }
-    }
+    },
+    "pasado": "Pasado a Final con {n} hallazgos abiertos, que quedan registrados.",
+    "bajarEstaHoja": "Bajar esta hoja"
   }
 }
