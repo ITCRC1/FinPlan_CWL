@@ -235,16 +235,43 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
     """
     tc = Decimal(str(tc)) if tc is not None else None
     salida, sin_mapeo = [], {}
+    #: Filas con monto y SIN código de cuenta reconocible. No se descartan en
+    #: silencio: así se perdieron $40.613 del gasto de Habitaciones en el Actual
+    #: 2024, en dos renglones, y el descuadre apareció meses después.
+    sin_cuenta: list[dict] = []
+    #: El subdetalle (`4000-0110-001`), agrupado por su cuenta padre de dos
+    #: segmentos. No entra a los totales —el padre ya lo suma— pero se conserva
+    #: para poder comprobar que efectivamente suma.
+    subdetalle: dict[str, Decimal] = {}
     for n, f in enumerate(filas[cols["fila_encabezado"] + 1:], cols["fila_encabezado"] + 2):
         cuenta = _texto(f[cols["cuenta"]] if cols["cuenta"] < len(f) else "")
+        crudo_m = f[cols["mes"]] if cols["mes"] < len(f) else None
         if not _parece_cuenta(cuenta):
+            desc = _texto(f[cols["descripcion"]]
+                          if cols["descripcion"] is not None
+                          and cols["descripcion"] < len(f) else "")
+            # ⚠️ Sólo cuenta como «fila sin cuenta» si trae DESCRIPCIÓN. El
+            # reporte de Integrity lleva sus propios subtotales —«UTILIDAD
+            # OPERATIVA», «UTILIDAD/PÉRDIDA NETA»— que tienen monto y no tienen
+            # código, y son correctos: su rótulo va en la columna de etiquetas,
+            # no en la de detalle. Sin este filtro, todos los meses aparecerían
+            # dos hallazgos criticos falsos y la lista se aprenderia a ignorar.
+            if _dec(crudo_m) != ZERO and desc:
+                sin_cuenta.append({"fila": n, "monto_crc": _dec(crudo_m),
+                                   "texto": desc})
             continue
         base = cuenta_base(cuenta)
         if base is None:
-            continue                      # clase sola o subdetalle: ya está sumado
-        crudo_mes = f[cols["mes"]] if cols["mes"] < len(f) else None
+            # Clase sola (`4000`) o subdetalle (`4000-0110-001`). No entra a los
+            # totales: el padre ya lo suma. El subdetalle se guarda aparte.
+            if cuenta.count("-") == 2:
+                padre = cuenta.rsplit("-", 1)[0]
+                subdetalle[padre] = subdetalle.get(padre, ZERO) + monto_mes(
+                    cuenta, crudo_m, f[cols["acumulado"]]
+                    if cols["acumulado"] < len(f) else None)
+            continue
         crudo_acum = f[cols["acumulado"]] if cols["acumulado"] < len(f) else None
-        mes_crc = monto_mes(cuenta, crudo_mes, crudo_acum)
+        mes_crc = monto_mes(cuenta, crudo_m, crudo_acum)
         acum_crc = monto_acumulado(cuenta, crudo_acum)
         depto = depto_de(cuenta)
         m = puente.get(depto)
@@ -273,7 +300,9 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
             acc["mes_usd"] += fila["mes_usd"]
             acc["cuentas"].append(cuenta)
     return {"filas": salida,
-            "sin_mapeo": sorted(sin_mapeo.values(), key=lambda x: -abs(x["mes_usd"]))}
+            "sin_mapeo": sorted(sin_mapeo.values(), key=lambda x: -abs(x["mes_usd"])),
+            "sin_cuenta": sin_cuenta,
+            "subdetalle": {k: v / tc for k, v in subdetalle.items()}}
 
 
 def leer(data: bytes, tc, puente: dict, grupo_de=None) -> dict:
