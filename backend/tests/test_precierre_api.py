@@ -347,3 +347,74 @@ async def test_el_detalle_traducido_dice_de_donde_salio_cada_numero(cliente):
     assert encabezados[0] == "Fila origen"
     assert "Depto Integrity" in encabezados and "Depto FinPlan" in encabezados
     assert ws.max_row == 326      # 325 filas + encabezado
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# EL INFORME DE LA REVISIÓN
+# ═════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_los_hallazgos_del_archivo_se_calculan_al_subir(cliente):
+    """Los niveles 1 y 2 dependen de lo que el lector descarta —filas sin
+    cuenta, subdetalle, departamentos sin puente— y eso no se guarda. Si no se
+    calculan al subir, después no se pueden calcular."""
+    async with cliente() as c:
+        j = (await _subir(c)).json()
+    claves = {h["clave"] for h in j["hallazgos"]}
+    assert "cuenta_sin_mapeo" in claves
+    assert all(h["nivel"] in (1, 2) for h in j["hallazgos"])
+
+
+@pytest.mark.asyncio
+async def test_el_informe_ordena_por_gravedad_y_por_monto(cliente):
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        d = (await c.get(f"/api/precierre/{pid}/hallazgos/")).json()
+    orden = {"critico": 0, "aviso": 1, "info": 2}
+    llaves = [(orden[h["gravedad"]], -abs(h["monto"])) for h in d["hallazgos"]]
+    assert llaves == sorted(llaves)
+    assert d["resumen"]["critico"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_el_informe_dice_lo_que_NO_pudo_revisar(cliente):
+    """«No se revisó» y «está bien» se ven igual en una lista vacía. Esa
+    confusión es la que este módulo viene a eliminar."""
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        d = (await c.get(f"/api/precierre/{pid}/hallazgos/")).json()
+    assert d["sin_revisar"], "tiene que decir qué cruces no se hicieron"
+    assert any("planilla" in x for x in d["sin_revisar"])
+
+
+@pytest.mark.asyncio
+async def test_los_umbrales_se_ajustan_sin_volver_a_subir(cliente):
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        d = (await c.get(f"/api/precierre/{pid}/hallazgos/"
+                         "?umbral_monto=1&umbral_pct=1")).json()
+    assert d["umbrales"] == {"monto": 1.0, "pct": 1.0}
+
+
+@pytest.mark.asyncio
+async def test_las_estadisticas_imposibles_llegan_al_informe(cliente):
+    """El nivel 3 corre en vivo con lo que le pasa la pantalla."""
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        d = (await c.get(f"/api/precierre/{pid}/hallazgos/"
+                         "?rooms_disponibles=930&rooms_ocupadas=1200"
+                         "&huespedes=1500")).json()
+    assert "estadisticas_incoherentes" in {h["clave"] for h in d["hallazgos"]}
+
+
+@pytest.mark.asyncio
+async def test_ningun_hallazgo_impide_nada(cliente):
+    """El informe informa. Bloquear es potestad de los cuatro controles de la
+    verificación, y de nadie más."""
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.get(f"/api/precierre/{pid}/hallazgos/")
+        assert r.status_code == 200
+        assert r.json()["resumen"]["critico"] >= 1
+        # y con hallazgos críticos la hoja y las descargas siguen funcionando
+        assert (await c.get(f"/api/precierre/{pid}/detalle.xlsx")).status_code == 200

@@ -77,6 +77,12 @@ class Precierre(Base):
     #: El detalle de esos hallazgos al momento de cerrar, en JSON. Un número
     #: solo no deja auditar nada.
     hallazgos: Mapped[str] = mapped_column(Text, default="")
+    #: Los hallazgos de los niveles 1 y 2, en JSON, calculados AL SUBIR.
+    #: Dependen de lo que el lector descarta —filas sin cuenta, subdetalle,
+    #: departamentos sin puente— y eso no se guarda: recalcularlos exigiría
+    #: volver a leer el archivo. Los niveles 3 y 4 sí se recalculan en cada
+    #: consulta, porque dependen de los auxiliares y de los escenarios.
+    hallazgos_archivo: Mapped[str] = mapped_column(Text, default="")
 
     escenario_destino_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("scenarios.id", ondelete="SET NULL"), nullable=True)

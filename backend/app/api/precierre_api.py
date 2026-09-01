@@ -43,9 +43,12 @@ from app.errores import ErrorApi
 from app.export import precierre_xlsx, revision_mes_xlsx as revision
 from app.hotel_actual import HOTEL_ID
 from app.importers import integrity_final
+from app.revision import (nivel1_estructura, nivel2_coherencia,
+                          nivel3_fuentes, nivel4_expectativa)
 from app.importers.registro_dep import registro_de_subida
 from app.models.department_catalog import DepartmentCatalog
 from app.models.precierre import Precierre, PrecierreFila
+from app.models.scenario import Scenario
 from app.textos import Idioma
 
 router = APIRouter()
@@ -159,7 +162,36 @@ async def crear(
     except integrity_final.FormatoInesperado as e:
         raise ErrorApi(422, "precierre.formato", detalle=str(e))
 
+    # ── Los hallazgos DEL ARCHIVO se calculan ahora ─────────────────────────
+    #
+    # Los niveles 1 y 2 dependen de lo que el lector descarta —las filas sin
+    # cuenta, el subdetalle, los departamentos que el puente no traduce— y eso
+    # no se guarda. Recalcularlos después exigiría volver a leer el archivo, que
+    # ya no está. Los niveles 3 y 4 sí se recalculan en cada consulta: dependen
+    # de los auxiliares y de los escenarios, que cambian.
+    from app.engine.recalculate import load_active_account_mappings
+    resolver = pl_engine.construir_resolvedor(await load_active_account_mappings(db))
+
+    def linea_de(depto: str, cuenta: str) -> str:
+        regla, _como = resolver(depto, cuenta)
+        return (regla or {}).get("report_line_code", "") if regla else ""
+
+    fuentes = {r.dept_code for r in
+               (await db.execute(select(DepartmentCatalog).where(
+                   DepartmentCatalog.is_allocation_source.is_(True)))).scalars().all()}
+    vistas = await _cuentas_de_meses_anteriores(db, anio, mes)
+    del_archivo = (
+        nivel1_estructura.revisar(leido["filas"], linea_de=linea_de,
+                                  sin_mapeo=leido["sin_mapeo"],
+                                  vistas_antes=vistas)
+        + nivel2_coherencia.revisar(leido["filas"], tc=tc,
+                                    sin_cuenta=leido["sin_cuenta"],
+                                    subdetalle=leido["subdetalle"],
+                                    fuentes_de_reparto=fuentes))
+
     pc = Precierre(hotel_id=HOTEL_ID, anio=anio, mes=mes, tc=tc,
+                   hallazgos_archivo=json.dumps(
+                       [h.como_dict() for h in del_archivo], ensure_ascii=False),
                    archivo_nombre=(file.filename or "")[:255],
                    # El checksum se guarda para poder decir DE QUE archivo salió
                    # este mes. El anti-reimport NO vive acá: lo hace
@@ -187,7 +219,23 @@ async def crear(
             # forma de saber si es ruido o si falta media operación.
             "sin_mapeo": [{"depto": x["depto"], "mes_usd": float(x["mes_usd"]),
                            "cuentas": x["cuentas"][:8]}
-                          for x in leido["sin_mapeo"]]}
+                          for x in leido["sin_mapeo"]],
+            "hallazgos": [h.como_dict() for h in del_archivo]}
+
+
+async def _cuentas_de_meses_anteriores(db: AsyncSession, anio: int, mes: int) -> set:
+    """`(cuenta_base, depto)` de los meses ya pasados por Pre-Cierre este año.
+
+    Es contra lo que se decide si una cuenta es NUEVA. Se miran los borradores y
+    los pasados a final: un mes que se revisó cuenta como visto aunque todavía no
+    se haya cerrado."""
+    filas = (await db.execute(
+        select(PrecierreFila.cuenta_base, PrecierreFila.depto)
+        .join(Precierre, Precierre.id == PrecierreFila.precierre_id)
+        .where(Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
+               Precierre.mes < mes,
+               Precierre.estado.in_(("borrador", "pasado_a_final"))))).all()
+    return {(c, d) for c, d in filas}
 
 
 # ─── Ver ──────────────────────────────────────────────────────────────────────
@@ -237,6 +285,120 @@ async def hoja(precierre_id: str, db: AsyncSession = Depends(get_db),
     return StreamingResponse(
         buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+def _sin_revisar(stats: dict, noches_opera, comp: dict) -> list[str]:
+    """Los cruces que esta corrida NO pudo hacer, y por qué.
+
+    Se listan aunque no sea culpa de nadie. Una lista de hallazgos vacía puede
+    significar «está todo bien» o «no se miró nada», y desde afuera se ven igual.
+    """
+    faltan = []
+    # Todavía sin conectar: el mayor contra los auxiliares del mes. Los chequeos
+    # están escritos y probados (`nivel3_fuentes`), pero falta identificar de
+    # dónde sale la planilla y el checkbook de un mes de ACTUALES — los que hay
+    # hoy cuelgan de un escenario, y un pre-cierre no es un escenario.
+    faltan.append("planilla contra el mayor (falta conectar el auxiliar del mes)")
+    faltan.append("checkbook de gastos contra el mayor (idem)")
+    if not stats:
+        faltan.append("coherencia de las estadísticas (no se cargaron)")
+    if noches_opera is None:
+        faltan.append("noches contra Opera (no se pasó el dato)")
+    if "forecast" not in comp:
+        faltan.append("varianzas contra el Forecast (no hay uno marcado como "
+                      "vigente para el año)")
+    if "budget" not in comp:
+        faltan.append("varianzas contra el Budget (no hay Budget del año)")
+    return faltan
+
+
+async def _valores_de_escenario(db: AsyncSession, escenario, mes: int) -> dict:
+    """El P&L de un escenario en las MISMAS claves que la hoja de revisión."""
+    from app.engine import recalculate as recalc
+    lineas = await recalc.compute_pl_month(db, escenario, mes)
+    return revision.valores_desde_lineas_pl(
+        {ln.line_code: ln.amount_usd for ln in lineas})
+
+
+async def _comparativos(db: AsyncSession, anio: int, mes: int) -> dict:
+    """El Forecast vigente y el Budget del año, si existen.
+
+    El Forecast es el marcado `is_current_forecast` — el vivo. Si no hay
+    ninguno, no se elige uno por descarte: comparar contra un forecast que nadie
+    designó daría varianzas que no significan nada.
+    """
+    escs = (await db.execute(select(Scenario).where(
+        Scenario.year == anio))).scalars().all()
+    fcst = next((e for e in escs
+                 if e.type == "FORECAST" and e.is_current_forecast), None)
+    bud = next((e for e in escs if e.type == "BUDGET"), None)
+    out = {}
+    if fcst is not None:
+        out["forecast"] = {"escenario": f"{fcst.type} {fcst.version}",
+                           "valores": await _valores_de_escenario(db, fcst, mes)}
+    if bud is not None:
+        out["budget"] = {"escenario": f"{bud.type} {bud.version}",
+                         "valores": await _valores_de_escenario(db, bud, mes)}
+    return out
+
+
+@router.get("/precierre/{precierre_id}/hallazgos/")
+async def hallazgos(
+    precierre_id: str,
+    umbral_monto: Decimal = Query(nivel4_expectativa.UMBRAL_MONTO, ge=0),
+    umbral_pct: Decimal = Query(nivel4_expectativa.UMBRAL_PCT, ge=0),
+    rooms_disponibles: int | None = Query(None),
+    rooms_ocupadas: int | None = Query(None),
+    huespedes: int | None = Query(None),
+    noches_opera: int | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """El informe de la revisión — varianzas y discrepancias, los cuatro niveles.
+
+    **Ninguno rechaza la carga.** Bloquear es potestad de los cuatro controles de
+    la verificación, y de nadie más: un hallazgo que rechazara enseñaría a
+    esquivarlo. Lo que se pide es que no se calle nada.
+
+    Los del **archivo** (niveles 1 y 2) se calcularon al subir y se leen tal
+    cual. Los de **contexto** (3 y 4) se recalculan acá, porque los auxiliares y
+    los escenarios cambian — y porque los umbrales se ajustan sin volver a subir.
+    """
+    pc = await _traer(db, precierre_id)
+    filas = await _filas(db, precierre_id)
+    del_archivo = json.loads(pc.hallazgos_archivo or "[]")
+
+    stats = {k: v for k, v in (("rooms_disponibles", rooms_disponibles),
+                               ("rooms_ocupadas", rooms_ocupadas),
+                               ("huespedes", huespedes)) if v is not None}
+    valores = revision.valores_completos(filas)
+    contexto = nivel3_fuentes.revisar(
+        filas, stats=stats,
+        ingreso_habitaciones=valores.get("rev.Rooms"),
+        noches_opera=noches_opera)
+
+    comp = await _comparativos(db, pc.anio, pc.mes)
+    contexto += nivel4_expectativa.revisar(
+        valores,
+        forecast=comp.get("forecast", {}).get("valores"),
+        budget=comp.get("budget", {}).get("valores"),
+        umbral_monto=umbral_monto, umbral_pct=umbral_pct)
+
+    todos = del_archivo + [h.como_dict() for h in contexto]
+    orden = {"critico": 0, "aviso": 1, "info": 2}
+    todos.sort(key=lambda h: (orden.get(h["gravedad"], 9), -abs(h["monto"])))
+    return {
+        "id": pc.id, "anio": pc.anio, "mes": pc.mes,
+        "umbrales": {"monto": float(umbral_monto), "pct": float(umbral_pct)},
+        "comparativos": {k: v["escenario"] for k, v in comp.items()},
+        "hallazgos": todos,
+        "resumen": {g: len([h for h in todos if h["gravedad"] == g])
+                    for g in ("critico", "aviso", "info")},
+        # ⚠️ Lo que NO se pudo mirar, dicho. Importa tanto como el hallazgo:
+        # «no se revisó» y «está bien» se ven IGUAL en una lista vacía, y esa
+        # confusión es justo la que este módulo viene a eliminar.
+        "sin_revisar": _sin_revisar(stats, noches_opera, comp),
+    }
 
 
 def _descarga(contenido: bytes, nombre: str) -> StreamingResponse:

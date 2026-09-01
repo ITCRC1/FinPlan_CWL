@@ -43,6 +43,13 @@ def upgrade() -> None:
         sa.Column("creado_en", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("hallazgos_abiertos", sa.Integer, nullable=False, server_default="0"),
         sa.Column("hallazgos", sa.Text, nullable=False, server_default=""),
+        # Los hallazgos de los niveles 1 y 2, calculados AL SUBIR. Dependen de
+        # cosas que el lector produce y que no se guardan —las filas sin cuenta,
+        # el subdetalle, los departamentos sin puente—, asi que no se pueden
+        # recalcular despues sin volver a leer el archivo. Los niveles 3 y 4 si
+        # se recalculan en cada consulta: dependen de los auxiliares y de los
+        # escenarios, que cambian.
+        sa.Column("hallazgos_archivo", sa.Text, nullable=False, server_default=""),
         sa.Column("escenario_destino_id", sa.String(36),
                   sa.ForeignKey("scenarios.id", ondelete="SET NULL"), nullable=True),
         sa.Column("pasado_en", sa.DateTime(timezone=True), nullable=True),
