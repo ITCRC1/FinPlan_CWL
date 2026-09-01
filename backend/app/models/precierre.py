@@ -30,8 +30,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import (DateTime, ForeignKey, Integer, Numeric, String, Text,
-                        UniqueConstraint, func)
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -45,13 +44,11 @@ ESTADOS = ("borrador", "pasado_a_final", "descartado")
 class Precierre(Base):
     """Un mes traducido desde Integrity, esperando revisión."""
     __tablename__ = "precierre"
-    __table_args__ = (
-        # Un solo borrador vivo por mes. Los pasados y descartados no compiten:
-        # son historia, y se conservan para poder decir con qué hallazgos
-        # abiertos se cerró cada mes.
-        UniqueConstraint("hotel_id", "anio", "mes", "estado",
-                         name="uq_precierre_mes_estado"),
-    )
+    #: ⚠️ La unicidad —un solo BORRADOR vivo por mes— es un índice PARCIAL y vive
+    #: en la migración 138. No se puede expresar como `UniqueConstraint` acá:
+    #: sobre (hotel, año, mes, estado) la tercera subida del mes reventaría,
+    #: porque el Integrity se sube muchas veces durante la revisión y cada una
+    #: deja un «descartado» más.
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True,
                                     default=lambda: str(uuid.uuid4()))

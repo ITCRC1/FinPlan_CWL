@@ -114,12 +114,22 @@ async def crear(
     tc: Decimal = Query(..., gt=0, description="Tipo de cambio CRC/USD del mes"),
     mes: int = Query(..., ge=1, le=12),
     anio: int = Query(...),
-    reemplazar: bool = Query(False, description="Descartar el borrador que ya exista"),
     db: AsyncSession = Depends(get_db),
     usuario=Depends(get_current_user),
     idioma: str = Idioma,
 ):
     """Sube el estado de resultados CRUDO de Integrity y lo deja en revisión.
+
+    **Subir de nuevo es el flujo normal, no la excepción.** Durante la revisión
+    el mismo mes se sube muchas veces: aparece un error de posteo, se corrige en
+    Integrity, se vuelve a bajar y se sube otra vez, hasta llegar al cierre
+    acordado. Por eso cada subida **reemplaza** el borrador anterior sin
+    preguntar — pedir confirmación en cada vuelta convertiría el camino principal
+    en una molestia, y a la quinta nadie lee el aviso.
+
+    No se pierde nada: el borrador anterior queda `descartado`, con su archivo y
+    su hora, y la respuesta dice a cuál reemplazó. La cuenta de vueltas es parte
+    de la historia del mes.
 
     El **tipo de cambio es obligatorio** y no tiene default: cambia todos los
     meses y es un dato del cierre, no una constante del sistema. Inventarlo
@@ -132,13 +142,15 @@ async def crear(
     ya = (await db.execute(select(Precierre).where(
         Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
         Precierre.mes == mes, Precierre.estado == "borrador"))).scalars().first()
+    reemplazado = None
     if ya is not None:
-        if not reemplazar:
-            raise ErrorApi(409, "precierre.ya_hay_borrador",
-                           extra={"motivo": "ya_hay_borrador", "id": ya.id},
-                           mes=MESES[mes - 1], anio=anio)
         ya.estado = "descartado"
+        reemplazado = {"id": ya.id, "archivo": ya.archivo_nombre,
+                       "subido_en": ya.creado_en.isoformat() if ya.creado_en else None}
         await db.flush()
+    vueltas = len((await db.execute(select(Precierre.id).where(
+        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
+        Precierre.mes == mes))).all()) + 1
 
     puente = await _puente()
     grupo_de = await _clasificador(db)
@@ -168,6 +180,9 @@ async def crear(
 
     return {"id": pc.id, "anio": anio, "mes": mes, "tc": float(tc),
             "filas": len(leido["filas"]),
+            # A cuál reemplazó y cuántas vueltas lleva el mes. Reemplazar sin
+            # decirlo sería pisar en silencio; decirlo lo vuelve historia.
+            "reemplaza_a": reemplazado, "vuelta": vueltas,
             # Los departamentos que nadie mapeó, CON su monto: sin eso no hay
             # forma de saber si es ruido o si falta media operación.
             "sin_mapeo": [{"depto": x["depto"], "mes_usd": float(x["mes_usd"]),

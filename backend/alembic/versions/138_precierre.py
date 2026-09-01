@@ -47,12 +47,21 @@ def upgrade() -> None:
                   sa.ForeignKey("scenarios.id", ondelete="SET NULL"), nullable=True),
         sa.Column("pasado_en", sa.DateTime(timezone=True), nullable=True),
         sa.Column("pasado_por", sa.String(120), nullable=False, server_default=""),
-        # Un solo borrador vivo por mes. Los pasados y descartados no compiten:
-        # son historia, y se conservan para poder decir con que hallazgos
-        # abiertos se cerro cada mes.
-        sa.UniqueConstraint("hotel_id", "anio", "mes", "estado",
-                            name="uq_precierre_mes_estado"),
     )
+    # ⚠️ Un solo BORRADOR vivo por mes — indice PARCIAL, no una unique de cuatro
+    # columnas.
+    #
+    # El Integrity se sube muchas veces durante la revision: se corrige un error
+    # de posteo y se vuelve a subir, hasta llegar al final acordado. Cada subida
+    # descarta la anterior, asi que un mes acumula N descartados. Con una unique
+    # sobre (hotel, anio, mes, estado) la TERCERA subida reventaba, porque ya
+    # habria dos filas «descartado» del mismo mes.
+    #
+    # Los descartados y los pasados no compiten: son historia, y con ellos queda
+    # la traza de cuantas vueltas llevo cerrar el mes.
+    op.create_index("uq_precierre_borrador_vivo", "precierre",
+                    ["hotel_id", "anio", "mes"], unique=True,
+                    postgresql_where=sa.text("estado = 'borrador'"))
     op.create_table(
         "precierre_fila",
         sa.Column("id", sa.String(36), primary_key=True),
@@ -85,5 +94,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("guillermo_import_exceptions", "monto")
+    op.drop_index("uq_precierre_borrador_vivo", table_name="precierre")
     op.drop_table("precierre_fila")
     op.drop_table("precierre")

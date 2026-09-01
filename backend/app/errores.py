@@ -207,9 +207,6 @@ MENSAJES: dict[str, dict[str, str]] = {
     "precierre.formato": {
         "es": "No se pudo leer el estado de resultados de Integrity: {detalle}",
         "en": "Integrity's income statement could not be read: {detalle}"},
-    "precierre.ya_hay_borrador": {
-        "es": "{mes} {anio} ya tiene un pre-cierre en revisión. Si querés empezar de nuevo, repetí la subida confirmando que se reemplace — el borrador actual se descarta.",
-        "en": "{mes} {anio} already has a pre-close under review. To start over, repeat the upload confirming replacement — the current draft is discarded."},
     "precierre.ya_paso_a_final": {
         "es": "Este pre-cierre ya se pasó a Final: no se puede descartar. Lo que se subió se corrige subiendo el mes de nuevo.",
         "en": "This pre-close was already passed to Final and cannot be discarded. What was uploaded is corrected by uploading the month again."},

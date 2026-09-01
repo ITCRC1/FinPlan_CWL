@@ -10,6 +10,7 @@ base: si el traductor está bien pero el guardado redondea, acá se ve.
 Necesita PostgreSQL. Sin base se salta sola, igual que el resto de las pruebas
 que la piden.
 """
+import io
 import json
 import pathlib
 from decimal import Decimal as D
@@ -161,31 +162,58 @@ async def test_la_hoja_descargada_reproduce_el_tab(cliente):
 
 
 @pytest.mark.asyncio
-async def test_hay_DOS_guardas_y_cada_una_pregunta_lo_suyo(cliente):
-    """Subir dos veces choca contra dos frenos distintos, en orden.
+async def test_el_mes_se_sube_muchas_veces_hasta_el_cierre_acordado(cliente):
+    """Subir de nuevo es el FLUJO, no la excepción.
 
-    1. **`registro_de_subida`** ve el mismo CONTENIDO y dice «este archivo ya se
-       importó». Es el mecanismo común a las veinticuatro puertas de subida.
-    2. Recién pasado ése, el pre-cierre ve que el MES ya tiene un borrador en
-       revisión y pregunta si se descarta.
+    Owner (2026-08-31): *«es posible que el Integrity lo suba múltiples veces,
+    porque es revisión: un error en posteo se corrige y se sube otra vez, y así
+    sucesivamente hasta lograr el final acordado»*.
 
-    Son dos preguntas distintas —«¿el mismo archivo otra vez?» y «¿tiro lo que
-    estabas revisando?»— y cada una se contesta con su propia bandera. Juntarlas
-    en una sola haría que confirmar una confirmara la otra sin querer.
+    Así que cada vuelta reemplaza el borrador anterior **sin preguntar**. Pedir
+    confirmación en cada una convertiría el camino principal en una molestia, y
+    a la quinta nadie lee el aviso.
+
+    ⚠️ Esto es lo que exige que la unicidad sea un índice PARCIAL sobre los
+    borradores. Con una unique de cuatro columnas —(hotel, año, mes, estado)—
+    la TERCERA subida reventaba: ya habría dos filas «descartado» del mes.
     """
+    import openpyxl
+    async with cliente() as c:
+        # Tres vueltas con contenido distinto, como un error de posteo corregido.
+        ids = []
+        for vuelta in range(3):
+            wb = openpyxl.load_workbook(FIXTURE)
+            wb["Final"]["R17"] = 52273.25 + vuelta      # una cifra que cambia
+            buf = io.BytesIO()
+            wb.save(buf)
+            r = await c.post("/api/precierre/?tc=454.75&mes=7&anio=2026",
+                             files={"file": (f"Conc JUL v{vuelta}.xlsx",
+                                             buf.getvalue())})
+            assert r.status_code == 200, f"vuelta {vuelta}: {r.text}"
+            j = r.json()
+            assert j["vuelta"] == vuelta + 1
+            if vuelta:
+                assert j["reemplaza_a"]["id"] == ids[-1], "no dijo a cuál reemplazó"
+            ids.append(j["id"])
+
+        # Un solo borrador vivo; las vueltas anteriores quedan de historia.
+        listado = (await c.get("/api/precierre/")).json()["precierres"]
+        del_mes = [p for p in listado if p["mes"] == 7 and p["anio"] == 2026]
+        assert len([p for p in del_mes if p["estado"] == "borrador"]) == 1
+        assert len([p for p in del_mes if p["estado"] == "descartado"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_el_mismo_archivo_dos_veces_si_avisa(cliente):
+    """Distinto de lo de arriba: el CONTENIDO idéntico no es una vuelta nueva,
+    es la misma. Lo dice `registro_de_subida`, el mecanismo común a las
+    veinticuatro puertas — y se puede insistir con `permitir_reimport`."""
     async with cliente() as c:
         assert (await _subir(c)).status_code == 200
-
         mismo = await _subir(c)
         assert mismo.status_code == 409
         assert "import" in json.dumps(mismo.json(), ensure_ascii=False).lower()
-
-        otra_vez = await _subir(c, permitir_reimport="true")
-        assert otra_vez.status_code == 409
-        assert otra_vez.json()["detail"]["motivo"] == "ya_hay_borrador"
-
-        ambas = await _subir(c, permitir_reimport="true", reemplazar="true")
-        assert ambas.status_code == 200, ambas.text
+        assert (await _subir(c, permitir_reimport="true")).status_code == 200
 
 
 @pytest.mark.asyncio
