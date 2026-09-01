@@ -1,231 +1,220 @@
 {
   "_nota": [
-    "El mapeo de departamentos de Integrity, extraido del tab `mapD` del libro de",
-    "cierre del owner (`Conc JUL 2026.xlsx`, julio 2026) el 2026-08-31.",
+    "EL PUENTE: departamento de Integrity -> departamento de FinPlan.",
     "",
-    "Son las TRES busquedas que hacen las formulas de la hoja `Final`:",
-    "  division_usali  <- mapD!F por mapD!C   (columna AG)",
-    "  nombre_depto    <- mapD!I por mapD!H   (columna AI)",
-    "  depto_finplan   <- mapD!L por mapD!K   (columna AJ)",
+    "Extraido del tab `mapD` del libro de cierre del owner (`Conc JUL 2026.xlsx`)",
+    "el 2026-08-31, columnas K->L, con dos correcciones.",
     "",
-    "NO se deriva del catalogo de departamentos de la app, y se verifico por que:",
-    "seis codigos con plata en julio 2026 (0124, 0128, 0160, 0170, 0240 y el propio",
-    "0125/0129 en cero) NO existen en `department_catalog`. Son $41.141,29 que sin",
-    "este puente no llegarian a ningun departamento.",
+    "## Por que este puente TIENE que existir",
     "",
-    "CONFLICTO CONOCIDO — 0130. Aca dice Food & Beverage; `department_catalog` lo",
-    "tiene como SPA con padre 0140. En julio son $13.121,49 que cambian de division",
-    "segun a quien se le pregunte. Manda ESTE archivo, porque es el que produjo los",
-    "numeros que el owner ya reviso y cerro; la discrepancia se REPORTA como",
-    "hallazgo de Nivel 1 en vez de resolverse en silencio.",
+    "Los dos sistemas NO comparten espacio de codigos: el mismo numero significa",
+    "cosas distintas en cada uno. Verificado contra julio 2026:",
     "",
-    "Un codigo que no este aca no se adivina: queda 'Sin mapeo', se reporta con su",
-    "monto y no se carga."
+    "  * Integrity 0130 es el Restaurant Terra Kitchen ($13.121,49 de A&B).",
+    "    En FinPlan 0130 es 'Spa (gerencia)'. Mapear por igualdad de codigo",
+    "    mandaria la facturacion de un restaurante al Spa.",
+    "  * Integrity 0151 es el Gift Shop. En FinPlan 0151 es 'Tienda' y el Gift",
+    "    Shop es 0165 — son DOS locales distintos, abiertos a proposito.",
+    "",
+    "Por eso la regla 'si FinPlan conoce el codigo, manda FinPlan' es INSEGURA y",
+    "no se usa. El destino se declara aca, explicito.",
+    "",
+    "## Las dos correcciones al archivo del owner",
+    "",
+    "  0128 -> 0121, no 0120. Sus tres cuentas dicen PRIVATE BAR en el nombre y",
+    "         FinPlan tiene el Private Bar como centro de utilidad propio. Son",
+    "         $288,23 en julio que estaban tapados dentro de A&B todos los meses.",
+    "  0151 -> 0165, no 0151. Ver arriba.",
+    "",
+    "Tambien se dejo de guardar la 'division USALI' que traia el Excel: la",
+    "clasificacion sale del catalogo de FinPlan para el departamento DESTINO. Asi",
+    "0155 deja de contarse dentro de Tours y aparece como Innoceana, que es lo que",
+    "la propia hoja de revision del owner ya mostraba aparte.",
+    "",
+    "## Lo que NO hace",
+    "",
+    "No agrega departamentos al catalogo. Los codigos que FinPlan no conoce",
+    "(0124, 0125, 0128, 0129, 0130, 0160, 0170, 0240) se TRADUCEN a uno que si",
+    "conoce; el catalogo es master data de todo el grupo y no se toca para",
+    "acomodar el plan de cuentas de una propiedad.",
+    "",
+    "Los cinco puntos de venta de A&B que Integrity separa (0123 Restaurant, 0124",
+    "Sueño del Bosque, 0125 Pool, 0129 Otros, 0130 Terra Kitchen) caen todos en",
+    "0120, que es como el owner los viene reportando. Abrirlos es una decision",
+    "suya, no del importador.",
+    "",
+    "Un codigo que no este aca no se adivina: se reporta con su monto y no se carga."
   ],
   "departamentos": [
     {
       "codigo": "0110",
-      "division_usali": "Rooms",
-      "nombre_depto": "Departamento de Habitaciones",
-      "depto_finplan": "0110 · Rooms / Habitaciones"
+      "nombre_integrity": "Departamento de Habitaciones",
+      "destino_finplan": "0110"
     },
     {
       "codigo": "0111",
-      "division_usali": "Rooms",
-      "nombre_depto": "Departamento de Habitaciones",
-      "depto_finplan": "0110 · Rooms / Habitaciones"
+      "nombre_integrity": "Departamento de Habitaciones",
+      "destino_finplan": "0110"
     },
     {
       "codigo": "0112",
-      "division_usali": "Rooms",
-      "nombre_depto": "Departamento de Habitaciones",
-      "depto_finplan": "0110 · Rooms / Habitaciones"
+      "nombre_integrity": "Departamento de Habitaciones",
+      "destino_finplan": "0110"
     },
     {
       "codigo": "0113",
-      "division_usali": "Rooms",
-      "nombre_depto": "Departamento de Habitaciones",
-      "depto_finplan": "0110 · Rooms / Habitaciones"
+      "nombre_integrity": "Departamento de Habitaciones",
+      "destino_finplan": "0110"
     },
     {
       "codigo": "0114",
-      "division_usali": "Rooms",
-      "nombre_depto": "Departamento de Habitaciones",
-      "depto_finplan": "0110 · Rooms / Habitaciones"
+      "nombre_integrity": "Departamento de Habitaciones",
+      "destino_finplan": "0110"
     },
     {
       "codigo": "0120",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0122",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0123",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0124",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0125",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0128",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0121"
     },
     {
       "codigo": "0129",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0130",
-      "division_usali": "Food & Beverage",
-      "nombre_depto": "Departamento de A&B",
-      "depto_finplan": "0120 · Alimentos y Bebidas"
+      "nombre_integrity": "Departamento de A&B",
+      "destino_finplan": "0120"
     },
     {
       "codigo": "0132",
-      "division_usali": "SPA",
-      "nombre_depto": "Departamento de Spa",
-      "depto_finplan": "0140 · Departamento de Spa"
+      "nombre_integrity": "Departamento de Spa",
+      "destino_finplan": "0140"
     },
     {
       "codigo": "0140",
-      "division_usali": "SPA",
-      "nombre_depto": "Departamento de Spa",
-      "depto_finplan": "0140 · Departamento de Spa"
+      "nombre_integrity": "Departamento de Spa",
+      "destino_finplan": "0140"
     },
     {
       "codigo": "0150",
-      "division_usali": "Tours",
-      "nombre_depto": "Departamento de Tours",
-      "depto_finplan": "0150 · Tour Activities"
+      "nombre_integrity": "Departamento de Tours",
+      "destino_finplan": "0150"
     },
     {
       "codigo": "0151",
-      "division_usali": "Retail",
-      "nombre_depto": "Departamento Gift Shop",
-      "depto_finplan": "0151 · Tienda"
+      "nombre_integrity": "Departamento Gift Shop",
+      "destino_finplan": "0165"
     },
     {
       "codigo": "0152",
-      "division_usali": "Transportation",
-      "nombre_depto": "Departamento de Transportation",
-      "depto_finplan": "0152 · Transportation"
+      "nombre_integrity": "Departamento de Transportation",
+      "destino_finplan": "0152"
     },
     {
       "codigo": "0155",
-      "division_usali": "Tours",
-      "nombre_depto": "Departamento de INNOCEANA",
-      "depto_finplan": "0155 · Innoceana"
+      "nombre_integrity": "Departamento de INNOCEANA",
+      "destino_finplan": "0155"
     },
     {
       "codigo": "0160",
-      "division_usali": "Laundry",
-      "nombre_depto": "Departamento de Lavanderia",
-      "depto_finplan": "0162 · Laundry Revenue"
+      "nombre_integrity": "Departamento de Lavanderia",
+      "destino_finplan": "0162"
     },
     {
       "codigo": "0161",
-      "division_usali": "Laundry (Overhead)",
-      "nombre_depto": "Departamento de Lavanderia",
-      "depto_finplan": "0161 · Laundry Operations"
+      "nombre_integrity": "Departamento de Lavanderia",
+      "destino_finplan": "0161"
     },
     {
       "codigo": "0170",
-      "division_usali": "Miscellaneous Income",
-      "nombre_depto": "Departamento de  Miscelaneos",
-      "depto_finplan": "280 · Miscelaneos"
+      "nombre_integrity": "Departamento de  Miscelaneos",
+      "destino_finplan": "280"
     },
     {
       "codigo": "0180",
-      "division_usali": "Administrative & General",
-      "nombre_depto": "Departamento de Administración",
-      "depto_finplan": "0180 · Administración"
+      "nombre_integrity": "Departamento de Administración",
+      "destino_finplan": "0180"
     },
     {
       "codigo": "0181",
-      "division_usali": "Administrative & General",
-      "nombre_depto": "Departamento de Administración",
-      "depto_finplan": "0180 · Administración"
+      "nombre_integrity": "Departamento de Administración",
+      "destino_finplan": "0180"
     },
     {
       "codigo": "0182",
-      "division_usali": "Administrative & General",
-      "nombre_depto": "Departamento de Administración",
-      "depto_finplan": "0180 · Administración"
+      "nombre_integrity": "Departamento de Administración",
+      "destino_finplan": "0180"
     },
     {
       "codigo": "0183",
-      "division_usali": "Administrative & General",
-      "nombre_depto": "Departamento de Administración",
-      "depto_finplan": "0180 · Administración"
+      "nombre_integrity": "Departamento de Administración",
+      "destino_finplan": "0180"
     },
     {
       "codigo": "0186",
-      "division_usali": "Administrative & General",
-      "nombre_depto": "Departamento de Administración",
-      "depto_finplan": "0180 · Administración"
+      "nombre_integrity": "Departamento de Administración",
+      "destino_finplan": "0180"
     },
     {
       "codigo": "0190",
-      "division_usali": "Sales & Marketing",
-      "nombre_depto": "Departamento de  Ventas y Mercadeo",
-      "depto_finplan": "0190 · Sales and Marketing"
+      "nombre_integrity": "Departamento de  Ventas y Mercadeo",
+      "destino_finplan": "0190"
     },
     {
       "codigo": "0191",
-      "division_usali": "Sales & Marketing",
-      "nombre_depto": "Departamento de  Ventas y Mercadeo",
-      "depto_finplan": "0190 · Sales and Marketing"
+      "nombre_integrity": "Departamento de  Ventas y Mercadeo",
+      "destino_finplan": "0190"
     },
     {
       "codigo": "0200",
-      "division_usali": "Property Operation & Maintenance",
-      "nombre_depto": "Departamento de  Mantenimiento",
-      "depto_finplan": "0200 · Maintenance"
+      "nombre_integrity": "Departamento de  Mantenimiento",
+      "destino_finplan": "0200"
     },
     {
       "codigo": "0210",
-      "division_usali": "Utilities",
-      "nombre_depto": "Departamento de Utility",
-      "depto_finplan": "0210 · Utilities"
+      "nombre_integrity": "Departamento de Utility",
+      "destino_finplan": "0210"
     },
     {
       "codigo": "0220",
-      "division_usali": "Cafeteria",
-      "nombre_depto": "Departamento de Cafeteria",
-      "depto_finplan": "0220 · Employee Dining (Cafetería)"
+      "nombre_integrity": "Departamento de Cafeteria",
+      "destino_finplan": "0220"
     },
     {
       "codigo": "0230",
-      "division_usali": "Information & Telecommunications Systems",
-      "nombre_depto": "Departamento de TI",
-      "depto_finplan": "0230 · Information System"
+      "nombre_integrity": "Departamento de TI",
+      "destino_finplan": "0230"
     },
     {
       "codigo": "0240",
-      "division_usali": "Property Expenses",
-      "nombre_depto": "Departamento de  Property Expenses",
-      "depto_finplan": "0250 · Gastos de la Propiedad"
+      "nombre_integrity": "Departamento de  Property Expenses",
+      "destino_finplan": "0250"
     }
   ]
 }

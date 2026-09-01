@@ -28,12 +28,41 @@ SEMILLA = BASE / "app" / "seed_data" / "CWL" / "mapd_integrity.json"
 #: El tipo de cambio de julio 2026, tal como está en `Final!AD11` del libro.
 TC_JULIO = D("454.75")
 
-#: Las divisiones que NO son departamentos operativos. Es la agrupación USALI que
-#: usa el propio libro para partir «gasto operativo» de «overhead».
-OVERHEAD = {"Administrative & General", "Sales & Marketing",
-            "Property Operation & Maintenance", "Utilities", "Cafeteria",
-            "Information & Telecommunications Systems", "Laundry (Overhead)",
-            "Property Expenses"}
+@pytest.fixture(scope="module")
+def catalogo() -> dict:
+    """El catálogo de departamentos de FinPlan, sembrado desde las constantes del
+    motor. Es de donde sale la clasificación — el puente sólo traduce códigos."""
+    from app.engine import pl_engine
+    from app.seed_department_catalog import build_rows
+    filas = build_rows()
+    pl_engine.set_dept_catalog([{"dept_code": f["dept_code"],
+                                 "default_pl_group": f.get("default_pl_group", ""),
+                                 "parent_dept_code": f.get("parent_dept_code")}
+                                for f in filas])
+    return {f["dept_code"]: f for f in filas}
+
+
+@pytest.fixture(scope="module")
+def grupo_de(catalogo):
+    """Grupo del P&L según FinPlan. `None` cuando el catálogo lo deja vacío a
+    propósito (los que se abren POR CUENTA, como 280 Misceláneos): ahí no se
+    inventa un grupo."""
+    from app.engine import pl_engine
+
+    def resolver(destino: str):
+        fila = catalogo.get(destino)
+        if fila is not None and not (fila.get("default_pl_group") or ""):
+            return None
+        return pl_engine.group_for_dept(destino)
+    return resolver
+
+
+#: Los grupos que FinPlan considera overhead. Sale del motor, no de una lista
+#: escrita a mano acá — si el motor cambia, la prueba se entera.
+@pytest.fixture(scope="module")
+def overhead() -> set:
+    from app.engine import pl_engine
+    return set(pl_engine.OVERHEAD_DEPT_GROUPS)
 
 
 @pytest.fixture(scope="module")
@@ -43,8 +72,8 @@ def mapd() -> dict:
 
 
 @pytest.fixture(scope="module")
-def julio(mapd) -> dict:
-    return m.leer(FIXTURE.read_bytes(), TC_JULIO, mapd)
+def julio(mapd, grupo_de) -> dict:
+    return m.leer(FIXTURE.read_bytes(), TC_JULIO, mapd, grupo_de)
 
 
 @pytest.fixture(scope="module")
@@ -63,18 +92,18 @@ def test_ingresos_totales(por_categoria):
     assert abs(por_categoria["Ingresos"] - D("248437.33")) < D("0.02")
 
 
-def test_gasto_operativo(julio):
+def test_gasto_operativo(julio, overhead):
     """Los departamentos operativos, sin overhead y sin la clase 8."""
     t = sum((f["mes_usd"] for f in julio["filas"]
              if f["categoria"] not in ("Ingresos", "No Operativo")
-             and f["division_usali"] not in OVERHEAD), D(0))
+             and f["grupo"] not in overhead), D(0))
     assert abs(t - D("147248.79")) < D("0.02")
 
 
-def test_overhead(julio):
+def test_overhead(julio, overhead):
     t = sum((f["mes_usd"] for f in julio["filas"]
              if f["categoria"] not in ("Ingresos", "No Operativo")
-             and f["division_usali"] in OVERHEAD), D(0))
+             and f["grupo"] in overhead), D(0))
     assert abs(t - D("178789.87")) < D("0.02")
 
 
@@ -91,6 +120,79 @@ def test_la_clase_8_completa_es_la_suma_de_sus_cinco_baldes(por_categoria):
     depreciación · impuesto. Juntos tienen que dar el total de la clase."""
     baldes = D("18664.70") + D("9937.63") + D("0") + D("28343.41") + D("-40364.12")
     assert abs(por_categoria["No Operativo"] - baldes) < D("0.02")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LAS COLISIONES DE CÓDIGO — por qué el puente tiene que existir
+#
+# Los dos sistemas NO comparten espacio de códigos. Mapear por igualdad de
+# código movería plata de departamento sin que ningún total cambie.
+# ═════════════════════════════════════════════════════════════════════════════
+
+def test_el_0130_de_integrity_es_un_restaurante_no_el_spa(julio):
+    """Integrity `0130` = Restaurant Terra Kitchen. FinPlan `0130` = Spa
+    (gerencia). Son $13.121,49 de A&B que irían al Spa si se mapeara por código."""
+    filas = [f for f in julio["filas"] if f["depto"] == "0130"]
+    assert filas, "el fixture de julio tiene que traer el 0130"
+    assert all(f["destino_finplan"] == "0120" for f in filas)
+    assert all(f["grupo"] == "FB" for f in filas)
+    assert abs(sum((f["mes_usd"] for f in filas), D(0)) - D("13121.49")) < D("0.02")
+
+
+def test_el_0151_de_integrity_es_el_gift_shop_no_la_tienda(julio):
+    """FinPlan tiene DOS locales: `0151` Tienda y `0165` Gift Shop. El `0151` de
+    Integrity es el segundo — sus cuentas dicen RETAIL GIFT SHOP."""
+    filas = [f for f in julio["filas"] if f["depto"] == "0151"]
+    assert filas
+    assert all(f["destino_finplan"] == "0165" for f in filas)
+    assert all(f["grupo"] == "RETAIL" for f in filas)
+
+
+def test_el_private_bar_no_queda_tapado_dentro_de_ayb(julio):
+    """`0128` son cuentas que dicen PRIVATE BAR y FinPlan lo tiene como centro de
+    utilidad propio. El Excel del owner lo mandaba a A&B."""
+    filas = [f for f in julio["filas"] if f["depto"] == "0128"]
+    assert filas
+    assert all(f["destino_finplan"] == "0121" for f in filas)
+    assert all(f["grupo"] == "PRIVATE_BAR" for f in filas)
+
+
+def test_innoceana_no_se_cuenta_dentro_de_tours(julio):
+    """El Excel decía «Tours» en la columna de división, pero su propia hoja de
+    revisión ya mostraba Innoceana como fila aparte."""
+    filas = [f for f in julio["filas"] if f["depto"] == "0155"]
+    assert filas
+    assert all(f["grupo"] == "INNOCEANA" for f in filas)
+
+
+def test_la_lavanderia_son_dos_departamentos(julio):
+    """Diseño del owner: uno lleva el ingreso y el otro los gastos."""
+    ingreso = [f for f in julio["filas"] if f["depto"] == "0160"]
+    gasto = [f for f in julio["filas"] if f["depto"] == "0161"]
+    assert all(f["destino_finplan"] == "0162" and f["grupo"] == "LAUNDRY" for f in ingreso)
+    assert all(f["destino_finplan"] == "0161" and f["grupo"] == "LAUNDRY_OPS" for f in gasto)
+
+
+def test_la_lavanderia_de_gastos_cierra_en_cero(julio):
+    """`4999-0161 LAUNDRY EXPENSE DISTRIBUTION` reparte todo su costo a los
+    departamentos que lo consumen: el departamento neto tiene que dar cero."""
+    t = sum((f["mes_usd"] for f in julio["filas"] if f["depto"] == "0161"), D(0))
+    assert abs(t) < D("0.02")
+
+
+def test_un_destino_sin_grupo_no_se_inventa(julio):
+    """`280` Misceláneos se abre POR CUENTA y el catálogo lo deja sin grupo a
+    propósito. Poner el fallback rotularía como overhead lo que es ingreso."""
+    filas = [f for f in julio["filas"] if f["destino_finplan"] == "280"]
+    assert filas
+    assert all(f["grupo"] is None for f in filas)
+
+
+def test_todo_destino_existe_en_el_catalogo_de_finplan(mapd, catalogo):
+    """Un destino que FinPlan no conoce dejaría la plata sin clasificar."""
+    faltan = {d["codigo"]: d["destino_finplan"] for d in mapd.values()
+              if d["destino_finplan"] not in catalogo}
+    assert not faltan, f"destinos que no existen en FinPlan: {faltan}"
 
 
 def test_ningun_departamento_quedo_sin_mapeo(julio):

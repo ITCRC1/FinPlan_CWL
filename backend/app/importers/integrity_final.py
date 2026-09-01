@@ -209,12 +209,26 @@ def ubicar_encabezados(filas: list[tuple]) -> dict:
         f"«{ENCABEZADOS['acumulado']}». ¿Es el estado de resultados de Integrity?")
 
 
-def mapear_filas(filas: list[tuple], cols: dict, tc, mapd: dict) -> dict:
+def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
+                 grupo_de=None) -> dict:
     """Las filas ya traducidas, más los departamentos que nadie mapeó.
 
-    `mapd` = {codigo: {division_usali, nombre_depto, depto_finplan}}.
+    `puente` = {codigo_integrity: {nombre_integrity, destino_finplan}} — la
+    semilla `seed_data/<HOTEL>/mapd_integrity.json`.
 
-    Un departamento que no está en `mapd` **no se adivina**: va a `sin_mapeo`
+    `grupo_de(destino)` devuelve el grupo del P&L al que pertenece ese
+    departamento **según FinPlan**, o `None` si el catálogo lo deja vacío a
+    propósito (los departamentos que se abren POR CUENTA, como `280`
+    Misceláneos). Cuando es `None` no se inventa un grupo: la línea la resuelve
+    el mapeo de cuentas, y poner el fallback —`OTHER_OVERHEAD`— rotularía como
+    overhead lo que en realidad es ingreso.
+
+    ⚠️ **La clasificación no sale de este archivo, sale del catálogo de
+    FinPlan.** El puente sólo traduce el CÓDIGO, porque los dos sistemas no
+    comparten espacio de códigos: Integrity `0130` es el Restaurant Terra
+    Kitchen y FinPlan `0130` es «Spa (gerencia)». Ver la nota de la semilla.
+
+    Un departamento que no está en el puente **no se adivina**: va a `sin_mapeo`
     con su monto, para que se pueda decidir si es ruido o si falta media
     operación. Es la misma regla que el importador de Channel Mix aplica con los
     market codes sin canal.
@@ -233,7 +247,8 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, mapd: dict) -> dict:
         mes_crc = monto_mes(cuenta, crudo_mes, crudo_acum)
         acum_crc = monto_acumulado(cuenta, crudo_acum)
         depto = depto_de(cuenta)
-        m = mapd.get(depto)
+        m = puente.get(depto)
+        destino = (m or {}).get("destino_finplan", "")
         fila = {
             "fila": n,
             "cuenta": cuenta,
@@ -243,9 +258,9 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, mapd: dict) -> dict:
                                   if cols["descripcion"] is not None
                                   and cols["descripcion"] < len(f) else ""),
             "categoria": categoria_usali(cuenta),
-            "division_usali": (m or {}).get("division_usali", "Sin mapeo"),
-            "depto_finplan": (m or {}).get("depto_finplan", ""),
-            "nombre_depto": (m or {}).get("nombre_depto", ""),
+            "destino_finplan": destino,
+            "grupo": (grupo_de(destino) if grupo_de and destino else None),
+            "nombre_integrity": (m or {}).get("nombre_integrity", ""),
             "mes_crc": mes_crc,
             "acumulado_crc": acum_crc,
             "mes_usd": a_dolares(mes_crc, tc),
@@ -261,7 +276,7 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, mapd: dict) -> dict:
             "sin_mapeo": sorted(sin_mapeo.values(), key=lambda x: -abs(x["mes_usd"]))}
 
 
-def leer(data: bytes, tc, mapd: dict) -> dict:
+def leer(data: bytes, tc, puente: dict, grupo_de=None) -> dict:
     """El archivo crudo de Integrity → filas traducidas. Es la puerta del módulo."""
     import io as _io
     import openpyxl
@@ -273,4 +288,4 @@ def leer(data: bytes, tc, mapd: dict) -> dict:
             f"El archivo no trae la hoja «{HOJA}». Trae: {', '.join(wb.sheetnames)}.")
     filas = list(wb[HOJA].iter_rows(values_only=True))
     cols = ubicar_encabezados(filas)
-    return {**mapear_filas(filas, cols, tc, mapd), "columnas": cols}
+    return {**mapear_filas(filas, cols, tc, puente, grupo_de), "columnas": cols}
