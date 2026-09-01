@@ -134,6 +134,12 @@ class ImportException(Base):
     # esconder». Una propuesta sin explicación no se puede auditar ni discutir.
     rationale: Mapped[str] = mapped_column(Text, default="")
 
+    #: Cuánta plata hay detrás del hallazgo. Sin esto no hay forma de saber si es
+    #: ruido o si falta media operación, y una cola que no distingue las dos cosas
+    #: se aprende a ignorar. `None` para los hallazgos que no son de monto (una
+    #: cuenta sin mapeo que todavía no movió nada).
+    monto: Mapped[Decimal | None] = mapped_column(Numeric(16, 2), nullable=True)
+
     # pending | approved | rejected | auto_applied
     estado: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     resuelto_por: Mapped[str] = mapped_column(String(120), default="")

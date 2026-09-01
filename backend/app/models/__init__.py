@@ -49,6 +49,7 @@ from app.models.scenario_stat import ScenarioStat
 from app.models.stat_account import StatAccount
 from app.models.stat_account import DIMENSIONES as DIMENSIONES_ESTADISTICAS
 from app.models.market_code import MarketCode, CANALES, CANAL_A_COMISION
+from app.models.precierre import Precierre, PrecierreFila, ESTADOS as PRECIERRE_ESTADOS
 from app.models.canal_comercial import CanalComercial
 from app.models.canal_comision import CanalComision
 from app.models.canal_mix_escenario import CanalMixEscenario
@@ -111,6 +112,7 @@ __all__ = [
     "ScenarioStat", "ClubMembershipStat", "ClubFeeBudget",
     "StatAccount", "StatisticalEntry", "DIMENSIONES_ESTADISTICAS",
     "MarketCode", "CANALES", "CANAL_A_COMISION", "CanalComercial",
+    "Precierre", "PrecierreFila", "PRECIERRE_ESTADOS",
     "CanalComision",
     "CanalMixEscenario",
     "CashFlowParams", "CashFlowVersion", "BelowGopAccountEntry",
