@@ -194,6 +194,25 @@ MENSAJES: dict[str, dict[str, str]] = {
     "tipo_habitacion.posicion_no_se_mueve": {
         "es": "«{nombre}» nació en la posición {posicion} y ahí se queda: el importador del Excel mapea sus filas por posición, y reordenar movería las tarifas de categoría.",
         "en": "“{nombre}” was born at position {posicion} and there it stays: the Excel importer maps its rows by position, and reordering would move the rates to the wrong category."},
+    # ── Pre-Cierre ───────────────────────────────────────────────────────────
+    "precierre.no_encontrado": {
+        "es": "Ese pre-cierre no existe o ya se borró.",
+        "en": "That pre-close does not exist or has been deleted."},
+    "precierre.archivo_vacio": {
+        "es": "El archivo llegó vacío.",
+        "en": "The file arrived empty."},
+    "precierre.sin_puente": {
+        "es": "Esta propiedad no tiene cargado el mapeo de departamentos de Integrity (`mapd_integrity.json`). Sin él no se sabe a qué departamento de FinPlan va cada código.",
+        "en": "This property has no Integrity department bridge loaded (`mapd_integrity.json`). Without it there is no way to know which FinPlan department each code belongs to."},
+    "precierre.formato": {
+        "es": "No se pudo leer el estado de resultados de Integrity: {detalle}",
+        "en": "Integrity's income statement could not be read: {detalle}"},
+    "precierre.ya_hay_borrador": {
+        "es": "{mes} {anio} ya tiene un pre-cierre en revisión. Si querés empezar de nuevo, repetí la subida confirmando que se reemplace — el borrador actual se descarta.",
+        "en": "{mes} {anio} already has a pre-close under review. To start over, repeat the upload confirming replacement — the current draft is discarded."},
+    "precierre.ya_paso_a_final": {
+        "es": "Este pre-cierre ya se pasó a Final: no se puede descartar. Lo que se subió se corrige subiendo el mes de nuevo.",
+        "en": "This pre-close was already passed to Final and cannot be discarded. What was uploaded is corrected by uploading the month again."},
     "xml.anio_no_esta": {
         "es": "El XML no trae datos de {anio}. Trae: {anios}.",
         "en": "The XML carries no data for {anio}. It carries: {anios}."},

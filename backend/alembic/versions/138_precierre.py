@@ -72,8 +72,11 @@ def upgrade() -> None:
         # (280 Miscelaneos) no tienen grupo, y ponerles uno los rotularia mal.
         sa.Column("grupo", sa.String(30), nullable=False, server_default=""),
         sa.Column("categoria", sa.String(20), nullable=False, server_default=""),
-        sa.Column("mes_usd", sa.Numeric(16, 2), nullable=False, server_default="0"),
-        sa.Column("acumulado_usd", sa.Numeric(16, 2), nullable=False, server_default="0"),
+        # SEIS decimales: el dolar sale de dividir colones entre el TC y casi
+        # nunca es exacto. Con dos se redondeaban las 325 filas antes de sumar y
+        # la utilidad neta de julio daba -94.182,93 en vez de -94.182,95.
+        sa.Column("mes_usd", sa.Numeric(18, 6), nullable=False, server_default="0"),
+        sa.Column("acumulado_usd", sa.Numeric(18, 6), nullable=False, server_default="0"),
     )
     # El monto del hallazgo, en la cola que ya existe.
     op.add_column("guillermo_import_exceptions",

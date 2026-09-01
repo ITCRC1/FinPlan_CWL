@@ -144,6 +144,14 @@ def valores_desde_precierre(filas: list[dict]) -> dict[str, Decimal]:
     return v
 
 
+def valores_completos(filas: list[dict]) -> dict[str, Decimal]:
+    """Las claves de la hoja **con la cascada ya resuelta** — divisiones y
+    totales. Es lo que consume cualquiera que quiera los números sin dibujar el
+    Excel: `valores_desde_precierre` sola devuelve el detalle y deja los totales
+    sin calcular, que fue exactamente el error de la primera corrida."""
+    return _totales(valores_desde_precierre(filas))
+
+
 def _totales(v: dict[str, Decimal]) -> dict[str, Decimal]:
     """Los totales de la cascada. Se calculan, nunca se reciben: así el cuadro
     cierra consigo mismo."""

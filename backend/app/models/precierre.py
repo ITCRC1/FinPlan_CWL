@@ -123,8 +123,14 @@ class PrecierreFila(Base):
     grupo: Mapped[str] = mapped_column(String(30), default="")
     categoria: Mapped[str] = mapped_column(String(20), default="")
 
-    mes_usd: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"))
-    acumulado_usd: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=Decimal("0"))
+    #: ⚠️ SEIS decimales, no dos. El monto en dólares sale de dividir colones
+    #: entre el tipo de cambio, así que casi nunca es exacto. Con `Numeric(16,2)`
+    #: se redondeaba CADA UNA de las 325 filas antes de sumarlas, y la utilidad
+    #: neta de julio daba -94.182,93 en vez de -94.182,95. Son dos centavos y no
+    #: rompían ninguna validación — por eso hay que cuidarlo acá: la deriva que
+    #: nadie nota es la que se acumula.
+    mes_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    acumulado_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
 
     def __repr__(self) -> str:
         return f"<PrecierreFila {self.cuenta} ${self.mes_usd}>"
