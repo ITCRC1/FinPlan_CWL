@@ -144,6 +144,122 @@ def valores_desde_precierre(filas: list[dict]) -> dict[str, Decimal]:
     return v
 
 
+#: Fila del reporte → el sufijo de sus líneas del P&L, en el vocabulario
+#: CANÓNICO.
+#:
+#: ⚠️ No son los grupos del catálogo. Un escenario emite los DOS vocabularios
+#: —`REV_TRANSPORT` (el del motor viejo) y `REV_TRANSPORTATION` (el canónico)—
+#: y hay que usar uno solo: mezclarlos contaría la plata dos veces. Se elige el
+#: canónico porque `canonicalize_pl_lines` garantiza que exista siempre; el
+#: viejo aparece sólo en los escenarios importados.
+#:
+#: Los que difieren del grupo del catálogo: `TRANSPORT`→`TRANSPORTATION` y
+#: `CROWTHER`→`CROWTHER_LAB`. Con el grupo, esas dos filas salían en CERO.
+SUFIJOS_PL = {
+    "Rooms": ["ROOMS"],
+    "F&B": ["FB", "PRIVATE_BAR"],
+    "SPA": ["SPA"],
+    "Tours": ["TOURS"],
+    "Retail-Gift Shop": ["RETAIL", "TIENDA"],
+    "Transportation": ["TRANSPORTATION"],
+    "Laundry": ["LAUNDRY"],
+    "Innoceana": ["INNOCEANA"],
+    "Crowther Lab": ["CROWTHER_LAB"],
+    "Miscellaneous": ["MISC_OTHER", "SUSTAINABILITY"],
+}
+
+#: Overhead del reporte → el sufijo de sus líneas del P&L. Los nombres no son
+#: iguales a los grupos del catálogo: `SALES` es `OH_SALES_MARKETING`, `IT` es
+#: `OH_INFORMATION_SYSTEM`, `LAUNDRY_OPS` es `OH_LAUNDRY`.
+#:
+#: ⚠️ `Administrations` incluye además `CC_COMMISSIONS`. Medido contra julio
+#: 2026: el Budget da `OH_ADMIN` 54.311,53 y el tab dice 56.811,5 — los
+#: 2.500,00 que faltan son las comisiones de tarjeta.
+OH_SUFIJOS = {
+    "Administrations": ["ADMIN", "CC_COMMISSIONS"],
+    "Sales & Marketing": ["SALES_MARKETING"],
+    "Maintenance": ["MAINTENANCE"],
+    "Information System": ["INFORMATION_SYSTEM"],
+    "Utilities": ["UTILITIES"],
+    "Claro Huerta": ["CLARO_HUERTA"],
+    "Cafeteria": ["CAFETERIA"],
+    "Laundry": ["LAUNDRY"],
+}
+
+#: Línea de abajo del GOP → su código en el P&L.
+BG_LINEAS = {
+    "RENT": ["RENT"],
+    "MANAGEMENT FEES (3%)": ["MGMT_FEE_3"],
+    "MANAGEMENT FEES (5%) Royalties": ["MGMT_FEE_5_ROYALTIES"],
+    "PROPERTIES INSURANCE": ["PROPERTY_INSURANCE"],
+    "OTHER EXPENSES": ["OTHER_EXPENSES"],
+    "CAPITAL RESERVE": ["CAPITAL_RESERVE"],
+    "LARGE CAPITAL EXPENDITURE": ["LARGE_CAPITAL_EXPENDITURE"],
+    # ⚠️ SOLO `DEPRECIATION`. El escenario trae también `TOTAL_DEPRECIATIONS`
+    # con el mismo valor —son la línea y su total—, y sumar las dos daba
+    # 53.166,66 donde el tab dice 26.583,33.
+    "DEPRECIATION": ["DEPRECIATION"],
+    "Income Tax (30%)": ["INCOME_TAXES"],
+    "BAC INTERESES PRESTAMO": [],
+    "B.C.R. INTERESES PRESTAMO": [],
+    "LEASING CAMION": [],
+    "PERDIDAS FINANCIERAS": ["FINANCIAL_LOSSES"],
+}
+
+#: Totales que el escenario trae ya calculados. Cuando vienen, mandan: el tab
+#: abre los financieros por prestamista y FinPlan no, así que sumar las cuatro
+#: filas de abajo daría cero donde el escenario dice 226,01.
+TOTALES_DEL_ESCENARIO = {
+    "FINANCIAL EXPENSES": "FINANCIAL_EXPENSES",
+}
+
+
+def _suma_por_prefijo(lineas: dict, prefijos: list[str], sufijos: list) -> Decimal:
+    """Suma las líneas `PREFIJO_SUFIJO` y sus hijas `PREFIJO_SUFIJO_*`.
+
+    Las hijas importan: el A&B del Budget trae `COS_FB_FOOD` y `COS_FB_BEV`
+    aparte de `OPEX_FB`, y sin ellas el gasto del departamento sale a menos de
+    la mitad.
+    """
+    total = ZERO
+    for p in prefijos:
+        for s in sufijos:
+            if s is None:
+                continue
+            base = f"{p}_{s}"
+            for codigo, monto in lineas.items():
+                if codigo == base or codigo.startswith(base + "_"):
+                    total += _d(monto)
+    return total
+
+
+def valores_desde_lineas_pl(lineas: dict) -> dict[str, Decimal]:
+    """Las claves de la hoja, desde el P&L de un escenario de FinPlan.
+
+    `lineas` = `{line_code: monto}` de `compute_pl_month`. Es lo que llena las
+    columnas **Forecast** y **Budget**: el mismo diccionario de claves que
+    produce `valores_desde_precierre` para la columna Actual, así que las tres
+    se comparan sin traducir nada en el medio.
+    """
+    v: dict[str, Decimal] = {}
+    for etiqueta, _grupos in DIVISIONES:
+        suf = SUFIJOS_PL.get(etiqueta, [])
+        v[f"rev.{etiqueta}"] = _suma_por_prefijo(lineas, ["REV"], suf)
+        # El gasto del departamento es OPEX **más** el costo de ventas. El A&B
+        # del Budget trae `COS_FB_FOOD` y `COS_FB_BEV` aparte de `OPEX_FB`.
+        v[f"opex.{etiqueta}"] = _suma_por_prefijo(lineas, ["OPEX", "COS"], suf)
+        v[f"profit.{etiqueta}"] = _suma_por_prefijo(lineas, ["PROFIT"], suf)
+    for etiqueta, _grupo in OVERHEADS:
+        v[f"oh.{etiqueta}"] = _suma_por_prefijo(
+            lineas, ["OH", "COH"], OH_SUFIJOS.get(etiqueta, []))
+    for etiqueta, codigos in BG_LINEAS.items():
+        v[f"bg.{etiqueta}"] = sum((_d(lineas.get(c)) for c in codigos), ZERO)
+    for clave, codigo in TOTALES_DEL_ESCENARIO.items():
+        if codigo in lineas:
+            v[clave] = _d(lineas[codigo])
+    return v
+
+
 def valores_completos(filas: list[dict]) -> dict[str, Decimal]:
     """Las claves de la hoja **con la cascada ya resuelta** — divisiones y
     totales. Es lo que consume cualquiera que quiera los números sin dibujar el
@@ -177,9 +293,13 @@ def _totales(v: dict[str, Decimal]) -> dict[str, Decimal]:
                                   + t["PROPERTY INSURANCE"]
                                   + t["TOTAL OTHER EXPENSES"])
     t["EBITDA"] = t["TOTAL GROSS OPERATING PROFIT"] - t["TOTAL Owners Expenses"]
-    t["FINANCIAL EXPENSES"] = (bg("BAC INTERESES PRESTAMO")
-                               + bg("B.C.R. INTERESES PRESTAMO")
-                               + bg("LEASING CAMION") + bg("PERDIDAS FINANCIERAS"))
+    # Si el escenario ya trajo el total, manda ese: el tab abre los financieros
+    # por prestamista y FinPlan no, así que sumar las cuatro filas daría cero.
+    t["FINANCIAL EXPENSES"] = v.get("FINANCIAL EXPENSES") if v.get(
+        "FINANCIAL EXPENSES") else (bg("BAC INTERESES PRESTAMO")
+                                    + bg("B.C.R. INTERESES PRESTAMO")
+                                    + bg("LEASING CAMION")
+                                    + bg("PERDIDAS FINANCIERAS"))
     t["TOTAL DEPRECIATIONS"] = bg("DEPRECIATION")
     t["EARNINGS BEFORE INCOME TAXES"] = (t["EBITDA"] - t["FINANCIAL EXPENSES"]
                                          - t["TOTAL DEPRECIATIONS"]

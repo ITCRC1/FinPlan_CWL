@@ -42,6 +42,8 @@ resto del sistema.
 from app.revision.hallazgo import GRAVEDADES, Hallazgo, hallazgo
 from app.revision.nivel1_estructura import revisar as revisar_estructura
 from app.revision.nivel2_coherencia import revisar as revisar_coherencia
+from app.revision.nivel3_fuentes import revisar as revisar_fuentes
+from app.revision.nivel4_expectativa import revisar as revisar_expectativa
 
-__all__ = ["Hallazgo", "hallazgo", "GRAVEDADES",
-           "revisar_estructura", "revisar_coherencia"]
+__all__ = ["Hallazgo", "hallazgo", "GRAVEDADES", "revisar_estructura",
+           "revisar_coherencia", "revisar_fuentes", "revisar_expectativa"]
