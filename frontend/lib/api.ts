@@ -4698,3 +4698,118 @@ export async function correrRondaGuillermo(): Promise<{
 }> {
   return api.post(`/guillermo/ronda/`, {});
 }
+
+
+// ── Pre-Cierre ────────────────────────────────────────────────────────────────
+//
+// El carril donde los actuales se revisan antes de declararlos finales. Ver
+// `backend/app/api/precierre_api.py`.
+
+/** El mensaje que el backend escribio, no el JSON crudo.
+ *
+ * ⚠️ El resto de este archivo tira `API 422: {"detail":"..."}` y el usuario ve
+ * el JSON. Hay un catalogo de errores bilingue en `backend/app/errores.py` que
+ * no llega a la pantalla. Acá se desenvuelve; el arreglo general de las otras
+ * 29 llamadas es una tarea aparte. */
+async function errorLegible(res: Response): Promise<Error> {
+  const texto = await res.text();
+  let mensaje = texto, clave: string | undefined, detalle: unknown;
+  try {
+    const j = JSON.parse(texto);
+    clave = j?.clave;
+    detalle = j?.detail;
+    mensaje = typeof j?.detail === "string" ? j.detail
+            : (j?.detail?.mensaje ?? j?.detail?.error ?? texto);
+  } catch { /* no era JSON */ }
+  return Object.assign(new Error(mensaje), { clave, detalle, status: res.status });
+}
+
+export interface PrecierreHallazgo {
+  clave: string; titulo: string; gravedad: "critico" | "aviso" | "info";
+  detalle: string; porque: string; que_hacer: string;
+  monto: number; nivel: number; referencias: Record<string, unknown>[];
+}
+export interface PrecierreFilaHoja {
+  fila: number; etiqueta: string; clave: string | null; actual: number | null;
+}
+export interface PrecierreResumen {
+  id: string; anio: number; mes: number; estado: string; tc: number;
+  archivo: string; subido_por: string; creado_en: string | null;
+  hallazgos_abiertos: number;
+}
+
+export async function subirPrecierre(
+  archivo: File, opts: { tc: string; mes: number; anio: number },
+): Promise<{ id: string; filas: number; vuelta: number;
+             reemplaza_a: { archivo: string; subido_en: string } | null;
+             sin_mapeo: { depto: string; mes_usd: number }[];
+             hallazgos: PrecierreHallazgo[] }> {
+  const form = new FormData();
+  form.append("file", archivo);
+  const q = new URLSearchParams({ tc: opts.tc, mes: String(opts.mes),
+                                  anio: String(opts.anio) });
+  const res = await fetch(`${BASE}/precierre/?${q}`, {
+    method: "POST", body: form, headers: authHeaders(),
+  });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+export function listarPrecierres(): Promise<{ precierres: PrecierreResumen[] }> {
+  return api.get("/precierre/");
+}
+
+export function verPrecierre(id: string): Promise<{
+  id: string; anio: number; mes: number; estado: string; tc: number;
+  hoja: PrecierreFilaHoja[]; filas: number;
+}> {
+  return api.get(`/precierre/${id}/`);
+}
+
+export function hallazgosPrecierre(id: string, opts?: {
+  umbralMonto?: number; umbralPct?: number;
+  roomsDisponibles?: number; roomsOcupadas?: number; huespedes?: number;
+}): Promise<{
+  umbrales: { monto: number; pct: number };
+  comparativos: Record<string, string>;
+  hallazgos: PrecierreHallazgo[];
+  resumen: Record<string, number>;
+  sin_revisar: string[];
+}> {
+  const q = new URLSearchParams();
+  if (opts?.umbralMonto != null) q.set("umbral_monto", String(opts.umbralMonto));
+  if (opts?.umbralPct != null) q.set("umbral_pct", String(opts.umbralPct));
+  if (opts?.roomsDisponibles != null) q.set("rooms_disponibles", String(opts.roomsDisponibles));
+  if (opts?.roomsOcupadas != null) q.set("rooms_ocupadas", String(opts.roomsOcupadas));
+  if (opts?.huespedes != null) q.set("huespedes", String(opts.huespedes));
+  return api.get(`/precierre/${id}/hallazgos/${q.toString() ? `?${q}` : ""}`);
+}
+
+export async function pasarPrecierreAFinal(id: string, opts?: {
+  dryRun?: boolean; confirmarDiferencias?: boolean;
+}): Promise<{ estado?: string; hallazgos_abiertos?: number; dry_run?: boolean }> {
+  const q = new URLSearchParams();
+  if (opts?.dryRun) q.set("dry_run", "true");
+  if (opts?.confirmarDiferencias) q.set("confirmar_diferencias", "true");
+  const res = await fetch(`${BASE}/precierre/${id}/pasar-a-final/?${q}`, {
+    method: "POST", headers: authHeaders(),
+  });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+export async function descartarPrecierre(id: string): Promise<{ estado: string }> {
+  const res = await fetch(`${BASE}/precierre/${id}/`, {
+    method: "DELETE", headers: authHeaders(),
+  });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+/** Las cuatro descargas. Todas editables: valores, no formulas. */
+export const descargasPrecierre = (id: string) => ({
+  detalle: dlUrl(`/precierre/${id}/detalle.xlsx`),
+  hoja: dlUrl(`/precierre/${id}/hoja.xlsx`),
+  filas: dlUrl(`/precierre/${id}/filas.xlsx`),
+  listado: dlUrl(`/precierre/listado.xlsx`),
+});

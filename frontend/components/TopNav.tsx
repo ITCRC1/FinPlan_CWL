@@ -60,6 +60,9 @@ export const NAV: NavGroup[] = [
     key: "scenarios",
     items: [
       { key: "scenarios", href: "/scenarios" },
+      // Pre-Cierre va ANTES de la carga porque es el paso que la precede: el
+      // mes se revisa y recién después se declara final.
+      { key: "preCierre", href: "/pre-cierre" },
       { key: "importActuals", href: "/admin/import-actuals" },
     ],
   },

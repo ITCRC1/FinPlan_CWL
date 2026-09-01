@@ -130,7 +130,8 @@
       "costMasterData": "Master Data",
       "costFloors": "Price Floors",
       "costEscalones": "Cost Steps",
-      "costSimulator": "Group Simulator"
+      "costSimulator": "Group Simulator",
+      "preCierre": "Pre-Close"
     },
     "groupsFull": {
       "financials": "Financial Statements",
@@ -4293,6 +4294,69 @@
       "dondeSeValidaElArchivo": "Where the file is validated before uploading",
       "laVersionLargaDeEstosKpi": "The long-form version of these same KPIs",
       "elDetalleOperativo": "The same KPIs with the operational detail"
+    }
+  },
+  "precierre": {
+    "titulo": "Pre-Close",
+    "bajada": "Upload the income statement exactly as it comes out of Integrity. The system builds the review sheet and tells you what it found — variances and discrepancies. Nothing is written until you pass it to Final.",
+    "archivo": "Integrity file",
+    "tc": "Exchange rate",
+    "tcAyuda": "CRC per USD, for the month",
+    "mes": "Month",
+    "anio": "Year",
+    "subir": "Upload and review",
+    "subiendo": "Reading…",
+    "cargado": "Loaded: {filas} rows translated.",
+    "vueltaN": "Round {n}. Replaces “{archivo}”.",
+    "todaviaNoEsta": "This is NOT in the system yet. No report reads it until you pass it to Final.",
+    "umbrales": "Report deviations above",
+    "sinHallazgos": "No findings at these thresholds.",
+    "sinRevisar": "What this run could NOT check",
+    "porque": "Why it matters:",
+    "queHacer": "What to do:",
+    "verDetalle": "See the {n} rows",
+    "nivel": "Level {n}",
+    "hojaAyuda": "The review sheet, with the same layout as the tab you review by eye.",
+    "estado": {
+      "borrador": "under review",
+      "pasado_a_final": "final",
+      "descartado": "discarded"
+    },
+    "gravedad": {
+      "critico": "Critical",
+      "aviso": "Warning",
+      "info": "Info"
+    },
+    "tab": {
+      "hallazgos": "Findings",
+      "hoja": "Month review",
+      "descargas": "Downloads"
+    },
+    "final": {
+      "titulo": "Pass to Final",
+      "sinHallazgos": "No open findings. Passing to Final writes the month through the usual door.",
+      "conHallazgos": "{n} findings are still open ({criticos} critical). None of them blocks closing, but which ones were open is recorded.",
+      "pasar": "Pass to Final",
+      "pasarConfirmando": "Pass even if verification does not tie",
+      "descartar": "Discard this draft"
+    },
+    "dl": {
+      "detalle": {
+        "titulo": "FinPlan standard format",
+        "que": "The same file the app downloads and reads back, already filled with the month. Edit it and upload it through the usual door."
+      },
+      "hoja": {
+        "titulo": "Review sheet",
+        "que": "The layout of the tab you review by eye, with Forecast, Budget and Actual columns."
+      },
+      "filas": {
+        "titulo": "Translated detail",
+        "que": "Every account with the row of the source Excel it came from."
+      },
+      "listado": {
+        "titulo": "Pre-close history",
+        "que": "Each month's rounds: who uploaded what, and when."
+      }
     }
   }
 }

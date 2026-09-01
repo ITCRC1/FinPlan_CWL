@@ -130,7 +130,8 @@
       "costMasterData": "Master Data",
       "costFloors": "Price Floors",
       "costEscalones": "Cost Steps",
-      "costSimulator": "Group Simulator"
+      "costSimulator": "Group Simulator",
+      "preCierre": "Pre-Cierre"
     },
     "groupsFull": {
       "financials": "Estados financieros",
@@ -4293,6 +4294,69 @@
       "dondeSeValidaElArchivo": "Donde se valida el archivo antes de subirlo",
       "laVersionLargaDeEstosKpi": "La versión larga de estos mismos KPIs",
       "elDetalleOperativo": "Los mismos KPIs con el detalle operativo"
+    }
+  },
+  "precierre": {
+    "titulo": "Pre-Cierre",
+    "bajada": "Subí el estado de resultados tal como baja de Integrity. El sistema arma la hoja de revisión y te dice qué encontró — varianzas y discrepancias. Nada se escribe hasta que lo pases a Final.",
+    "archivo": "Archivo de Integrity",
+    "tc": "Tipo de cambio",
+    "tcAyuda": "CRC por USD, del mes",
+    "mes": "Mes",
+    "anio": "Año",
+    "subir": "Subir y revisar",
+    "subiendo": "Leyendo…",
+    "cargado": "Cargado: {filas} filas traducidas.",
+    "vueltaN": "Vuelta {n}. Reemplaza a «{archivo}».",
+    "todaviaNoEsta": "Esto todavía NO está en el sistema. Ningún reporte lo lee hasta que lo pases a Final.",
+    "umbrales": "Reportar desvíos mayores a",
+    "sinHallazgos": "Sin hallazgos con estos umbrales.",
+    "sinRevisar": "Lo que esta corrida NO pudo revisar",
+    "porque": "Por qué importa:",
+    "queHacer": "Qué hacer:",
+    "verDetalle": "Ver las {n} filas",
+    "nivel": "Nivel {n}",
+    "hojaAyuda": "La hoja de revisión, con el mismo layout del tab que revisás a ojo.",
+    "estado": {
+      "borrador": "en revisión",
+      "pasado_a_final": "final",
+      "descartado": "descartado"
+    },
+    "gravedad": {
+      "critico": "Crítico",
+      "aviso": "Aviso",
+      "info": "Info"
+    },
+    "tab": {
+      "hallazgos": "Hallazgos",
+      "hoja": "Revisión del mes",
+      "descargas": "Descargas"
+    },
+    "final": {
+      "titulo": "Pasar a Final",
+      "sinHallazgos": "Sin hallazgos abiertos. Al pasar a Final el mes se escribe por la misma puerta de siempre.",
+      "conHallazgos": "Quedan {n} hallazgos abiertos ({criticos} críticos). Ninguno impide cerrar, pero queda registrado con cuáles se cerró el mes.",
+      "pasar": "Pasar a Final",
+      "pasarConfirmando": "Pasar aunque la verificación no cuadre",
+      "descartar": "Descartar este borrador"
+    },
+    "dl": {
+      "detalle": {
+        "titulo": "Formato estándar de FinPlan",
+        "que": "El mismo archivo que la app baja y vuelve a leer, ya lleno con el mes. Se edita y se sube por la puerta de siempre."
+      },
+      "hoja": {
+        "titulo": "Hoja de revisión",
+        "que": "El layout del tab que revisás a ojo, con las columnas Forecast, Budget y Actual."
+      },
+      "filas": {
+        "titulo": "Detalle traducido",
+        "que": "Cada cuenta con la fila del Excel de origen de la que salió."
+      },
+      "listado": {
+        "titulo": "Historial de pre-cierres",
+        "que": "Las vueltas de cada mes: quién subió qué y cuándo."
+      }
     }
   }
 }

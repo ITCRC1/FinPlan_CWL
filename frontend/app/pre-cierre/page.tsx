@@ -1,0 +1,461 @@
+"use client";
+/**
+ * Pre-Cierre — la revisión integral de los actuales antes de declararlos finales.
+ *
+ * Se sube el estado de resultados CRUDO de Integrity, el sistema arma la hoja
+ * de revisión y entrega el informe de varianzas y discrepancias. Recién cuando
+ * convence, se pasa a Final.
+ *
+ * ## El orden de las pestañas no es casual
+ *
+ * **Hallazgos va primero.** Es la razón de ser del módulo: hasta hoy la
+ * revisión pasaba por el ojo de una persona sobre un Excel de 104 MB, y por ahí
+ * podía entrar cualquier cosa. Poner la hoja primero invitaría a mirar los
+ * totales —que casi siempre cuadran— y saltarse lo que no cuadra.
+ *
+ * **Y se muestra lo que NO se pudo revisar.** «No se miró» y «está bien» se ven
+ * igual en una lista vacía.
+ *
+ * ## Subir de nuevo es lo normal
+ *
+ * El mismo mes se sube muchas veces: se corrige un error de posteo y se vuelve
+ * a subir, hasta el cierre acordado. Por eso el formulario no desaparece
+ * después de la primera carga y la pantalla dice en qué vuelta va.
+ */
+import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+
+import {
+  descargasPrecierre, descartarPrecierre, hallazgosPrecierre, listarPrecierres,
+  pasarPrecierreAFinal, subirPrecierre, verPrecierre,
+  type PrecierreFilaHoja, type PrecierreHallazgo, type PrecierreResumen,
+} from "@/lib/api";
+
+const MESES = ["January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December"];
+
+const COLOR: Record<string, string> = {
+  critico: "#B42318", aviso: "#B54708", info: "#475467",
+};
+const FONDO: Record<string, string> = {
+  critico: "#FEF3F2", aviso: "#FFFAEB", info: "#F9FAFB",
+};
+
+const usd = (n: number) =>
+  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+type Pestana = "hallazgos" | "hoja" | "descargas";
+
+export default function PreCierrePage() {
+  const t = useTranslations("precierre");
+  const hoy = new Date();
+
+  const [lista, setLista] = useState<PrecierreResumen[]>([]);
+  const [id, setId] = useState<string | null>(null);
+  const [pestana, setPestana] = useState<Pestana>("hallazgos");
+
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [tc, setTc] = useState("");
+  const [mes, setMes] = useState(hoy.getMonth() || 12);
+  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [subiendo, setSubiendo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [hoja, setHoja] = useState<PrecierreFilaHoja[]>([]);
+  const [estado, setEstado] = useState<string>("");
+  const [hallazgos, setHallazgos] = useState<PrecierreHallazgo[]>([]);
+  const [sinRevisar, setSinRevisar] = useState<string[]>([]);
+  const [comparativos, setComparativos] = useState<Record<string, string>>({});
+  const [umbralMonto, setUmbralMonto] = useState(5000);
+  const [umbralPct, setUmbralPct] = useState(10);
+  const [abierto, setAbierto] = useState<string | null>(null);
+
+  const recargarLista = useCallback(async () => {
+    try { setLista((await listarPrecierres()).precierres); } catch { /* nada */ }
+  }, []);
+
+  useEffect(() => { void recargarLista(); }, [recargarLista]);
+
+  const cargar = useCallback(async (pid: string) => {
+    setError(null);
+    try {
+      const [d, h] = await Promise.all([
+        verPrecierre(pid),
+        hallazgosPrecierre(pid, { umbralMonto, umbralPct }),
+      ]);
+      setHoja(d.hoja);
+      setEstado(d.estado);
+      setHallazgos(h.hallazgos);
+      setSinRevisar(h.sin_revisar);
+      setComparativos(h.comparativos);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [umbralMonto, umbralPct]);
+
+  useEffect(() => { if (id) void cargar(id); }, [id, cargar]);
+
+  async function subir() {
+    if (!archivo || !tc) return;
+    setSubiendo(true); setError(null); setAviso(null);
+    try {
+      const r = await subirPrecierre(archivo, { tc, mes, anio });
+      setId(r.id);
+      setAviso(r.reemplaza_a
+        ? t("vueltaN", { n: r.vuelta, archivo: r.reemplaza_a.archivo })
+        : t("cargado", { filas: r.filas }));
+      await recargarLista();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally { setSubiendo(false); }
+  }
+
+  async function pasarAFinal(confirmar: boolean) {
+    if (!id) return;
+    setError(null); setAviso(null);
+    try {
+      const r = await pasarPrecierreAFinal(id, { confirmarDiferencias: confirmar });
+      setAviso(t("pasado", { n: r.hallazgos_abiertos ?? 0 }));
+      setEstado("pasado_a_final");
+      await recargarLista();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  const criticos = hallazgos.filter(h => h.gravedad === "critico").length;
+  const dl = id ? descargasPrecierre(id) : null;
+
+  return (
+    <main style={{ padding: "24px 28px", maxWidth: 1180, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{t("titulo")}</h1>
+      <p style={{ color: "var(--text-secondary)", marginBottom: 20, maxWidth: 760 }}>
+        {t("bajada")}
+      </p>
+
+      {/* ── Subir ─────────────────────────────────────────────────────────── */}
+      <section style={caja}>
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <Campo etiqueta={t("archivo")}>
+            <input type="file" accept=".xlsx"
+                   onChange={e => setArchivo(e.target.files?.[0] ?? null)} />
+          </Campo>
+          <Campo etiqueta={t("tc")} ayuda={t("tcAyuda")}>
+            <input value={tc} onChange={e => setTc(e.target.value)}
+                   placeholder="454.75" inputMode="decimal" style={input} />
+          </Campo>
+          <Campo etiqueta={t("mes")}>
+            <select value={mes} onChange={e => setMes(Number(e.target.value))} style={input}>
+              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </Campo>
+          <Campo etiqueta={t("anio")}>
+            <input type="number" value={anio} onChange={e => setAnio(Number(e.target.value))}
+                   style={{ ...input, width: 90 }} />
+          </Campo>
+          <button onClick={subir} disabled={!archivo || !tc || subiendo} style={boton}>
+            {subiendo ? t("subiendo") : t("subir")}
+          </button>
+        </div>
+        {lista.length > 0 && (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {lista.slice(0, 8).map(p => (
+              <button key={p.id} onClick={() => setId(p.id)}
+                      style={{ ...chip, ...(p.id === id ? chipActivo : {}) }}>
+                {MESES[p.mes - 1]} {p.anio} · {t(`estado.${p.estado}`)}
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {aviso && <Nota tono="ok">{aviso}</Nota>}
+      {error && <Nota tono="mal">{error}</Nota>}
+
+      {id && (
+        <>
+          {estado !== "pasado_a_final" && (
+            <Nota tono="ojo">{t("todaviaNoEsta")}</Nota>
+          )}
+
+          <nav style={{ display: "flex", gap: 4, margin: "18px 0 12px" }}>
+            {(["hallazgos", "hoja", "descargas"] as Pestana[]).map(p => (
+              <button key={p} onClick={() => setPestana(p)}
+                      style={{ ...tab, ...(pestana === p ? tabActivo : {}) }}>
+                {t(`tab.${p}`)}
+                {p === "hallazgos" && criticos > 0 && (
+                  <span style={pill}>{criticos}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {pestana === "hallazgos" && (
+            <Hallazgos
+              hallazgos={hallazgos} sinRevisar={sinRevisar}
+              comparativos={comparativos}
+              umbralMonto={umbralMonto} umbralPct={umbralPct}
+              setUmbralMonto={setUmbralMonto} setUmbralPct={setUmbralPct}
+              abierto={abierto} setAbierto={setAbierto} t={t} />
+          )}
+          {pestana === "hoja" && <Hoja filas={hoja} t={t} />}
+          {pestana === "descargas" && dl && <Descargas dl={dl} t={t} />}
+
+          {/* ── Pasar a Final ─────────────────────────────────────────────── */}
+          {estado !== "pasado_a_final" && (
+            <section style={{ ...caja, marginTop: 20 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+                {t("final.titulo")}
+              </h2>
+              <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 12 }}>
+                {hallazgos.length > 0
+                  ? t("final.conHallazgos", { n: hallazgos.length, criticos })
+                  : t("final.sinHallazgos")}
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => pasarAFinal(false)} style={boton}>
+                  {t("final.pasar")}
+                </button>
+                <button onClick={() => pasarAFinal(true)} style={botonSecundario}>
+                  {t("final.pasarConfirmando")}
+                </button>
+                <button onClick={async () => {
+                  if (!id) return;
+                  await descartarPrecierre(id); setId(null); await recargarLista();
+                }} style={botonSuave}>
+                  {t("final.descartar")}
+                </button>
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </main>
+  );
+}
+
+/* ── Hallazgos ─────────────────────────────────────────────────────────────── */
+
+function Hallazgos({ hallazgos, sinRevisar, comparativos, umbralMonto, umbralPct,
+                     setUmbralMonto, setUmbralPct, abierto, setAbierto, t }: {
+  hallazgos: PrecierreHallazgo[]; sinRevisar: string[];
+  comparativos: Record<string, string>;
+  umbralMonto: number; umbralPct: number;
+  setUmbralMonto: (n: number) => void; setUmbralPct: (n: number) => void;
+  abierto: string | null; setAbierto: (s: string | null) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 12,
+                    flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          {t("umbrales")}
+        </span>
+        <label style={etiquetaChica}>US$
+          <input type="number" value={umbralMonto} style={{ ...input, width: 90 }}
+                 onChange={e => setUmbralMonto(Number(e.target.value))} />
+        </label>
+        <label style={etiquetaChica}>%
+          <input type="number" value={umbralPct} style={{ ...input, width: 70 }}
+                 onChange={e => setUmbralPct(Number(e.target.value))} />
+        </label>
+        {Object.entries(comparativos).map(([k, v]) => (
+          <span key={k} style={chip}>{k}: {v}</span>
+        ))}
+      </div>
+
+      {hallazgos.length === 0 && (
+        <Nota tono="ok">{t("sinHallazgos")}</Nota>
+      )}
+
+      {hallazgos.map(h => (
+        <article key={h.clave}
+                 style={{ ...caja, borderLeft: `4px solid ${COLOR[h.gravedad]}`,
+                          background: FONDO[h.gravedad], marginBottom: 10 }}>
+          <button onClick={() => setAbierto(abierto === h.clave ? null : h.clave)}
+                  style={{ all: "unset", cursor: "pointer", display: "block", width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: COLOR[h.gravedad],
+                               textTransform: "uppercase", letterSpacing: .4 }}>
+                  {t(`gravedad.${h.gravedad}`)} · {t("nivel", { n: h.nivel })}
+                </span>
+                <div style={{ fontWeight: 600, marginTop: 2 }}>{h.titulo}</div>
+              </div>
+              {h.monto !== 0 && (
+                <div style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700,
+                              whiteSpace: "nowrap" }}>
+                  US$ {usd(h.monto)}
+                </div>
+              )}
+            </div>
+            <p style={{ fontSize: 13, marginTop: 6, color: "var(--text-secondary)" }}>
+              {h.detalle}
+            </p>
+          </button>
+          {abierto === h.clave && (
+            <div style={{ marginTop: 10, fontSize: 13, display: "grid", gap: 8 }}>
+              <p><b>{t("porque")}</b> {h.porque}</p>
+              <p><b>{t("queHacer")}</b> {h.que_hacer}</p>
+              {h.referencias.length > 0 && (
+                <details>
+                  <summary style={{ cursor: "pointer" }}>
+                    {t("verDetalle", { n: h.referencias.length })}
+                  </summary>
+                  <pre style={pre}>
+                    {JSON.stringify(h.referencias.slice(0, 30), null, 1)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          )}
+        </article>
+      ))}
+
+      {/* ⚠️ Lo que NO se pudo revisar. Una lista de hallazgos vacía puede
+          significar «está todo bien» o «no se miró nada». */}
+      {sinRevisar.length > 0 && (
+        <section style={{ ...caja, marginTop: 14 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+            {t("sinRevisar")}
+          </h3>
+          <ul style={{ fontSize: 13, color: "var(--text-secondary)", paddingLeft: 18 }}>
+            {sinRevisar.map(x => <li key={x}>{x}</li>)}
+          </ul>
+        </section>
+      )}
+    </>
+  );
+}
+
+/* ── La hoja de revisión ───────────────────────────────────────────────────── */
+
+function Hoja({ filas, t }: {
+  filas: PrecierreFilaHoja[]; t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div style={{ ...caja, overflowX: "auto" }}>
+      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+        {t("hojaAyuda")}
+      </p>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+        <tbody>
+          {filas.map(f => {
+            const total = f.etiqueta === f.etiqueta.toUpperCase();
+            return (
+              <tr key={f.fila} style={{ borderTop: "1px solid var(--border)" }}>
+                <td style={{ padding: "5px 10px", fontWeight: total ? 700 : 400 }}>
+                  {f.etiqueta}
+                </td>
+                <td style={{ padding: "5px 10px", textAlign: "right",
+                             fontVariantNumeric: "tabular-nums",
+                             fontWeight: total ? 700 : 400 }}>
+                  {f.actual == null ? "" : usd(f.actual)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Descargas ─────────────────────────────────────────────────────────────── */
+
+function Descargas({ dl, t }: {
+  dl: ReturnType<typeof descargasPrecierre>;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const items: [keyof typeof dl, string][] = [
+    ["detalle", "dl.detalle"], ["hoja", "dl.hoja"],
+    ["filas", "dl.filas"], ["listado", "dl.listado"],
+  ];
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {items.map(([k, clave]) => (
+        <a key={k} href={dl[k]} style={{ ...caja, textDecoration: "none",
+                                         display: "block", color: "inherit" }}>
+          <div style={{ fontWeight: 600 }}>{t(`${clave}.titulo`)}</div>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            {t(`${clave}.que`)}
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/* ── Piezas chicas ─────────────────────────────────────────────────────────── */
+
+function Campo({ etiqueta, ayuda, children }: {
+  etiqueta: string; ayuda?: string; children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: "grid", gap: 3 }}>
+      <span style={{ fontSize: 12, fontWeight: 600 }}>{etiqueta}</span>
+      {children}
+      {ayuda && <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{ayuda}</span>}
+    </label>
+  );
+}
+
+function Nota({ tono, children }: { tono: "ok" | "mal" | "ojo"; children: React.ReactNode }) {
+  const c = { ok: ["#067647", "#ECFDF3"], mal: ["#B42318", "#FEF3F2"],
+              ojo: ["#B54708", "#FFFAEB"] }[tono];
+  return (
+    <div style={{ margin: "12px 0", padding: "10px 14px", borderRadius: 8,
+                  background: c[1], color: c[0], fontSize: 13,
+                  border: `1px solid ${c[0]}22` }}>
+      {children}
+    </div>
+  );
+}
+
+const caja: React.CSSProperties = {
+  background: "var(--surface)", border: "1px solid var(--border)",
+  borderRadius: 10, padding: 16,
+};
+const input: React.CSSProperties = {
+  padding: "6px 9px", border: "1px solid var(--border)", borderRadius: 6,
+  fontSize: 14, background: "var(--surface)", color: "var(--text-primary)",
+};
+const boton: React.CSSProperties = {
+  padding: "8px 16px", borderRadius: 7, border: "none", cursor: "pointer",
+  background: "var(--brand)", color: "#fff", fontWeight: 600, fontSize: 14,
+};
+const botonSecundario: React.CSSProperties = {
+  ...boton, background: "transparent", color: "var(--brand)",
+  border: "1px solid var(--brand)",
+};
+const botonSuave: React.CSSProperties = {
+  ...botonSecundario, color: "var(--text-secondary)", border: "1px solid var(--border)",
+};
+const tab: React.CSSProperties = {
+  padding: "7px 14px", border: "none", background: "transparent", cursor: "pointer",
+  fontSize: 14, borderBottom: "2px solid transparent", color: "var(--text-secondary)",
+};
+const tabActivo: React.CSSProperties = {
+  color: "var(--brand)", borderBottom: "2px solid var(--brand)", fontWeight: 600,
+};
+const chip: React.CSSProperties = {
+  padding: "3px 10px", borderRadius: 20, border: "1px solid var(--border)",
+  fontSize: 12, background: "var(--surface)", cursor: "pointer",
+  color: "var(--text-secondary)",
+};
+const chipActivo: React.CSSProperties = {
+  borderColor: "var(--brand)", color: "var(--brand)", fontWeight: 600,
+};
+const pill: React.CSSProperties = {
+  marginLeft: 6, background: "#B42318", color: "#fff", borderRadius: 20,
+  padding: "0 7px", fontSize: 11, fontWeight: 700,
+};
+const etiquetaChica: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 5, fontSize: 13,
+};
+const pre: React.CSSProperties = {
+  fontSize: 11, background: "var(--surface-2, #0000000a)", padding: 10,
+  borderRadius: 6, overflowX: "auto", maxHeight: 260,
+};
