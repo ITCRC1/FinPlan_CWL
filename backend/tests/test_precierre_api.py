@@ -418,3 +418,126 @@ async def test_ningun_hallazgo_impide_nada(cliente):
         assert r.json()["resumen"]["critico"] >= 1
         # y con hallazgos críticos la hoja y las descargas siguen funcionando
         assert (await c.get(f"/api/precierre/{pid}/detalle.xlsx")).status_code == 200
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PASAR A FINAL
+# ═════════════════════════════════════════════════════════════════════════════
+
+@pytest_asyncio.fixture()
+async def escenario_de_prueba():
+    """Un ACTUAL 2026 de prueba. **Nunca el real**: `pasar-a-final` escribe."""
+    import uuid
+    from sqlalchemy import delete, select
+    from app.db import SessionLocal
+    from app.models.scenario import Scenario
+
+    async def limpiar():
+        async with SessionLocal() as db:
+            for e in (await db.execute(select(Scenario).where(
+                    Scenario.version == "PRUEBA_PRECIERRE"))).scalars().all():
+                await db.delete(e)
+            await db.commit()
+
+    await limpiar()
+    async with SessionLocal() as db:
+        sc = Scenario(id=str(uuid.uuid4()), hotel_id="CWL", year=2026,
+                      type="ACTUAL", version="PRUEBA_PRECIERRE", status="draft",
+                      source_mode="imported")
+        db.add(sc)
+        await db.commit()
+        sid = sc.id
+    yield sid
+    await limpiar()
+
+
+@pytest.mark.asyncio
+async def test_la_verificacion_bloquea_y_no_escribe_nada(cliente, escenario_de_prueba):
+    """Julio tiene 8 cuentas sin regla de mapeo, así que el detalle consolidado
+    queda corto y los cuatro controles no cuadran. El importador frena — y ése
+    es exactamente el punto de reusar su puerta en vez de abrir otra."""
+    from sqlalchemy import select
+    from app.db import SessionLocal
+    from app.models.revenue_account_entry import RevenueAccountEntry
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.post(f"/api/precierre/{pid}/pasar-a-final/?dry_run=true")
+    assert r.status_code == 409
+    async with SessionLocal() as db:
+        escritas = (await db.execute(select(RevenueAccountEntry).where(
+            RevenueAccountEntry.scenario_id == escenario_de_prueba))).scalars().all()
+    assert not escritas, "un dry_run no puede escribir"
+
+
+@pytest.mark.asyncio
+async def test_confirmando_la_diferencia_si_escribe(cliente, escenario_de_prueba):
+    from sqlalchemy import select
+    from app.db import SessionLocal
+    from app.models.opex_entry import OpexEntry
+    from app.models.precierre import Precierre
+    from app.models.revenue_account_entry import RevenueAccountEntry
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.post(f"/api/precierre/{pid}/pasar-a-final/"
+                         "?confirmar_diferencias=true")
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "pasado_a_final"
+    async with SessionLocal() as db:
+        ing = (await db.execute(select(RevenueAccountEntry).where(
+            RevenueAccountEntry.scenario_id == escenario_de_prueba))).scalars().all()
+        gto = (await db.execute(select(OpexEntry).where(
+            OpexEntry.scenario_id == escenario_de_prueba))).scalars().all()
+        pc = await db.get(Precierre, pid)
+    assert ing and gto, "tenía que escribir cuentas de ingreso y de gasto"
+    assert pc.pasado_en is not None and pc.pasado_por == "prueba@local"
+
+
+@pytest.mark.asyncio
+async def test_queda_escrito_con_cuantos_hallazgos_se_cerro(cliente,
+                                                            escenario_de_prueba):
+    """Ninguno impide cerrar — bloquear enseñaría a esquivarlos. Pero ignorar
+    uno es una decisión, y una decisión sin registro no se puede revisar."""
+    import json as _json
+    from app.db import SessionLocal
+    from app.models.precierre import Precierre
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        j = (await c.post(f"/api/precierre/{pid}/pasar-a-final/"
+                          "?confirmar_diferencias=true")).json()
+    assert j["hallazgos_abiertos"] >= 1
+    async with SessionLocal() as db:
+        pc = await db.get(Precierre, pid)
+    guardados = _json.loads(pc.hallazgos)
+    assert len(guardados) == j["hallazgos_abiertos"]
+    assert all(h["porque"] for h in guardados), "sin el por qué no se puede auditar"
+
+
+@pytest.mark.asyncio
+async def test_no_se_pasa_dos_veces(cliente, escenario_de_prueba):
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        await c.post(f"/api/precierre/{pid}/pasar-a-final/?confirmar_diferencias=true")
+        r = await c.post(f"/api/precierre/{pid}/pasar-a-final/")
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_sin_escenario_destino_NO_se_marca_como_final(cliente):
+    """⚠️ Que el importador devuelva 200 no quiere decir que haya escrito.
+
+    Si ningún bloque encuentra su escenario, devuelve `matched: null` y sigue
+    sin fallar. Marcar el mes como final ahí sería declarar un cierre que no
+    ocurrió, con la base intacta.
+
+    Esta prueba corre SIN el escenario de prueba a propósito.
+    """
+    from app.db import SessionLocal
+    from app.models.precierre import Precierre
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.post(f"/api/precierre/{pid}/pasar-a-final/"
+                         "?confirmar_diferencias=true")
+    assert r.status_code == 409
+    async with SessionLocal() as db:
+        pc = await db.get(Precierre, pid)
+    assert pc.estado == "borrador", "el mes tiene que seguir en revisión"

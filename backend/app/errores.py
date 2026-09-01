@@ -207,6 +207,12 @@ MENSAJES: dict[str, dict[str, str]] = {
     "precierre.formato": {
         "es": "No se pudo leer el estado de resultados de Integrity: {detalle}",
         "en": "Integrity's income statement could not be read: {detalle}"},
+    "precierre.sin_escenario_destino": {
+        "es": "No hay un escenario ACTUAL de {anio} al que escribir, así que no se escribió nada y el mes sigue en revisión. Bloques del archivo: {bloques}.",
+        "en": "There is no ACTUAL scenario for {anio} to write into, so nothing was written and the month stays under review. File blocks: {bloques}."},
+    "precierre.esta_descartado": {
+        "es": "Este pre-cierre se descartó: no se puede pasar a Final. Subí el mes de nuevo.",
+        "en": "This pre-close was discarded and cannot be passed to Final. Upload the month again."},
     "precierre.ya_paso_a_final": {
         "es": "Este pre-cierre ya se pasó a Final: no se puede descartar. Lo que se subió se corrige subiendo el mes de nuevo.",
         "en": "This pre-close was already passed to Final and cannot be discarded. What was uploaded is corrected by uploading the month again."},

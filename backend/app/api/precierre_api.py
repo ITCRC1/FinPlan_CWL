@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
@@ -460,6 +461,110 @@ async def listado_xlsx(db: AsyncSession = Depends(get_db),
          "creado_en": p.creado_en.strftime("%Y-%m-%d %H:%M") if p.creado_en else "",
          "hallazgos_abiertos": p.hallazgos_abiertos} for p in filas])
     return _descarga(datos, "Pre-cierres.xlsx")
+
+
+async def _plantilla_para_importar(db: AsyncSession, pc: Precierre) -> bytes:
+    """El mes en el formato estándar de FinPlan, listo para el importador.
+
+    Es EXACTAMENTE el mismo archivo que baja `detalle.xlsx`. Que sean el mismo
+    importa: lo que se revisa y lo que se escribe no pueden ser dos cosas
+    parecidas.
+    """
+    from app.engine.recalculate import load_active_account_mappings
+    filas = await _filas(db, pc.id)
+    valores = revision.valores_completos(filas)
+    resolver = pl_engine.construir_resolvedor(await load_active_account_mappings(db))
+
+    def linea_de(depto: str, cuenta: str) -> str:
+        regla, _como = resolver(depto, cuenta)
+        return (regla or {}).get("report_line_code", "") if regla else ""
+
+    nombres = {r.dept_code: r.dept_name for r in
+               (await db.execute(select(DepartmentCatalog))).scalars().all()}
+    return precierre_xlsx.plantilla_finplan(
+        pc.mes, pc.anio, f"Actual {pc.anio}", filas, valores, nombres, linea_de)
+
+
+@router.post("/precierre/{precierre_id}/pasar-a-final/")
+async def pasar_a_final(
+    precierre_id: str,
+    dry_run: bool = Query(False, description="Sólo reporta qué se escribiría"),
+    confirmar_diferencias: bool = Query(
+        False, description="Escribir aunque la verificación no cuadre"),
+    db: AsyncSession = Depends(get_db),
+    usuario=Depends(get_current_user),
+    idioma: str = Idioma,
+):
+    """Declara el mes final y lo escribe.
+
+    ## No escribe acá
+
+    Arma la plantilla estándar y se la da a `import_gl_detail`, que es **el
+    único camino que escribe actuales en este sistema**. Este repo ya se quemó
+    con dos puertas al mismo dato: el pre-cierre es una antesala, no un atajo.
+
+    De ahí salen gratis las protecciones que ese importador ya tiene: la
+    verificación por buckets que bloquea si ingresos, GOP, EBITDA o utilidad
+    neta no cuadran contra el detalle; el recorte al mes de cierre; y la negativa
+    a escribir una fila con monto y sin cuenta.
+
+    ## Los hallazgos abiertos no lo impiden — pero quedan escritos
+
+    Ninguno bloquea: bloquear enseñaría a esquivarlos. Pero al pasar a final se
+    guarda **con cuántos se cerró el mes y cuáles eran**. Ignorar uno es una
+    decisión, y una decisión sin registro no se puede revisar después.
+    """
+    pc = await _traer(db, precierre_id)
+    if pc.estado == "pasado_a_final":
+        raise ErrorApi(409, "precierre.ya_paso_a_final")
+    if pc.estado == "descartado":
+        raise ErrorApi(409, "precierre.esta_descartado")
+
+    datos = await _plantilla_para_importar(db, pc)
+
+    # El importador de siempre. Se le pasa `mes_de_cierre` para que escriba SOLO
+    # este mes y descarte el resto — un pre-cierre es de un mes, no de un año.
+    from app.api.scenarios_api import import_gl_detail
+
+    class _Archivo:
+        """Lo mínimo que `import_gl_detail` necesita de un `UploadFile`."""
+        filename = f"precierre_{pc.anio}_{pc.mes:02d}.xlsx"
+
+        async def read(self):
+            return datos
+
+    resultado = await import_gl_detail(
+        file=_Archivo(), dry_run=dry_run, merge=True, scenario_id=None,
+        confirmar_diferencias=confirmar_diferencias,
+        mes_de_cierre=pc.mes, db=db, idioma=idioma)
+
+    if dry_run:
+        return {"dry_run": True, "importacion": resultado}
+
+    # ⚠️ Que haya devuelto 200 no quiere decir que haya escrito.
+    #
+    # `import_gl_detail` empareja cada bloque del archivo con un escenario por
+    # (tipo, año). Si no encuentra ninguno —no existe el ACTUAL del año, o se
+    # renombró— **no falla**: devuelve el bloque con `matched: null` y sigue.
+    # Marcar el mes como final ahí sería declarar un cierre que no ocurrió, y el
+    # pre-cierre quedaría cerrado con la base intacta.
+    bloques = resultado.get("blocks") or resultado.get("results") or []
+    if not any(b.get("matched") for b in bloques):
+        raise ErrorApi(409, "precierre.sin_escenario_destino",
+                       anio=pc.anio,
+                       bloques=", ".join(str(b.get("label") or "?") for b in bloques))
+
+    # Con cuántos hallazgos abiertos se cerró el mes, y cuáles.
+    abiertos = json.loads(pc.hallazgos_archivo or "[]")
+    pc.hallazgos = json.dumps(abiertos, ensure_ascii=False)
+    pc.hallazgos_abiertos = len(abiertos)
+    pc.estado = "pasado_a_final"
+    pc.pasado_por = getattr(usuario, "email", "") or ""
+    pc.pasado_en = datetime.now(timezone.utc)
+    await db.commit()
+    return {"id": pc.id, "estado": pc.estado,
+            "hallazgos_abiertos": pc.hallazgos_abiertos,
+            "importacion": resultado}
 
 
 @router.delete("/precierre/{precierre_id}/")
