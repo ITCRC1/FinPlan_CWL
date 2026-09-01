@@ -249,3 +249,101 @@ async def test_descartar_no_borra(cliente):
         assert r.status_code == 200 and r.json()["estado"] == "descartado"
         listado = (await c.get("/api/precierre/")).json()["precierres"]
     assert [p for p in listado if p["id"] == pid]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LAS DESCARGAS — «todos los datos de este módulo, en Excel editable»
+# ═════════════════════════════════════════════════════════════════════════════
+
+#: Los once controles del bloque VERIF del libro del owner (julio 2026).
+VERIF_DEL_OWNER = {
+    "VER_INGRESOS": D("248437.33"), "VER_GASTO_OPERATIVO": D("147248.79"),
+    "VER_OVERHEAD": D("178789.87"), "VER_GOP": D("-77601.33"),
+    "VER_NO_OPERATIVO": D("18664.70"), "VER_EBITDA": D("-96266.03"),
+    "VER_CAPITAL": D("9937.63"), "VER_FINANCIEROS": D("0"),
+    "VER_DEPRECIACION": D("28343.41"), "VER_IMPUESTO": D("-40364.12"),
+    "VER_UTILIDAD_NETA": D("-94182.95"),
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ruta,nombre", [
+    ("detalle.xlsx", "el formato estándar de FinPlan"),
+    ("filas.xlsx", "el detalle traducido"),
+    ("hoja.xlsx", "la hoja de revisión"),
+])
+async def test_todo_se_puede_bajar(cliente, ruta, nombre):
+    import openpyxl
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.get(f"/api/precierre/{pid}/{ruta}")
+    assert r.status_code == 200, nombre
+    assert "attachment" in r.headers["content-disposition"]
+    openpyxl.load_workbook(io.BytesIO(r.content))      # que abra de verdad
+
+
+@pytest.mark.asyncio
+async def test_el_listado_tambien(cliente):
+    import openpyxl
+    async with cliente() as c:
+        await _subir(c)
+        r = await c.get("/api/precierre/listado.xlsx")
+    assert r.status_code == 200
+    ws = openpyxl.load_workbook(io.BytesIO(r.content)).active
+    assert ws.cell(1, 1).value == "Año"
+    assert ws.cell(2, 2).value == 7
+
+
+@pytest.mark.asyncio
+async def test_la_plantilla_estandar_lleva_los_once_controles(cliente):
+    """El bloque VERIF del formato de FinPlan, contra el del libro del owner.
+
+    Es lo que decide si la carga pasa: si estos once no cuadran contra el
+    detalle de abajo, `import-gl-detail` la frena. Que salgan bien acá es lo que
+    hace que el archivo se pueda subir sin tocarlo.
+    """
+    import openpyxl
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.get(f"/api/precierre/{pid}/detalle.xlsx")
+    ws = openpyxl.load_workbook(io.BytesIO(r.content)).active
+    vistos = {}
+    for fila in ws.iter_rows(min_row=1, max_row=14, values_only=True):
+        for j, v in enumerate(fila):
+            if isinstance(v, str) and v.startswith("VER_"):
+                vistos[v] = next((x for x in fila[j + 1:]
+                                  if isinstance(x, (int, float))), None)
+    malos = {k: (float(esp), vistos.get(k)) for k, esp in VERIF_DEL_OWNER.items()
+             if vistos.get(k) is None or abs(D(str(vistos[k])) - esp) > D("0.02")}
+    assert not malos, f"controles que no coinciden con el libro del owner: {malos}"
+
+
+@pytest.mark.asyncio
+async def test_las_descargas_son_valores_y_no_formulas(cliente):
+    """Editable de verdad. Un Excel con fórmulas se ve igual pero se rompe al
+    editar una celda de la que otras dependen, y el que lo edita no se entera."""
+    import openpyxl
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        for ruta in ("detalle.xlsx", "filas.xlsx", "hoja.xlsx"):
+            r = await c.get(f"/api/precierre/{pid}/{ruta}")
+            wb = openpyxl.load_workbook(io.BytesIO(r.content))   # sin data_only
+            formulas = [(ws.title, c2.coordinate) for ws in wb.worksheets
+                        for fila in ws.iter_rows() for c2 in fila
+                        if isinstance(c2.value, str) and c2.value.startswith("=")]
+            assert not formulas, f"{ruta} trae fórmulas: {formulas[:5]}"
+
+
+@pytest.mark.asyncio
+async def test_el_detalle_traducido_dice_de_donde_salio_cada_numero(cliente):
+    """Lleva la fila del Excel de origen: sin eso, revisar un número obliga a
+    buscarlo a ojo en el archivo de Integrity."""
+    import openpyxl
+    async with cliente() as c:
+        pid = (await _subir(c)).json()["id"]
+        r = await c.get(f"/api/precierre/{pid}/filas.xlsx")
+    ws = openpyxl.load_workbook(io.BytesIO(r.content)).active
+    encabezados = [ws.cell(1, j).value for j in range(1, 11)]
+    assert encabezados[0] == "Fila origen"
+    assert "Depto Integrity" in encabezados and "Depto FinPlan" in encabezados
+    assert ws.max_row == 326      # 325 filas + encabezado

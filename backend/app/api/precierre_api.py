@@ -40,7 +40,7 @@ from app.auth import get_current_user
 from app.db import get_db
 from app.engine import pl_engine
 from app.errores import ErrorApi
-from app.export import revision_mes_xlsx as revision
+from app.export import precierre_xlsx, revision_mes_xlsx as revision
 from app.hotel_actual import HOTEL_ID
 from app.importers import integrity_final
 from app.importers.registro_dep import registro_de_subida
@@ -237,6 +237,67 @@ async def hoja(precierre_id: str, db: AsyncSession = Depends(get_db),
     return StreamingResponse(
         buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+def _descarga(contenido: bytes, nombre: str) -> StreamingResponse:
+    return StreamingResponse(
+        io.BytesIO(contenido),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+@router.get("/precierre/{precierre_id}/detalle.xlsx")
+async def detalle_xlsx(precierre_id: str, db: AsyncSession = Depends(get_db),
+                       _=Depends(get_current_user)):
+    """El mes en el formato ESTÁNDAR de FinPlan — el mismo que la app baja y
+    vuelve a leer.
+
+    Se edita y se sube por la puerta de siempre (`import-gl-detail`), sin pasar
+    por Pre-Cierre. Es también el archivo que `pasar-a-final` le va a dar al
+    importador: una sola forma del dato, no dos parecidas.
+    """
+    from app.engine.recalculate import load_active_account_mappings
+    pc = await _traer(db, precierre_id)
+    filas = await _filas(db, precierre_id)
+    valores = revision.valores_completos(filas)
+
+    resolver = pl_engine.construir_resolvedor(await load_active_account_mappings(db))
+
+    def linea_de(depto: str, cuenta: str) -> str:
+        regla, _como = resolver(depto, cuenta)
+        return (regla or {}).get("report_line_code", "") if regla else ""
+
+    nombres = {r.dept_code: r.dept_name for r in
+               (await db.execute(select(DepartmentCatalog))).scalars().all()}
+    etiqueta = f"Actual {pc.anio}"
+    datos = precierre_xlsx.plantilla_finplan(pc.mes, pc.anio, etiqueta, filas,
+                                             valores, nombres, linea_de)
+    return _descarga(datos, f"Detalle_{MESES[pc.mes - 1]}_{pc.anio}.xlsx")
+
+
+@router.get("/precierre/{precierre_id}/filas.xlsx")
+async def filas_xlsx(precierre_id: str, db: AsyncSession = Depends(get_db),
+                     _=Depends(get_current_user)):
+    """El detalle traducido, con la fila del Excel de origen de cada número."""
+    pc = await _traer(db, precierre_id)
+    datos = precierre_xlsx.filas_editables(await _filas(db, precierre_id))
+    return _descarga(datos, f"Traducido_{MESES[pc.mes - 1]}_{pc.anio}.xlsx")
+
+
+@router.get("/precierre/listado.xlsx")
+async def listado_xlsx(db: AsyncSession = Depends(get_db),
+                       _=Depends(get_current_user)):
+    """Las vueltas de cada mes: quién subió qué, cuándo, y en qué quedó."""
+    filas = (await db.execute(select(Precierre).where(
+        Precierre.hotel_id == HOTEL_ID).order_by(
+        Precierre.anio.desc(), Precierre.mes.desc(),
+        Precierre.creado_en.desc()))).scalars().all()
+    datos = precierre_xlsx.listado([
+        {"anio": p.anio, "mes": p.mes, "estado": p.estado, "tc": p.tc,
+         "archivo": p.archivo_nombre, "subido_por": p.subido_por,
+         "creado_en": p.creado_en.strftime("%Y-%m-%d %H:%M") if p.creado_en else "",
+         "hallazgos_abiertos": p.hallazgos_abiertos} for p in filas])
+    return _descarga(datos, "Pre-cierres.xlsx")
 
 
 @router.delete("/precierre/{precierre_id}/")
