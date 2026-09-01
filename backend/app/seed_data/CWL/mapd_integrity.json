@@ -1,0 +1,231 @@
+{
+  "_nota": [
+    "El mapeo de departamentos de Integrity, extraido del tab `mapD` del libro de",
+    "cierre del owner (`Conc JUL 2026.xlsx`, julio 2026) el 2026-08-31.",
+    "",
+    "Son las TRES busquedas que hacen las formulas de la hoja `Final`:",
+    "  division_usali  <- mapD!F por mapD!C   (columna AG)",
+    "  nombre_depto    <- mapD!I por mapD!H   (columna AI)",
+    "  depto_finplan   <- mapD!L por mapD!K   (columna AJ)",
+    "",
+    "NO se deriva del catalogo de departamentos de la app, y se verifico por que:",
+    "seis codigos con plata en julio 2026 (0124, 0128, 0160, 0170, 0240 y el propio",
+    "0125/0129 en cero) NO existen en `department_catalog`. Son $41.141,29 que sin",
+    "este puente no llegarian a ningun departamento.",
+    "",
+    "CONFLICTO CONOCIDO — 0130. Aca dice Food & Beverage; `department_catalog` lo",
+    "tiene como SPA con padre 0140. En julio son $13.121,49 que cambian de division",
+    "segun a quien se le pregunte. Manda ESTE archivo, porque es el que produjo los",
+    "numeros que el owner ya reviso y cerro; la discrepancia se REPORTA como",
+    "hallazgo de Nivel 1 en vez de resolverse en silencio.",
+    "",
+    "Un codigo que no este aca no se adivina: queda 'Sin mapeo', se reporta con su",
+    "monto y no se carga."
+  ],
+  "departamentos": [
+    {
+      "codigo": "0110",
+      "division_usali": "Rooms",
+      "nombre_depto": "Departamento de Habitaciones",
+      "depto_finplan": "0110 · Rooms / Habitaciones"
+    },
+    {
+      "codigo": "0111",
+      "division_usali": "Rooms",
+      "nombre_depto": "Departamento de Habitaciones",
+      "depto_finplan": "0110 · Rooms / Habitaciones"
+    },
+    {
+      "codigo": "0112",
+      "division_usali": "Rooms",
+      "nombre_depto": "Departamento de Habitaciones",
+      "depto_finplan": "0110 · Rooms / Habitaciones"
+    },
+    {
+      "codigo": "0113",
+      "division_usali": "Rooms",
+      "nombre_depto": "Departamento de Habitaciones",
+      "depto_finplan": "0110 · Rooms / Habitaciones"
+    },
+    {
+      "codigo": "0114",
+      "division_usali": "Rooms",
+      "nombre_depto": "Departamento de Habitaciones",
+      "depto_finplan": "0110 · Rooms / Habitaciones"
+    },
+    {
+      "codigo": "0120",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0122",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0123",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0124",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0125",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0128",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0129",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0130",
+      "division_usali": "Food & Beverage",
+      "nombre_depto": "Departamento de A&B",
+      "depto_finplan": "0120 · Alimentos y Bebidas"
+    },
+    {
+      "codigo": "0132",
+      "division_usali": "SPA",
+      "nombre_depto": "Departamento de Spa",
+      "depto_finplan": "0140 · Departamento de Spa"
+    },
+    {
+      "codigo": "0140",
+      "division_usali": "SPA",
+      "nombre_depto": "Departamento de Spa",
+      "depto_finplan": "0140 · Departamento de Spa"
+    },
+    {
+      "codigo": "0150",
+      "division_usali": "Tours",
+      "nombre_depto": "Departamento de Tours",
+      "depto_finplan": "0150 · Tour Activities"
+    },
+    {
+      "codigo": "0151",
+      "division_usali": "Retail",
+      "nombre_depto": "Departamento Gift Shop",
+      "depto_finplan": "0151 · Tienda"
+    },
+    {
+      "codigo": "0152",
+      "division_usali": "Transportation",
+      "nombre_depto": "Departamento de Transportation",
+      "depto_finplan": "0152 · Transportation"
+    },
+    {
+      "codigo": "0155",
+      "division_usali": "Tours",
+      "nombre_depto": "Departamento de INNOCEANA",
+      "depto_finplan": "0155 · Innoceana"
+    },
+    {
+      "codigo": "0160",
+      "division_usali": "Laundry",
+      "nombre_depto": "Departamento de Lavanderia",
+      "depto_finplan": "0162 · Laundry Revenue"
+    },
+    {
+      "codigo": "0161",
+      "division_usali": "Laundry (Overhead)",
+      "nombre_depto": "Departamento de Lavanderia",
+      "depto_finplan": "0161 · Laundry Operations"
+    },
+    {
+      "codigo": "0170",
+      "division_usali": "Miscellaneous Income",
+      "nombre_depto": "Departamento de  Miscelaneos",
+      "depto_finplan": "280 · Miscelaneos"
+    },
+    {
+      "codigo": "0180",
+      "division_usali": "Administrative & General",
+      "nombre_depto": "Departamento de Administración",
+      "depto_finplan": "0180 · Administración"
+    },
+    {
+      "codigo": "0181",
+      "division_usali": "Administrative & General",
+      "nombre_depto": "Departamento de Administración",
+      "depto_finplan": "0180 · Administración"
+    },
+    {
+      "codigo": "0182",
+      "division_usali": "Administrative & General",
+      "nombre_depto": "Departamento de Administración",
+      "depto_finplan": "0180 · Administración"
+    },
+    {
+      "codigo": "0183",
+      "division_usali": "Administrative & General",
+      "nombre_depto": "Departamento de Administración",
+      "depto_finplan": "0180 · Administración"
+    },
+    {
+      "codigo": "0186",
+      "division_usali": "Administrative & General",
+      "nombre_depto": "Departamento de Administración",
+      "depto_finplan": "0180 · Administración"
+    },
+    {
+      "codigo": "0190",
+      "division_usali": "Sales & Marketing",
+      "nombre_depto": "Departamento de  Ventas y Mercadeo",
+      "depto_finplan": "0190 · Sales and Marketing"
+    },
+    {
+      "codigo": "0191",
+      "division_usali": "Sales & Marketing",
+      "nombre_depto": "Departamento de  Ventas y Mercadeo",
+      "depto_finplan": "0190 · Sales and Marketing"
+    },
+    {
+      "codigo": "0200",
+      "division_usali": "Property Operation & Maintenance",
+      "nombre_depto": "Departamento de  Mantenimiento",
+      "depto_finplan": "0200 · Maintenance"
+    },
+    {
+      "codigo": "0210",
+      "division_usali": "Utilities",
+      "nombre_depto": "Departamento de Utility",
+      "depto_finplan": "0210 · Utilities"
+    },
+    {
+      "codigo": "0220",
+      "division_usali": "Cafeteria",
+      "nombre_depto": "Departamento de Cafeteria",
+      "depto_finplan": "0220 · Employee Dining (Cafetería)"
+    },
+    {
+      "codigo": "0230",
+      "division_usali": "Information & Telecommunications Systems",
+      "nombre_depto": "Departamento de TI",
+      "depto_finplan": "0230 · Information System"
+    },
+    {
+      "codigo": "0240",
+      "division_usali": "Property Expenses",
+      "nombre_depto": "Departamento de  Property Expenses",
+      "depto_finplan": "0250 · Gastos de la Propiedad"
+    }
+  ]
+}
