@@ -1,0 +1,349 @@
+{
+ "_nota": [
+  "La columna ACTUAL del tab `Julio 2026` del libro de cierre del owner,",
+  "extraida el 2026-08-31. Es la referencia de la prueba celda-por-celda:",
+  "la hoja que genera `revision_mes_xlsx` tiene que dar esto mismo, en la",
+  "misma fila y con la misma etiqueta.",
+  "",
+  "El libro pesa 104 MB y no entra al repo; esto son 67 numeros."
+ ],
+ "mes": "July",
+ "anio": 2026,
+ "filas": [
+  {
+   "fila": 17,
+   "etiqueta": "Rooms",
+   "actual": 105358.37218251787
+  },
+  {
+   "fila": 18,
+   "etiqueta": "F&B",
+   "actual": 51117.93508521166
+  },
+  {
+   "fila": 19,
+   "etiqueta": "SPA",
+   "actual": 4910.949598680594
+  },
+  {
+   "fila": 20,
+   "etiqueta": "Tours",
+   "actual": 38417.9091148983
+  },
+  {
+   "fila": 21,
+   "etiqueta": "Retail-Gift Shop",
+   "actual": 2274.06553051127
+  },
+  {
+   "fila": 22,
+   "etiqueta": "Transportation",
+   "actual": 16845.78652006597
+  },
+  {
+   "fila": 23,
+   "etiqueta": "Laundry",
+   "actual": 374.1330401319406
+  },
+  {
+   "fila": 24,
+   "etiqueta": "Innoceana",
+   "actual": 10974.889125893349
+  },
+  {
+   "fila": 25,
+   "etiqueta": "Crowther Lab",
+   "actual": null
+  },
+  {
+   "fila": 26,
+   "etiqueta": "Miscellaneous",
+   "actual": 18163.291472677294
+  },
+  {
+   "fila": 28,
+   "etiqueta": "TOTAL INCOMES",
+   "actual": 248437.33167058826
+  },
+  {
+   "fila": 32,
+   "etiqueta": "Rooms",
+   "actual": 47010.909889389775
+  },
+  {
+   "fila": 33,
+   "etiqueta": "F&B",
+   "actual": 43266.12373831775
+  },
+  {
+   "fila": 34,
+   "etiqueta": "SPA",
+   "actual": 3436.1002528862014
+  },
+  {
+   "fila": 35,
+   "etiqueta": "Tours",
+   "actual": 44088.109928532154
+  },
+  {
+   "fila": 36,
+   "etiqueta": "Retail-Gift Shop",
+   "actual": 1521.641999340297
+  },
+  {
+   "fila": 37,
+   "etiqueta": "Transportation",
+   "actual": 7776.372930181416
+  },
+  {
+   "fila": 38,
+   "etiqueta": "Laundry",
+   "actual": 149.53271028037383
+  },
+  {
+   "fila": 39,
+   "etiqueta": "Innoceana",
+   "actual": 0
+  },
+  {
+   "fila": 40,
+   "etiqueta": "Crowther Lab",
+   "actual": 0
+  },
+  {
+   "fila": 41,
+   "etiqueta": "Miscellaneous",
+   "actual": 0
+  },
+  {
+   "fila": 44,
+   "etiqueta": "Total Operationg expenses",
+   "actual": 147248.79144892798
+  },
+  {
+   "fila": 49,
+   "etiqueta": "Rooms",
+   "actual": 58347.46229312809
+  },
+  {
+   "fila": 50,
+   "etiqueta": "F&B",
+   "actual": 7851.811346893912
+  },
+  {
+   "fila": 51,
+   "etiqueta": "SPA",
+   "actual": 1474.8493457943928
+  },
+  {
+   "fila": 52,
+   "etiqueta": "Tours",
+   "actual": -5670.200813633855
+  },
+  {
+   "fila": 53,
+   "etiqueta": "Retail-Gift Shop",
+   "actual": 752.4235311709731
+  },
+  {
+   "fila": 54,
+   "etiqueta": "Transportation",
+   "actual": 9069.413589884552
+  },
+  {
+   "fila": 55,
+   "etiqueta": "Laundry",
+   "actual": 224.60032985156678
+  },
+  {
+   "fila": 56,
+   "etiqueta": "Innoceana",
+   "actual": 10974.889125893349
+  },
+  {
+   "fila": 57,
+   "etiqueta": "Crowther Lab",
+   "actual": 0
+  },
+  {
+   "fila": 58,
+   "etiqueta": "Miscellaneos",
+   "actual": 18163.291472677294
+  },
+  {
+   "fila": 62,
+   "etiqueta": "OPERATING PROFIT",
+   "actual": 101188.54022166028
+  },
+  {
+   "fila": 68,
+   "etiqueta": "Administrations",
+   "actual": 59532.90504233095
+  },
+  {
+   "fila": 69,
+   "etiqueta": "Sales & Marketing",
+   "actual": 39255.65820252886
+  },
+  {
+   "fila": 70,
+   "etiqueta": "Maintenance",
+   "actual": 33172.99185046729
+  },
+  {
+   "fila": 71,
+   "etiqueta": "Information System",
+   "actual": 13410.049623749313
+  },
+  {
+   "fila": 72,
+   "etiqueta": "Utilities",
+   "actual": 33418.269356789446
+  },
+  {
+   "fila": 73,
+   "etiqueta": "Claro Huerta",
+   "actual": 0
+  },
+  {
+   "fila": 74,
+   "etiqueta": "Cafeteria",
+   "actual": 0
+  },
+  {
+   "fila": 75,
+   "etiqueta": "Laundry",
+   "actual": 0
+  },
+  {
+   "fila": 77,
+   "etiqueta": "TOTAL OVERHEAD EXPENSES",
+   "actual": 178789.87407586584
+  },
+  {
+   "fila": 79,
+   "etiqueta": "TOTAL GROSS OPERATING PROFIT",
+   "actual": -77601.33385420556
+  },
+  {
+   "fila": 81,
+   "etiqueta": "RENT",
+   "actual": 8716.39318306762
+  },
+  {
+   "fila": 82,
+   "etiqueta": "MANAGEMENT FEES (3%)",
+   "actual": 7389.559142385926
+  },
+  {
+   "fila": 83,
+   "etiqueta": "MANAGEMENT FEES (5%) Royalties",
+   "actual": 0
+  },
+  {
+   "fila": 85,
+   "etiqueta": "TOTAL RENTA AND MANAGEMENT FEES",
+   "actual": 16105.952325453545
+  },
+  {
+   "fila": 87,
+   "etiqueta": "PROPERTIES INSURANCE",
+   "actual": 0
+  },
+  {
+   "fila": 89,
+   "etiqueta": "PROPERTY INSURANCE",
+   "actual": 0
+  },
+  {
+   "fila": 91,
+   "etiqueta": "OTHER EXPENSES",
+   "actual": 2558.747817482133
+  },
+  {
+   "fila": 93,
+   "etiqueta": "TOTAL OTHER EXPENSES",
+   "actual": 2558.747817482133
+  },
+  {
+   "fila": 99,
+   "etiqueta": "CAPITAL EXPENSE",
+   "actual": 0
+  },
+  {
+   "fila": 103,
+   "etiqueta": "TOTAL Owners Expenses",
+   "actual": 18664.70014293568
+  },
+  {
+   "fila": 105,
+   "etiqueta": "EBITDA",
+   "actual": -96266.03399714123
+  },
+  {
+   "fila": 107,
+   "etiqueta": "BAC INTERESES PRESTAMO",
+   "actual": 0
+  },
+  {
+   "fila": 108,
+   "etiqueta": "B.C.R. INTERESES PRESTAMO",
+   "actual": 0
+  },
+  {
+   "fila": 109,
+   "etiqueta": "LEASING CAMION",
+   "actual": 0
+  },
+  {
+   "fila": 110,
+   "etiqueta": "PERDIDAS FINANCIERAS",
+   "actual": 0
+  },
+  {
+   "fila": 112,
+   "etiqueta": "FINANCIAL EXPENSES",
+   "actual": 0
+  },
+  {
+   "fila": 114,
+   "etiqueta": "DEPRECIATION",
+   "actual": 28343.40785046729
+  },
+  {
+   "fila": 116,
+   "etiqueta": "TOTAL DEPRECIATIONS",
+   "actual": 28343.40785046729
+  },
+  {
+   "fila": 118,
+   "etiqueta": "CAPITAL RESERVE",
+   "actual": 9937.625200659702
+  },
+  {
+   "fila": 119,
+   "etiqueta": "LARGE CAPITAL EXPENDITURE",
+   "actual": 0
+  },
+  {
+   "fila": 121,
+   "etiqueta": "CAPITAL EXPENSE",
+   "actual": 9937.625200659702
+  },
+  {
+   "fila": 123,
+   "etiqueta": "EARNINGS BEFORE INCOME TAXES",
+   "actual": -134547.06704826822
+  },
+  {
+   "fila": 125,
+   "etiqueta": "Income Tax (30%)",
+   "actual": -40364.12094557449
+  },
+  {
+   "fila": 128,
+   "etiqueta": "EARNINGS AFTER INCOME TAXES",
+   "actual": -94182.94610269374
+  }
+ ]
+}
