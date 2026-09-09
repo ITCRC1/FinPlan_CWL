@@ -336,6 +336,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "gl.filas_sin_cuenta_y_mas": {
         "es": "El archivo tiene {n} filas con monto y SIN numero de cuenta, por un total de {total}. No se cargo nada.\n\n{muestra}\n... y {resto} mas.\n\nEsa plata no tiene a donde ir: sin codigo de cuenta el importador no sabe a que linea del P&L corresponde. Ponele el numero de cuenta en el Excel y volve a subirlo.",
         "en": "The file has {n} rows with an amount and NO account number, for a total of {total}. Nothing was loaded.\n\n{muestra}\n... and {resto} more.\n\nThat money has nowhere to go: without an account code the importer cannot tell which P&L line it belongs to. Write the account number in the Excel file and upload it again."},
+    "gl.moneda_no_creible": {
+        "es": "El archivo parece estar en colones, no en dólares: la tarifa promedio que sale del mayor no es creíble en dólares. Exportá el mayor de QuickBooks en DÓLARES y volvé a subirlo. Si la tarifa de esta propiedad realmente está fuera del rango, volvé a subir con confirmar_diferencias=true.",
+        "en": "The file looks like it is in colones, not dollars: the average daily rate implied by the ledger is not credible in dollars. Export the QuickBooks ledger in DOLLARS and upload it again. If this property's rate really is outside the range, upload again with confirmar_diferencias=true."},
     "gl.verificacion_no_cuadra": {
         "es": "La verificación de arriba no cuadra con el detalle de abajo. Revisá la comparación bucket por bucket. Si el detalle está bien y la diferencia es esperada, volvé a subir con confirmar_diferencias=true.",
         "en": "The control totals at the top do not match the detail below. Review the comparison bucket by bucket. If the detail is right and the difference is expected, upload again with confirmar_diferencias=true."},
