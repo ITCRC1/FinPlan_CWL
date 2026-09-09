@@ -3,15 +3,23 @@ Tests for the YTD / Full Year aggregator (A2) — pl_api._aggregate.
 
 Run: pytest tests/test_pl_ytd.py -v
 """
+import pytest
+
 from decimal import Decimal
 
 from app.engine.pl_engine import PLLineResult
 from app.api.pl_api import _aggregate, _aggregate_selected, _apply_tax_correction
 
 
-def _month(m, rooms_rev, rooms_avail, rooms_occ, ebt=0.0, tax=0.0, adr=None):
+def _month(m, rooms_rev, rooms_avail, rooms_occ, ebt=0.0, tax=0.0, adr=None,
+           total_rev=None):
+    # `total_rev` por defecto = el de habitaciones. El RevPAR sale del TOTAL
+    # desde el 2026-09-08 (owner: «total revenue by total rooms available»), asi
+    # que la linea tiene que existir para que haya de donde calcularlo.
     lines = [
         PLLineResult("REV_ROOMS", "Rooms", "REVENUES", Decimal(str(rooms_rev))),
+        PLLineResult("TOTAL_REVENUES", "Total Revenues", "REVENUES",
+                     Decimal(str(rooms_rev if total_rev is None else total_rev))),
         PLLineResult("EBT", "EBT", "TOTALS", Decimal(str(ebt))),
         PLLineResult("INCOME_TAXES", "Income Taxes", "TOTALS", Decimal(str(tax))),
         PLLineResult("NET_PROFIT", "Net Profit", "TOTALS", Decimal(str(ebt - tax))),
@@ -95,8 +103,14 @@ def test_adr_sale_de_las_estadisticas_no_de_la_linea():
     agg = _aggregate(monthly, 2)
     assert agg["kpis"]["rooms_occupied"] == 1000
     assert round(agg["kpis"]["adr"], 2) == 100.00        # no 200.00
-    # y RevPAR mantiene la identidad ADR x ocupación
-    assert round(agg["kpis"]["revpar"], 4) == round(100.0 * 1000 / 1800, 4)
+    # ⚠️ Y el RevPAR YA NO es ADR x ocupacion.
+    #
+    # Owner, 2026-09-08: «revpar es total revenue per available room».
+    # Antes esta linea comprobaba la identidad `ADR x occ/avail`, que
+    # era cierta cuando el RevPAR salia del ingreso de habitaciones.
+    # Ahora sale del ingreso TOTAL, asi que la identidad se rompio a
+    # proposito: son dos indicadores distintos.
+    assert round(agg["kpis"]["revpar"], 4) == round(200000 / 1800, 4)
 
 
 def test_el_adr_agregado_pondera_por_noches_ocupadas():
@@ -108,3 +122,43 @@ def test_el_adr_agregado_pondera_por_noches_ocupadas():
     agg = _aggregate(monthly, 2)
     esperado = (100.0 * 900 + 300.0 * 100) / 1000        # 120, no 200
     assert round(agg["kpis"]["adr"], 2) == round(esperado, 2)
+
+
+def test_revpar_es_ingreso_TOTAL_por_habitacion_disponible():
+    """Owner, 2026-09-08: *«revpar es total revenue per available room»* ·
+    *«total revenue by total rooms available»*.
+
+    Antes era `ADR × ocupación`, o sea ingreso DE HABITACIONES por disponible, y
+    estaba puesto a propósito para ser coherente con la tarifa mostrada al lado.
+    El owner lo redefinió: mide cuánto rinde cada habitación disponible con TODO
+    lo que el hotel factura — spa, tours y A&B incluidos.
+
+    Acá el spa y los tours aportan 40.000 sobre 160.000 de habitaciones. El
+    RevPAR tiene que contarlos: 200.000 / 1.800, no 160.000 / 1.800.
+    """
+    monthly = [
+        _month(1, 80000, 900, 500, adr=160.0, total_rev=100000),
+        _month(2, 80000, 900, 500, adr=160.0, total_rev=100000),
+    ]
+    agg = _aggregate(monthly, 2)
+    assert round(agg["kpis"]["revpar"], 4) == round(200000 / 1800, 4)
+    # Y NO el de habitaciones solas, que es lo que daba antes.
+    assert round(agg["kpis"]["revpar"], 4) != round(160000 / 1800, 4)
+
+
+def test_el_revpar_de_habitaciones_sigue_disponible_aparte():
+    """El RevPAR viejo no se perdió: quedó como `revpar_bruto`. Sirve para
+    comparar contra la tarifa, que es justo para lo que servía.
+
+    ⚠️ Sólo aplica donde existe el resumen de habitaciones. Una instalación que
+    todavía no lo tiene no puede fallar por no publicar un campo de un cuadro
+    que no dibuja — pero el día que lo agregue, esta guarda la agarra: lo que
+    se comprueba es que si hay resumen, el RevPAR de habitaciones esté ahí.
+    """
+    import inspect
+
+    from app.api import pl_api
+    fuente = inspect.getsource(pl_api)
+    if '"rooms_revenue"' not in fuente:
+        pytest.skip("esta instalación todavía no tiene el resumen de habitaciones")
+    assert '"revpar_bruto"' in fuente

@@ -31,6 +31,7 @@ from app.models.scenario_stat import ScenarioStat
 from app.models.cashflow_params import CashFlowParams
 from app.models.tax_params import TaxParams
 from app.engine import recalculate as recalc
+from app.engine import kpis as kpis_engine
 from app.engine import pl_engine
 from app.engine.cashflow_budget import (
     compute_cashflow_budget, compute_wc_calibration, wc_actuals_from_balances,
@@ -90,19 +91,47 @@ def _kpis(r) -> dict:
     }
 
 
-def _kpis_from_stat(s: ScenarioStat) -> dict:
-    """KPIs from a ScenarioStat row. RevPAR derived as adr*occupied/available."""
-    avail = s.rooms_available
-    occ = float(s.rooms_occupied)
-    adr = float(s.adr)
-    return {
-        "rooms_available": avail,
-        "rooms_occupied": occ,
-        "guests": float(s.guests),
-        "occupancy_pct": float(s.occupancy_pct),
-        "adr": adr,
-        "revpar": (adr * occ / avail) if avail else 0.0,
-    }
+#: ⚠️ **RevPAR = ingreso TOTAL / habitaciones disponibles** (owner, 2026-09-08:
+#: «revpar es total revenue per available room» · «total revenue by total rooms
+#: available»).
+#:
+#: Antes era `ADR × ocupación`, o sea ingreso DE HABITACIONES por habitación
+#: disponible, y estaba puesto a propósito «para que sea coherente con la tarifa
+#: que se muestra al lado».
+#:
+#: El owner cambió la definición: mide cuánto rinde cada habitación disponible
+#: con TODO lo que el hotel factura —spa, tours, A&B incluidos—, no sólo la
+#: noche. Es lo que en la literatura se llama TRevPAR, y el módulo de punto de
+#: equilibrio ya lo calculaba así (`be_trevpar`).
+#:
+#: Se pierde la identidad `RevPAR = ADR × occ/avail`. Es deliberado: ya no son
+#: el mismo indicador.
+def _revpar(total_revenue: float, rooms_available: float) -> float:
+    return (float(total_revenue) / float(rooms_available)) if rooms_available else 0.0
+
+
+def _kpis_from_stat(s: ScenarioStat, ingreso_habitaciones=None,
+                    ingreso_total: float = 0.0) -> dict:
+    """KPIs a partir de una fila de `ScenarioStat`.
+
+    Las NOCHES salen siempre de la fila (mandan `scenario_stats`). La ocupación
+    se deriva de esas noches, y el ADR del `ingreso_habitaciones` cuando lo hay
+    — ver `engine/kpis.py`, que explica por qué ese ingreso es
+    `RevenueResult.rooms` y **nunca** la línea `REV_ROOMS`.
+
+    Sin `ingreso_habitaciones` —ACTUAL, o cualquier escenario donde lo subido
+    manda— queda el ADR guardado, que es exactamente lo que hacía esta función
+    antes.
+    """
+    return kpis_engine.kpis_de_habitaciones(
+        rooms_available=s.rooms_available,
+        rooms_occupied=s.rooms_occupied,
+        guests=s.guests,
+        ingreso_habitaciones=ingreso_habitaciones,
+        ingreso_total=ingreso_total,
+        adr_guardado=s.adr,
+        occupancy_guardada=s.occupancy_pct,
+    )
 
 
 async def _get_scenario_or_404(session, scenario_id: str) -> Scenario:
@@ -140,6 +169,12 @@ async def _monthly_results(session, scenario) -> list[dict]:
     """
     is_actual = scenario.type == "ACTUAL"
     revenue_results = None if is_actual else await recalc.load_revenue_results(session, scenario)
+
+    # ¿Se puede derivar el ADR? Sólo donde el motor calcula las tarifas.
+    # En un ACTUAL —o en cualquier escenario donde lo subido manda— el
+    # ingreso de habitaciones no sale de una tarifa, así que se respeta el
+    # ADR guardado. Ver `recalc.lo_subido_manda` y `engine/kpis.py`.
+    se_deriva = not is_actual and not await recalc.lo_subido_manda(session, scenario)
 
     # Room KPIs: prefer ScenarioStat (authoritative, covers all scenario types).
     # Fallback to HistoricalKpi for ACTUAL, or rate-card revenue_results otherwise.
@@ -180,10 +215,26 @@ async def _monthly_results(session, scenario) -> list[dict]:
     out = []
     for month in range(1, 13):
         lines = await recalc.compute_pl_month(session, scenario, month, revenue_results)
+        # El ingreso TOTAL del mes, que es de donde sale el RevPAR.
+        ingreso_mes = next(
+            (float(getattr(l, "amount_usd", 0) or 0) for l in lines
+             if getattr(l, "line_code", "") == "TOTAL_REVENUES"), 0.0)
+        # El ingreso de HABITACIONES del mes, de donde sale el ADR derivado.
+        # Es `RevenueResult.rooms` —la tarifa, que nunca pasó por las
+        # cuentas—, NO la línea `REV_ROOMS`: ver `engine/kpis.py`.
+        #
+        # ⚠️ En los meses CERRADOS de un forecast va en None a propósito: ese
+        # ingreso lo pone el ACTUAL enlazado, no las tarifas de este
+        # escenario, así que su ADR es el del PMS y no se deriva.
+        ingreso_hab = (revenue_results.get(month) if (se_deriva and revenue_results)
+                       else None)
+        ingreso_hab = getattr(ingreso_hab, "rooms", None) if ingreso_hab else None
         if through >= month and month in actual_stat_kpis:
-            kpis = _kpis_from_stat(actual_stat_kpis[month])
+            kpis = _kpis_from_stat(actual_stat_kpis[month],
+                                   ingreso_total=ingreso_mes)
         elif month in stat_kpis:
-            kpis = _kpis_from_stat(stat_kpis[month])
+            kpis = _kpis_from_stat(stat_kpis[month], ingreso_hab,
+                                   ingreso_total=ingreso_mes)
         else:
             kpis_src = hist_kpis.get(month) if is_actual else (
                 revenue_results[month] if revenue_results else None)
@@ -374,7 +425,8 @@ def _aggregate_selected(sel: list[dict], *, lo_subido_manda: bool = False,
         "adr": adr,
         # Mismo criterio que `_kpis_from_stat`: RevPAR = ADR × ocupación. Dejarlo
         # sobre REV_ROOMS rompería la identidad RevPAR = ADR × occ/avail.
-        "revpar": (adr * occ / avail) if avail else 0.0,
+        # Mismo criterio que `_kpis_from_stat`: ingreso TOTAL / disponibles.
+        "revpar": _revpar(amounts.get("TOTAL_REVENUES", 0.0), avail),
     }
     lines = []
     for code, amt in amounts.items():
