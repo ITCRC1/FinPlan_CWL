@@ -107,7 +107,24 @@ def test_tiene_el_modelo_del_gift_shop():
     # Todas son del mismo departamento; lo que se vigila es que ninguna sea
     # de A&B.
     assert destinos == {"REV_PRIVATE_BAR", "OPEX_PRIVATE_BAR", "COS_PRIVATE_BAR"}
-    assert sum(1 for m in propias if m["report_line_code"] == "REV_PRIVATE_BAR") == 4
+    # ⚠️ Cuántas son de INGRESO se compara contra la TIENDA, no contra un
+    # número fijo.
+    #
+    # Acá decía `== 4`, que es exactamente lo que el docstring de arriba critica
+    # dos párrafos antes: el 2026-09-09 la tienda sumó seis cuentas de retail
+    # (VISORS/HATS/CAPS, CLOTHING, NEWSPAPERS, CANDY…), el bar las sumó con
+    # ella —que es lo que esta prueba pide— y el número mágico la puso roja por
+    # un crecimiento legítimo.
+    #
+    # Lo que se vigila es el reparto entre ingreso y el resto, y ése tiene que
+    # ser el mismo en los dos: son el mismo modelo de negocio.
+    de_ingreso = sum(1 for m in propias
+                     if m["report_line_code"] == "REV_PRIVATE_BAR")
+    de_ingreso_tienda = sum(1 for m in modelo
+                            if m["report_line_code"] == "REV_RETAIL")
+    assert de_ingreso == de_ingreso_tienda, (
+        f"el bar tiene {de_ingreso} cuentas de ingreso y la tienda "
+        f"{de_ingreso_tienda}: dejaron de ser el mismo modelo")
 
 
 def test_su_plata_llega_a_su_linea_y_no_a_la_de_ayb():

@@ -225,6 +225,20 @@ async def _sin_regla_propia(session, detalle) -> list[tuple[str, str, str, float
         cuenta = str(r.get("account_code") or "")
         if not cuenta:
             continue
+        # ⚠️ El ingreso de un presupuesto NO llega con una cuenta: llega con el
+        # GRUPO pelado —`ROOMS`, `SPA`, `ACTIVITIES`, `LAUNDRY`—, porque se
+        # planea a nivel de línea y no cuenta por cuenta. Esas filas ya saben a
+        # qué renglón van (`linea_propia`) y NO pasan por el mapeo.
+        #
+        # Sin esta puerta, el aviso las denunciaba a las cuatro en cada
+        # presupuesto —374.791,20 de Rooms entre ellas— como si fueran plata
+        # extraviada. No lo eran: el resolvedor sólo entiende cuentas, y una
+        # llave que no es una cuenta le sale `DROP` por definición.
+        #
+        # Un aviso que grita donde no pasa nada enseña a ignorarlo, y el día que
+        # tenga razón nadie lo va a mirar.
+        if not cuenta.strip().isdigit():
+            continue
         m, como = resolver(dept, cuenta)
         # ⚠️ `DROP` también, no sólo `FALLBACK`. Son dos formas de perderse:
         # el descarte manda la plata al renglón equivocado, y el DROP —cuando
