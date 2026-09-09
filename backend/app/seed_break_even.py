@@ -141,6 +141,23 @@ async def seed_break_even(db, hotel_id: str | None = None) -> dict:
             source_rows=c["source_rows"][:120]))
         nuevas += 1
     await db.flush()
+
+    # ⚠️ Lo que esta en la BASE y ya no esta en el archivo se CUENTA y se dice.
+    #
+    # Este cargador inserta y nunca borra —bien: una regla que alguien ajusto a
+    # mano contra produccion no se pisa desde un archivo—. El costo es que las
+    # dos fuentes se separan en silencio: el 2026-09-09 salieron 15 cuentas del
+    # catalogo del 0181 y el CSV bajo a 798 filas, pero las tres bases siguieron
+    # con 813 durante horas, y nada lo dijo.
+    #
+    # No se borran acá: borrar desde un seed es como se pierde el ajuste que
+    # alguien hizo por una razon. Se REPORTA, que es lo que convierte una deriva
+    # invisible en una linea del arranque que se lee en `railway logs`.
+    del_archivo = {(c["dept_code"] or "", c["account"] or "", c["pl_line"])
+                   for c in clases}
+    sobran = sum(1 for llave in ya if llave not in del_archivo)
+
     return {"sembrado": True, "hotel": hotel,
             "departamentos": len(deptos), "departamentos_nuevos": nuevos_deptos,
-            "reglas": len(clases), "reglas_nuevas": nuevas}
+            "reglas": len(clases), "reglas_nuevas": nuevas,
+            "reglas_solo_en_la_base": sobran}

@@ -251,9 +251,15 @@ async def seed():
             rb = await seed_break_even(db)
             await db.commit()
         if rb["sembrado"]:
+            # ⚠️ `solo_en_la_base` NO es un error: el cargador no borra, a
+            # proposito. Es la unica señal de que el archivo y la base dejaron
+            # de decir lo mismo — sin ella la deriva no se ve en ningun lado.
+            sobran = rb.get("reglas_solo_en_la_base", 0)
             print(f"  break_even: {rb['departamentos']} departamentos "
                   f"({rb['departamentos_nuevos']} nuevos), {rb['reglas']} reglas "
-                  f"({rb['reglas_nuevas']} nuevas)")
+                  f"({rb['reglas_nuevas']} nuevas)"
+                  + (f" - {sobran} en la base que NO estan en el archivo "
+                     f"(no se tocan)" if sobran else ""))
         else:
             print(f"  break_even: {rb['hotel']} no trae semilla - se carga en la app")
     except Exception as e:
