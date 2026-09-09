@@ -36,7 +36,8 @@ import re
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import (APIRouter, Depends, File, HTTPException,
+                     Query, UploadFile)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,6 +49,7 @@ from app.api import _be_base
 from app.engine import break_even as be
 from app.engine import pl_engine
 from app.hotel_actual import HOTEL_ID
+from app.importers.registro_dep import registro_de_subida
 from app.models.break_even import (
     BeCostClassification, BeDepartment, DEPT_ACTIVO,
 )
@@ -784,3 +786,191 @@ async def comparar(
         })
 
     return {"modo": modo, "month": month, "meses": meses, "versiones": salida}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LA CLASIFICACIÓN, EN EXCEL: baja, se llena, sube
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Owner, 2026-09-09: *«necesito que revises la configuración, la forma de asignar
+# el % de fijo o variable. Veo esa asignación muy complicada, debe ser muy fácil.
+# Inclusive que se baje a Excel y ahí se haga la asignación y se vuelva a subir;
+# veo que en la pantalla es muy difícil»*.
+#
+# La pantalla va departamento por departamento: entrar, marcar filas, teclear,
+# salir, entrar al siguiente. Con 798 reglas en 22 departamentos son 22 pantallas
+# y cientos de clics para una decisión que se toma de corrido, mirando todo junto.
+#
+# ⚠️ **Un archivo, la propiedad entera, sin mes.** Owner, el mismo día: *«el
+# criterio no debe ser por mes; debe ser completo, uno solo sin diferencial
+# mes»*. Y el modelo ya era así — la llave de `be_cost_classification` no tiene
+# columna de mes. El `month` que la PANTALLA acepta es sólo para mostrar el
+# monto; acá el monto va del año completo, que es la escala a la que se decide:
+# doce meses de una cuenta dicen si el gasto sigue a la venta, un mes suelto
+# puede ser un accidente.
+
+
+@router.get("/break-e/classification/plantilla.xlsx")
+async def bajar_plantilla(
+    scenario_id: str = Query(...),
+    data_version: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """La clasificación de TODA la propiedad, para llenar en Excel.
+
+    Una sola columna editable —`% Variable`— y la hoja protegida: el archivo
+    vuelve y se aparea por `id`, así que una columna corrida a mano rompería el
+    apareo sin que el que sube se entere.
+    """
+    from fastapi.responses import Response
+
+    from app.export.break_even_xlsx import construir_plantilla
+    from app.hotel_actual import HOTEL_NAME, hotel_slug
+
+    s = await _escenario_coherente(db, scenario_id, data_version)
+
+    deptos = {d.id: d for d in (await db.execute(
+        select(BeDepartment))).scalars()}
+    filas = (await db.execute(select(BeCostClassification).where(
+        BeCostClassification.property_id == HOTEL_ID))).scalars().all()
+
+    # El monto del AÑO COMPLETO (`month=0`), que es lo que hace que la decisión
+    # no sea a ciegas. Ver el encabezado de `break_even_xlsx`.
+    montos = await montos_del_escenario(db, s, 0)
+    por_clave: dict[tuple, Decimal] = {}
+    por_linea: dict[str, Decimal] = {}
+    for m in montos:
+        por_clave[(m.dept_code, m.account)] = (
+            por_clave.get((m.dept_code, m.account), Decimal("0")) + m.amount)
+        por_linea[m.pl_line] = por_linea.get(m.pl_line, Decimal("0")) + m.amount
+
+    out = []
+    for c in filas:
+        d = deptos.get(c.be_department_id)
+        monto = (por_clave.get((c.dept_code, c.account))
+                 if c.account else por_linea.get(c.pl_line)) or Decimal("0")
+        out.append({
+            "id": c.id,
+            "departamento": d.name if d else "",
+            "_orden": (d.display_order if d else 999, c.be_section or "",
+                       c.account or "", c.pl_line or ""),
+            "be_section": c.be_section, "dept_code": c.dept_code,
+            "account": c.account, "account_name": c.account_name,
+            "pl_line": c.pl_line, "pct_variable": float(c.pct_variable),
+            "amount": float(round(monto, 2)),
+            "original_class": c.original_class,
+            "excluded_from_be": c.excluded_from_be,
+        })
+    out.sort(key=lambda x: x["_orden"])
+    for x in out:
+        x.pop("_orden")
+
+    etiqueta = " ".join(str(v) for v in (s.type, s.version, s.year) if v)
+    xls = construir_plantilla(out, HOTEL_NAME, etiqueta)
+    fn = f"{hotel_slug()}_Clasificacion_Fijo_Variable.xlsx".replace(" ", "-")
+    return Response(
+        content=xls,
+        media_type=("application/vnd.openxmlformats-officedocument"
+                    ".spreadsheetml.sheet"),
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
+@router.post("/break-e/classification/upload/",
+             dependencies=[Depends(registro_de_subida)])
+async def subir_plantilla(
+    file: UploadFile = File(...),
+    aplicar: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lee la plantilla llena y devuelve QUÉ cambiaría. Aplica sólo si se pide.
+
+    ⚠️ **En seco por omisión.** Mover el % de una cuenta cambia el punto de
+    equilibrio, y el que sube tiene derecho a ver la lista antes. Con
+    `aplicar=true` se escribe.
+
+    ⚠️ **Una celda vacía deja la regla como está.** No es un cero. Tratarla como
+    cero convertiría un descuido —borrar una celda, filtrar y no darse cuenta—
+    en volver 100% fija una cuenta variable, sin que nada avise. Para poner cero
+    hay que escribir `0`.
+
+    Lo que no se puede aplicar NO se aplica a medias: se rechaza esa fila, se
+    dice cuál y por qué, y el resto sigue.
+    """
+    from app.export.break_even_xlsx import leer_plantilla
+
+    crudo = await file.read()
+    if not crudo:
+        raise ErrorApi(422, "break_even.archivo_vacio")
+    try:
+        del_archivo = leer_plantilla(crudo)
+    except ValueError:
+        raise ErrorApi(422, "break_even.sin_encabezado")
+    except Exception:
+        raise ErrorApi(422, "break_even.archivo_ilegible")
+
+    reglas = {c.id: c for c in (await db.execute(
+        select(BeCostClassification).where(
+            BeCostClassification.property_id == HOTEL_ID))).scalars()}
+
+    cambios: list[dict] = []
+    rechazos: list[dict] = []
+    sin_cambio = 0
+    vistos: set[str] = set()
+    for rid, bruto in del_archivo:
+        c = reglas.get(rid)
+        if c is None:
+            rechazos.append({"id": rid,
+                             "motivo": "no es una regla de esta propiedad"})
+            continue
+        if rid in vistos:
+            rechazos.append({"id": rid, "cuenta": c.account,
+                             "motivo": "la fila aparece dos veces en el archivo"})
+            continue
+        vistos.add(rid)
+        # Vacío = no se tocó. Ver el docstring.
+        if bruto is None or str(bruto).strip() == "":
+            sin_cambio += 1
+            continue
+        try:
+            pct = Decimal(str(bruto).strip().replace("%", "").replace(",", "."))
+        except Exception:
+            rechazos.append({"id": rid, "cuenta": c.account,
+                             "valor": str(bruto), "motivo": "no es un número"})
+            continue
+        if not (Decimal("0") <= pct <= Decimal("100")):
+            rechazos.append({"id": rid, "cuenta": c.account,
+                             "valor": str(bruto), "motivo": "fuera de 0 a 100"})
+            continue
+        if c.excluded_from_be:
+            rechazos.append({"id": rid, "cuenta": c.account,
+                             "motivo": "es una línea excluida del cálculo"})
+            continue
+        nuevo = (pct / Decimal("100")).quantize(Decimal("0.0001"))
+        actual = Decimal(str(c.pct_variable)).quantize(Decimal("0.0001"))
+        if nuevo == actual:
+            sin_cambio += 1
+            continue
+        cambios.append({"id": rid, "dept_code": c.dept_code,
+                        "cuenta": c.account, "nombre": c.account_name,
+                        "de": float(actual * 100), "a": float(nuevo * 100)})
+        if aplicar:
+            c.pct_variable = nuevo
+
+    # Lo que el archivo NO trajo. No es un error —se puede subir un archivo
+    # filtrado— pero se dice, porque el que sube cree que subió todo.
+    faltantes = len(reglas) - len(vistos)
+
+    if aplicar and cambios:
+        await db.commit()
+    else:
+        await db.rollback()
+
+    return {
+        "aplicado": bool(aplicar and cambios),
+        "cambios": len(cambios),
+        "sin_cambio": sin_cambio,
+        "rechazadas": len(rechazos),
+        "no_venian_en_el_archivo": faltantes,
+        "detalle": cambios[:200],
+        "rechazos": rechazos[:100],
+    }

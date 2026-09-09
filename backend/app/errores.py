@@ -44,6 +44,15 @@ MENSAJES: dict[str, dict[str, str]] = {
     "auth.solo_lectura": {
         "es": "Tu perfil ({perfil}) es de sólo lectura: podés ver todo, pero no modificar.",
         "en": "Your profile ({perfil}) is read-only: you can see everything, but not change it."},
+    "break_even.archivo_ilegible": {
+        "es": "No se pudo abrir el archivo. Tiene que ser el .xlsx que baja esta misma pantalla, guardado en formato Excel.",
+        "en": "The file could not be opened. It must be the .xlsx this screen downloads, saved in Excel format."},
+    "break_even.archivo_vacio": {
+        "es": "El archivo llegó vacío: no trae ninguna hoja con datos.",
+        "en": "The file arrived empty: it has no sheet with data."},
+    "break_even.sin_encabezado": {
+        "es": "El archivo no tiene el encabezado de la plantilla: faltan las columnas «id» y «% Variable». Bajá la plantilla de nuevo y llenala sobre ese archivo.",
+        "en": "The file is missing the template header: columns «id» and «% Variable» are not there. Download the template again and fill that file in."},
     "clase.desconocida": {
         "es": "Clase inválida: se espera revenue, cost, payroll, opex o property",
         "en": "Invalid class: expected revenue, cost, payroll, opex or property"},

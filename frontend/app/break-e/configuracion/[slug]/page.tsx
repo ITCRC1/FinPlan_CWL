@@ -36,10 +36,179 @@ import { useTranslations } from "next-intl";
 
 import {
   getBeDeptos, getBeClasificacion, setBePct, setBePctMasivo, resetBeDepto,
-  type BeDepto, type BeFila,
+  beClasificacionPlantillaUrl, subirBeClasificacion,
+  type BeDepto, type BeFila, type BeSubidaResultado, type DataVersion,
 } from "@/lib/api";
 import { bajarCuadros } from "@/lib/exportCuadro";
 import { BarraContexto, useContextoBE, useVigencia, usd, pct } from "../../_contexto";
+
+/**
+ * EL VIAJE REDONDO POR EXCEL: baja toda la clasificación, se llena, se sube.
+ *
+ * Owner, 2026-09-09: *«necesito que revises la configuración, la forma de
+ * asignar el % de fijo o variable. Veo esa asignación muy complicada, debe ser
+ * muy fácil. Inclusive que se baje a Excel y ahí se haga la asignación y se
+ * vuelva a subir; veo que en la pantalla es muy difícil»*.
+ *
+ * La pantalla de al lado sigue existiendo y sirve para ajustar una cuenta
+ * suelta. Lo que no sirve es para clasificar de cero: son 22 departamentos y
+ * cientos de clics para una decisión que se toma de corrido, mirando todo junto.
+ *
+ * ⚠️ **El archivo es de la propiedad ENTERA y no lleva mes.** Owner, el mismo
+ * día: *«el criterio no debe ser por mes; debe ser completo, uno solo sin
+ * diferencial mes»*. Por eso los botones NO dependen del departamento en el que
+ * uno esté parado: bajan y suben todo.
+ *
+ * ⚠️ **Se sube en dos tiempos.** Primero se lee el archivo y se muestra QUÉ
+ * cambiaría; recién con «Aplicar» se escribe. Mover el % de una cuenta mueve el
+ * punto de equilibrio, y eso no puede pasar porque alguien apretó un botón.
+ */
+function PlantillaExcel({ escenarioId, dataVersion, alAplicar }: {
+  escenarioId: string;
+  dataVersion: DataVersion;
+  alAplicar: () => void;
+}) {
+  const archivo = useRef<HTMLInputElement>(null);
+  const [previa, setPrevia] = useState<BeSubidaResultado | null>(null);
+  const [pendiente, setPendiente] = useState<File | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const leer = async (f: File) => {
+    setOcupado(true); setError(null);
+    try {
+      setPrevia(await subirBeClasificacion(f, false));
+      setPendiente(f);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo leer el archivo");
+      setPrevia(null); setPendiente(null);
+    } finally { setOcupado(false); }
+  };
+
+  const aplicar = async () => {
+    if (!pendiente) return;
+    setOcupado(true); setError(null);
+    try {
+      setPrevia(await subirBeClasificacion(pendiente, true));
+      setPendiente(null);
+      alAplicar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo aplicar");
+    } finally { setOcupado(false); }
+  };
+
+  const BOTON: React.CSSProperties = {
+    padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13,
+    border: "1px solid var(--border-medium)", background: "var(--bg-surface)",
+    color: "var(--text-primary)",
+  };
+
+  return (
+    <>
+      <a href={beClasificacionPlantillaUrl(escenarioId, dataVersion)}
+         style={{ ...BOTON, textDecoration: "none", fontWeight: 600 }}
+         title="Baja TODAS las cuentas de la propiedad en un archivo. Una sola
+columna se edita: el % variable.">
+        ⬇ Plantilla (toda la propiedad)
+      </a>
+      <button onClick={() => archivo.current?.click()} disabled={ocupado}
+              style={{ ...BOTON, fontWeight: 600 }}
+              title="Sube la plantilla llena. Primero muestra qué cambiaría.">
+        {ocupado ? "Leyendo…" : "⬆ Subir plantilla"}
+      </button>
+      <input ref={archivo} type="file" accept=".xlsx" hidden
+             onChange={e => {
+               const f = e.target.files?.[0];
+               e.target.value = "";        // que subir el mismo archivo vuelva a disparar
+               if (f) void leer(f);
+             }} />
+
+      {error && (
+        <div style={{ width: "100%", marginTop: 8, padding: "8px 12px",
+                      borderRadius: 6, fontSize: 12.5,
+                      border: "1px solid #C53030", color: "#C53030" }}>
+          {error}
+        </div>
+      )}
+
+      {previa && (
+        <div style={{ width: "100%", marginTop: 10, padding: "12px 14px",
+                      borderRadius: 8, border: "1px solid var(--border-medium)",
+                      background: "var(--bg-surface)" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 6 }}>
+            {previa.aplicado
+              ? `Aplicado: ${previa.cambios} regla(s) cambiadas.`
+              : `El archivo cambiaría ${previa.cambios} regla(s).`}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)",
+                        marginBottom: previa.rechazadas ? 6 : 10 }}>
+            {previa.sin_cambio} sin cambio
+            {previa.no_venian_en_el_archivo > 0 && (
+              <> · <strong>{previa.no_venian_en_el_archivo}</strong> regla(s) no
+                venían en el archivo (se quedan como están)</>
+            )}
+          </div>
+
+          {previa.rechazadas > 0 && (
+            <div style={{ fontSize: 12.5, color: "#C05621", marginBottom: 10 }}>
+              <strong>{previa.rechazadas} fila(s) rechazadas</strong>, y no se
+              aplican a medias:
+              <ul style={{ margin: "4px 0 0 18px", padding: 0 }}>
+                {previa.rechazos.slice(0, 8).map((r, i) => (
+                  <li key={i}>
+                    {r.cuenta ? `cuenta ${r.cuenta}` : r.id}
+                    {r.valor ? ` («${r.valor}»)` : ""} — {r.motivo}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {previa.detalle.length > 0 && !previa.aplicado && (
+            <div className="fin-scroll-x" style={{ maxHeight: 230,
+                          overflowY: "auto", marginBottom: 10 }}>
+              <table className="fin-table" style={{ width: "100%", fontSize: 12.5 }}>
+                <tbody>
+                  {previa.detalle.map(d => (
+                    <tr key={d.id}>
+                      <td style={{ padding: "3px 8px" }}>{d.dept_code}</td>
+                      <td style={{ padding: "3px 8px" }}>{d.cuenta}</td>
+                      <td style={{ padding: "3px 8px" }}>{d.nombre}</td>
+                      <td style={{ padding: "3px 8px", textAlign: "right",
+                                   color: "var(--text-secondary)" }}>
+                        {Math.round(d.de)}%
+                      </td>
+                      <td style={{ padding: "3px 8px", textAlign: "center" }}>→</td>
+                      <td style={{ padding: "3px 8px", textAlign: "right",
+                                   fontWeight: 600 }}>{Math.round(d.a)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8 }}>
+            {!previa.aplicado && previa.cambios > 0 && (
+              <button onClick={() => void aplicar()} disabled={ocupado}
+                style={{ padding: "7px 16px", borderRadius: 6, cursor: "pointer",
+                         fontSize: 13, fontWeight: 600, border: "1px solid #1A7F4B",
+                         background: "#1A7F4B", color: "#fff" }}>
+                Aplicar los {previa.cambios} cambios
+              </button>
+            )}
+            <button onClick={() => { setPrevia(null); setPendiente(null); }}
+              style={{ padding: "7px 14px", borderRadius: 6, cursor: "pointer",
+                       fontSize: 13, border: "1px solid var(--border-medium)",
+                       background: "transparent", color: "var(--text-secondary)" }}>
+              {previa.aplicado ? "Cerrar" : "Descartar"}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 const TH: React.CSSProperties = {
   textAlign: "right", padding: "7px 8px", fontSize: 11, fontWeight: 700,
@@ -341,6 +510,11 @@ export default function ConfiguracionDepto() {
           borderRadius: 6, cursor: "pointer", fontSize: 13,
           border: "1px solid var(--border-medium)", background: "var(--bg-surface)",
           color: "var(--text-secondary)" }}>{t("restablecer")}</button>
+        {/* ⚠️ El viaje redondo por Excel NO depende del departamento en el que
+            uno esté parado: baja y sube la propiedad ENTERA, en un solo
+            archivo y sin mes. Ver el comentario de `PlantillaExcel`. */}
+        <PlantillaExcel escenarioId={ctx.scenarioId} dataVersion={ctx.dataVersion}
+                        alAplicar={() => void cargar()} />
       </div>
 
       <div className="fin-scroll-x">

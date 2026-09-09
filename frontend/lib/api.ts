@@ -4377,6 +4377,58 @@ export async function resetBeDepto(deptSlug: string): Promise<{ ok: boolean; res
   return api.post(`/break-e/classification/${encodeURIComponent(deptSlug)}/reset/`, {});
 }
 
+/** La plantilla de clasificación fijo/variable, para llenar en Excel.
+ *
+ *  Owner, 2026-09-09: *«veo esa asignación muy complicada, debe ser muy fácil;
+ *  inclusive que se baje a Excel y ahí se haga la asignación y se vuelva a
+ *  subir»*.
+ *
+ *  ⚠️ **No lleva departamento ni mes.** Baja la propiedad ENTERA en un solo
+ *  archivo — que es todo el punto: la pantalla obliga a recorrer 22
+ *  departamentos— y la clasificación no tiene mes: una cuenta es variable o
+ *  fija por su naturaleza. El escenario sólo decide qué MONTO se muestra al
+ *  lado, para no clasificar a ciegas. */
+export function beClasificacionPlantillaUrl(
+  scenarioId: string, dataVersion: DataVersion,
+): string {
+  return dlUrl(`/break-e/classification/plantilla.xlsx`
+    + `?scenario_id=${scenarioId}&data_version=${dataVersion}`);
+}
+
+export interface BeSubidaResultado {
+  aplicado: boolean;
+  cambios: number;
+  sin_cambio: number;
+  rechazadas: number;
+  no_venian_en_el_archivo: number;
+  detalle: { id: string; dept_code: string; cuenta: string; nombre: string;
+             de: number; a: number }[];
+  rechazos: { id: string; cuenta?: string; valor?: string; motivo: string }[];
+}
+
+/** Sube la plantilla llena.
+ *
+ *  ⚠️ `aplicar=false` por omisión: primero se ve QUÉ cambiaría. Mover el % de
+ *  una cuenta mueve el punto de equilibrio, y el que sube tiene derecho a
+ *  mirar la lista antes de que se escriba. */
+export async function subirBeClasificacion(
+  archivo: File, aplicar = false,
+): Promise<BeSubidaResultado> {
+  const form = new FormData();
+  form.append("file", archivo);
+  const token = getToken();
+  const res = await fetch(
+    `${BASE}/break-e/classification/upload/?aplicar=${aplicar}`,
+    { method: "POST", body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const cuerpo = await res.json().catch(() => ({}));
+    throw Object.assign(new Error("No se pudo leer el archivo"),
+                        { detail: cuerpo.detail });
+  }
+  return res.json();
+}
+
 // ─── Break-Even Fase 2 ───────────────────────────────────────────────────────
 export interface BeSensibilidad {
   ocupaciones: number[]; factores_adr: number[];
