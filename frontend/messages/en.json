@@ -131,7 +131,13 @@
       "costFloors": "Price Floors",
       "costEscalones": "Cost Steps",
       "costSimulator": "Group Simulator",
-      "preCierre": "Pre-Close"
+      "preCierre": "Pre-Close",
+      "plDetailFull": "P&L Detail Full (consolidated)",
+      "plDetailHotel": "P&L Detail Hotel",
+      "plDetailClub": "P&L Detail Club",
+      "monthEndDetailFull": "P&L Detail Full (consolidated)",
+      "monthEndCheckbooks": "Checkbooks (read-only)",
+      "monthEndRevenuePlan": "Revenue build-up (read-only)"
     },
     "groupsFull": {
       "financials": "Financial Statements",
@@ -658,7 +664,8 @@
     "uploadExcel": "↑ Upload Excel",
     "uploading": "Uploading...",
     "withoutAllocation": "without the allocation",
-    "xlsImported": "✓ Excel imported: {n} lines"
+    "xlsImported": "✓ Excel imported: {n} lines",
+    "referenceTotal": "hotel total revenue"
   },
   "control": {
     "activeRules": "Active rules:",
@@ -1822,7 +1829,9 @@
     "step2Factor": "2 · Discount factor (Net Factor, from Sales Channels)",
     "step3Net": "3 · Net Rate (= Rack × Factor)",
     "totalExperience": "Experience total ({n}N)",
-    "xlsRackNetSheet": "Rack and Net Rate"
+    "xlsRackNetSheet": "Rack and Net Rate",
+    "emptyTitle": "This scenario has no experiences yet.",
+    "emptyBody": "Create one with “{boton}” and add its components with “{inclusion}”. Rack & Net is built from the components of the experience marked ★."
   },
   "rates": {
     "villaType": "Villa type",
@@ -2498,7 +2507,8 @@
     "sourceDriversMsg": "Source = Drivers. The P&L will use rate cards × occupancy when it recalculates.",
     "title": "Revenue — Checkbook",
     "xlsCheckbookTitle": "Revenue — Checkbook (USD)",
-    "xlsRoomsTitle": "Rooms — scenario statistics"
+    "xlsRoomsTitle": "Rooms — scenario statistics",
+    "keptManual": "Kept {n} typed cell(s) whose driver is zero."
   },
   "pax": {
     "title": "Pax (Guests) per Month",
@@ -2795,7 +2805,12 @@
     "xlSinVariacion": "no variance (data missing in one of the two columns)",
     "xlTitulo": "Month-End Close — {periodo} {year}",
     "xlVariacionEntre": "Variance: {escA} vs {escB}",
-    "ytdA": "YTD to {mes} {year}"
+    "ytdA": "YTD to {mes} {year}",
+    "tab_doce": "12 months",
+    "tab_formato": "Format",
+    "tab_auditoria": "Audit",
+    "tab_resumen12": "12m Summary",
+    "tab_utilidad": "Profit by Dept"
   },
   "otb": {
     "a851Nota1": "{metrica} by {unidad}:",
@@ -3212,7 +3227,12 @@
     "subtitle": "Class 7 · detail by account and sub-line",
     "totalIntoPl": "TOTAL THAT THE P&L ADDS UP (checkbook + allocation)",
     "uploadExcel": "↑ Upload Excel",
-    "uploading": "Uploading..."
+    "uploading": "Uploading...",
+    "tcBtn": "↻ Recalculate at budget FX",
+    "tcRunning": "Recalculating…",
+    "tcHint": "Re-derives the USD of colón lines using the scenario's exchange rate. Dollar lines are left alone.",
+    "tcDone": "{n} colón line(s) recalculated at FX {tc}.",
+    "tcNone": "No colón lines in this scenario — nothing to recalculate."
   },
   "ownersQ": {
     "bajarExcel": "Download Excel",

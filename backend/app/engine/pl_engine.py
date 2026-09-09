@@ -536,6 +536,165 @@ def nonop_bucket_for_account(code: str) -> str:
     return NONOP_ACCOUNT_MAP.get((code or "").strip(), "bank_interest")
 
 
+#: Grupo de cada línea de ingreso — la inversa de `GROUP_TO_REVENUE_LINE`, para
+#: poder contestar «¿en qué renglón cayó esto?» cuando la fila no trae
+#: departamento y el motor resolvió por rango de cuenta.
+_GRUPO_DE_LINEA_INGRESO: dict[str, str] = {
+    linea: grupo for grupo, linea in GROUP_TO_REVENUE_LINE.items()
+}
+
+#: Qué línea del P&L alimenta cada cajón de `NonOpActuals`. Es la vuelta que da
+#: `calculate_full_pl` al armar el bloque bajo GOP, escrita una vez para que la
+#: auditoría pueda seguir el mismo camino en lugar de adivinarlo.
+_LINEA_DE_CAJON: dict[str, str] = {
+    "rent": "RENT",
+    "mgmt_fee": "MGMT_FEE",
+    "royalties": "ROYALTIES",
+    "properties_insurance": "PROPERTIES_INSURANCE",
+    "other_expenses": "OTHER_EXPENSES",
+    "capital_reserve": "CAPITAL_RESERVE",
+    "large_capex": "LARGE_CAPEX",
+    "bank_interest": "BANK_INTEREST",
+    "depreciation": "DEPRECIATION",
+    "income_tax": "INCOME_TAXES",
+}
+
+#: Cómo se llama cada naturaleza en la auditoría. Son los mismos nombres que usa
+#: el estado de resultados del owner, para que el cotejo se pueda hacer a ojo.
+TIPO_INGRESO = "Ingresos"
+TIPO_COSTO = "Costo de ventas"
+TIPO_PAYROLL = "Payroll"
+TIPO_OPEX = "Opex"
+TIPO_REPARTO = "Reparto"
+TIPO_BAJO_GOP = "Bajo GOP"
+
+
+def _canon(code: str | None) -> str | None:
+    """Del vocabulario del motor al CANÓNICO (`report_line_config`).
+
+    ⚠️ **Los dos vocabularios se ven iguales y no lo son**, y confundirlos ya
+    costó dos veces. `calculate_full_pl` emite `OPEXP_ROOMS`, `OVH_ADMIN`,
+    `MGMT_FEE`; el camino DB-driven —que es el que corre en producción para los
+    actuales— emite `OPEX_ROOMS`, `OH_ADMIN`, `MGMT_FEE_3`. Los TOTALES
+    coinciden por `add_pl_aliases`, así que un cuadro mal codificado **cierra
+    igual** y sólo se le ven los renglones de detalle en cero.
+
+    `canonicalize_pl_lines` ya traduce las líneas; esto traduce un código suelto
+    con la misma tabla, para que la auditoría hable el idioma que el reporte
+    realmente devuelve.
+    """
+    if code is None:
+        return None
+    par = _MOTOR_TO_CANON.get(code)
+    return par[0] if par else code
+
+
+def linea_de_fila(account_code: str, dept_code: str) -> tuple[str | None, str]:
+    """A qué línea del P&L cae UNA fila del GL, y de qué naturaleza es.
+
+    Devuelve `(line_code, tipo)`. `line_code` es `None` cuando la fila no entra
+    al P&L (las 9xxx de estadística, o una 4xxx que no resuelve a ninguna línea
+    de ingreso).
+
+    ## Por qué existe
+
+    Es la trazabilidad al revés. `build_actual_inputs` **suma** las filas en
+    cajones y pierde de dónde salió cada monto; la auditoría necesita lo
+    contrario: por cada monto, en qué renglón terminó.
+
+    ⚠️ **Las reglas de acá tienen que ser las MISMAS que las de
+    `build_actual_inputs` y `calculate_full_pl`.** Una auditoría que clasifica
+    distinto que el motor no audita nada: cuadraría consigo misma y diría que
+    todo está bien justo cuando no lo está. Por eso reusa `group_for_dept`,
+    `revenue_line_for_account` y `nonop_line_for_account` en vez de repetir sus
+    tablas, y hay una prueba que suma el detalle y lo compara contra las líneas
+    que devuelve el motor.
+    """
+    code = (account_code or "").strip()
+    dept = (dept_code or "").strip()
+    if not code:
+        return None, ""
+
+    grupo = group_for_dept(dept) if dept else FALLBACK_OVERHEAD_GROUP
+    #: Un grupo de overhead no tiene bloque operativo: todo lo suyo —planilla,
+    #: opex, costo y reparto— cae en su única línea `OVH_`. Es lo que hace que
+    #: el sobrante de cafetería y lavandería se vea (owner, 2026-08-28).
+    de_overhead = grupo in OVERHEAD_GROUP_ORDER
+
+    if code in ALLOCATION_ACCOUNTS:
+        return _canon(f"OVH_{grupo}" if de_overhead
+                      else f"OPEXP_{grupo}"), TIPO_REPARTO
+
+    primero = code[0]
+    if primero == "4":
+        #: El motor emite `REV_{grupo}` recorriendo `OPERATING_GROUP_ORDER`, así
+        #: que con el departamento resuelto el grupo YA es la respuesta — pasar
+        #: por la línea de ingreso y volver sería un rodeo que puede diferir.
+        if dept and dept in _DEPT_TO_GROUP:
+            return _canon(f"REV_{grupo}") if not de_overhead else None, TIPO_INGRESO
+        #: Sin departamento, el motor cae en `revenue_line_for_account`. Se
+        #: repite ese camino y se vuelve al grupo por la tabla inversa.
+        linea = revenue_line_for_account(code)
+        grp = _GRUPO_DE_LINEA_INGRESO.get(linea or "")
+        return (_canon(f"REV_{grp}") if grp else None), TIPO_INGRESO
+    if primero == "8":
+        #: ⚠️ **`nonop_line_for_account` NO sirve acá.** Devuelve el vocabulario
+        #: del REPORTE de dueños (`MGMT_FEE_5_ROYALTIES`, `PROPERTY_INSURANCE`,
+        #: `LEASINGS_RENTS`…), que no es el que emite `calculate_full_pl`
+        #: (`ROYALTIES`, `PROPERTIES_INSURANCE`, `BANK_INTEREST`). Usarlo hacía
+        #: que casi todo el bloque bajo GOP saliera como huérfano en la
+        #: auditoría: plata atribuida a renglones que el P&L no dibuja.
+        #:
+        #: El camino correcto es el mismo que recorre el motor: cuenta → cajón
+        #: de `NonOpActuals` → línea que ese cajón alimenta.
+        return _canon(
+            _LINEA_DE_CAJON.get(nonop_bucket_for_account(code))), TIPO_BAJO_GOP
+    if primero == "9":
+        return None, ""
+    if primero not in ("5", "6", "7"):
+        return None, ""
+
+    tipo = {"5": TIPO_COSTO, "6": TIPO_PAYROLL, "7": TIPO_OPEX}[primero]
+    #: ⚠️ Los grupos de sólo-ingreso (`REVENUE_ONLY_GROUPS`) NO tienen bloque de
+    #: gasto operativo: `calculate_full_pl` se los salta. Su gasto no se pierde
+    #: —no existe—, pero si alguna vez llega, decir `OPEXP_MISC_OTHER` sería
+    #: nombrar una línea que el reporte no dibuja. Se devuelve `None` para que
+    #: la auditoría lo muestre como huérfano en vez de esconderlo.
+    if not de_overhead and grupo in REVENUE_ONLY_GROUPS:
+        return None, tipo
+    return _canon(f"OVH_{grupo}" if de_overhead else f"OPEXP_{grupo}"), tipo
+
+
+def codigos_atribuibles() -> set[str]:
+    """Los renglones a los que una fila del GL PUEDE caer.
+
+    Sirve para saber qué se puede auditar y qué no. El P&L tiene renglones
+    **derivados** —los totales, y todo el bloque de Operating Profit, que es
+    ingreso menos gasto— que no se componen de asientos: su detalle siempre
+    daría cero y compararlos contra él inventa un descuadre por renglón.
+
+    En julio 2026 eran seis: `PROFIT_ROOMS`, `PROFIT_FB`, `PROFIT_SPA`,
+    `PROFIT_TOURS`, `PROFIT_CLUB` y la fila de misceláneos. Ninguno estaba mal.
+
+    ⚠️ **Se calcula recorriendo `linea_de_fila`, no con una lista.** Una lista
+    de exclusiones habría que acordarse de actualizarla cada vez que se agrega
+    un departamento o una cuenta; esto pregunta directamente adónde puede ir
+    cada combinación, así que un bloque derivado nuevo queda excluido solo.
+    """
+    out: set[str] = set()
+    #: Una cuenta de cada clase alcanza: la clase es lo que decide la rama.
+    muestras = ["4000", "5700", "6000", "7065", "4900"]
+    for dept in list(_DEPT_TO_GROUP) + [""]:
+        for cuenta in muestras:
+            code, _ = linea_de_fila(cuenta, dept)
+            if code:
+                out.add(code)
+    for cuenta in NONOP_ACCOUNT_LINE:
+        code, _ = linea_de_fila(cuenta, "0250")
+        if code:
+            out.add(code)
+    return out
+
 def build_actual_inputs(rows: list[dict]) -> dict:
     """
     Turn raw ActualEntry-like rows into the kwargs that calculate_full_pl expects.

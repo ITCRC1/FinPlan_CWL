@@ -296,8 +296,25 @@ async def _lo_subido_manda(session, scenario) -> bool:
     return await recalc.lo_subido_manda(session, scenario)
 
 
+async def _renta_digitada(session, scenario) -> bool:
+    """¿Alguien escribió el impuesto de renta a mano en el auxiliar Below-GOP?
+
+    Se pregunta por separado de `_lo_subido_manda` a propósito: esa bandera
+    también decide si el recálculo puede pisar los auxiliares, y colgarle este
+    caso cambiaría cosas que no tienen nada que ver con el impuesto.
+
+    Cero no cuenta: el auxiliar guarda una fila en cero por cada línea que se
+    abre, y una línea abierta y vacía no puede apagar el cálculo.
+    """
+    filas = (await session.execute(select(NonOpEntry).where(
+        NonOpEntry.scenario_id == scenario.id,
+        NonOpEntry.report_line_code == "INCOME_TAXES"))).scalars().all()
+    return any(any(getattr(e, m, None) for m in _BG_MONTH_COLS) for e in filas)
+
+
 def _aggregate_selected(sel: list[dict], *, lo_subido_manda: bool = False,
-                       ebt_anual: float | None = None) -> dict:
+                       ebt_anual: float | None = None,
+                       renta_digitada: bool = False) -> dict:
     """Sum a chosen set of monthly results (each {month, kpis, lines}) into one
     column → {kpis, lines}. Lines carry summed amount + PAR/POR over the
     aggregated room KPIs. Building block for single month, YTD and Full Year.
@@ -312,7 +329,11 @@ def _aggregate_selected(sel: list[dict], *, lo_subido_manda: bool = False,
         for ln in m["lines"]:
             amounts[ln.line_code] = amounts.get(ln.line_code, 0.0) + float(ln.amount_usd)
             meta.setdefault(ln.line_code, ln)
-    if not lo_subido_manda:
+    # `renta_digitada` apaga la correccion por la misma razon que
+    # `lo_subido_manda`: el motor ya respeta lo que alguien escribio a mano,
+    # pero sin esto la reparacion de la COLUMNA lo volvia a pisar. Owner,
+    # 2026-08-27: «que no se sobreescriba al menos que yo venga y lo quite».
+    if not (lo_subido_manda or renta_digitada):
         _apply_tax_correction(
             amounts,
             [sum(float(ln.amount_usd) for ln in m["lines"] if ln.line_code == "EBT")

@@ -483,7 +483,7 @@ export default function AllocationsConfigPage() {
 
       const repCaf = cuadroReparto("CAFETERIA", t("xlsSheetCafSplit"));
       if (repCaf) cuadros.push(repCaf);
-      if (calcResult) cuadros.push(cuadroMensual(calcResult.monthly.cafeteria,
+      if (calcResult?.monthly) cuadros.push(cuadroMensual(calcResult.monthly.cafeteria,
         `${t("xlsCalcResult")} — ${t("cafeteria")}`, t("xlsSheetCafMonthly")));
 
       // Validación: el reparto de cafetería tiene que netear $0 cada mes.
@@ -585,7 +585,7 @@ export default function AllocationsConfigPage() {
 
       const repLau = cuadroReparto("LAUNDRY", t("xlsSheetLauSplit"));
       if (repLau) cuadros.push(repLau);
-      if (calcResult) cuadros.push(cuadroMensual(calcResult.monthly.laundry,
+      if (calcResult?.monthly) cuadros.push(cuadroMensual(calcResult.monthly.laundry,
         `${t("xlsCalcResult")} — ${t("laundry")}`, t("xlsSheetLauMonthly")));
 
       if (breakdown && breakdown.total_cost.some(v => Math.abs(v) > 0.5)) {
@@ -1425,7 +1425,8 @@ export default function AllocationsConfigPage() {
               })}
             </div>
           )}
-          {calcResult.total_entries > 0 && calcResult.monthly.laundry.every(m => m.rows === 0) && (
+          {calcResult.total_entries > 0
+            && calcResult.monthly?.laundry?.every(m => m.rows === 0) && (
             <div style={{
               marginBottom: 16, padding: "10px 14px", borderRadius: 4, fontSize: 12,
               background: "rgba(255,193,7,0.08)", color: "var(--warning, #FFC107)",
@@ -1453,7 +1454,7 @@ export default function AllocationsConfigPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calcResult.monthly.cafeteria.map(m => (
+                  {(calcResult.monthly?.cafeteria ?? []).map(m => (
                     <tr key={m.month}>
                       <td>{MONTHS[m.month - 1]}</td>
                       <td className="mono" style={{ textAlign: "right" }}>
@@ -1485,7 +1486,7 @@ export default function AllocationsConfigPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {calcResult.monthly.laundry.map(m => (
+                  {(calcResult.monthly?.laundry ?? []).map(m => (
                     <tr key={m.month}>
                       <td>{MONTHS[m.month - 1]}</td>
                       <td className="mono" style={{ textAlign: "right" }}>

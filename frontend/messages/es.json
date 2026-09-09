@@ -131,7 +131,13 @@
       "costFloors": "Price Floors",
       "costEscalones": "Cost Steps",
       "costSimulator": "Group Simulator",
-      "preCierre": "Pre-Cierre"
+      "preCierre": "Pre-Cierre",
+      "plDetailFull": "P&L Detail Full (consolidado)",
+      "plDetailHotel": "P&L Detail Hotel",
+      "plDetailClub": "P&L Detail Club",
+      "monthEndDetailFull": "P&L Detail Full (consolidado)",
+      "monthEndCheckbooks": "Checkbooks (consulta)",
+      "monthEndRevenuePlan": "Armado de ingresos (consulta)"
     },
     "groupsFull": {
       "financials": "Estados financieros",
@@ -658,7 +664,8 @@
     "uploadExcel": "↑ Subir Excel",
     "uploading": "Subiendo...",
     "withoutAllocation": "sin el reparto",
-    "xlsImported": "✓ Excel importado: {n} líneas"
+    "xlsImported": "✓ Excel importado: {n} líneas",
+    "referenceTotal": "ingreso total del hotel"
   },
   "control": {
     "activeRules": "Reglas activas:",
@@ -1822,7 +1829,9 @@
     "step2Factor": "2 · Factor de descuento (Net Factor, de Canales de Venta)",
     "step3Net": "3 · Net Rate (= Rack × Factor)",
     "totalExperience": "Total experiencia ({n}N)",
-    "xlsRackNetSheet": "Rack y Net Rate"
+    "xlsRackNetSheet": "Rack y Net Rate",
+    "emptyTitle": "Todavía no hay experiencias en este escenario.",
+    "emptyBody": "Creá una con «{boton}» y agregale sus componentes con «{inclusion}». El Rack & Net se arma con los componentes de la experiencia marcada con ★."
   },
   "rates": {
     "villaType": "Tipo de Villa",
@@ -2498,7 +2507,8 @@
     "sourceDriversMsg": "Fuente = Drivers. El P&L usará rate cards × ocupación al recalcular.",
     "title": "Revenue — Checkbook",
     "xlsCheckbookTitle": "Revenue — Checkbook (USD)",
-    "xlsRoomsTitle": "Rooms — estadísticas del escenario"
+    "xlsRoomsTitle": "Rooms — estadísticas del escenario",
+    "keptManual": "Se respetaron {n} celda(s) digitadas cuyo driver está en cero."
   },
   "pax": {
     "title": "Pax (Huéspedes) por Mes",
@@ -2795,7 +2805,12 @@
     "xlSinVariacion": "sin variación (falta dato en una de las dos columnas)",
     "xlTitulo": "Cierre de mes — {periodo} {year}",
     "xlVariacionEntre": "Variación: {escA} vs {escB}",
-    "ytdA": "YTD a {mes} {year}"
+    "ytdA": "YTD a {mes} {year}",
+    "tab_doce": "12 meses",
+    "tab_formato": "Formato",
+    "tab_auditoria": "Auditoría",
+    "tab_resumen12": "Resumen 12m",
+    "tab_utilidad": "Utilidad x depto"
   },
   "otb": {
     "a851Nota1": "{metrica} por {unidad}:",
@@ -3212,7 +3227,12 @@
     "subtitle": "Clase 7 · detalle por cuenta y sub-línea",
     "totalIntoPl": "TOTAL QUE SUMA EL P&L (checkbook + reparto)",
     "uploadExcel": "↑ Subir Excel",
-    "uploading": "Subiendo..."
+    "uploading": "Subiendo...",
+    "tcBtn": "↻ Recalcular al TC del budget",
+    "tcRunning": "Recalculando…",
+    "tcHint": "Vuelve a pasar a dólares las líneas en colones con el tipo de cambio del escenario. Las líneas en dólares no se tocan.",
+    "tcDone": "{n} línea(s) en colones recalculadas al TC {tc}.",
+    "tcNone": "No hay líneas en colones en este escenario: nada que recalcular."
   },
   "ownersQ": {
     "bajarExcel": "Bajar Excel",

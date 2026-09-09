@@ -78,8 +78,13 @@ def test_el_cero_no_se_imprime_y_el_negativo_va_en_rojo():
 
 def test_una_hoja_por_cuadro_y_los_nombres_no_chocan():
     wb = _abrir([CUADRO, {**CUADRO, "titulo": "Otro"}, CUADRO])
-    assert len(wb.worksheets) == 3
-    assert len(set(wb.sheetnames)) == 3      # sin duplicados aunque el título repita
+    # ⚠️ El libro de VARIAS hojas trae además un «Índice» adelante desde el
+    # 2026-09-03 (owner: «que baje bien profesional y claro»): con doce hojas,
+    # los nombres van cortados a 31 caracteres y no se leen enteros.
+    assert wb.sheetnames[0] == "Índice"
+    cuadros = [h for h in wb.sheetnames if h != "Índice"]
+    assert len(cuadros) == 3
+    assert len(set(cuadros)) == 3            # sin duplicados aunque el título repita
 
 
 def test_la_celda_vacia_no_es_un_cero():

@@ -52,6 +52,25 @@ export interface Cuadro {
   hoja?: string;
   columnas: ColumnaCuadro[];
   filas: FilaCuadro[];
+  /** Las notas ya escritas, para que el Word las imprima DENTRO del recuadro
+   *  de comentarios.
+   *
+   *  Owner, 2026-09-03: «una vez que se impriman en Word, estas notas
+   *  aparezcan en el box editable». Separar lo escrito de donde se escribe
+   *  haría que en la reunión se comente dos veces lo mismo. */
+  comentarios?: string[];
+  /** La franja de estadísticas, como cabecera del cuadro.
+   *
+   *  Owner, 2026-09-03: «no están saliendo las estadísticas en cada tab».
+   *
+   *  ⚠️ En la pantalla la franja se dibuja UNA vez arriba de los sub-tabs, así
+   *  que se ve en todos. En un documento cada hoja se lee sola —se imprime, se
+   *  manda suelta— y sin las estadísticas al lado, los montos no tienen contra
+   *  qué leerse: 56.001 de ingreso con 132 noches vendidas dice algo distinto
+   *  que con 400. */
+  kpis?: { label: string; valores: (string | number | null)[] }[];
+  /** Los rótulos de las columnas de `kpis` (una por versión). */
+  kpis_columnas?: string[];
 }
 
 /**
@@ -91,4 +110,47 @@ export function num(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : null;
+}
+
+
+// ── El reporte de cierre en Word (owner, 2026-09-02) ─────────────────────────
+//
+// «Un documento Word con todos los tabs activos… dejá espacio entre los tabs
+// para poder comentar.»
+//
+// Mismo contrato que el Excel a propósito: los `cuadros` son los MISMOS objetos
+// que ya arma cada pantalla, así que un reporte que se puede bajar a Excel se
+// puede meter en el Word sin escribir nada nuevo. Lo que se agrega es lo que
+// necesita la portada.
+export interface CierreWord {
+  archivo: string;
+  titulo: string;
+  periodo: string;
+  versiones: string;
+  cuadros: Cuadro[];
+  /** Los sub-tabs que la pantalla NO pudo incluir, con el motivo. Se imprimen
+   *  en la portada.
+   *
+   *  ⚠️ Con la lista sólo en un aviso del navegador, el que abre el archivo
+   *  después —o el que lo recibe por correo— no tiene forma de saber si falta
+   *  algo: un índice de diez cuadros se ve completo aunque falten cuatro. */
+  omitidos?: string[];
+}
+
+export async function bajarCierreWord(body: CierreWord): Promise<Blob> {
+  const token = getToken();
+  const res = await fetch(`${BASE}/export/cuadros/word/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    // Igual que el Excel: que un fallo se VEA. Una descarga que no pasa nada
+    // deja al usuario esperando un archivo que nunca va a llegar.
+    throw new Error(`No se pudo generar el Word (${res.status}): ${await res.text()}`);
+  }
+  return res.blob();
 }

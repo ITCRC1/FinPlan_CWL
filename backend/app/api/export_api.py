@@ -19,8 +19,9 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.errores import ErrorApi
+from app.export.cierre_word import DOCX, build_cierre_docx
 from app.export.cuadro_excel import FORMATOS, build_cuadros_workbook
-from app.hotel_actual import hotel_slug
+from app.hotel_actual import HOTEL_NAME, hotel_slug
 
 router = APIRouter(tags=["export"])
 
@@ -53,12 +54,35 @@ class Fila(BaseModel):
     valores: list[float | str | None] = Field(default_factory=list)
 
 
+class FilaKpi(BaseModel):
+    """Un renglón de la franja de estadísticas: el rótulo y un valor por
+    versión."""
+    label: str = ""
+    valores: list[float | str | None] = Field(default_factory=list)
+
+
 class Cuadro(BaseModel):
     titulo: str = "Cuadro"
     subtitulo: str | None = None
     hoja: str | None = None
     columnas: list[Columna] = Field(default_factory=list)
     filas: list[Fila] = Field(default_factory=list)
+    #: Las notas ya escritas, para que el Word las imprima DENTRO del recuadro
+    #: de comentarios.
+    #:
+    #: ⚠️ **Tiene que estar declarado acá o no llega.** Pydantic descarta en
+    #: silencio los campos que el modelo no conoce: la pantalla las mandaba, el
+    #: generador sabía imprimirlas, y en el medio se caían sin que nada fallara
+    #: — el documento salía con el recuadro vacío (owner, 2026-09-03: «las
+    #: notas no salen»).
+    comentarios: list[str] = Field(default_factory=list)
+    #: La franja de estadísticas, como cabecera del cuadro.
+    #:
+    #: ⚠️ Igual que `comentarios`: si el modelo no lo declara, Pydantic lo
+    #: descarta en silencio y el documento sale sin la franja sin que nada
+    #: falle. Ya pasó una vez con las notas.
+    kpis: list[FilaKpi] = Field(default_factory=list)
+    kpis_columnas: list[str] = Field(default_factory=list)
 
 
 class ExportBody(BaseModel):
@@ -66,8 +90,30 @@ class ExportBody(BaseModel):
     cuadros: list[Cuadro] = Field(default_factory=list)
 
 
-@router.post("/export/cuadros/")
-async def exportar_cuadros(body: ExportBody):
+class WordBody(ExportBody):
+    """Lo mismo que el Excel, mas lo que necesita la PORTADA.
+
+    Hereda a proposito: el cuadro es el mismo objeto que ya arma cada pantalla,
+    asi que un reporte que se puede bajar a Excel se puede meter en el Word sin
+    escribir nada nuevo.
+    """
+    titulo: str = "Reporte de cierre"
+    periodo: str = ""
+    versiones: str = ""
+    #: Los sub-tabs que la pantalla NO pudo incluir, con el motivo. Se imprimen
+    #: en la portada: un índice de diez cuadros se ve completo aunque falten
+    #: cuatro, y el que recibe el archivo por correo no tiene otra forma de
+    #: saberlo (owner, 2026-09-03: «no todos los tabs salen»).
+    omitidos: list[str] = Field(default_factory=list)
+
+
+def _validar(body: ExportBody) -> None:
+    """Lo que NO se puede exportar, en un solo lugar.
+
+    El Excel y el Word tienen que rechazar lo mismo: si uno aceptara un cuadro
+    que el otro no, habria formas de bajar un documento con una columna de mas
+    que nadie revisa.
+    """
     if not body.cuadros:
         raise ErrorApi(422, "export.sin_cuadros")
     total = sum(len(c.filas) for c in body.cuadros)
@@ -96,9 +142,39 @@ async def exportar_cuadros(body: ExportBody):
                                columnas=len(cu.columnas),
                                sobran=len(f.valores) - huecos)
 
+@router.post("/export/cuadros/")
+async def exportar_cuadros(body: ExportBody):
+    _validar(body)
     contenido = build_cuadros_workbook([c.model_dump() for c in body.cuadros])
     nombre = f"{body.archivo}_{hotel_slug()}.xlsx".replace(" ", "_")
     return Response(
         content=contenido, media_type=XLSX,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.post("/export/cuadros/word/")
+async def exportar_word(body: WordBody):
+    """El reporte de cierre en Word, con espacio para comentar cada cuadro.
+
+    Owner, 2026-09-02: *«un documento Word con todos los tabs activos… dejá
+    espacio entre los tabs para poder comentar… y siempre deben salir los tabs
+    que estén activos en la vista»*.
+
+    ⚠️ **Lo de «los que estén activos» sale gratis y por eso no hay codigo que
+    lo resuelva.** La pantalla manda los cuadros que dibuja, y dibuja
+    exactamente los que quedaron activos en el panel de Vistas. Filtrar acá por
+    `tab_enablement` seria una segunda lectura de la misma decision: el dia que
+    las dos difieran, el documento diria una cosa y la pantalla otra.
+    """
+    _validar(body)
+    contenido = build_cierre_docx(
+        [c.model_dump() for c in body.cuadros],
+        propiedad=HOTEL_NAME, titulo=body.titulo,
+        periodo=body.periodo, versiones=body.versiones,
+        omitidos=body.omitidos)
+    nombre = f"{body.archivo}_{hotel_slug()}.docx".replace(" ", "_")
+    return Response(
+        content=contenido, media_type=DOCX,
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )

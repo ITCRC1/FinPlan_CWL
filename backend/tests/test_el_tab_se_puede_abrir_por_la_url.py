@@ -114,7 +114,12 @@ def test_todo_href_del_menu_apunta_a_una_pantalla_que_existe():
     rotos = []
     for grupo, hrefs in _grupos().items():
         for h in hrefs:
-            ruta = os.path.join(RAIZ, "app", *[p for p in h.split("/") if p],
+            # El `?…` no es parte de la ruta. Hay entradas que apuntan a la MISMA
+            # pantalla con parámetros distintos —los tres P&L Detail, que son la
+            # misma cascada con otro ámbito— y sin esto la guarda las daba por
+            # rotas cuando el archivo existe.
+            camino = h.split("?")[0].split("#")[0]
+            ruta = os.path.join(RAIZ, "app", *[p for p in camino.split("/") if p],
                                 "page.tsx")
             if not os.path.exists(ruta):
                 rotos.append(f"{h} (tab «{grupo}»)")

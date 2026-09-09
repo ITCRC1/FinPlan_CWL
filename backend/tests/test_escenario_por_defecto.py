@@ -272,7 +272,19 @@ def test_lo_guardado_se_puede_despegar():
     txt = (FRONT / "lib" / "escenarioPreferido.ts").read_text(encoding="utf-8")
     assert "GENERACION" in txt and "limpiarSiEsDeOtraGeneracion" in txt
     # Y la limpieza tiene que alcanzar a las DOS familias de llaves.
-    assert "finplan_planning_scenario" in txt, "la llave compartida de Planning no se limpia"
+    # La llave compartida de Planning tiene que quedar limpia. Ya no se nombra
+    # una por una: la limpieza barre TODO lo que empiece con `finplan` salvo la
+    # sesion, y `finplan_planning_scenario` empieza con `finplan`.
+    #
+    # ⚠️ El prefijo angosto de antes (`finplan_esc_`) es exactamente por lo que
+    # el owner seguia viendo 2035: dejaba afuera `finplan.month-end.pl`, donde
+    # Cierre de Mes guarda sus cuatro ranuras.
+    limpieza = txt[txt.index("export function limpiarSiEsDeOtraGeneracion"):]
+    limpieza = limpieza[:limpieza.index(chr(10) + "}")]
+    assert 'startsWith("finplan")' in limpieza, (
+        "la limpieza volvio a un prefijo angosto: alguna pantalla se queda con "
+        "el escenario viejo pegado")
+    assert "SAGRADAS" in limpieza, "la limpieza puede estar deslogueando al usuario"
     compartido = (FRONT / "lib" / "planningScenario.ts").read_text(encoding="utf-8")
     assert "limpiarSiEsDeOtraGeneracion" in compartido
 

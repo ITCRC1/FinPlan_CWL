@@ -41,15 +41,33 @@ from app.i18n import DEFAULT_LOCALE, normalize_locale
 #: mano — y con tres redacciones distintas entre ellos.
 MENSAJES: dict[str, dict[str, str]] = {
     # ── Lo que no se encuentra ────────────────────────────────────────────────
+    "auth.solo_lectura": {
+        "es": "Tu perfil ({perfil}) es de sólo lectura: podés ver todo, pero no modificar.",
+        "en": "Your profile ({perfil}) is read-only: you can see everything, but not change it."},
+    "clase.desconocida": {
+        "es": "Clase inválida: se espera revenue, cost, payroll, opex o property",
+        "en": "Invalid class: expected revenue, cost, payroll, opex or property"},
+    "comentario.sin_renglon": {
+        "es": "Falta decir a qué renglón pertenece el comentario",
+        "en": "The comment must say which line it belongs to"},
+    "escenario.falta": {
+        "es": "Hay que decir al menos un escenario",
+        "en": "At least one scenario is required"},
     "escenario.no_encontrado": {
         "es": "Escenario no encontrado",
         "en": "Scenario not found"},
+    "horizonte.invalido": {
+        "es": "El ámbito tiene que ser month, ytd o full",
+        "en": "Scope must be month, ytd or full"},
     "propiedad.no_encontrada": {
         "es": "Propiedad no encontrada",
         "en": "Property not found"},
     "entrada.no_encontrada": {
         "es": "Entrada no encontrada",
         "en": "Entry not found"},
+    "reporte.ambito_desconocido": {
+        "es": "Ámbito de reporte desconocido: {ambito}",
+        "en": "Unknown report scope: {ambito}"},
     "version.no_encontrada": {
         "es": "Versión no encontrada",
         "en": "Version not found"},

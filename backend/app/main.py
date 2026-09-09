@@ -39,6 +39,14 @@ from app.api.estadisticas_api import router as estadisticas_router
 from app.api.checkbook_api import router as checkbook_router
 from app.api.canales_api import router as canales_router
 from app.api.precierre_api import router as precierre_router
+from app.api.auditoria_api import router as auditoria_router
+from app.api.detalle_celda_api import router as detalle_celda_router
+from app.api.comentario_pl_api import router as comentario_pl_router
+from app.api.pl_detail_api import router as pl_detail_router
+# Le devuelve el cero de adelante a los codigos de departamento que entran sin
+# el (`110` -> `0110`). Ver `app/departamentos.py`: hay cuatro caminos de
+# escritura y el ORM los ve a todos.
+import app.departamentos  # noqa: F401
 from app.api.semillas_api import router as semillas_router
 from app.api.mixer_api import router as mixer_router
 from app.api.chequeo_api import router as chequeo_router
@@ -116,6 +124,15 @@ async def _escenario_bloqueado(request: Request, exc: ScenarioLockedError):
 # el 2026-08-20, de 194 endpoints que escriben sólo catorce lo verificaban.
 # Enganchado en el router, una ruta nueva queda cubierta sin que nadie se
 # acuerde — ver `app/candado.py`.
+# ⚠️ Falta `solo_lectura` acá, y NO es un olvido.
+#
+# El perfil de sólo lectura de las otras propiedades se apoya en un campo
+# `role` del usuario que ESTA instalación todavía no tiene: engancharlo
+# revienta con `'Usuario' object has no attribute 'role'` en cada petición.
+# `app/perfiles.py` ya está en el repo para cuando se porte el modelo de
+# usuario y su migración; hasta entonces queda desconectado, que es honesto:
+# un guardia que no puede hacer su trabajo es peor que ninguno, porque se
+# lee como si lo estuviera haciendo.
 _guard = [Depends(get_current_user), Depends(candado_del_escenario)]
 app.include_router(accounts_router, prefix="/api", dependencies=_guard)
 app.include_router(scenarios_router, prefix="/api", dependencies=_guard)
@@ -149,6 +166,10 @@ app.include_router(estadisticas_router, prefix="/api", dependencies=_guard)
 app.include_router(checkbook_router, prefix="/api", dependencies=_guard)
 app.include_router(canales_router, prefix="/api", dependencies=_guard)
 app.include_router(precierre_router, prefix="/api", dependencies=_guard)
+app.include_router(auditoria_router, prefix="/api", dependencies=_guard)
+app.include_router(detalle_celda_router, prefix="/api", dependencies=_guard)
+app.include_router(comentario_pl_router, prefix="/api", dependencies=_guard)
+app.include_router(pl_detail_router, prefix="/api", dependencies=_guard)
 app.include_router(semillas_router, prefix="/api", dependencies=_guard)
 app.include_router(mixer_router, prefix="/api", dependencies=_guard)
 app.include_router(chequeo_router, prefix="/api", dependencies=_guard)

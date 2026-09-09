@@ -142,6 +142,17 @@ export const NAV: NavGroup[] = [
       { key: "plByDeptCompare", href: "/reports/pl-by-dept-compare" },
       { key: "plYtd", href: "/reports/pl-ytd" },
       { key: "plFullExec", href: "/reports/pl-full" },
+      // Las tres hojas del libro del owner. Van como TRES entradas porque
+      // asi las pide, y apuntan a UNA sola pantalla con `?ambito=`: los tres
+      // son la misma cascada con otro alcance.
+      //
+      // ⚠️ El ambito `club` queda igual aunque esta propiedad no opere Club:
+      // la pantalla contesta vacia, y esconderlo por hotel seria una segunda
+      // regla de visibilidad compitiendo con `tab_enablement`, que es la que
+      // manda y se edita sin desplegar.
+      { key: "plDetailFull", href: "/reports/pl-detail?ambito=consolidado" },
+      { key: "plDetailHotel", href: "/reports/pl-detail?ambito=hotel" },
+      { key: "plDetailClub", href: "/reports/pl-detail?ambito=club" },
       { key: "execSummary", href: "/reports/summary" },
       { key: "ytdSummary", href: "/reports/ytd" },
       { key: "operations", header: true },
