@@ -590,7 +590,23 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                 <tr>
                   <td colSpan={4} style={{ ...TDL, textAlign: "right", fontWeight: 800,
                                            paddingTop: 5 }}>
-                    Subtotal {d.code} · {d.nombre}
+                    {/* ⚠️ NO es el resultado del departamento.
+                        Owner, 2026-09-10: «en sub tab audit profit es
+                        diferente, debe ser ingreso menos gastos».
+                        Tenia razon en como se lee: decia «Subtotal» debajo de
+                        una lista que abre con INGRESOS y sigue con PAYROLL y
+                        OPEX, asi que se lee como resultado. Y no lo es —
+                        `g.total` suma todos los montos SIN mirar la
+                        naturaleza, porque aca los importes vienen como
+                        magnitudes positivas.
+                        En Spa: 1.941,83 + 3.351,34 + 465,10 = 5.758,27. El
+                        resultado seria -1.874,61.
+                        No se cambia la matematica: el resultado por
+                        departamento lo calcula el motor (`PROFIT_<dept>`) y se
+                        ve en «Profit by Dept». Calcularlo aca seria la segunda
+                        verdad que el encabezado de este archivo prohibe. Se
+                        cambia el NOMBRE, que era el problema. */}
+                    Movimiento total {d.code} · {d.nombre}
                   </td>
                   <td style={{ ...TD, fontWeight: 800, paddingTop: 5,
                                borderTop: "1px solid var(--border-medium)" }}>
