@@ -42,7 +42,7 @@ import Auditoria from "./Auditoria";
 // El Profit by Department del owner, tal como ya está construido bajo Cierre de
 // Mes. Se importa la pantalla entera a propósito: ver el comentario del sub-tab
 // `utilidad` más abajo.
-import PLDetailEnCierre from "../pl-detail/page";
+import PLDetailEnCierre from "../pl-detail/Pantalla";
 import DetalleCelda, { type Celda } from "./DetalleCelda";
 import Estadisticas from "./Estadisticas";
 import VistasVisibles from "./VistasVisibles";

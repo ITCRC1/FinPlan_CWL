@@ -87,7 +87,13 @@ def test_utilidad_ve_los_espejos():
     sub-tab que trae su propia lista tiene que pedirlos, o el espejo no existe
     para el aunque la pantalla lo tenga elegido.
     """
-    src = _leer(RAIZ, "app", "month-end", "pl-detail", "page.tsx")
+    # ⚠️ `Pantalla.tsx`, NO `page.tsx`. El componente se mudo el 2026-09-10:
+    # recibia `esPre` como prop viviendo en una ruta, y Next exige que las
+    # props de una ruta sean `PageProps`. El build de Railway se cayo con
+    # «Type '{ esPre?: boolean }' does not satisfy the constraint 'PageProps'»
+    # y `tsc --noEmit` no lo habia atrapado: esa restriccion la generan los
+    # tipos de ruta que Next escribe durante `next build`.
+    src = _leer(RAIZ, "app", "month-end", "pl-detail", "Pantalla.tsx")
     assert "getScenarios(HOTEL_ID, esPre)" in src, (
         "pl-detail carga escenarios sin pedir los espejos: en Pre-Closing no "
         "puede ver el precierre")
@@ -103,3 +109,27 @@ def test_la_regla_generica_nunca_devuelve_un_espejo():
     assert "!e.es_precierre" in src, (
         "`elegir()` no descarta los espejos: puede devolver el precierre "
         "donde se pidio el Actual")
+
+
+def test_ninguna_ruta_recibe_props_propias():
+    """⚠️ Una `page.tsx` con props propias NO compila, y `tsc` no lo dice.
+
+    Next valida que las props de una ruta sean `PageProps` —`params` /
+    `searchParams`—. El 2026-09-10 se le paso `esPre` a
+    `month-end/pl-detail/page.tsx` y el deploy se cayo con:
+
+        Type '{ esPre?: boolean | undefined } | undefined' does not satisfy
+        the constraint 'PageProps'.
+
+    `tsc --noEmit` paso limpio: la restriccion la generan los tipos de ruta que
+    Next escribe durante `next build`, que el typecheck no corre. Cinco commits
+    salieron con el build roto sin que nada avisara.
+
+    La regla: una pantalla que toma props va en su propio archivo y la ruta la
+    envuelve. Se revisan las dos que hoy comparten pantalla.
+    """
+    for ruta in (("month-end", "pl"), ("month-end", "pl-detail"),
+                 ("pre-closing",)):
+        src = _leer(RAIZ, "app", *ruta, "page.tsx")
+        assert "export default function Page()" in src, (
+            f"app/{'/'.join(ruta)}/page.tsx no es un envoltorio sin props")
