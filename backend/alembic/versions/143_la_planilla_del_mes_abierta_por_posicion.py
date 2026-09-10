@@ -47,7 +47,7 @@ def upgrade() -> None:
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("precierre_id", sa.String(36),
                   sa.ForeignKey("precierre.id", ondelete="CASCADE"),
-                  nullable=False, index=True),
+                  nullable=False),   # el índice se crea abajo, por nombre
         sa.Column("fila", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("cuenta", sa.String(30), nullable=False, server_default=""),
         sa.Column("cuenta_base", sa.Integer(), nullable=True),
@@ -57,6 +57,13 @@ def upgrade() -> None:
         sa.Column("descripcion", sa.String(200), nullable=False, server_default=""),
         sa.Column("mes_usd", sa.Numeric(18, 6), nullable=False, server_default="0"),
     )
+    # ⚠️ Los índices se crean ACÁ y no con `index=True` en la columna.
+    #
+    # Con las dos cosas, alembic emite el índice dos veces con el MISMO nombre
+    # autogenerado (`ix_precierre_posicion_precierre_id`): la segunda falla,
+    # la migración se cae, `alembic upgrade head` corta el arranque y la app
+    # NO LEVANTA. Pasó el 2026-09-10: el backend quedó en 502 y la pantalla de
+    # Pre-Cierre decía «Failed to fetch», que no se parece en nada a la causa.
     op.create_index("ix_precierre_posicion_precierre_id",
                     "precierre_posicion", ["precierre_id"])
     op.create_index("ix_precierre_posicion_posicion",
