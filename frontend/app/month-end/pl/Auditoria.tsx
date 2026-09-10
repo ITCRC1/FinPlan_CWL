@@ -687,7 +687,11 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                         <td style={{ ...TDL, paddingLeft: 34,
                                      fontVariantNumeric: "tabular-nums",
                                      color: "var(--text-secondary)" }}>
-                          {f.account_code}
+                          {/* El ingreso viene junto por renglón, con la
+                              cuenta en blanco y las de origen en `cuentas`.
+                              Owner, 2026-09-10: «rooms no tiene cuenta,
+                              habíamos creado 4000-4001-4002». */}
+                          {f.account_code || f.cuentas || "—"}
                         </td>
                         <td style={TDL}>
                           {f.account_name}{f.outlet ? ` · ${f.outlet}` : ""}
@@ -785,6 +789,19 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
             {columnas.map(c => <th key={c} style={{ ...TH, minWidth: 108 }}>{c}</th>)}
             <th style={{ ...TH, minWidth: 118,
                          borderLeft: "2px solid var(--border-medium)" }}>Total gasto</th>
+            {/* Owner, 2026-09-10: «pone acá el P/L una columna adicional para
+                el net profit». Su definición, de antes: «profit es diferente,
+                debe ser ingreso menos gastos».
+
+                ⚠️ El número se calcula, pero NO es una segunda verdad: cuando
+                el motor tiene su propia línea para ese departamento
+                (`PROFIT_<grupo>`) viene en `resultado_motor` y la celda se
+                marca si difieren. Ese es el trabajo de este tab. */}
+            <th style={{ ...TH, minWidth: 122,
+                         borderLeft: "2px solid var(--border-medium)" }}
+                title="Ingresos menos Total gasto. Se marca si el motor dice otra cosa.">
+              Resultado
+            </th>
           </tr></thead>
           <tbody>
             {(datos?.departamentos ?? []).map(d => (
@@ -797,6 +814,22 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                              borderLeft: "2px solid var(--border-medium)" }}>
                   {usd(d.total_gasto)}
                 </td>
+                {(() => {
+                  const m = d.resultado_motor;
+                  const diff = m !== null && Math.abs(m - d.resultado) > 0.01;
+                  return (
+                    <td style={{ ...TD, fontWeight: 700,
+                                 borderLeft: "2px solid var(--border-medium)",
+                                 color: diff ? "var(--negative)"
+                                   : d.resultado < 0 ? "var(--negative)" : undefined }}
+                        title={diff
+                          ? `El motor dice ${usd(m as number)} para este departamento: `
+                            + `${usd((m as number) - d.resultado)} de diferencia.`
+                          : undefined}>
+                      {usd(d.resultado)}{diff ? " ⚠" : ""}
+                    </td>
+                  );
+                })()}
               </tr>
             ))}
             {datos && (
@@ -808,6 +841,11 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                 ))}
                 <td style={{ ...TD, borderLeft: "2px solid var(--border-medium)" }}>
                   {usd(datos.totales.total_gasto ?? 0)}
+                </td>
+                <td style={{ ...TD, borderLeft: "2px solid var(--border-medium)",
+                             color: (datos.totales.resultado ?? 0) < 0
+                               ? "var(--negative)" : undefined }}>
+                  {usd(datos.totales.resultado ?? 0)}
                 </td>
               </tr>
             )}

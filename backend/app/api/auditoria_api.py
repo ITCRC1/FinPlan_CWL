@@ -57,6 +57,7 @@ from app.models.actual_entry import ActualEntry
 from app.models.department_catalog import DepartmentCatalog
 from app.models.mapping import AccountMapping, ReportLineConfig
 from app.nombres_cuenta import limpiar_nombre
+from app.api.gasto_por_clase_api import FUSION_INGRESO
 
 router = APIRouter(tags=["auditoria"])
 
@@ -72,6 +73,12 @@ COLUMNAS = [pl_engine.TIPO_INGRESO, pl_engine.TIPO_COSTO, pl_engine.TIPO_PAYROLL
 #: reparto saldría bruto y no netearía.
 GASTO = {pl_engine.TIPO_COSTO, pl_engine.TIPO_PAYROLL, pl_engine.TIPO_OPEX,
          pl_engine.TIPO_REPARTO, pl_engine.TIPO_BAJO_GOP}
+
+#: El grupo del motor y el renglón del reporte no siempre se llaman igual.
+#: `TRANSPORT` es el grupo y `PROFIT_TRANSPORTATION` el renglón; sin el alias,
+#: Transportation sería el único departamento operativo sin número del motor y
+#: parecería que al motor le falta la línea, cuando lo que falla es el nombre.
+PROFIT_ALIAS = {"TRANSPORT": "PROFIT_TRANSPORTATION"}
 
 CERO = Decimal("0")
 
@@ -277,6 +284,14 @@ def _acumular(destino: list[dict], indice: dict[tuple, dict], fila: dict) -> Non
     previa["monto"] = round(float(previa["monto"]) + float(fila["monto"]), 2)
     # Una opción sin movimiento que se junta con una que sí lo tuvo, se movió.
     previa["movimiento"] = bool(previa.get("movimiento") or fila.get("movimiento"))
+    # ⚠️ Y se guarda DE QUÉ CUENTAS salió.
+    #
+    # El ingreso se junta por renglón y la cuenta queda en blanco (es lo único
+    # comparable contra un presupuesto, que no tiene cuentas de ingreso). Pero
+    # dejar la columna «Cuenta» vacía hace ver como si el renglón no tuviera
+    # cuenta — owner, 2026-09-10: *«rooms no tiene cuenta, habíamos creado
+    # 4000-4001-4002»*. Las tiene: se muestran acá.
+    previa["cuentas"] |= fila["cuentas"]
 
 
 async def _asientos_del_checkbook(session, escenario) -> list:
@@ -436,6 +451,30 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             l.line_code: l.line_name
             for l in (await session.execute(select(ReportLineConfig))).scalars()
         }
+        # ⚠️ El MISMO resolvedor que usa el P&L, para el renglón del ingreso.
+        #
+        # `linea_de_fila` devuelve `REV_<grupo>`: una sola línea por grupo. Le
+        # alcanza al P&L consolidado, pero el reporte tiene el ingreso más
+        # abierto que el grupo —A&B son tres renglones: Food, Beverage y
+        # Misc— y el motor los resuelve por `account_mapping`.
+        #
+        # Owner, 2026-09-10: *«no puede quedar solo ingreso de como food todo,
+        # debe ser Food por un lado y Beverage por otro lado»*. Tenía razón:
+        # desde que el ingreso se junta por renglón, esa diferencia de finura
+        # metía los $8.377,82 de bebida dentro de «F&B Food».
+        #
+        # Y no es solo cosmético: el presupuesto SÍ trae las tres líneas
+        # (`REVENUE_LINE_TO_REPORT_LINE`), así que comparar contra él exige que
+        # los dos lados usen la misma apertura.
+        filas_mapeo = [
+            {"account_code": r[0], "dept_code": r[1], "report_line_code": r[2],
+             "active_status": r[3], "rollup_operator": r[4]}
+            for r in (await session.execute(select(
+                AccountMapping.account_code, AccountMapping.dept_code,
+                AccountMapping.report_line_code, AccountMapping.active_status,
+                AccountMapping.rollup_operator))).all()
+        ]
+        resolver_motor = pl_engine.construir_resolvedor(filas_mapeo)
         catalogo = await _catalogo_gl(session)
 
         # ── 1. El detalle, fila por fila ──────────────────────────────────────
@@ -492,6 +531,12 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             tipo = getattr(e, "tipo_propio", "")
             if not linea:
                 linea, tipo = pl_engine.linea_de_fila(e.account_code, e.dept_code)
+                # El ingreso, por el mapeo: es más fino que el grupo.
+                if tipo == pl_engine.TIPO_INGRESO and str(
+                        e.account_code or "").strip().isdigit():
+                    regla, _como = resolver_motor(e.dept_code, e.account_code)
+                    if regla and regla.get("report_line_code"):
+                        linea = regla["report_line_code"]
             if not tipo:
                 # 9xxx: estadística, no es plata. Se CUENTA en vez de
                 # desaparecer, para que el total del mes se pueda comprobar.
@@ -529,10 +574,32 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             # sub-tab de ingreso y en el renglón del P&L Statement, que se abre
             # con un click y muestra las cuentas que lo forman.
             es_ingreso = tipo == pl_engine.TIPO_INGRESO
+            # ⚠️ El INGRESO de lavandería se ve en el 0162, no en el 0161.
+            #
+            # Owner, 2026-09-10: *«los ingresos deben estar en el 0162, mueve
+            # en esta vista los ingresos del 0161 para el 0162, nada más»*.
+            #
+            # La lavandería está partida a propósito: el 0162 factura y el
+            # 0161 lleva la operación que se reparte. El 0161 es un grupo de
+            # OVERHEAD, así que su ingreso no resuelve a ninguna línea —salía
+            # «no cae en ninguna línea» con los $900 del Budget al lado—.
+            # Movido al 0162 cae en `REV_LAUNDRY`, que es su renglón.
+            #
+            # Se reusa `FUSION_INGRESO`, la misma tabla que ya aplica
+            # `gasto-por-clase`. Una copia acá diría lo mismo hoy y otra cosa
+            # el día que se toque una de las dos.
+            if es_ingreso:
+                raiz = FUSION_INGRESO.get(raiz, raiz)
             _acumular(detalle, idx_detalle, {
                 "dept_code": raiz,
                 "dept_name": nombres.get(raiz, raiz),
                 "account_code": "" if es_ingreso else e.account_code,
+                # De qué cuentas del mayor salió. Solo las que son un número:
+                # un presupuesto trae la llave del driver («rooms», «spa»), que
+                # no es una cuenta y decirlo lo sería.
+                "cuentas": ({e.account_code} if es_ingreso
+                            and str(e.account_code or "").strip().isdigit()
+                            else set()),
                 "account_name": (nombres_de_linea.get(linea, "") or linea or "Ingreso")
                                 if es_ingreso else
                                 _nombre(e.dept_code, e.account_code, e.account_name),
@@ -582,12 +649,18 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             if raiz not in por_depto or (dept, cuenta) in vistas:
                 continue
             linea, tipo = pl_engine.linea_de_fila(cuenta, dept)
+            # La misma mudanza del ingreso que arriba: una opción de ingreso
+            # del 0161 ofrecida bajo el 0161 volvería a decir «no cae en
+            # ninguna línea», ahora con monto cero y sin que nada pase.
+            if tipo == pl_engine.TIPO_INGRESO:
+                raiz = FUSION_INGRESO.get(raiz, raiz)
             if not tipo or (raiz, tipo) not in con_movimiento:
                 continue
             _acumular(detalle, idx_detalle, {
                 "dept_code": raiz,
                 "dept_name": nombres.get(raiz, raiz),
                 "account_code": cuenta,
+                "cuentas": set(),
                 "account_name": _nombre(dept, cuenta, nombre),
                 "outlet": None,
                 "tipo": tipo,
@@ -596,6 +669,9 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
                 "movimiento": False,
             })
 
+        # El set era para juntar; lo que viaja es texto legible.
+        for r in detalle:
+            r["cuentas"] = ", ".join(sorted(r.pop("cuentas", ()) or ()))
         detalle.sort(key=lambda r: (r["dept_code"], r["tipo"], r["account_code"]))
 
         # ── 2. El cuadre, POR RENGLÓN DEL REPORTE ─────────────────────────
@@ -741,18 +817,43 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
                     "motor": 0.0, "detalle": _f(det), "dif": _f(-det)})
 
         # ── 3. La matriz por departamento ─────────────────────────────────────
+        #
+        # El RESULTADO por departamento: ingreso menos gasto (owner, 2026-09-10:
+        # *«pone acá el P/L una columna adicional para el net profit»*, y antes
+        # *«profit es diferente, debe ser ingreso menos gastos»*).
+        #
+        # ⚠️ Se calcula acá, pero NO es una segunda verdad: cuando el motor
+        # tiene su propia línea para ese departamento (`PROFIT_<grupo>`), viaja
+        # al lado en `motor` y la pantalla marca la celda si difieren. Ese es
+        # justo el trabajo de este tab — si el detalle y el motor no dan lo
+        # mismo, hay que verlo, no elegir uno de los dos y callar el otro.
+        #
+        # El motor solo tiene línea para los departamentos OPERATIVOS: el
+        # overhead no tiene «utilidad», se resta después. Ahí `motor` va en
+        # `None` y la celda no se marca: no hay contra qué comparar, y colorear
+        # una diferencia inexistente enseñaría a ignorar el color.
+        def _profit_del_motor(dept: str) -> float | None:
+            grupo = pl_engine.group_for_dept(dept)
+            fila = lineas_motor.get(f"PROFIT_{grupo}") or lineas_motor.get(
+                PROFIT_ALIAS.get(grupo, ""))
+            return None if fila is None else _f(Decimal(str(fila["amount_usd"])))
+
         departamentos = []
         for dept in sorted(por_depto):
             caja = por_depto[dept]
+            gasto = sum((caja.get(c, CERO) for c in GASTO), CERO)
             departamentos.append({
                 "dept_code": dept,
                 "dept_name": nombres.get(dept, dept),
                 **{c: _f(caja.get(c, CERO)) for c in COLUMNAS},
-                "total_gasto": _f(sum((caja.get(c, CERO) for c in GASTO), CERO)),
+                "total_gasto": _f(gasto),
+                "resultado": _f(caja.get(pl_engine.TIPO_INGRESO, CERO) - gasto),
+                "resultado_motor": _profit_del_motor(dept),
             })
         totales = {c: round(sum(d[c] for d in departamentos), 2) for c in COLUMNAS}
         totales["total_gasto"] = round(
             sum(d["total_gasto"] for d in departamentos), 2)
+        totales["resultado"] = round(sum(d["resultado"] for d in departamentos), 2)
 
         # ── 3b. Los tres números de cabecera ─────────────────────────────────
         #

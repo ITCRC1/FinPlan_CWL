@@ -126,7 +126,8 @@ def test_las_filas_que_colapsan_al_consolidar_se_suman():
     from app.api.auditoria_api import _acumular
     destino, indice = [], {}
     base = {"dept_code": "0140", "account_code": "7065", "outlet": "",
-            "tipo": "Opex", "linea": "OPEX_SPA", "movimiento": False}
+            "tipo": "Opex", "linea": "OPEX_SPA", "movimiento": False,
+            "cuentas": set()}
     _acumular(destino, indice, {**base, "monto": 100.0})
     _acumular(destino, indice, {**base, "monto": 25.5, "movimiento": True})
     assert len(destino) == 1
@@ -137,3 +138,82 @@ def test_las_filas_que_colapsan_al_consolidar_se_suman():
     # esconderia justamente eso.
     _acumular(destino, indice, {**base, "linea": "OPEX_ROOMS", "monto": 9.0})
     assert len(destino) == 2
+
+
+def test_el_ingreso_juntado_dice_de_que_cuentas_salio():
+    """Owner, 2026-09-10: *«rooms no tiene cuenta, habiamos creado
+    4000-4001-4002»*. El ingreso se junta por renglon y la cuenta queda en
+    blanco —es lo unico comparable contra un presupuesto, que no tiene cuentas
+    de ingreso—, pero la columna vacia hace ver como si el renglon no tuviera
+    cuenta. Las cuentas de origen viajan juntas."""
+    from app.api.auditoria_api import _acumular
+    destino, indice = [], {}
+    base = {"dept_code": "0110", "account_code": "", "outlet": "",
+            "tipo": "Ingresos", "linea": "REV_ROOMS", "movimiento": True}
+    _acumular(destino, indice, {**base, "monto": 100.0, "cuentas": {"4000"}})
+    _acumular(destino, indice, {**base, "monto": 5.0, "cuentas": {"4001"}})
+    _acumular(destino, indice, {**base, "monto": 1.0, "cuentas": {"4000"}})
+    assert len(destino) == 1
+    assert destino[0]["monto"] == 106.0
+    assert destino[0]["cuentas"] == {"4000", "4001"}
+
+
+def test_el_ingreso_del_mayor_se_abre_como_el_reporte_no_como_el_grupo():
+    """A&B son TRES renglones de ingreso, no uno.
+
+    `linea_de_fila` devuelve `REV_<grupo>` —una linea por grupo—, y el reporte
+    tiene el ingreso mas abierto: Food, Beverage y Misc. Desde que el Audit
+    junta el ingreso por renglon, usar el grupo metia la bebida dentro de
+    «F&B Food» (owner, 2026-09-10). Y el presupuesto SI trae las tres, asi que
+    la comparacion exige la misma apertura en los dos lados.
+    """
+    import json
+    from app.engine import pl_engine
+    seed = json.loads(io.open(
+        os.path.join(os.path.dirname(__file__), "..", "app", "seed_data",
+                     "mapping_pl.json"), encoding="utf-8").read())
+    res = pl_engine.construir_resolvedor(seed["account_mapping"])
+
+    # El grupo las junta...
+    assert pl_engine.linea_de_fila("4110", "0120")[0] == "REV_FB"
+    assert pl_engine.linea_de_fila("4120", "0120")[0] == "REV_FB"
+    # ...y el mapeo del motor las separa, que es como el reporte las dibuja.
+    assert res("0120", "4110")[0]["report_line_code"] == "REV_FB"
+    assert res("0120", "4120")[0]["report_line_code"] == "REV_FB_BEV"
+    assert res("0120", "4132")[0]["report_line_code"] == "REV_FB_MISC"
+    # El presupuesto tambien las trae por separado.
+    m = pl_engine.REVENUE_LINE_TO_REPORT_LINE
+    assert m["food"] == "REV_FB" and m["beverage"] == "REV_FB_BEV"
+
+    # Y el endpoint pregunta al resolvedor del motor para el ingreso.
+    src = _leer(API)
+    assert "resolver_motor = pl_engine.construir_resolvedor(filas_mapeo)" in src
+    assert "regla, _como = resolver_motor(e.dept_code, e.account_code)" in src
+
+
+def test_el_ingreso_de_lavanderia_se_ve_en_el_0162():
+    """Owner, 2026-09-10: *«los ingresos deben estar en el 0162, mueve en esta
+    vista los ingresos del 0161 para el 0162, nada mas»*.
+
+    La lavanderia esta partida a proposito: el 0162 factura y el 0161 lleva la
+    operacion que se reparte. El 0161 es grupo de OVERHEAD, asi que su ingreso
+    no resuelve a ninguna linea — la pantalla mostraba «no cae en ninguna
+    linea» con los $900 del Budget al lado. En el 0162 cae en `REV_LAUNDRY`.
+
+    Se reusa `FUSION_INGRESO`, la tabla que ya aplica `gasto-por-clase`: una
+    copia diria lo mismo hoy y otra cosa el dia que se toque una de las dos.
+    """
+    from app.api.auditoria_api import FUSION_INGRESO
+    from app.api.gasto_por_clase_api import FUSION_INGRESO as ORIGEN
+    assert FUSION_INGRESO is ORIGEN, "el Audit tiene su propia copia de la tabla"
+    assert FUSION_INGRESO == {"0161": "0162"}
+
+    src = _leer(API)
+    # Solo el INGRESO se muda. El gasto del 0161 se queda donde esta.
+    assert "if es_ingreso:\n                raiz = FUSION_INGRESO.get(raiz, raiz)" in src
+
+    from app.engine import pl_engine
+    # El porque: el 0161 es overhead y su ingreso no tiene renglon; el 0162 si.
+    assert pl_engine.group_for_dept("0161") == "LAUNDRY_OPS"
+    assert pl_engine.linea_de_fila("4700", "0161")[0] is None
+    assert pl_engine.linea_de_fila("4700", "0162")[0] == "REV_LAUNDRY"

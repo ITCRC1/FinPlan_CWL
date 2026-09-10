@@ -2713,6 +2713,13 @@ export async function getEstadisticasCierre(
 export interface AuditoriaFila {
   dept_code: string; dept_name: string;
   account_code: string; account_name: string; outlet: string;
+  /** Las cuentas del mayor que formaron este renglón, separadas por coma.
+   *
+   *  Solo el INGRESO la usa: se junta por renglón —lo único comparable contra
+   *  un presupuesto, que no tiene cuentas de ingreso— y `account_code` queda
+   *  vacío. Sin esto la columna «Cuenta» se ve en blanco y parece que Rooms no
+   *  tuviera cuenta, cuando tiene la 4000, la 4001 y la 4002. */
+  cuentas: string;
   /** Ingresos · Costo de ventas · Payroll · Opex · Reparto · Bajo GOP */
   tipo: string;
   /** La línea del P&L a la que cae. `null` = huérfana: NO suma en ningún lado. */
@@ -2759,7 +2766,14 @@ export interface AuditoriaCuadre {
 }
 export interface AuditoriaDepto {
   dept_code: string; dept_name: string; total_gasto: number;
-  [columna: string]: string | number;
+  /** Ingresos − Total gasto de ESTE departamento. */
+  resultado: number;
+  /** Lo que dice el motor para ese departamento (`PROFIT_<grupo>`), o `null`
+   *  cuando no tiene línea propia — el overhead no tiene utilidad, se resta
+   *  después. Viaja para poder CONTRASTAR, no para reemplazar: si difiere del
+   *  `resultado`, la pantalla lo marca. */
+  resultado_motor: number | null;
+  [columna: string]: string | number | null;
 }
 export interface Auditoria {
   scenario_id: string; escenario: string; year: number; mes: number;
