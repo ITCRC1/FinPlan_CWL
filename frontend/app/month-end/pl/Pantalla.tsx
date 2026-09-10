@@ -174,9 +174,13 @@ const REV_DETALLE: { code: string | null; label: string; nota?: string }[] = [
  *  otra verdad, el cuadro **compara el GOP derivado contra el del motor y avisa
  *  si se separan** — que es justo el tipo de diferencia que no se nota sola.
  */
-const ESTADO: {
+type FilaEstado = {
   code: string; label: string; gasto?: boolean; fuerte?: boolean; borde?: boolean;
-}[] = [
+  /** Qué abre el click, cuando no sale de `CLASE_DE` (ver `filasEstado`). */
+  abre?: { clase: string; clave: string };
+};
+
+const ESTADO: FilaEstado[] = [
   { code: "X_ROOMS", label: "Rooms Revenue" },
   { code: "X_FB", label: "F&B Revenue" },
   { code: "X_OTHER", label: "Other Revenue" },
@@ -929,6 +933,49 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   const gA = gastos.find(g => g.scenario_id === idA);
   const gB = gastos.find(g => g.scenario_id === idB);
 
+  /** Las filas del P&L Statement. En el PRE-CIERRE el ingreso se abre.
+   *
+   *  Owner, 2026-09-10: *«los ingresos acá se deben ver individuales ya que es
+   *  revisión»*. Las tres líneas de siempre —Rooms, F&B, Other— sirven para
+   *  leer el resultado, pero «Other Revenue» se come Spa, Tours, Gift Shop,
+   *  Transporte, Lavandería, Innoceana y el Sustainability Fee en un solo
+   *  número. Revisar un mes es justamente mirar línea por línea: si el Spa
+   *  quedó a la mitad y el Gift Shop al doble, en «Other» se cancelan y el mes
+   *  se ve bien.
+   *
+   *  ⚠️ Las líneas se leen DEL MOTOR (sección `REVENUES` de la respuesta), no
+   *  de una lista escrita acá: así una línea de ingreso nueva aparece sola y no
+   *  hay una segunda verdad que se desactualice. Se respeta el orden en que
+   *  vienen, que es el `display_order` del reporte, y se saltan las que están
+   *  en cero en las dos versiones —una columna de ceros no se revisa—.
+   *
+   *  Suman Total Revenue por construcción: son las mismas líneas que el motor
+   *  totaliza. Fuera del Pre-Cierre no cambia nada.
+   */
+  const filasEstado = useMemo<FilaEstado[]>(() => {
+    if (!esPre) return ESTADO;
+    const lineas = new Map<string, string>();
+    for (const c of [vA?.month, vA?.ytd, vB?.month, vB?.ytd]) {
+      for (const l of c?.lines ?? []) {
+        if (l.section !== "REVENUES") continue;
+        if (l.line_code.startsWith("SEC_") || l.line_code === "TOTAL_REVENUES") continue;
+        if (Math.abs(Number(l.amount_usd)) < 0.005) continue;
+        if (!lineas.has(l.line_code)) lineas.set(l.line_code, l.line_name || l.line_code);
+      }
+    }
+    if (!lineas.size) return ESTADO;   // sin datos todavía: el cuadro de siempre
+    return [
+      ...Array.from(lineas, ([code, label]) => ({
+        code, label,
+        // El click abre las CUENTAS de esa línea: el mismo camino que ya usa
+        // la sub-fila de «Other», con clase `revenue` y la línea como clave.
+        abre: { clase: "revenue", clave: code },
+      })),
+      // Y de acá para abajo, el estado de resultados intacto.
+      ...ESTADO.filter(f => !["X_ROOMS", "X_FB", "X_OTHER"].includes(f.code)),
+    ];
+  }, [esPre, vA, vB]);
+
   const mesesDe = (h: "month" | "ytd") =>
     h === "month" ? [mes] : Array.from({ length: mes }, (_, i) => i + 1);
 
@@ -1117,7 +1164,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     // ⚠️ El Excel baja lo que se ESTA VIENDO, sub-filas incluidas. Este
     // proyecto ya pago una vez por un Excel que no era la pantalla
     // (owner, 2026-08-27: «el excel no baja lo que esta viendo»).
-    const filas: FilaCuadro[] = ESTADO.flatMap(f => [
+    const filas: FilaCuadro[] = filasEstado.flatMap(f => [
       {
     label: f.label, es_total: !!f.fuerte,
     valores: [
@@ -1910,7 +1957,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
         const k = m[2] === "*" ? "todos los departamentos" : m[2];
         out.push(`${deptos[k] ? `${k} · ${deptos[k]}` : k} — ${texto.trim()}`);
       } else if (clases.includes("__pl__")) {
-        const fila = ESTADO.find(f => f.code === ref);
+        const fila = filasEstado.find(f => f.code === ref);
         out.push(`${fila ? fila.label : ref} — ${texto.trim()}`);
       }
     }
@@ -2887,7 +2934,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                 </tr>
               </thead>
               <tbody>
-                {ESTADO.flatMap(f => [(
+                {filasEstado.flatMap(f => [(
                   <tr key={f.code} style={{
                     background: f.fuerte ? "var(--bg-elevated)" : undefined,
                     borderTop: f.borde ? BL : undefined,
@@ -2898,13 +2945,16 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                         derivados— no se pueden abrir, y por eso no llevan el
                         subrayado: un adorno que no hace nada al tocarlo es
                         peor que no tenerlo. */}
-                    <td onClick={CLASE_DE[f.code]
-                          ? e => setCelda({ clase: CLASE_DE[f.code], clave: "",
-                                            titulo: f.label,
-                                            origen: { x: e.clientX, y: e.clientY } })
-                          : undefined}
-                        className={CLASE_DE[f.code] ? ABRIBLE : undefined}
-                        title={CLASE_DE[f.code] ? "Ver las cuentas que suman esta línea" : undefined}
+                    <td onClick={(() => {
+                          const ab = f.abre ?? (CLASE_DE[f.code]
+                            ? { clase: CLASE_DE[f.code], clave: "" } : null);
+                          return ab ? (e: React.MouseEvent) => setCelda({
+                            ...ab, titulo: f.label,
+                            origen: { x: e.clientX, y: e.clientY } }) : undefined;
+                        })()}
+                        className={f.abre || CLASE_DE[f.code] ? ABRIBLE : undefined}
+                        title={f.abre || CLASE_DE[f.code]
+                          ? "Ver las cuentas que suman esta línea" : undefined}
                         style={{ ...TDL, fontWeight: f.fuerte ? 700 : 500 }}>
                       {f.label}
                     </td>
