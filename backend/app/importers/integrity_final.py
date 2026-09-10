@@ -220,6 +220,32 @@ def _elegir_hoja(wb) -> tuple[str, list[tuple]]:
         f"¿Es el estado de resultados de Integrity?")
 
 
+def _columna_de_montos(datos: list[tuple], desde: int, hasta: int) -> int | None:
+    """La columna con más montos entre `desde` y `hasta`, o `None` si no hay.
+
+    ⚠️ **El rótulo no marca la columna del número.** En el archivo de agosto
+    2026 «Acumulado» está en la columna 19 y los montos en la 20 —una celda
+    combinada corrida—, y el módulo leía la 19: vacía. Como `_dec("")` es cero
+    y `monto_mes()` decide el SIGNO mirando el acumulado, cada ingreso salía
+    NEGATIVO. El P&L cuadraba consigo mismo y el total de ventas daba menos
+    277.777, sin un solo error.
+
+    Es la misma trampa que la columna de cuenta, y se resuelve igual: contando
+    contenido. Los montos también vienen como texto con separadores de miles,
+    así que cuenta las dos formas.
+    """
+    conteo: dict[int, int] = {}
+    for f in datos:
+        for j in range(desde, min(hasta + 1, len(f))):
+            v = f[j]
+            if isinstance(v, (int, float, Decimal)):
+                if v != 0:
+                    conteo[j] = conteo.get(j, 0) + 1
+            elif isinstance(v, str) and _dec(v) != ZERO:
+                conteo[j] = conteo.get(j, 0) + 1
+    return max(conteo, key=lambda j: conteo[j]) if conteo else None
+
+
 def ubicar_encabezados(filas: list[tuple]) -> dict:
     """Dónde están las columnas, buscadas POR TEXTO.
 
@@ -249,8 +275,20 @@ def ubicar_encabezados(filas: list[tuple]) -> dict:
                 f"Se encontró la fila de encabezados ({i + 1}) pero ninguna columna "
                 f"trae códigos de cuenta con el formato de Integrity (`4000-0110`).")
         col_cuenta = max(conteo, key=lambda j: conteo[j])
-        return {"fila_encabezado": i, "cuenta": col_cuenta, "mes": col_mes,
-                "acumulado": col_acum,
+        # Los rótulos dan el punto de partida; el número manda. La ventana de
+        # «Mes Actual» termina donde empieza el rótulo del acumulado, para que
+        # una no se coma la columna de la otra.
+        tope_mes = col_acum - 1 if col_acum > col_mes else col_mes + 3
+        mes = _columna_de_montos(datos, col_mes, tope_mes)
+        acumulado = _columna_de_montos(datos, col_acum, col_acum + 3)
+        if mes is None or acumulado is None or mes == acumulado:
+            raise FormatoInesperado(
+                f"Se ubicó la fila de encabezados ({i + 1}) pero no las dos "
+                f"columnas de monto: «{ENCABEZADOS['mes']}» resolvió a "
+                f"{mes} y «{ENCABEZADOS['acumulado']}» a {acumulado}. "
+                f"Sin el acumulado no se puede saber el signo de un ingreso.")
+        return {"fila_encabezado": i, "cuenta": col_cuenta, "mes": mes,
+                "acumulado": acumulado,
                 "descripcion": textos.get(ENCABEZADOS["descripcion"].lower())}
     raise FormatoInesperado(
         f"La hoja no trae una fila con «{ENCABEZADOS['mes']}» y "

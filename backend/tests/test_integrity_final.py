@@ -425,3 +425,46 @@ def test_un_libro_entero_vacio_da_un_error_legible():
     with pytest.raises(m.FormatoInesperado) as e:
         m.leer(_libro({"Sheet1": [[None] * 4] * 20}), TC_JULIO, PUENTE_MIN)
     assert "Ninguna hoja" in str(e.value)
+
+
+def test_el_rotulo_no_marca_la_columna_del_monto():
+    """⚠️ El bug más caro que tuvo este módulo: los ingresos salían NEGATIVOS.
+
+    En el archivo de agosto 2026 el rótulo «Acumulado» está una columna a la
+    izquierda de sus montos —una celda combinada corrida—. El módulo leía la
+    columna del rótulo, que está vacía; `_dec("")` es cero; y `monto_mes()`
+    decide el signo MIRANDO EL ACUMULADO, así que con cero no entraba en la
+    rama del crédito y a cada ingreso le quedaba `signo = -1`.
+
+    Resultado: «VENTAS TOTALES −277.777». El P&L cuadraba consigo mismo, no
+    hubo ningún error, y el mes entero estaba dado vuelta.
+    """
+    cab = [None] * 21
+    cab[2], cab[9], cab[17], cab[19] = "Cuenta", "Descripción", "Mes Actual", "Acumulado"
+
+    def fila(cuenta, desc, mes, acum):
+        f = [None] * 21
+        f[3], f[9], f[17], f[20] = cuenta, desc, mes, acum   # monto en 20, no 19
+        return f
+
+    libro = _libro({"Sheet1": [cab,
+                               fila("4000-0110", "ROOMS", 1000.0, -5000.0),
+                               fila("7065-0110", "LIMPIEZA", 200.0, 800.0)]})
+    r = m.leer(libro, TC_JULIO, PUENTE_MIN)
+
+    assert r["columnas"]["acumulado"] == 20, "se quedó en la columna del rótulo"
+    ingreso = next(f for f in r["filas"] if f["cuenta"] == "4000-0110")
+    assert ingreso["mes_usd"] > 0, "un ingreso no puede salir negativo"
+    gasto = next(f for f in r["filas"] if f["cuenta"] == "7065-0110")
+    assert gasto["mes_usd"] > 0
+
+
+def test_sin_columna_de_acumulado_se_niega_a_adivinar():
+    """Sin acumulado no se puede saber el signo. Antes leía cero y seguía."""
+    cab = [None] * 21
+    cab[2], cab[17], cab[19] = "Cuenta", "Mes Actual", "Acumulado"
+    f = [None] * 21
+    f[3], f[17] = "4000-0110", 1000.0          # sin acumulado en ninguna parte
+    with pytest.raises(m.FormatoInesperado) as e:
+        m.leer(_libro({"Sheet1": [cab, f]}), TC_JULIO, PUENTE_MIN)
+    assert "signo" in str(e.value)
