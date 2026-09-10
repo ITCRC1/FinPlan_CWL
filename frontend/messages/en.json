@@ -4352,7 +4352,22 @@
     "tab": {
       "hallazgos": "Findings",
       "hoja": "Month review",
+      "cambios": "What changed",
       "descargas": "Downloads"
+    },
+    "cambios": {
+      "primera": "This is the first round for this month: nothing to compare against.",
+      "contra": "Against «{archivo}», uploaded {cuando}.",
+      "tcCambio": "The exchange rate changed too: part of the movement comes from that, not from the posting.",
+      "movidas": "Amount changed",
+      "nuevas": "Appeared",
+      "ausentes": "Disappeared",
+      "ausentesOjo": "A line that disappears makes no noise in any total, because the total drops too.",
+      "sinCambios": "No account moved by more than a cent.",
+      "antes": "Before",
+      "ahora": "Now",
+      "delta": "Difference",
+      "totalMes": "Month total"
     },
     "final": {
       "titulo": "Pass to Final",

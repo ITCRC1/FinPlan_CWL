@@ -26,9 +26,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
-  precierreExcelUrl, descartarPrecierre, hallazgosPrecierre, listarPrecierres,
+  precierreExcelUrl, cambiosPrecierre, descartarPrecierre,
+  hallazgosPrecierre, listarPrecierres,
   pasarPrecierreAFinal, subirPrecierre, verPrecierre,
-  type PrecierreFilaHoja, type PrecierreHallazgo, type PrecierreResumen,
+  type PrecierreCambios, type PrecierreFilaHoja, type PrecierreHallazgo,
+  type PrecierreResumen,
 } from "@/lib/api";
 
 const MESES = ["January", "February", "March", "April", "May", "June", "July",
@@ -44,7 +46,7 @@ const FONDO: Record<string, string> = {
 const usd = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Pestana = "hallazgos" | "hoja" | "descargas";
+type Pestana = "hallazgos" | "hoja" | "cambios" | "descargas";
 
 export default function PreCierrePage() {
   const t = useTranslations("precierre");
@@ -65,6 +67,7 @@ export default function PreCierrePage() {
   const [hoja, setHoja] = useState<PrecierreFilaHoja[]>([]);
   const [estado, setEstado] = useState<string>("");
   const [hallazgos, setHallazgos] = useState<PrecierreHallazgo[]>([]);
+  const [cambios, setCambios] = useState<PrecierreCambios | null>(null);
   const [sinRevisar, setSinRevisar] = useState<string[]>([]);
   const [comparativos, setComparativos] = useState<Record<string, string>>({});
   const [umbralMonto, setUmbralMonto] = useState(5000);
@@ -80,13 +83,15 @@ export default function PreCierrePage() {
   const cargar = useCallback(async (pid: string) => {
     setError(null);
     try {
-      const [d, h] = await Promise.all([
+      const [d, h, c] = await Promise.all([
         verPrecierre(pid),
         hallazgosPrecierre(pid, { umbralMonto, umbralPct }),
+        cambiosPrecierre(pid),
       ]);
       setHoja(d.hoja);
       setEstado(d.estado);
       setHallazgos(h.hallazgos);
+      setCambios(c);
       setSinRevisar(h.sin_revisar);
       setComparativos(h.comparativos);
     } catch (e) {
@@ -194,7 +199,7 @@ export default function PreCierrePage() {
           )}
 
           <nav style={{ display: "flex", gap: 4, margin: "18px 0 12px" }}>
-            {(["hallazgos", "hoja", "descargas"] as Pestana[]).map(p => (
+            {(["hallazgos", "hoja", "cambios", "descargas"] as Pestana[]).map(p => (
               <button key={p} onClick={() => setPestana(p)}
                       style={{ ...tab, ...(pestana === p ? tabActivo : {}) }}>
                 {t(`tab.${p}`)}
@@ -216,6 +221,7 @@ export default function PreCierrePage() {
           {pestana === "hoja" && dl && (
             <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t} />
           )}
+          {pestana === "cambios" && <Cambios datos={cambios} t={t} />}
           {pestana === "descargas" && dl && <Descargas dl={dl} t={t} />}
 
           {/* ── Pasar a Final ─────────────────────────────────────────────── */}
@@ -390,6 +396,121 @@ function Hoja({ filas, hojaExcelUrl, t }: {
     </div>
   );
 }
+
+/* ── Qué cambió ────────────────────────────────────────────────────────────── */
+/**
+ * El diff contra la vuelta anterior del mismo mes.
+ *
+ * ⚠️ **«Desaparecieron» va con aviso y no es decoración.** Una cuenta que se
+ * movió salta a la vista porque el total cambia; una que se fue no hace ruido
+ * en ningún total, porque el total baja con ella. Es el único de los tres
+ * grupos que hay que leer aunque esté vacío.
+ */
+function Cambios({ datos, t }: {
+  datos: PrecierreCambios | null;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  if (!datos) return null;
+  if (!datos.anterior) {
+    return <div style={caja}>
+      <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+        {t("cambios.primera")}
+      </p>
+    </div>;
+  }
+  const cuando = datos.anterior.creado_en
+    ? new Date(datos.anterior.creado_en).toLocaleString()
+    : "";
+  const grupos: [string, PrecierreCambios["movidas"], string | null][] = [
+    ["cambios.movidas", datos.movidas, null],
+    ["cambios.nuevas", datos.nuevas, null],
+    ["cambios.ausentes", datos.ausentes, "cambios.ausentesOjo"],
+  ];
+  const nada = !datos.movidas.length && !datos.nuevas.length && !datos.ausentes.length;
+
+  return (
+    <div style={caja}>
+      <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+        {t("cambios.contra", { archivo: datos.anterior.archivo, cuando })}
+      </p>
+      {datos.tc_cambio && (
+        <p style={{ fontSize: 12, color: COLOR.aviso, marginBottom: 8 }}>
+          {t("cambios.tcCambio")}
+        </p>
+      )}
+      <p style={{ fontSize: 13, marginBottom: 14 }}>
+        <strong>{t("cambios.totalMes")}:</strong>{" "}
+        {datos.total_antes == null ? "" : usd(datos.total_antes)} →{" "}
+        {datos.total_ahora == null ? "" : usd(datos.total_ahora)}
+        {datos.delta_total != null && Math.abs(datos.delta_total) >= 0.01 && (
+          <span style={{ color: datos.delta_total > 0 ? COLOR.info : COLOR.critico }}>
+            {"  ("}{datos.delta_total > 0 ? "+" : ""}{usd(datos.delta_total)}{")"}
+          </span>
+        )}
+      </p>
+
+      {nada && (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          {t("cambios.sinCambios")}
+        </p>
+      )}
+
+      {grupos.map(([clave, filas, ojo]) => filas.length > 0 && (
+        <section key={clave} style={{ marginBottom: 18 }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+            {t(clave)} · {filas.length}
+          </h3>
+          {ojo && (
+            <p style={{ fontSize: 11.5, color: COLOR.aviso, marginBottom: 6 }}>
+              {t(ojo)}
+            </p>
+          )}
+          <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                  <th style={th}>#</th>
+                  <th style={th}>Cuenta</th>
+                  <th style={th}>Descripción</th>
+                  <th style={{ ...th, textAlign: "right" }}>{t("cambios.antes")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{t("cambios.ahora")}</th>
+                  <th style={{ ...th, textAlign: "right" }}>{t("cambios.delta")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map(f => {
+                  const delta = f.delta ?? (f.mes_usd - (f.mes_usd_antes ?? 0));
+                  return (
+                    <tr key={`${clave}-${f.cuenta}`}
+                        style={{ borderTop: "1px solid var(--border)" }}>
+                      <td style={td}>{f.fila}</td>
+                      <td style={{ ...td, whiteSpace: "nowrap" }}>{f.cuenta}</td>
+                      <td style={td}>{f.descripcion}</td>
+                      <td style={tdNum}>
+                        {f.mes_usd_antes == null ? "—" : usd(f.mes_usd_antes)}
+                      </td>
+                      <td style={tdNum}>{usd(f.mes_usd)}</td>
+                      <td style={{ ...tdNum,
+                                   color: delta < 0 ? COLOR.critico : COLOR.info }}>
+                        {delta > 0 ? "+" : ""}{usd(delta)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+const th: React.CSSProperties = { padding: "4px 8px", fontWeight: 600 };
+const td: React.CSSProperties = { padding: "4px 8px" };
+const tdNum: React.CSSProperties = {
+  padding: "4px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums",
+};
 
 /* ── Descargas ─────────────────────────────────────────────────────────────── */
 

@@ -236,3 +236,34 @@ def test_el_error_esta_en_los_dos_idiomas(clave):
 
     assert clave in MENSAJES
     assert set(MENSAJES[clave]) >= {"es", "en"}
+
+
+# ─── La antesala se sube muchas veces, y no es un error ───────────────────────
+
+def test_precierre_no_se_bloquea_por_duplicado():
+    """Owner, 2026-09-10: «este es el proceso de revisión, subir una y otra vez».
+
+    ⚠️ El guard registraba el checksum ANTES de leer el archivo, así que un
+    intento fallido dejaba el archivo marcado «ya importado» y no había forma
+    de reintentarlo: el mensaje pedía `permitir_reimport=true`, un parámetro
+    que ninguna parte de la pantalla podía mandar. Costó una tarde del cierre
+    de agosto 2026.
+
+    `/api/precierre/` no escribe el dato definitivo —arma la plantilla y recién
+    `pasar-a-final` escribe, por la puerta que sí queda protegida—, así que
+    frenar el duplicado ahí no protegía nada y rompía el flujo normal.
+    """
+    from app.importers.registro_dep import _sin_bloqueo
+    assert _sin_bloqueo("/api/precierre/")
+    assert _sin_bloqueo("/api/precierre/")           # con o sin id, la misma
+
+
+def test_las_puertas_que_si_escriben_siguen_bloqueadas():
+    """La exención es de UNA ruta, no una puerta abierta para todas."""
+    from app.importers.registro_dep import _sin_bloqueo
+    for ruta in ("/api/opex/abc/import/excel/",
+                 "/api/scenarios/import-gl-detail/",
+                 "/api/payroll/abc/import/excel/",
+                 "/api/precierre-algo-que-no-existe/"[:20] + "/",
+                 "/api/scenarios/import-all/"):
+        assert not _sin_bloqueo(ruta), ruta

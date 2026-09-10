@@ -5214,6 +5214,29 @@ export async function subirPrecierre(
   return res.json();
 }
 
+// ── Qué cambió entre una vuelta y la siguiente ───────────────────────────────
+// La revisión es iterativa: se sube, se mira, se corrige en Integrity y se
+// vuelve a subir. Esto cierra el lazo — dice qué se movió sin tener que
+// compararlo a ojo contra una pantalla que ya no está.
+export interface PrecierreCambio {
+  cuenta: string; descripcion: string; depto: string; categoria: string;
+  fila: number; mes_usd: number; mes_usd_antes: number | null; delta?: number;
+}
+export interface PrecierreCambios {
+  precierre_id: string;
+  anterior: { id: string; archivo: string; estado: string; tc: number;
+              creado_en: string | null } | null;
+  tc_cambio?: boolean;
+  movidas: PrecierreCambio[];
+  nuevas: PrecierreCambio[];
+  ausentes: PrecierreCambio[];
+  total_antes: number | null; total_ahora: number | null;
+  delta_total: number | null;
+}
+export function cambiosPrecierre(id: string): Promise<PrecierreCambios> {
+  return api.get(`/precierre/${id}/cambios/`);
+}
+
 export function listarPrecierres(): Promise<{ precierres: PrecierreResumen[] }> {
   return api.get("/precierre/");
 }

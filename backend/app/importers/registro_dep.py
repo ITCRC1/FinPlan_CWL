@@ -38,6 +38,29 @@ from app.hotel_actual import HOTEL_ID
 from app.models.import_registro import ImportBatch, ImportFile
 
 
+#: Rutas donde subir el MISMO contenido muchas veces es el flujo normal, no un
+#: error a frenar. Se registran igual —la traza de quién subió qué y cuándo no
+#: se pierde— pero no se rechazan.
+#:
+#: ⚠️ Estar acá exige una condición: **la ruta no puede escribir el dato
+#: definitivo.** `/precierre/` es una antesala y lo dice en su propio
+#: docstring: «Subir de nuevo es el flujo normal, no la excepción. Durante la
+#: revisión el mismo mes se sube muchas veces». No importa nada — arma la
+#: plantilla y recién `pasar-a-final` escribe, por la puerta de siempre, que sí
+#: queda protegida por este guard.
+#:
+#: Bloquearla costó una tarde entera del cierre de agosto 2026: cada intento
+#: fallido registraba el checksum ANTES de leer el archivo, así que un archivo
+#: que nunca se pudo importar quedaba «ya importado» y no había forma de
+#: reintentarlo desde la pantalla. El mensaje pedía `permitir_reimport=true`,
+#: un parámetro que ninguna parte de la UI podía mandar.
+RUTAS_SIN_BLOQUEO = ("/api/precierre/",)
+
+
+def _sin_bloqueo(ruta: str) -> bool:
+    return any(ruta.startswith(r) for r in RUTAS_SIN_BLOQUEO)
+
+
 def _verdadero(v: str | None) -> bool:
     return (v or "").lower() in ("1", "true", "yes", "on")
 
@@ -103,7 +126,7 @@ async def registro_de_subida(
             continue
         suma = checksum_de(data)
         previa = await subida_previa(db, suma, scenario_id)
-        if previa is not None and not permitir_reimport:
+        if previa is not None and not permitir_reimport and not _sin_bloqueo(ruta):
             raise ErrorApi(
                 409, "import.ya_subido",
                 detalle=(f"«{previa.nombre or up.filename}» ya se importó "

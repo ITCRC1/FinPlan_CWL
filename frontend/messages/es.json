@@ -4352,7 +4352,22 @@
     "tab": {
       "hallazgos": "Hallazgos",
       "hoja": "Revisión del mes",
+      "cambios": "Qué cambió",
       "descargas": "Descargas"
+    },
+    "cambios": {
+      "primera": "Es la primera vuelta de este mes: no hay contra qué comparar.",
+      "contra": "Contra «{archivo}», subido el {cuando}.",
+      "tcCambio": "El tipo de cambio también cambió: parte del movimiento viene de ahí, no del posteo.",
+      "movidas": "Cambiaron de monto",
+      "nuevas": "Aparecieron",
+      "ausentes": "Desaparecieron",
+      "ausentesOjo": "Un renglón que desaparece no hace ruido en ningún total, porque el total también baja.",
+      "sinCambios": "Ninguna cuenta se movió más de un centavo.",
+      "antes": "Antes",
+      "ahora": "Ahora",
+      "delta": "Diferencia",
+      "totalMes": "Total del mes"
     },
     "final": {
       "titulo": "Pasar a Final",

@@ -282,6 +282,99 @@ async def detalle(precierre_id: str, db: AsyncSession = Depends(get_db),
     }
 
 
+# ─── Qué cambió respecto de la vuelta anterior ────────────────────────────────
+#
+# Owner, 2026-09-10: «necesito tener la opción de subir N cantidad de veces» ·
+# «y que el sistema me diga qué cambió versus lo que estaba».
+#
+# La revisión es iterativa por diseño: se sube, se mira, se corrige el posteo en
+# Integrity, se vuelve a subir. Lo que faltaba era cerrar el lazo — decir qué se
+# movió entre una vuelta y la siguiente, para no tener que compararlo a ojo
+# contra la vuelta anterior que ya no está en pantalla.
+
+#: Por debajo de esto no es un cambio, es la división por el tipo de cambio.
+#: Los montos se guardan con seis decimales a propósito (ver el modelo).
+RUIDO = Decimal("0.01")
+
+
+@router.get("/precierre/{precierre_id}/cambios/")
+async def cambios(precierre_id: str, db: AsyncSession = Depends(get_db),
+                  _=Depends(get_current_user)):
+    """Qué cambió respecto de la subida anterior del MISMO mes.
+
+    Se compara cuenta por cuenta, que es la llave del mayor. Tres clases de
+    cambio, y las tres importan por razones distintas:
+
+    * **movidas** — la cuenta está en las dos y el monto cambió. Es la
+      corrección que se fue a buscar.
+    * **nuevas** — aparecieron. Un posteo que faltaba, o una cuenta que nadie
+      esperaba: por eso se listan aunque el monto sea chico.
+    * **ausentes** — estaban y ya no. ⚠️ Es la más peligrosa: un renglón que
+      desaparece no hace ruido en ningún total, porque el total también baja.
+
+    Si es la primera vuelta del mes, `anterior` viene en `null` y las tres
+    listas vacías: no hay contra qué comparar y no se inventa una base.
+    """
+    pc = await _traer(db, precierre_id)
+
+    prev = (await db.execute(
+        select(Precierre)
+        .where(Precierre.hotel_id == pc.hotel_id, Precierre.anio == pc.anio,
+               Precierre.mes == pc.mes, Precierre.id != pc.id,
+               Precierre.creado_en <= pc.creado_en)
+        .order_by(Precierre.creado_en.desc()))).scalars().first()
+
+    if prev is None:
+        return {"precierre_id": precierre_id, "anterior": None,
+                "movidas": [], "nuevas": [], "ausentes": [],
+                "total_antes": None, "total_ahora": None, "delta_total": None}
+
+    def por_cuenta(filas):
+        return {f["cuenta"]: f for f in filas}
+
+    ahora = por_cuenta(await _filas(db, pc.id))
+    antes = por_cuenta(await _filas(db, prev.id))
+
+    movidas, nuevas, ausentes = [], [], []
+    for cuenta, f in ahora.items():
+        viejo = antes.get(cuenta)
+        if viejo is None:
+            nuevas.append({**_resumen(f), "mes_usd_antes": None})
+        elif abs(f["mes_usd"] - viejo["mes_usd"]) >= RUIDO:
+            movidas.append({**_resumen(f),
+                            "mes_usd_antes": viejo["mes_usd"],
+                            "delta": f["mes_usd"] - viejo["mes_usd"]})
+    for cuenta, viejo in antes.items():
+        if cuenta not in ahora:
+            ausentes.append({**_resumen(viejo), "mes_usd_antes": viejo["mes_usd"],
+                             "mes_usd": Decimal("0")})
+
+    # El orden es por tamaño del movimiento: lo que más plata mueve, primero.
+    movidas.sort(key=lambda x: -abs(x["delta"]))
+    nuevas.sort(key=lambda x: -abs(x["mes_usd"]))
+    ausentes.sort(key=lambda x: -abs(x["mes_usd_antes"]))
+
+    total_antes = sum((f["mes_usd"] for f in antes.values()), Decimal("0"))
+    total_ahora = sum((f["mes_usd"] for f in ahora.values()), Decimal("0"))
+    return {
+        "precierre_id": precierre_id,
+        "anterior": {"id": prev.id, "archivo": prev.archivo_nombre,
+                     "estado": prev.estado, "tc": prev.tc,
+                     "creado_en": prev.creado_en.isoformat() if prev.creado_en else None},
+        "tc_cambio": (pc.tc != prev.tc),
+        "movidas": movidas, "nuevas": nuevas, "ausentes": ausentes,
+        "total_antes": total_antes, "total_ahora": total_ahora,
+        "delta_total": total_ahora - total_antes,
+    }
+
+
+def _resumen(f: dict) -> dict:
+    """Lo mínimo para identificar la fila en pantalla y poder ir a mirarla."""
+    return {"cuenta": f["cuenta"], "descripcion": f["descripcion"],
+            "depto": f["depto"], "categoria": f["categoria"],
+            "fila": f["fila"], "mes_usd": f["mes_usd"]}
+
+
 @router.get("/precierre/{precierre_id}/hoja.xlsx")
 async def hoja(precierre_id: str, db: AsyncSession = Depends(get_db),
                _=Depends(get_current_user)):
