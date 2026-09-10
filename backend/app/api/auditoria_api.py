@@ -55,7 +55,7 @@ from app.engine import pl_engine
 from app.errores import ErrorApi
 from app.models.actual_entry import ActualEntry
 from app.models.department_catalog import DepartmentCatalog
-from app.models.mapping import AccountMapping
+from app.models.mapping import AccountMapping, ReportLineConfig
 from app.nombres_cuenta import limpiar_nombre
 
 router = APIRouter(tags=["auditoria"])
@@ -252,6 +252,33 @@ async def _sin_regla_propia(session, detalle) -> list[tuple[str, str, str, float
     return [(d, c, lc, v) for (d, c, lc), v in
             sorted(por_par.items(), key=lambda x: -abs(x[1]))]
 
+def _acumular(destino: list[dict], indice: dict[tuple, dict], fila: dict) -> None:
+    """Suma la fila al detalle, juntando las que quedaron iguales al consolidar.
+
+    Consolidar departamentos hace que dos asientos distintos caigan en la misma
+    celda: el 7065 del 0130 y el 7065 del 0140 son, después de subir la cadena,
+    la misma cuenta del mismo departamento. Dibujarlos como dos renglones
+    idénticos con montos distintos es peor que no consolidar — no hay forma de
+    saber cuál mirar, y la pantalla los aparea por
+    `departamento|cuenta|outlet`, así que el segundo pisaría al primero en la
+    comparación contra las otras versiones.
+
+    Se juntan por lo que la pantalla usa como identidad, más la naturaleza y el
+    renglón: dos filas con la misma cuenta que van a renglones distintos NO son
+    la misma fila, y juntarlas escondería justamente eso.
+    """
+    k = (fila["dept_code"], fila["account_code"], fila.get("outlet") or "",
+         fila.get("tipo") or "", fila.get("linea") or "")
+    previa = indice.get(k)
+    if previa is None:
+        indice[k] = fila
+        destino.append(fila)
+        return
+    previa["monto"] = round(float(previa["monto"]) + float(fila["monto"]), 2)
+    # Una opción sin movimiento que se junta con una que sí lo tuvo, se movió.
+    previa["movimiento"] = bool(previa.get("movimiento") or fila.get("movimiento"))
+
+
 async def _asientos_del_checkbook(session, escenario) -> list:
     """El detalle por cuenta de una version SIN mayor: sale de los checkbooks.
 
@@ -270,6 +297,37 @@ async def _asientos_del_checkbook(session, escenario) -> list:
     # Adentro de la funcion: `detalle_celda_api` importa de `pl_api`, igual
     # que este modulo, y a nivel de modulo se cerraria el circulo.
     from app.api.detalle_celda_api import _del_auxiliar
+
+    # ── El ingreso del presupuesto necesita SU departamento ─────────────────
+    #
+    # Owner, 2026-09-10: *«veo que transportation no tiene revenue en forecast
+    # ni budget»*. Lo tenía —$229.805,70 al año en el Budget— pero invisible:
+    # la fila se creaba con `dept_code` VACÍO, porque un presupuesto planea el
+    # ingreso por línea y no por departamento.
+    #
+    # Con el departamento en blanco, el Audit apareaba `|transport|` contra el
+    # `0152|4500|` del Actual y no encontraba nada: dos versiones que SÍ tienen
+    # el número, mostrando cero. Y no fallaba nada, porque cada lado por
+    # separado estaba bien.
+    #
+    # El departamento sale del MISMO `account_mapping` que usa el P&L: las 19
+    # líneas de ingreso lo declaran (`REV_TRANSPORTATION`→`0152`). No se
+    # inventa acá ni se deduce del nombre.
+    dept_de_linea: dict[str, str] = {}
+    for cta, dep, linea_map in (await session.execute(select(
+            AccountMapping.account_code, AccountMapping.dept_code,
+            AccountMapping.report_line_code).where(
+            AccountMapping.report_line_code.like("REV_%")))).all():
+        linea_map = str(linea_map or "")
+        dep = str(dep or "").strip()
+        if not dep:
+            continue
+        # La de MENOR cuenta, igual que `audit_api`: da el mismo departamento
+        # corra cuando corra, sin depender del orden físico de las filas.
+        previo = dept_de_linea.get(linea_map)
+        if previo is None or str(cta or "") < previo[1]:
+            dept_de_linea[linea_map] = (dep, str(cta or ""))
+    dept_de_linea = {k: v[0] for k, v in dept_de_linea.items()}
 
     fuera = []
     for clase in ("revenue", "cost", "payroll", "opex", "property"):
@@ -299,7 +357,8 @@ async def _asientos_del_checkbook(session, escenario) -> list:
                     pl_engine.REVENUE_LINE_TO_REPORT_LINE.get(cuenta.lower())
                     or "REV_%s" % cuenta)
                 fuera.append(_AsientoDeCheckbook(
-                    "", cuenta, nombres.get(linea, "") or nombres.get(cuenta, ""),
+                    dept_de_linea.get(linea, ""), cuenta,
+                    nombres.get(linea, "") or nombres.get(cuenta, ""),
                     serie, linea_propia=linea,
                     tipo_propio=pl_engine.TIPO_INGRESO))
                 continue
@@ -371,6 +430,12 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             for d in (await session.execute(select(DepartmentCatalog))).scalars()
         }
         rotulo_planilla = _nombres_de_planilla()
+        # El rótulo del RENGLÓN, para el ingreso: se junta por línea, así que
+        # su nombre es el de la línea del P&L y no el de una cuenta.
+        nombres_de_linea = {
+            l.line_code: l.line_name
+            for l in (await session.execute(select(ReportLineConfig))).scalars()
+        }
         catalogo = await _catalogo_gl(session)
 
         # ── 1. El detalle, fila por fila ──────────────────────────────────────
@@ -390,6 +455,7 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             todos = await _asientos_del_checkbook(session, escenario)
 
         detalle = []
+        idx_detalle: dict[tuple, dict] = {}
         por_linea: dict[str, Decimal] = {}
         por_depto: dict[str, dict[str, Decimal]] = {}
         vistas: set[tuple[str, str]] = set()
@@ -437,12 +503,40 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             if monto == CERO:
                 continue
             n_con_monto += 1
-            detalle.append({
-                "dept_code": e.dept_code,
-                "dept_name": nombres.get(e.dept_code, e.dept_code),
-                "account_code": e.account_code,
-                "account_name": _nombre(e.dept_code, e.account_code, e.account_name),
-                "outlet": e.outlet,
+            # ⚠️ El departamento que se MUESTRA es la RAÍZ de la cadena de
+            # padres, no el que trae el asiento.
+            #
+            # Owner, 2026-09-10: *«hay spa department 0130 y spa 0140, la
+            # vista debe ser consolidada no separada»*. El Spa son tres
+            # departamentos —0132 planilla, 0130 gerencia, 0140 el padre— y
+            # este tab los dibujaba como tres bloques: uno con el ingreso,
+            # otro con la planilla. Los tres correctos, y ninguno el Spa.
+            #
+            # El nombre también sale de la raíz: decir «0140» y rotularlo
+            # «Spa (gerencia)» sería peor que no consolidar.
+            raiz = pl_engine.consolidate_dept_raiz(e.dept_code)
+            # ⚠️ El INGRESO se junta por RENGLÓN, no por cuenta.
+            #
+            # Es el único nivel en el que las dos clases de versión se pueden
+            # comparar: el Actual trae cuentas del mayor (4500, 4501…) y un
+            # presupuesto NO tiene cuentas de ingreso —se planea por línea, con
+            # tarifas y ocupación—. Aparear por cuenta compara un número real
+            # contra una cuenta de plantilla que el mapeo eligió de ejemplo, y
+            # el resultado es lo que el owner vio: Budget y Forecast en CERO al
+            # lado de un Actual que sí tiene plata.
+            #
+            # El detalle por cuenta del ingreso no se pierde: vive en el
+            # sub-tab de ingreso y en el renglón del P&L Statement, que se abre
+            # con un click y muestra las cuentas que lo forman.
+            es_ingreso = tipo == pl_engine.TIPO_INGRESO
+            _acumular(detalle, idx_detalle, {
+                "dept_code": raiz,
+                "dept_name": nombres.get(raiz, raiz),
+                "account_code": "" if es_ingreso else e.account_code,
+                "account_name": (nombres_de_linea.get(linea, "") or linea or "Ingreso")
+                                if es_ingreso else
+                                _nombre(e.dept_code, e.account_code, e.account_name),
+                "outlet": "" if es_ingreso else e.outlet,
                 "tipo": tipo,
                 "linea": linea,
                 "monto": _f(monto),
@@ -450,7 +544,7 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             })
             if linea:
                 por_linea[linea] = por_linea.get(linea, CERO) + monto
-            caja = por_depto.setdefault(e.dept_code, {c: CERO for c in COLUMNAS})
+            caja = por_depto.setdefault(raiz, {c: CERO for c in COLUMNAS})
             caja[tipo] = caja.get(tipo, CERO) + monto
 
         # ── 1b. Las opciones de GL que el departamento tiene y NO usó ─────────
@@ -481,14 +575,18 @@ async def auditoria_del_mes(scenario_id: str, mes: int,
             (r["dept_code"], r["tipo"]) for r in detalle if r["movimiento"]
         }
         for (dept, cuenta), nombre in sorted(catalogo.items()):
-            if dept not in por_depto or (dept, cuenta) in vistas:
+            # La misma raíz que arriba: si acá se usara el departamento crudo,
+            # las opciones del 0130 aparecerían en un bloque «0130» que ya no
+            # existe, con subtotal propio y sin nada al lado.
+            raiz = pl_engine.consolidate_dept_raiz(dept)
+            if raiz not in por_depto or (dept, cuenta) in vistas:
                 continue
             linea, tipo = pl_engine.linea_de_fila(cuenta, dept)
-            if not tipo or (dept, tipo) not in con_movimiento:
+            if not tipo or (raiz, tipo) not in con_movimiento:
                 continue
-            detalle.append({
-                "dept_code": dept,
-                "dept_name": nombres.get(dept, dept),
+            _acumular(detalle, idx_detalle, {
+                "dept_code": raiz,
+                "dept_name": nombres.get(raiz, raiz),
                 "account_code": cuenta,
                 "account_name": _nombre(dept, cuenta, nombre),
                 "outlet": None,

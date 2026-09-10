@@ -285,6 +285,35 @@ def consolidate_dept(dept_code: str) -> str:
     return _CONSOLIDATION.get((dept_code or "").strip(), dept_code)
 
 
+def consolidate_dept_raiz(dept_code: str) -> str:
+    """El departamento RAÍZ: sube la cadena de padres hasta el final.
+
+    `consolidate_dept` resuelve UN escalón, y hay cadenas de dos: el 0132 (Spa
+    planilla) cuelga del 0130 (Spa gerencia) y el 0130 del 0140 (Spa). Subir un
+    escalón deja el Spa partido en DOS departamentos —uno con el ingreso y otro
+    con la planilla— sin que nada falle: los dos bloques son correctos por
+    separado y ninguno es el Spa.
+
+    Vive acá y no copiada en cada pantalla. Ya había dos copias (`_padre` en
+    `detalle_celda_api`) y una copia que se queda atrás hace que una pantalla
+    consolide y la otra no, que es la peor forma de fallar para algo cuyo único
+    trabajo es que los números coincidan.
+
+    Tope de 5 saltos y memoria de lo visto: un padre mal declarado en el
+    catálogo —un ciclo— cuelga la petición en vez de dar un número raro, y eso
+    ya no se arregla mirando el P&L.
+    """
+    dept = (dept_code or "").strip()
+    visto: set[str] = set()
+    for _ in range(5):
+        padre = consolidate_dept(dept)
+        if padre == dept or padre in visto:
+            return dept
+        visto.add(dept)
+        dept = padre
+    return dept
+
+
 def construir_resolvedor(mappings: list[dict]):
     """Arma la búsqueda (departamento, cuenta) → regla de mapeo.
 

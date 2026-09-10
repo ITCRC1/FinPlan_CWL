@@ -102,14 +102,7 @@ def _padre(dept: str) -> str:
     usa `gasto_por_clase` para armar la celda; si acá subiera un escalón menos,
     el desplegable mostraría cuentas que no son las que suman ese número.
     """
-    visto: set[str] = set()
-    for _ in range(5):
-        padre = pl_engine.consolidate_dept(dept)
-        if padre == dept or padre in visto:
-            return dept
-        visto.add(dept)
-        dept = padre
-    return dept
+    return pl_engine.consolidate_dept_raiz(dept)
 
 
 async def _del_mayor(session, escenario, clase: str, clave: str) -> dict:

@@ -77,9 +77,17 @@ const orden = (tipo: string) => {
  *
  *  ⚠️ Incluye el `outlet`. En A&B la misma cuenta vive en varios outlets
  *  (Vitrales, Terra Kitchen, Sueños del Bosque) y sin el outlet los tres se
- *  aparearian entre si: el Budget de uno restaria contra el actual de otro. */
-const llave = (f: { dept_code: string; account_code: string; outlet: string }) =>
-  `${f.dept_code}|${f.account_code}|${f.outlet || ""}`;
+ *  aparearian entre si: el Budget de uno restaria contra el actual de otro.
+ *
+ *  ⚠️ Y incluye la LÍNEA. El ingreso no se aparea por cuenta —no puede: un
+ *  presupuesto no tiene cuentas de ingreso, se planea por línea con tarifas y
+ *  ocupación— así que el backend lo manda junto por renglón, con la cuenta en
+ *  blanco. Sin la línea en la llave, las tres líneas de A&B de un mismo
+ *  departamento (Food, Beverage, Misc) caerían todas en `0120||` y se
+ *  pisarían entre ellas. */
+const llave = (f: { dept_code: string; account_code: string; outlet: string;
+                    linea: string | null }) =>
+  `${f.dept_code}|${f.account_code}|${f.outlet || ""}|${f.linea || ""}`;
 
 const colorDe = (tipo: string) =>
   NATURALEZA.find(n => n.tipo === tipo)?.color ?? "var(--text-secondary)";
