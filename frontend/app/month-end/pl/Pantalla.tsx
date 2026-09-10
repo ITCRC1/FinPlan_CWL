@@ -819,10 +819,27 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     return pos < 0 ? usadas.length : pos + 1;
   }, [usadas, varA, varB]);
 
+  /** El espejo del Pre-Cierre se rotula distinto EN TODAS PARTES.
+   *
+   * ⚠️ Es un ACTUAL del mismo año que el de verdad, y la unica diferencia en
+   * el texto era una palabra de la version: «ACTUAL Pre-Cierre» contra
+   * «ACTUAL actual». En un desplegable, a las siete de la tarde de un cierre,
+   * eso no es una diferencia.
+   *
+   * `models/precierre.py` advierte que dos versiones del mismo mes conviviendo
+   * dejan la pregunta «¿cual es el bueno?» sin respuesta desde adentro del
+   * sistema. Este rotulo ES la respuesta, y por eso sale de UNA funcion: dos
+   * lugares rotulando por su cuenta terminan discrepando.
+   */
+  const marcar = useCallback((sc: { es_precierre?: boolean } | undefined,
+                              texto: string) =>
+    sc?.es_precierre ? `◧ ${t("espejoMarca")} · ${texto}` : texto,
+  [t]);
+
   const etiqueta = useCallback((id: string) => {
     const s = escenarios.find(x => x.id === id);
-    return s ? `${s.type} ${s.version} ${s.year}` : "—";
-  }, [escenarios]);
+    return s ? marcar(s, `${s.type} ${s.version} ${s.year}`) : "—";
+  }, [escenarios, marcar]);
 
   /** Una columna sin dato del período: todas sus líneas en cero. */
   const vacia = (c: PLColumn | undefined) =>
@@ -2141,6 +2158,17 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   return (
     <div className="pag pag-ancha" style={{ padding: "18px 22px" }}>
       <IrA esc={ranuras[1]} />
+      {/* ⚠️ Permanente y no descartable, a proposito. Es la unica pantalla de
+          la app que muestra un mes que TODAVIA no esta en el sistema; si
+          alguien decide algo con estos numeros creyendo que son el Actual, el
+          aviso tiene que haber estado a la vista todo el tiempo. */}
+      {esPre && (
+        <div style={{
+          background: "#FFFAEB", border: "1px solid #FEDF89", borderRadius: 8,
+          padding: "8px 12px", marginBottom: 10, fontSize: 12.5,
+          color: "#B54708",
+        }}>{t("espejoAviso")}</div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t("titulo")}</h1>
         <select value={mes} onChange={e => setMes(Number(e.target.value))} style={SEL}>
@@ -2184,7 +2212,9 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
               onChange={e => setRanuras(prev => prev.map((v, j) => j === i ? e.target.value : v))}>
               <option value="">{t("ranuraVacia")}</option>
               {escenarios.map(s => (
-                <option key={s.id} value={s.id}>{s.year} · {s.type} {s.version}</option>
+                <option key={s.id} value={s.id}
+                        title={s.es_precierre ? t("espejoAyuda") : undefined}>
+                  {marcar(s, `${s.year} · ${s.type} ${s.version}`)}</option>
               ))}
             </select>
           </label>
