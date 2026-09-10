@@ -21,7 +21,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.importers.registro_dep import registro_de_subida
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
@@ -1636,4 +1636,75 @@ async def subir_beneficios_excel(
         "conceptos": [c for c, f in datos.items() if f],
         "avisos": avisos,
         "aviso": t(idioma, "planilla.recalcular_para_verlo"),
+    }
+
+
+@router.get("/payroll/por-cuenta/")
+async def payroll_por_cuenta(
+    scenarios: str = Query(..., description="ids separados por coma"),
+    mes: int = Query(0, ge=0, le=12, description="0 = año completo"),
+    horizonte: str = Query("full", description="month | ytd | full"),
+    db: AsyncSession = Depends(get_db),
+):
+    """La planilla abierta por CUENTA —los 17 conceptos—, para varias versiones.
+
+    Owner, 2026-09-10: *«todas las cuentas de Payroll por totales […] esto es
+    para ver total salarios, total comisiones, total horas extras, y todo»*.
+
+    El sistema ya abría la planilla por DEPARTAMENTO y por MES. Faltaba el
+    tercer corte, que es el que contesta «cuánto pagamos de horas extra este
+    mes» sin sumar a mano veintitantos departamentos.
+
+    ## Tiene que pegar con el reporte por departamento
+
+    Owner: *«todas ellas sumadas al final esa debe pegar con los reportes de
+    cada departamento»*. Por eso sale de la MISMA tabla (`PayrollConceptEntry`)
+    y aplica la MISMA exclusión de deptos de allocation que
+    `/payroll/{id}/dept-report/`, incluida la excepción del Pre-Cierre
+    (`allocation_en_overhead`). Si se leyera de otro lado o se filtrara
+    distinto, los dos cuadros dirían cosas distintas y ninguno avisaría.
+
+    Blindado por `tests/test_payroll_por_cuenta.py`, que suma los dos cortes y
+    exige que den el mismo número.
+    """
+    from app.api.consulta_api import CONCEPTOS
+
+    ids = [x.strip() for x in scenarios.split(",") if x.strip()]
+    if not ids:
+        raise ErrorApi(422, "escenarios.requerido")
+    if mes and horizonte == "month":
+        meses = {mes}
+    elif mes and horizonte == "ytd":
+        meses = set(range(1, mes + 1))
+    else:
+        meses = set(range(1, 13))
+
+    salida = []
+    for sid in ids:
+        esc = await db.get(Scenario, sid)
+        if esc is None:
+            continue   # un id que ya no existe no tumba la comparación
+        excluir = (set() if allocation_en_overhead(esc)
+                   else ALLOC_EXCL_PAYROLL)
+        entries = (await db.execute(select(PayrollConceptEntry).where(
+            PayrollConceptEntry.scenario_id == sid))).scalars().all()
+        montos = {codigo: 0.0 for _campo, codigo, _rotulo in CONCEPTOS}
+        for e in entries:
+            if e.dept_code in excluir or (e.month or 0) not in meses:
+                continue
+            for campo, codigo, _rotulo in CONCEPTOS:
+                v = getattr(e, campo, None)
+                if v:
+                    montos[codigo] += float(v)
+        salida.append({
+            "scenario_id": sid, "type": esc.type,
+            "version": esc.version, "year": esc.year,
+            "montos": {k: round(v, 2) for k, v in montos.items()},
+            "total": round(sum(montos.values()), 2),
+        })
+
+    return {
+        "cuentas": [{"account_code": c, "nombre": r}
+                    for _campo, c, r in CONCEPTOS],
+        "escenarios": salida,
     }

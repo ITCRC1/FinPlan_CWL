@@ -778,6 +778,27 @@ export interface GastoEscenario {
   nombres_cuenta: Record<string, string>;
 }
 
+// ── La planilla abierta por CUENTA (owner, 2026-09-10) ───────────────────────
+//
+// El tercer corte de la planilla. Ya existian por DEPARTAMENTO y por MES; este
+// contesta «cuanto pagamos de horas extra este mes» sin sumar a mano
+// veintitantos departamentos. Sale de la misma tabla y con el mismo filtro que
+// el reporte por departamento, para que los totales peguen.
+export interface PlanillaCuenta { account_code: string; nombre: string }
+export interface PlanillaPorCuentaEsc {
+  scenario_id: string; type: string; version: string; year: number;
+  /** {codigo de cuenta: monto} */
+  montos: Record<string, number>;
+  total: number;
+}
+export async function getPlanillaPorCuenta(
+  scenarioIds: string[], mes: number, horizonte: "month" | "ytd" | "full",
+): Promise<{ cuentas: PlanillaCuenta[]; escenarios: PlanillaPorCuentaEsc[] }> {
+  const ids = scenarioIds.filter(Boolean).join(",");
+  return api.get(`/payroll/por-cuenta/?scenarios=${encodeURIComponent(ids)}`
+    + `&mes=${mes}&horizonte=${horizonte}`);
+}
+
 export async function getGastoPorClase(
   scenarioIds: string[], detalle = false,
 ): Promise<{

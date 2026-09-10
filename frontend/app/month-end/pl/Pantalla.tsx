@@ -27,6 +27,7 @@ import {
   getAuditoria, getPLDetail, getComentariosPL, guardarComentarioPL,
   getEstadisticasCierre, getDetalleDeCelda,
   getConsultaCatalogo, correrConsulta, bajarConsultaExcel, getPLDoceMeses,
+  getPlanillaPorCuenta,
   type ConsultaFila, type ConsultaCatalogo, type FbDetalle, type FbMes, type IngresoDetalle,
   type AuditoriaCuadre, type PLDetailFila, type EstadisticasCierre,
   type Scenario, type PLCompareVersion, type PLColumn, type GastoEscenario,
@@ -94,6 +95,10 @@ const VISTAS = [
   { key: "revdet" },
   { key: "fb" },
   { key: "pl" },          // el primero que existió; hoy lo cubre `estado`
+  // Owner, 2026-09-10: «mete un nuevo tab a la par de P/L […] todas las
+  // cuentas de Payroll por totales». El tercer corte de la planilla: ya
+  // estaban por departamento y por mes, faltaba por cuenta.
+  { key: "planillaCuentas" },
 ] as const;
 type Vista = typeof VISTAS[number]["key"];
 
@@ -431,6 +436,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
    *  habría abierto en el cuadro equivocado. */
   const VISTA_INICIAL: Vista = VISTAS[0].key;
   const [vista, setVista] = useState<Vista>(VISTA_INICIAL);
+  // La planilla por cuenta: se pide solo cuando se abre su tab. Son 17 filas y
+  // no las mira nadie desde los otros sub-tabs; traerlas siempre seria pagar
+  // una consulta en cada carga de la pantalla para nada.
+  const [planillaCtas, setPlanillaCtas] =
+    useState<Awaited<ReturnType<typeof getPlanillaPorCuenta>> | null>(null);
   /** El P&L Statement, abierto por departamento.
    *
    *  Owner, 2026-09-02: *«podés con un click llevarlo de totales a
@@ -704,6 +714,20 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   useEffect(() => {
     if (vista === "consulta" && !cat) getConsultaCatalogo().then(setCat).catch(() => setCat(null));
   }, [vista, cat]);
+
+  // La planilla por cuenta se recarga cuando cambian las versiones, el mes o
+  // el horizonte: es el mismo período que el resto de la pantalla, y un cuadro
+  // que se quedó en el mes anterior es peor que uno vacío.
+  useEffect(() => {
+    if (vista !== "planillaCuentas") return;
+    const ids = ranuras.filter(Boolean);
+    if (!ids.length) { setPlanillaCtas(null); return; }
+    let vivo = true;
+    getPlanillaPorCuenta(ids, mes, horizonte)
+      .then(r => { if (vivo) setPlanillaCtas(r); })
+      .catch(() => { if (vivo) setPlanillaCtas(null); });
+    return () => { vivo = false; };
+  }, [vista, ranuras, mes, horizonte]);
 
   // La caja final de los dos escenarios comparados. Se pide al abrir el Summary
   // y no antes; si falla, el resto del cuadro sigue en pie y solo esa fila queda
@@ -3443,6 +3467,89 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
        * overhead, que es el error que ya dejó a Sistemas 937,33 corto.
        * Ver la nota `finplan-dos-vocabularios-de-linea`. */}
       {vista === "utilidad" && <PLDetailEnCierre esPre={esPre} />}
+
+      {vista === "planillaCuentas" && (() => {
+        /* La planilla abierta por CUENTA — los 17 conceptos.
+         *
+         * Owner, 2026-09-10: *«todas las cuentas de Payroll por totales […]
+         * para ver total salarios, total comisiones, total horas extras, y
+         * todo»*, y *«todas ellas sumadas al final esa debe pegar con los
+         * reportes de cada departamento»*.
+         *
+         * ⚠️ El TOTAL sale del backend, no de sumar las filas acá. Es el mismo
+         * número que devuelve el corte por departamento, calculado del mismo
+         * lado; sumarlo en la pantalla sería una segunda aritmética que el día
+         * que se agregue un concepto dejaría de cuadrar en silencio. */
+        const cols = usadas;
+        const filas = (planillaCtas?.cuentas ?? []).map(c => ({
+          ...c,
+          por: (id: string) =>
+            planillaCtas?.escenarios.find(e => e.scenario_id === id)
+              ?.montos[c.account_code] ?? 0,
+        }));
+        // Una cuenta en cero en TODAS las versiones no se revisa: solo alarga
+        // el cuadro. Se cuentan aparte para que conste que no se perdieron.
+        const conMonto = filas.filter(
+          f => cols.some(u => Math.abs(f.por(u.id)) >= 0.005));
+        const enCero = filas.length - conMonto.length;
+
+        return (
+          <div>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)",
+                        margin: "0 0 10px", maxWidth: 820, lineHeight: 1.6 }}>
+              {t("planillaCuentasIntro")}
+            </p>
+            {!planillaCtas ? (
+              <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                {tc("loading")}
+              </div>
+            ) : (
+              <div className="fin-scroll-x">
+                <table style={{ borderCollapse: "collapse", minWidth: 640 }}>
+                  <thead><tr>
+                    <th style={{ ...TH, textAlign: "left", minWidth: 90 }}>{t("cuenta")}</th>
+                    <th style={{ ...TH, textAlign: "left", minWidth: 210 }}>{t("concepto")}</th>
+                    {cols.map(u => (
+                      <th key={u.id} style={{ ...TH, minWidth: 130 }}>{etiqueta(u.id)}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {conMonto.map(f => (
+                      <tr key={f.account_code}>
+                        <td style={{ ...TDL, fontVariantNumeric: "tabular-nums",
+                                     color: "var(--text-secondary)" }}>
+                          {f.account_code}
+                        </td>
+                        <td style={TDL}>{f.nombre}</td>
+                        {cols.map(u => (
+                          <td key={u.id} style={TD}>{usd(f.por(u.id))}</td>
+                        ))}
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 800,
+                                 borderTop: "2px solid var(--border-medium)" }}>
+                      <td style={TDL} />
+                      <td style={TDL}>{t("planillaCuentasTotal")}</td>
+                      {cols.map(u => (
+                        <td key={u.id} style={TD}>
+                          {usd(planillaCtas.escenarios
+                            .find(e => e.scenario_id === u.id)?.total ?? 0)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+                {enCero > 0 && (
+                  <p style={{ fontSize: 11.5, color: "var(--text-secondary)",
+                              marginTop: 10 }}>
+                    {t("planillaCuentasEnCero", { n: enCero })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {vista === "consulta" && (
         <div>
