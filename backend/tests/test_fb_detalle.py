@@ -142,19 +142,38 @@ def test_el_departamento_de_ab_es_el_0120():
     assert DEPT_FB == "0120"
 
 
-def test_la_linea_private_bar_no_tiene_cuentas_de_bar():
-    """Deja constancia del hallazgo: si alguien quiere parear «F&B Beverage»
-    contra `REV_PRIVATE_BAR` porque el nombre calza, acá ve que sus cuentas son
-    de TIENDA."""
+def test_la_linea_private_bar_si_tiene_cuentas_de_bar_y_ab_la_incluye():
+    """El Private Bar postea en cuentas de BAR, y el desglose de A&B lo incluye.
+
+    Hasta el 2026-09-10 esta prueba exigía lo contrario —que `REV_PRIVATE_BAR`
+    NO tuviera cuentas de bar— y era cierto por accidente: el bar estaba
+    mapeado con las cuentas de PLANTILLA de la tienda (`4301`-`4304`, «Ingreso
+    Tienda»), que Integrity no usa. En el mayor real el bar postea en
+    `4120` NA Beverage, `4125` Beer y `4131` Wine (migración 142).
+
+    La prueba vieja traía escrita su propia condición de salida: *«revisar si
+    el desglose de A&B tiene que incluirla»*. Se revisó y sí la incluye —
+    `LINEAS_FB` en `month-end/pl/Pantalla.tsx` lleva `REV_PRIVATE_BAR` desde
+    que existe la línea—, así que la plata del bar se ve en los dos lados: en
+    su propia línea de utilidad y dentro del total de A&B. Esta versión vigila
+    justamente eso, que es lo que no se puede romper sin que algo se esconda.
+    """
     datos = json.loads(SEED.read_text(encoding="utf-8"))
     nombres = " ".join(
         (r.get("account_name_example") or "") for r in datos["account_mapping"]
         if r.get("report_line_code") == "REV_PRIVATE_BAR").lower()
+    # Las de plantilla se quedan (el seed no borra lo que sobra) y las reales
+    # entraron: las dos cosas tienen que ser ciertas.
     assert "tienda" in nombres
-    for palabra in ("beer", "liquor", "wine", "beverage"):
-        assert palabra not in nombres, (
-            "REV_PRIVATE_BAR ahora sí tiene cuentas de bar; revisar si el "
-            "desglose de A&B tiene que incluirla")
+    for palabra in ("beverage", "beer", "wine"):
+        assert palabra in nombres, f"falta la cuenta de {palabra} del bar"
+
+    # Y el desglose de A&B la incluye, o el bar quedaría fuera del total de A&B.
+    pantalla = (pathlib.Path(__file__).parent.parent.parent / "frontend" / "app"
+                / "month-end" / "pl" / "Pantalla.tsx").read_text(encoding="utf-8")
+    assert '"REV_PRIVATE_BAR"]' in pantalla.split("LINEAS_FB = ")[1][:120], (
+        "REV_PRIVATE_BAR salio de LINEAS_FB: el ingreso del bar dejaria de "
+        "sumar en el total de A&B del P&L Statement")
 
 
 def test_el_cargador_del_motor_no_trae_el_nombre_de_la_cuenta():

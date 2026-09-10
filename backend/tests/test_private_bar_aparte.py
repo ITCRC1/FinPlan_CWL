@@ -79,18 +79,28 @@ def test_el_catalogo_lo_refleja():
 
 
 def test_tiene_el_modelo_del_gift_shop():
-    """Las MISMAS cuentas que el Gift Shop, sean las que sean.
+    """El MODELO de tienda es idéntico; lo que difiere es la cuenta de ingreso.
 
     El owner lo pidió modelado como tienda —compra producto y lo vende con su
     margen— y con las mismas cuentas del `0165`. Funciona porque la línea la
     decide el par (departamento, cuenta): los mismos números en el 0121 caen en
     las líneas del Private Bar, no en las del Gift Shop.
 
-    Se comparan los CONJUNTOS y no un número fijo. La versión anterior exigía
-    «35 y 35», y el día que la tienda sumó el núcleo compartido de cuentas
-    (4999, 7105, 7110, 7150, 7175, 7185) la prueba falló por el número aunque
-    lo que vigila —que los dos lleven lo mismo— seguía siendo cierto. Un número
-    mágico convierte cualquier crecimiento legítimo en una falla.
+    ## Por qué esto ya no exige conjuntos IDÉNTICOS
+
+    Hasta el 2026-09-10 exigía `cuentas(0121) == cuentas(0165)`, y se cumplía
+    por una razón que no era la decisión del owner: **los dos lados estaban
+    mapeados con las mismas cuentas de PLANTILLA** (`4301`-`4304`, «Ingreso
+    Tienda #1..#4»), que Integrity no usa en ninguno de los dos.
+
+    Con las cuentas reales (migración 142) el ingreso ya no puede coincidir:
+
+        0121 Private Bar   4120 NA BEVERAGE · 4125 BEER · 4131 WINE
+        0165 Gift Shop     4305 VISORS/HATS · 4307 CLOTHING · 4316 · 4320
+
+    Lo que sí encierra la decisión del owner —y sigue siendo cierto al centavo—
+    es que el MODELO es el mismo: idéntico costo de ventas, idéntico opex, y
+    tres líneas propias que no son de A&B. Eso es lo que se vigila acá.
     """
     datos = json.loads(MAPEO.read_text(encoding="utf-8"))
     propias = [m for m in datos["account_mapping"]
@@ -98,33 +108,32 @@ def test_tiene_el_modelo_del_gift_shop():
     modelo = [m for m in datos["account_mapping"]
               if (m.get("dept_code") or "").strip() == "0165"]
     assert propias and modelo
-    assert len(propias) == len(modelo)
-    # mismas cuentas que la tienda, ni una de más ni de menos
-    assert ({m["account_code"] for m in propias}
-            == {m["account_code"] for m in modelo})
+
+    def cuentas_de(filas, prefijo):
+        return {m["account_code"] for m in filas
+                if m["report_line_code"].startswith(prefijo)}
+
+    # El modelo de tienda: costo de ventas y opex IDÉNTICOS, cuenta por cuenta.
+    # Si un día se le agrega un gasto al bar y no a la tienda, dejaron de ser
+    # el mismo negocio y hay que decidirlo, no descubrirlo en un reporte.
+    assert cuentas_de(propias, "COS_") == cuentas_de(modelo, "COS_")
+    assert cuentas_de(propias, "OPEX_") == cuentas_de(modelo, "OPEX_")
+
     destinos = {m["report_line_code"] for m in propias}
     # Se le sumo `COS_PRIVATE_BAR` al separar el costo de ventas (2026-08-14).
     # Todas son del mismo departamento; lo que se vigila es que ninguna sea
     # de A&B.
     assert destinos == {"REV_PRIVATE_BAR", "OPEX_PRIVATE_BAR", "COS_PRIVATE_BAR"}
-    # ⚠️ Cuántas son de INGRESO se compara contra la TIENDA, no contra un
-    # número fijo.
-    #
-    # Acá decía `== 4`, que es exactamente lo que el docstring de arriba critica
-    # dos párrafos antes: el 2026-09-09 la tienda sumó seis cuentas de retail
-    # (VISORS/HATS/CAPS, CLOTHING, NEWSPAPERS, CANDY…), el bar las sumó con
-    # ella —que es lo que esta prueba pide— y el número mágico la puso roja por
-    # un crecimiento legítimo.
-    #
-    # Lo que se vigila es el reparto entre ingreso y el resto, y ése tiene que
-    # ser el mismo en los dos: son el mismo modelo de negocio.
-    de_ingreso = sum(1 for m in propias
-                     if m["report_line_code"] == "REV_PRIVATE_BAR")
-    de_ingreso_tienda = sum(1 for m in modelo
-                            if m["report_line_code"] == "REV_RETAIL")
-    assert de_ingreso == de_ingreso_tienda, (
-        f"el bar tiene {de_ingreso} cuentas de ingreso y la tienda "
-        f"{de_ingreso_tienda}: dejaron de ser el mismo modelo")
+
+    # El ingreso: cada uno postea en SUS cuentas de Integrity, y las de la
+    # plantilla se quedan en los dos (el seed no borra lo que sobra, y una
+    # regla que no dispara no hace daño).
+    ingreso_bar = cuentas_de(propias, "REV_")
+    ingreso_tienda = cuentas_de(modelo, "REV_")
+    plantilla = {"4301", "4302", "4303", "4304"}
+    assert plantilla <= ingreso_bar and plantilla <= ingreso_tienda
+    assert ingreso_bar - plantilla == {"4120", "4125", "4131"}
+    assert ingreso_tienda - plantilla == {"4305", "4307", "4316", "4320"}
 
 
 def test_su_plata_llega_a_su_linea_y_no_a_la_de_ayb():
