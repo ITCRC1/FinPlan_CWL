@@ -1696,7 +1696,8 @@ async def import_gl_detail(
     los meses presentes en el archivo (los detecta de los valores) y preserva los
     demás meses ya cargados — para subir solo el mes que cerrás."""
     from app.importers.gl_detail_importer import (
-        parse_gl_detail, filas_sin_cuenta, es_contrapartida_de_allocation)
+        parse_gl_detail, filas_sin_cuenta, es_contrapartida_de_allocation,
+        allocation_en_overhead)
     from app.importers import verificacion as verificacion_mod
     data = await file.read()
 
@@ -1704,8 +1705,22 @@ async def import_gl_detail(
     # `registro_de_subida`, enganchado en el decorador de esta ruta. Vive allá y
     # no acá para que sea UN mecanismo y no veintiuno — ver
     # `app/importers/registro_dep.py`.
+
+    # ── El escenario destino se resuelve ANTES de parsear ────────────────────
+    #
+    # No es cosmético: el modo `en_overhead` (allocation visible como overhead)
+    # es una propiedad DEL DESTINO, no del archivo ni de quien llama. Resolverlo
+    # acá arriba es lo que hace imposible pedirlo por fuera: no hay parámetro
+    # que mandar — o el destino es el espejo del Pre-Cierre, o no lo es.
+    scenarios = (await db.execute(select(Scenario))).scalars().all()
+    forced = None
+    if scenario_id:
+        forced = next((s for s in scenarios if s.id == scenario_id), None)
+        if forced is None:
+            raise ErrorApi(404, "escenario.no_encontrado")
+
     try:
-        blocks = parse_gl_detail(data)
+        blocks = parse_gl_detail(data, en_overhead=allocation_en_overhead(forced))
     except Exception as e:
         raise ErrorApi(400, "archivo.no_se_pudo_leer", detalle=str(e))
 
@@ -1745,7 +1760,6 @@ async def import_gl_detail(
                                              if m == mes_de_cierre}
     meses_descartados = sorted(set(meses_descartados))
 
-    scenarios = (await db.execute(select(Scenario))).scalars().all()
     # Mapeo de cuentas + config de líneas del reporte: el motor consolida el detalle
     # al P&L (below-GOP/fees/impuesto salen de las cuentas 8xxx reales). Validado al
     # dólar contra el Dashboard (Actual 2026 / Budget 2026).
@@ -1758,11 +1772,7 @@ async def import_gl_detail(
     # Versión explícita: si el owner eligió el escenario destino en la UI, TODOS los
     # bloques del archivo van ahí (necesario cuando hay varios del mismo tipo+año,
     # ej. 2 forecast 2026). Si no, se empareja por tipo+año como siempre.
-    forced = None
-    if scenario_id:
-        forced = next((s for s in scenarios if s.id == scenario_id), None)
-        if forced is None:
-            raise ErrorApi(404, "escenario.no_encontrado")
+    # `forced` ya quedó resuelto arriba, antes de parsear.
     # ── La VERIFICACIÓN corre ANTES de escribir una sola fila ────────────────
     #
     # Owner (2026-08-16): «que el upload tenga la verificación arriba versus el

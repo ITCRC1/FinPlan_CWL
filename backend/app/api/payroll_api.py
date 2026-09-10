@@ -47,7 +47,7 @@ from app.engine.payroll_calculator import (
     DeptPayrollSummary, FTEReport, total_entry,
 )
 from app.importers.codificacion_importer import import_codificacion
-from app.importers.gl_detail_importer import ALLOC_EXCL_PAYROLL
+from app.importers.gl_detail_importer import ALLOC_EXCL_PAYROLL, allocation_en_overhead
 from app.api._allocated import lineas_del_allocation
 
 router = APIRouter(tags=["payroll"])
@@ -642,6 +642,11 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     """Reporte de planilla por departamento (USD anual): headcount (# posiciones),
     FTE promedio, salario base (S&W) y costo total con cargas. Base de los
     reportes de Headcount / FTE / Salarios por depto."""
+    # En el PRE-CIERRE el gasto de allocation se ve (cae en su línea de
+    # overhead) para que el detalle diga lo mismo que el P&L del mismo tab.
+    # Ver `allocation_en_overhead`.
+    excluir = set() if allocation_en_overhead(
+        await db.get(Scenario, scenario_id)) else ALLOC_EXCL_PAYROLL
     positions = (await db.execute(
         select(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id)
     )).scalars().all()
@@ -657,7 +662,7 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
             "headcount": 0, "fte_avg": 0.0, "sw_annual": 0.0, "total_annual": 0.0})
 
     for p in positions:
-        if p.dept_code in ALLOC_EXCL_PAYROLL:
+        if p.dept_code in excluir:
             continue  # Employee Dining / Laundry interna: allocation → fuera de planilla
         d = row(p.dept_code, p.dept_name)
         if p.position_code == "GL":
@@ -666,7 +671,7 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
             d["headcount"] += 1
             d["fte_avg"] += sum(float(get_fte(p, m)) for m in range(1, 13)) / 12.0
     for e in entries:
-        if e.dept_code in ALLOC_EXCL_PAYROLL:
+        if e.dept_code in excluir:
             continue
         d = row(e.dept_code)
         d["sw_annual"] += float(e.c6000_sw)
@@ -700,6 +705,11 @@ async def get_dept_report_monthly(scenario_id: str, db: AsyncSession = Depends(g
     ese depto tiene carga manual — ver `_dept_fte_override`). total[m] = suma
     de los 17 conceptos de ese mes. Excluye deptos de allocation (Employee
     Dining / Laundry)."""
+    # En el PRE-CIERRE el gasto de allocation se ve (cae en su línea de
+    # overhead) para que el detalle diga lo mismo que el P&L del mismo tab.
+    # Ver `allocation_en_overhead`.
+    excluir = set() if allocation_en_overhead(
+        await db.get(Scenario, scenario_id)) else ALLOC_EXCL_PAYROLL
     positions = (await db.execute(
         select(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id)
     )).scalars().all()
@@ -715,7 +725,7 @@ async def get_dept_report_monthly(scenario_id: str, db: AsyncSession = Depends(g
             "headcount": [0] * 12, "fte": [0.0] * 12, "total": [0.0] * 12})
 
     for p in positions:
-        if p.dept_code in ALLOC_EXCL_PAYROLL:
+        if p.dept_code in excluir:
             continue
         d = row(p.dept_code, p.dept_name)
         if p.position_code == "GL":
@@ -732,7 +742,7 @@ async def get_dept_report_monthly(scenario_id: str, db: AsyncSession = Depends(g
         for m, f in meses.items():
             d["fte"][m - 1] = f
     for e in entries:
-        if e.dept_code in ALLOC_EXCL_PAYROLL:
+        if e.dept_code in excluir:
             continue
         if not (1 <= e.month <= 12):
             continue

@@ -91,6 +91,29 @@ ALLOC_EXCL_PAYROLL = {d for d, cs in ALLOCATION_EXCLUDE.items() if "6" in cs}  #
 ALLOC_EXCL_OPEX = {d for d, cs in ALLOCATION_EXCLUDE.items() if "7" in cs}     # {0220, 0161}
 
 
+def allocation_en_overhead(sc) -> bool:
+    """¿Este escenario ENSEÑA el gasto de allocation como overhead en vez de esconderlo?
+
+    Solo el espejo del PRE-CIERRE (`es_precierre`). Owner, 2026-09-10: «los
+    allocations en overhead […] esta regla es solo para este tab».
+
+    Mientras la 4999 no está posteada el gasto de 0220/0161 no se reparte, y la
+    regla permanente lo deja FUERA del P&L: en agosto 2026 son $40,700.78
+    ($36,378.28 de Cafetería + $4,322.50 de Lavandería) que no aparecen en
+    ninguna línea. En el P&L de verdad eso es correcto —netea a 0 cuando se
+    reparte—, pero la pantalla de REVISIÓN existe para que no se escape plata:
+    ahí el gasto tiene que verse.
+
+    No hace falta línea nueva: el mapeo ya manda las clases 5/6/7 de esos deptos
+    a COH_CAFETERIA/OH_CAFETERIA y COS_LAUNDRY/OH_LAUNDRY, y la 4999 cae en LA
+    MISMA línea. El día que posteen la distribución, la línea netea a cero sola
+    y no hay nada que deshacer ni ninguna regla que volver a cambiar.
+
+    El Actual/Budget/Forecast no se tocan: ahí sigue mandando ALLOCATION_EXCLUDE.
+    """
+    return bool(getattr(sc, "es_precierre", False))
+
+
 def _acct_code(v) -> str | None:
     """Normaliza el código de cuenta venga como número (6020) o texto ('6000')."""
     if isinstance(v, (int, float)):
@@ -197,11 +220,15 @@ def _parse_version(label: str) -> tuple[str | None, int | None]:
     return typ, (int(ym.group(1)) if ym else None)
 
 
-def parse_gl_detail(data: bytes) -> list[dict]:
+def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
     """Returns [{label, type, year, opex:[...], costs:[...], unmapped:set, skipped:{...}}].
 
     Cada fila de opex/costs: {dept_code, dept_name, account_code, account_name,
-    months: {1..12: float}} (solo meses con valor)."""
+    months: {1..12: float}} (solo meses con valor).
+
+    `en_overhead=True` NO aplica ALLOCATION_EXCLUDE: el gasto de los deptos de
+    allocation entra y cae en su propia línea de overhead. Es el modo del
+    Pre-Cierre y de nadie más — ver `allocation_en_overhead`."""
     wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True, read_only=True)
     ws = _pick_gl_sheet(wb)
     # max_col evita materializar miles de columnas fantasma (dimensión inflada).
@@ -382,7 +409,9 @@ def parse_gl_detail(data: bytes) -> list[dict]:
             # Deptos de allocation: se excluyen las clases que se reparten (ver
             # ALLOCATION_EXCLUDE). 0220 = todo (5,6,7); 0161 = solo planilla+insumos
             # (6,7), conservando su Laundry Services operativo (ingreso 4xxx + costo 5xxx).
-            if cls in ALLOCATION_EXCLUDE.get(dcode, set()):
+            # La única excepción es `en_overhead` (Pre-Cierre): ahí no se excluye
+            # nada y el gasto se ve en su línea de overhead.
+            if not en_overhead and cls in ALLOCATION_EXCLUDE.get(dcode, set()):
                 blk["skipped"]["allocation"] = blk["skipped"].get("allocation", 0) + 1
                 continue
             months = {}

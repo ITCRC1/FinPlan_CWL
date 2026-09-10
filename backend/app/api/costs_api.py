@@ -25,7 +25,7 @@ from app.errores import ErrorApi
 from app.textos import Idioma, t
 from app.models.scenario import Scenario
 from app.models.cost_entry import CostEntry, DRIVER_TYPES, REVENUE_LINES
-from app.importers.gl_detail_importer import ALLOC_EXCL_COST
+from app.importers.gl_detail_importer import ALLOC_EXCL_COST, allocation_en_overhead
 from app.engine.cost_calculator import calculate_cost_amount, recalculate_cost_entries
 from app.api._nombres_de_depto import nombres_de_depto
 from app.export.costs_excel import export_costs_to_excel, import_costs_from_excel
@@ -351,7 +351,11 @@ async def get_dept_checkbook(scenario_id: str, dept_code: str, db: AsyncSession 
 @router.get("/costs/{scenario_id}/report/")
 async def costs_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     """Costos de venta por departamento → cuentas con total anual (reporte C6)."""
-    await _get_scenario_or_404(scenario_id, db)
+    sc = await _get_scenario_or_404(scenario_id, db)
+    # En el PRE-CIERRE el gasto de allocation se ve (cae en su línea de
+    # overhead) para que el detalle diga lo mismo que el P&L del mismo tab.
+    # Ver `allocation_en_overhead`.
+    excluir = set() if allocation_en_overhead(sc) else ALLOC_EXCL_COST
     _M = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
     entries = (await db.execute(
         select(CostEntry).where(CostEntry.scenario_id == scenario_id)
@@ -359,7 +363,7 @@ async def costs_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     )).scalars().all()
     by_dept: dict[str, list] = {}
     for e in entries:
-        if e.dept_code in ALLOC_EXCL_COST:
+        if e.dept_code in excluir:
             continue  # solo Employee Dining (0220): allocation. 0161 conserva su costo de venta
         by_dept.setdefault(e.dept_code, []).append(e)
     depts = []

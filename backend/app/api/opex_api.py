@@ -32,7 +32,7 @@ from app.errores import ErrorApi
 from app.models.scenario import Scenario
 from app.models.opex_entry import OpexEntry
 from app.importers.opex_importer import import_opex_for_scenario, import_single_opex_file, OPEX_FILE_MAP
-from app.importers.gl_detail_importer import ALLOC_EXCL_OPEX
+from app.importers.gl_detail_importer import ALLOC_EXCL_OPEX, allocation_en_overhead
 from app.api._nombres_de_depto import nombres_de_depto
 from app.export.opex_excel import export_opex_to_excel, import_opex_from_excel
 from app.api._allocated import lineas_del_allocation
@@ -588,14 +588,18 @@ async def get_dept_opex(scenario_id: str, dept_code: str, db: AsyncSession = Dep
 @router.get("/opex/{scenario_id}/report/")
 async def opex_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     """OPEX por departamento → cuentas con total anual (reporte C6)."""
-    await _get_scenario_or_404(scenario_id, db)
+    sc = await _get_scenario_or_404(scenario_id, db)
+    # En el PRE-CIERRE el gasto de allocation se ve (cae en su línea de
+    # overhead) para que el detalle diga lo mismo que el P&L del mismo tab.
+    # Ver `allocation_en_overhead`.
+    excluir = set() if allocation_en_overhead(sc) else ALLOC_EXCL_OPEX
     entries = (await db.execute(
         select(OpexEntry).where(OpexEntry.scenario_id == scenario_id)
         .order_by(OpexEntry.dept_code, OpexEntry.account_code)
     )).scalars().all()
     by_dept: dict[str, list] = {}
     for e in entries:
-        if e.dept_code in ALLOC_EXCL_OPEX:
+        if e.dept_code in excluir:
             continue  # Employee Dining / Laundry interna: allocation → fuera del OpEx
         by_dept.setdefault(e.dept_code, []).append(e)
     depts = []
