@@ -73,6 +73,14 @@ const orden = (tipo: string) => {
   const i = NATURALEZA.findIndex(n => n.tipo === tipo);
   return i < 0 ? NATURALEZA.length : i;
 };
+/** La llave que aparea la misma cuenta entre versiones.
+ *
+ *  ⚠️ Incluye el `outlet`. En A&B la misma cuenta vive en varios outlets
+ *  (Vitrales, Terra Kitchen, Sueños del Bosque) y sin el outlet los tres se
+ *  aparearian entre si: el Budget de uno restaria contra el actual de otro. */
+const llave = (f: { dept_code: string; account_code: string; outlet: string }) =>
+  `${f.dept_code}|${f.account_code}|${f.outlet || ""}`;
+
 const colorDe = (tipo: string) =>
   NATURALEZA.find(n => n.tipo === tipo)?.color ?? "var(--text-secondary)";
 
@@ -94,9 +102,18 @@ function primeroDe(escenarios: Scenario[], tipo: string): string {
 }
 
 export default function Auditoria({ escenarios, inicial, mes, horizonte = "month",
-                                   compacto = true }: {
+                                   compacto = true, comparar = [] }: {
   escenarios: Scenario[];
   inicial?: string;
+  /** Las otras versiones contra las que comparar el detalle, en el orden en
+   *  que se muestran.
+   *
+   *  Owner, 2026-09-10: *«este reporte es el mas importante de todos porque
+   *  permite ver el detalle; favor hacerlo comparativo versus budget y
+   *  forecast y actuales»*.
+   *
+   *  Vacio = el cuadro de una sola version, como era. */
+  comparar?: { id: string; etiqueta: string }[];
   /** ⚠️ El mes lo MANDA la pantalla. No hay estado propio ni selector acá.
    *
    *  Owner, 2026-09-08: *«el único que debe escoger es la parte de arriba y
@@ -121,6 +138,19 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
 }) {
   const [scenarioId, setScenarioId] = useState("");
   const [datos, setDatos] = useState<Datos | null>(null);
+  /** Las otras versiones, ya reducidas a `llave -> monto`.
+   *
+   *  ⚠️ Se guarda el MAPA y no el `Datos` entero: de cada version comparada
+   *  solo se usa el monto por (departamento, cuenta, outlet). Quedarse con
+   *  todo triplicaria memoria para nada. */
+  const [otros, setOtros] = useState<Record<string, Map<string, number>>>({});
+  /** Las cuentas que alguna version comparada tiene y la principal NO.
+   *
+   *  ⚠️ Sin esto el cuadro solo mostraria las cuentas del Pre-Cierre, y la
+   *  pregunta mas util de una comparacion es exactamente la contraria: **que
+   *  presupuesto NO se ejecuto**. Una cuenta con Budget y sin actual no
+   *  apareceria en ninguna fila, y su ausencia no se ve. */
+  const [extras, setExtras] = useState<AuditoriaFila[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Sólo las líneas que NO cuadran. Es el modo en que se usa esta pantalla
@@ -136,7 +166,43 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
     if (!scenarioId) return;
     setCargando(true); setError(null);
     try {
-      setDatos(await getAuditoria(scenarioId, mes, horizonte));
+      // ⚠️ En PARALELO, y la principal PRIMERO en la lista de espera: si una
+      // comparada falla, `allSettled` deja pasar el resto. Un Budget que no
+      // responde no puede dejar la auditoria sin su columna principal, que es
+      // la que se vino a mirar.
+      const ids = comparar.map(c => c.id).filter(id => id && id !== scenarioId);
+      const [principal, ...resto] = await Promise.all([
+        getAuditoria(scenarioId, mes, horizonte),
+        ...ids.map(id => getAuditoria(id, mes, horizonte)
+          .then(d => d).catch(() => null)),
+      ]);
+      setDatos(principal);
+      const mapas: Record<string, Map<string, number>> = {};
+      resto.forEach((d, i) => {
+        if (!d) return;
+        const m = new Map<string, number>();
+        for (const f of d.detalle) m.set(llave(f), (m.get(llave(f)) ?? 0) + f.monto);
+        mapas[ids[i]] = m;
+      });
+      setOtros(mapas);
+
+      const propias = new Set(principal.detalle.map(llave));
+      const vistos = new Set<string>();
+      const fuera: AuditoriaFila[] = [];
+      resto.forEach(d => {
+        if (!d) return;
+        for (const f of d.detalle) {
+          const k = llave(f);
+          if (propias.has(k) || vistos.has(k)) continue;
+          if (Math.abs(f.monto) < 0.005) continue;   // en cero alla tampoco es dato
+          vistos.add(k);
+          // La principal no la tiene: entra en cero, y `movimiento: true` para
+          // que `Compacto` NO la esconda — que la principal no la tenga es
+          // justamente lo que hay que ver.
+          fuera.push({ ...f, monto: 0, movimiento: true });
+        }
+      });
+      setExtras(fuera);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la auditoría");
       setDatos(null);
@@ -144,7 +210,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
     // ⚠️ `horizonte` va en las dependencias. Sin él, cambiar de mes a YTD
     // arriba no volvía a pedir nada y la pantalla seguía mostrando el período
     // anterior con el rótulo nuevo — que es peor que no cambiar nada.
-  }, [scenarioId, mes, horizonte]);
+  }, [scenarioId, mes, horizonte, comparar]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -196,13 +262,38 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
    *
    *  El orden lo fija ORDEN_NATURALEZA y NO el alfabeto: un P&L se lee ingreso
    *  primero y gasto después. */
+  /** Las versiones comparadas que de verdad trajeron dato. Una que fallo o
+   *  que no existe no dibuja columna: una columna vacia se lee como ceros. */
+  const cmp = useMemo(
+    () => comparar.filter(c => c.id && c.id !== scenarioId && otros[c.id]),
+    [comparar, scenarioId, otros]);
+
+  /** Como se llama la version principal. Sale de `comparar` si viene ahi, y si
+   *  no del escenario elegido en el selector de este sub-tab. */
+  const etiquetaPrincipal = useMemo(() => {
+    const enLista = comparar.find(c => c.id === scenarioId);
+    if (enLista) return enLista.etiqueta;
+    const e = escenarios.find(x => x.id === scenarioId);
+    return e ? `${e.type} ${e.version} ${e.year}` : "Monto US$";
+  }, [comparar, scenarioId, escenarios]);
+
+  /** El monto de esta cuenta en una version comparada. */
+  /** Cuantas columnas tiene la tabla del detalle. Los `colSpan` salen de aca y
+   *  NO de un numero escrito a mano: con el numero fijo, agregar una version
+   *  dejaba las barras de departamento cortadas y el cuadro desalineado — sin
+   *  dar error. */
+  const nCols = 5 + cmp.length + (cmp.length ? 1 : 0);
+
+  const montoEn = useCallback(
+    (id: string, f: AuditoriaFila) => otros[id]?.get(llave(f)) ?? 0, [otros]);
+
   const porDepto = useMemo(() => {
     const out = new Map<string, {
       nombre: string;
       grupos: Map<string, AuditoriaFila[]>;
       total: number;
     }>();
-    for (const f of datos?.detalle ?? []) {
+    for (const f of [...(datos?.detalle ?? []), ...extras]) {
       // ⚠️ `Compacto` esconde las OPCIONES del catálogo que no se movieron.
       // Es el mismo interruptor que ya gobierna los sub-tabs, y el pedido
       // original: «las líneas que no tienen saldo que no se vean
@@ -235,7 +326,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
           return Math.abs(y.monto) - Math.abs(x.monto);
         })] as [string, AuditoriaFila[]]),
     }));
-  }, [datos, compacto]);
+  }, [datos, compacto, extras]);
 
   const columnas = datos?.columnas ?? [];
   const descuadres = (datos?.cuadre ?? [])
@@ -498,7 +589,20 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
             <th colSpan={2} style={{ ...TH, textAlign: "left", minWidth: 200 }}>
               Renglón del P&L
             </th>
-            <th style={{ ...TH, minWidth: 110 }}>Monto US$</th>
+            <th style={{ ...TH, minWidth: 110 }}>
+              {cmp.length ? etiquetaPrincipal : "Monto US$"}
+            </th>
+            {/* Una columna por version comparada. El rotulo es el de la
+                pantalla grande, para que la misma version se llame igual en
+                los diecinueve sub-tabs. */}
+            {cmp.map(c => (
+              <th key={c.id} style={{ ...TH, minWidth: 110 }}>{c.etiqueta}</th>
+            ))}
+            {cmp.length > 0 && (
+              <th style={{ ...TH, minWidth: 110, color: "var(--brand)" }}>
+                Var vs {cmp[0].etiqueta}
+              </th>
+            )}
           </tr></thead>
           <tbody>
             {porDepto.map(d => (
@@ -509,7 +613,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                 {/* El departamento: barra completa, para que se lea como corte
                     y no como una fila más. */}
                 <tr>
-                  <td colSpan={5} style={{
+                  <td colSpan={nCols} style={{
                     ...TDL, fontWeight: 800, fontSize: 12.5,
                     padding: "7px 10px",
                     background: "var(--bg-elevated, #EDF1F5)",
@@ -539,6 +643,15 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                                    color: colorDe(tipo) }}>
                         {usd(filas.reduce((x, f) => x + f.monto, 0))}
                       </td>
+                      {cmp.map(c => (
+                        <td key={c.id} style={{ ...TD, fontSize: 10.5,
+                                                fontWeight: 800, paddingTop: 7,
+                                                paddingBottom: 2,
+                                                color: colorDe(tipo) }}>
+                          {usd(filas.reduce((x, f) => x + montoEn(c.id, f), 0))}
+                        </td>
+                      ))}
+                      {cmp.length > 0 && <td style={TD} />}
                     </tr>
                     {filas.map((f, i) => (
                       <Fragment key={`${d.code}-${tipo}-${i}`}>
@@ -547,7 +660,7 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                           movimiento de cero y no como una cuenta sin usar. */}
                       {!f.movimiento && (i === 0 || filas[i - 1].movimiento) && (
                         <tr>
-                          <td colSpan={5} style={{
+                          <td colSpan={nCols} style={{
                             ...TDL, paddingLeft: 34, paddingTop: 5,
                             fontSize: 10, fontStyle: "italic",
                             color: "var(--text-disabled)",
@@ -581,6 +694,24 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                           {f.linea || "⚠ no cae en ninguna línea"}
                         </td>
                         <td style={TD}>{usd(f.monto)}</td>
+                        {cmp.map(c => (
+                          <td key={c.id} style={TD}>{usd(montoEn(c.id, f))}</td>
+                        ))}
+                        {cmp.length > 0 && (() => {
+                          const d = f.monto - montoEn(cmp[0].id, f);
+                          // El color lo decide la NATURALEZA, no el signo: en
+                          // un ingreso gastar menos que el budget es malo y en
+                          // un gasto es bueno. Pintarlo al reves seria peor que
+                          // no pintarlo.
+                          const bueno = f.tipo === "Ingresos" ? d > 0 : d < 0;
+                          return (
+                            <td style={{ ...TD, color: Math.abs(d) < 0.005
+                              ? "var(--text-disabled)"
+                              : bueno ? "var(--positive)" : "var(--negative)" }}>
+                              {usd(d)}
+                            </td>
+                          );
+                        })()}
                       </tr>
                       </Fragment>
                     ))}
@@ -612,11 +743,22 @@ export default function Auditoria({ escenarios, inicial, mes, horizonte = "month
                                borderTop: "1px solid var(--border-medium)" }}>
                     {usd(d.total)}
                   </td>
+                  {cmp.map(c => (
+                    <td key={c.id} style={{ ...TD, fontWeight: 800, paddingTop: 5,
+                                            borderTop: "1px solid var(--border-medium)" }}>
+                      {usd(d.grupos.reduce((s2, [, filas]) =>
+                        s2 + filas.reduce((x, f) => x + montoEn(c.id, f), 0), 0))}
+                    </td>
+                  ))}
+                  {cmp.length > 0 && (
+                    <td style={{ ...TD, paddingTop: 5,
+                                 borderTop: "1px solid var(--border-medium)" }} />
+                  )}
                 </tr>
               </Fragment>
             ))}
             {!porDepto.length && (
-              <tr><td colSpan={5} style={{ ...TDL, color: "var(--text-secondary)" }}>
+              <tr><td colSpan={nCols} style={{ ...TDL, color: "var(--text-secondary)" }}>
                 Sin detalle por cuenta para este mes.
               </td></tr>
             )}

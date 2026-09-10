@@ -850,6 +850,20 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     return s ? marcar(s, `${s.type} ${s.version} ${s.year}`) : "—";
   }, [escenarios, marcar]);
 
+  /** Las ranuras ocupadas con su rótulo, para los sub-tabs que comparan por su
+   *  cuenta (hoy la Auditoría).
+   *
+   *  ⚠️ Memoizado: se pasa como prop y va en las dependencias del efecto que
+   *  pide los datos. Un arreglo nuevo en cada render volvería a pedir las
+   *  cuatro auditorías en bucle.
+   *
+   *  Owner, 2026-09-10: *«este reporte es el mas importante de todos porque
+   *  permite ver el detalle; favor hacerlo comparativo versus budget y
+   *  forecast y actuales»*. */
+  const versiones = useMemo(
+    () => usadas.map(u => ({ id: u.id, etiqueta: etiqueta(u.id) })),
+    [usadas, etiqueta]);
+
   /** Una columna sin dato del período: todas sus líneas en cero. */
   const vacia = (c: PLColumn | undefined) =>
     !!c && c.lines.every(l => Number(l.amount_usd) === 0);
@@ -3353,7 +3367,8 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
 
       {vista === "auditoria" && (
         <Auditoria escenarios={escenarios} inicial={ranuras[0] || undefined}
-                   mes={mes} horizonte={horizonte} compacto={compacto} />
+                   mes={mes} horizonte={horizonte} compacto={compacto}
+                   comparar={versiones} />
       )}
 
       {/* Profit by Department — mes · YTD · full year.
