@@ -137,3 +137,59 @@ class PrecierreFila(Base):
 
     def __repr__(self) -> str:
         return f"<PrecierreFila {self.cuenta} ${self.mes_usd}>"
+
+
+class PrecierrePosicion(Base):
+    """La planilla del mes abierta por POSICIÓN.
+
+    Owner, 2026-09-10: *«le metemos departamento, cuenta y posición — la
+    posición en las cuentas 6 es el tercer nivel»* · *«eso solo para actuales
+    del mes»* · *«es un reporte grande porque desgrana toda la cuenta y
+    departamento»*.
+
+    En Integrity una cuenta de planilla es `6000-0111-501-013-015-00-00`:
+    concepto, departamento y **posición** (CLAUDE.md §12.1). Hasta ahora la app
+    guardaba el nivel `concepto-departamento` y tiraba el resto, así que la
+    planilla real solo se podía mirar por departamento — no se podía contestar
+    «cuánto costaron los Room Attendants».
+
+    ## Por qué una tabla aparte y no una fila más en `precierre_fila`
+
+    Todo lo que consume `precierre_fila` **suma `mes_usd`**. Meter acá el
+    subdetalle duplicaría cada monto —el padre ya lo suma— y cada consulta
+    tendría que acordarse de filtrar. La que se olvide no falla: da un número
+    más alto y cuadra consigo misma.
+
+    Verificado sobre agosto 2026: las 244 filas de posición suman
+    US$227.497,60, **exactamente** el total de planilla del nivel cuenta. No es
+    un total nuevo: es el mismo, abierto.
+    """
+    __tablename__ = "precierre_posicion"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True,
+                                    default=lambda: str(uuid.uuid4()))
+    precierre_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("precierre.id", ondelete="CASCADE"), index=True)
+
+    #: La fila del Excel de origen, para poder ir a mirarla.
+    fila: Mapped[int] = mapped_column(Integer, default=0)
+    #: La cuenta COMPLETA hasta la posición: `6000-0111-501`.
+    cuenta: Mapped[str] = mapped_column(String(30), default="")
+    #: El concepto de nómina: 6000 S&W, 6001 Overtime, 6010 Comisiones…
+    cuenta_base: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: El tercer nivel: el código de posición (`501` = Front Desk Agent).
+    posicion: Mapped[str] = mapped_column(String(10), default="", index=True)
+    #: El departamento de Integrity…
+    depto: Mapped[str] = mapped_column(String(10), default="", index=True)
+    #: …y el de FinPlan. Los dos sistemas NO comparten códigos.
+    destino_finplan: Mapped[str] = mapped_column(String(10), default="")
+    #: «SALARIES AND WAGES FRONT DESK AGENT» — el nombre de la posición vive
+    #: acá dentro. Es lo único que la nombra: el código `501` solo no dice nada.
+    descripcion: Mapped[str] = mapped_column(String(200), default="")
+
+    #: Seis decimales, por la misma razón que en `PrecierreFila`: el dólar sale
+    #: de dividir colones y redondear antes de sumar acumula deriva.
+    mes_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    def __repr__(self) -> str:
+        return f"<PrecierrePosicion {self.cuenta} ${self.mes_usd}>"

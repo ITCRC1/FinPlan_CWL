@@ -329,6 +329,10 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
     #: segmentos. No entra a los totales —el padre ya lo suma— pero se conserva
     #: para poder comprobar que efectivamente suma.
     subdetalle: dict[str, Decimal] = {}
+    #: El nivel de POSICIÓN de las cuentas 6 (`6000-0111-501`), fila por fila.
+    #: No entra a ningún total —el padre ya lo suma—: es el mismo dinero,
+    #: abierto por quién lo cobra.
+    posiciones: list[dict] = []
     for n, f in enumerate(filas[cols["fila_encabezado"] + 1:], cols["fila_encabezado"] + 2):
         cuenta = _texto(f[cols["cuenta"]] if cols["cuenta"] < len(f) else "")
         crudo_m = f[cols["mes"]] if cols["mes"] < len(f) else None
@@ -352,9 +356,42 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
             # totales: el padre ya lo suma. El subdetalle se guarda aparte.
             if cuenta.count("-") == 2:
                 padre = cuenta.rsplit("-", 1)[0]
-                subdetalle[padre] = subdetalle.get(padre, ZERO) + monto_mes(
-                    cuenta, crudo_m, f[cols["acumulado"]]
-                    if cols["acumulado"] < len(f) else None)
+                m_crc = monto_mes(cuenta, crudo_m, f[cols["acumulado"]]
+                                  if cols["acumulado"] < len(f) else None)
+                subdetalle[padre] = subdetalle.get(padre, ZERO) + m_crc
+                # ⚠️ En las cuentas 6 este nivel ES LA POSICIÓN.
+                #
+                # `6000-0111-501` = concepto 6000, depto 0111, posición 501
+                # (Front Desk Agent) — CLAUDE.md §12.1. Owner, 2026-09-10: *«la
+                # posición en las cuentas 6 es el tercer nivel»*.
+                #
+                # Hasta acá el subdetalle se sumaba por cuenta padre y el
+                # código de posición se tiraba, así que la planilla real solo
+                # se podía mirar por departamento. Se conserva la fila entera
+                # para poder abrirla por posición.
+                #
+                # Verificado sobre agosto 2026: las 116 cuentas de planilla
+                # suman EXACTAMENTE lo mismo por posición que a nivel de
+                # cuenta. No es un total nuevo: es el mismo, abierto.
+                if cuenta[:1] == "6" and m_crc != ZERO:
+                    # El departamento sale del PADRE: `depto_de` lee una cuenta
+                    # de dos segmentos, y ésta tiene tres.
+                    dep = depto_de(padre)
+                    mm = puente.get(dep)
+                    posiciones.append({
+                        "fila": n,
+                        "cuenta": cuenta,
+                        "cuenta_base": cuenta_base(cuenta.rsplit("-", 1)[0]),
+                        "posicion": cuenta.rsplit("-", 1)[1],
+                        "depto": dep,
+                        "destino_finplan": (mm or {}).get("destino_finplan", ""),
+                        "descripcion": _texto(
+                            f[cols["descripcion"]]
+                            if cols["descripcion"] is not None
+                            and cols["descripcion"] < len(f) else ""),
+                        "mes_crc": m_crc,
+                        "mes_usd": a_dolares(m_crc, tc),
+                    })
             continue
         crudo_acum = f[cols["acumulado"]] if cols["acumulado"] < len(f) else None
         mes_crc = monto_mes(cuenta, crudo_m, crudo_acum)
@@ -388,7 +425,8 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
     return {"filas": salida,
             "sin_mapeo": sorted(sin_mapeo.values(), key=lambda x: -abs(x["mes_usd"])),
             "sin_cuenta": sin_cuenta,
-            "subdetalle": {k: v / tc for k, v in subdetalle.items()}}
+            "subdetalle": {k: v / tc for k, v in subdetalle.items()},
+            "posiciones": posiciones}
 
 
 #: Firma de los `.xls` viejos (OLE2). No son ZIP, y `openpyxl` sólo lee ZIP.

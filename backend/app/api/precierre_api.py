@@ -48,7 +48,7 @@ from app.revision import (nivel1_estructura, nivel2_coherencia,
                           nivel3_fuentes, nivel4_expectativa)
 from app.importers.registro_dep import registro_de_subida
 from app.models.department_catalog import DepartmentCatalog
-from app.models.precierre import Precierre, PrecierreFila
+from app.models.precierre import Precierre, PrecierreFila, PrecierrePosicion
 from app.models.scenario import Scenario
 from app.textos import Idioma
 
@@ -296,6 +296,17 @@ async def crear(
             depto=f["depto"], destino_finplan=f["destino_finplan"],
             grupo=f["grupo"] or "", categoria=f["categoria"],
             mes_usd=f["mes_usd"], acumulado_usd=f["acumulado_usd"]))
+    # La planilla abierta por POSICIÓN — el tercer nivel de las cuentas 6.
+    #
+    # No entra a ningún total: el nivel `concepto-departamento` de arriba ya
+    # suma esta misma plata. Se guarda para poder abrirla por quién la cobra
+    # (owner, 2026-09-10). Ver `PrecierrePosicion`.
+    for pz in leido.get("posiciones", []):
+        db.add(PrecierrePosicion(
+            precierre_id=pc.id, fila=pz["fila"], cuenta=pz["cuenta"],
+            cuenta_base=pz["cuenta_base"], posicion=pz["posicion"],
+            depto=pz["depto"], destino_finplan=pz["destino_finplan"],
+            descripcion=pz["descripcion"][:200], mes_usd=pz["mes_usd"]))
     await db.commit()
 
     # El espejo, para que los 19 sub-tabs puedan mirar este mes sin pasarlo a
@@ -767,3 +778,77 @@ async def descartar(precierre_id: str, db: AsyncSession = Depends(get_db),
     pc.estado = "descartado"
     await db.commit()
     return {"id": pc.id, "estado": pc.estado}
+
+
+# ⚠️ El año y el mes van en el PATH, no en el query.
+#
+# `/precierre/{precierre_id}/` se registra antes que esto, y FastAPI resuelve
+# por orden: una ruta `/precierre/planilla-por-posicion/` habría entrado por
+# ahí con `precierre_id="planilla-por-posicion"` y contestado 404 sin que nada
+# dijera por qué.
+@router.get("/precierre/planilla-por-posicion/{anio}/{mes}/")
+async def planilla_por_posicion(
+    anio: int,
+    mes: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """La planilla del mes en revisión, abierta por DEPARTAMENTO · CUENTA · POSICIÓN.
+
+    Owner, 2026-09-10: *«le metemos departamento, cuenta y posición — la
+    posición en las cuentas 6 es el tercer nivel»* · *«eso solo para actuales
+    del mes»* · *«y pones el nombre de la posición»*.
+
+    Sale del BORRADOR más reciente de ese mes, que es lo que significa «los
+    actuales del mes» en esta pantalla: lo último que se subió, todavía sin
+    pasar a Final.
+
+    ⚠️ **No es un total nuevo, es el mismo abierto.** Las filas suman
+    exactamente la planilla del nivel cuenta — verificado sobre agosto 2026:
+    244 filas, US$227.497,60, al centavo. Por eso el `total` viaja aparte y la
+    pantalla no lo recalcula sumando lo que dibuja.
+
+    Un mes subido ANTES de la migración 143 no tiene este detalle: se llena al
+    leer el archivo. La respuesta lo dice con `hay_detalle: false` en vez de
+    devolver una tabla vacía que parecería «no hubo planilla».
+    """
+    pc = (await db.execute(select(Precierre).where(
+        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
+        Precierre.mes == mes).order_by(
+        Precierre.creado_en.desc()))).scalars().first()
+    if pc is None:
+        return {"anio": anio, "mes": mes, "precierre_id": None,
+                "hay_detalle": False, "filas": [], "total": 0.0,
+                "motivo": "sin_borrador"}
+
+    filas = (await db.execute(select(PrecierrePosicion).where(
+        PrecierrePosicion.precierre_id == pc.id).order_by(
+        PrecierrePosicion.destino_finplan, PrecierrePosicion.cuenta_base,
+        PrecierrePosicion.posicion))).scalars().all()
+
+    nombres = {d.dept_code: d.dept_name for d in
+               (await db.execute(select(DepartmentCatalog))).scalars().all()}
+    from app.api.consulta_api import CONCEPTOS
+    rotulo_cuenta = {c: r for _campo, c, r in CONCEPTOS}
+
+    return {
+        "anio": anio, "mes": mes, "precierre_id": pc.id,
+        "subido": pc.creado_en.isoformat() if pc.creado_en else "",
+        "hay_detalle": bool(filas),
+        "motivo": "" if filas else "borrador_sin_detalle",
+        "filas": [{
+            "dept_code": f.destino_finplan,
+            "dept_name": nombres.get(f.destino_finplan, f.destino_finplan),
+            "depto_integrity": f.depto,
+            "cuenta": str(f.cuenta_base or ""),
+            "cuenta_nombre": rotulo_cuenta.get(str(f.cuenta_base or ""), ""),
+            "posicion": f.posicion,
+            # El nombre de la posición vive dentro de la descripción del mayor:
+            # el código `501` solo no le dice nada a nadie.
+            "posicion_nombre": f.descripcion,
+            "cuenta_completa": f.cuenta,
+            "fila": f.fila,
+            "monto": round(float(f.mes_usd), 2),
+        } for f in filas],
+        "total": round(float(sum(f.mes_usd for f in filas)), 2),
+    }

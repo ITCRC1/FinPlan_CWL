@@ -791,6 +791,44 @@ export interface PlanillaPorCuentaEsc {
   montos: Record<string, number>;
   total: number;
 }
+// ── La planilla del mes, abierta por DEPARTAMENTO · CUENTA · POSICION ───────
+//
+// Owner, 2026-09-10: «la posición en las cuentas 6 es el tercer nivel», «eso
+// solo para actuales del mes», «y pones el nombre de la posición».
+//
+// Sale del BORRADOR del Pre-Cierre —lo último subido, sin pasar a Final—, que
+// es lo que significa «los actuales del mes» en esta pantalla. No es un total
+// nuevo: suma exactamente la planilla del nivel cuenta.
+export interface PlanillaPosicionFila {
+  dept_code: string; dept_name: string;
+  /** El departamento tal como viene de Integrity, antes de traducirlo. */
+  depto_integrity: string;
+  cuenta: string; cuenta_nombre: string;
+  posicion: string;
+  /** «SALARIES AND WAGES FRONT DESK AGENT» — el código `501` solo no dice nada. */
+  posicion_nombre: string;
+  cuenta_completa: string;
+  fila: number;
+  monto: number;
+}
+export interface PlanillaPorPosicion {
+  anio: number; mes: number; precierre_id: string | null;
+  subido?: string;
+  /** `false` = no hay borrador, o se subió antes de que esto existiera. La
+   *  pantalla lo dice en vez de mostrar una tabla vacía, que se leería como
+   *  «no hubo planilla». */
+  hay_detalle: boolean;
+  motivo: string;
+  filas: PlanillaPosicionFila[];
+  /** Lo calcula el backend. Sumar las filas dibujadas sería otra aritmética. */
+  total: number;
+}
+export async function getPlanillaPorPosicion(
+  anio: number, mes: number,
+): Promise<PlanillaPorPosicion> {
+  return api.get(`/precierre/planilla-por-posicion/${anio}/${mes}/`);
+}
+
 export async function getPlanillaPorCuenta(
   scenarioIds: string[], mes: number, horizonte: "month" | "ytd" | "full",
 ): Promise<{ cuentas: PlanillaCuenta[]; escenarios: PlanillaPorCuentaEsc[] }> {
