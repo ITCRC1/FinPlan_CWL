@@ -438,7 +438,12 @@ function Cambios({ datos, t }: {
           {t("cambios.tcCambio")}
         </p>
       )}
-      <p style={{ fontSize: 13, marginBottom: 14 }}>
+      {/* ⚠️ NO es un total contable. Es la suma cruda de los renglones
+          —ingresos y gastos juntos— y sirve para detectar que algo se movió,
+          nada más. El rótulo lo dice y la nota de abajo lo repite: un número
+          con pinta de resultado del mes, en una pantalla de cierre, se lee
+          como resultado del mes. */}
+      <p style={{ fontSize: 13, marginBottom: 2 }}>
         <strong>{t("cambios.totalMes")}:</strong>{" "}
         {datos.total_antes == null ? "" : usd(datos.total_antes)} →{" "}
         {datos.total_ahora == null ? "" : usd(datos.total_ahora)}
@@ -447,6 +452,9 @@ function Cambios({ datos, t }: {
             {"  ("}{datos.delta_total > 0 ? "+" : ""}{usd(datos.delta_total)}{")"}
           </span>
         )}
+      </p>
+      <p style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 14 }}>
+        {t("cambios.totalMesOjo")}
       </p>
 
       {nada && (

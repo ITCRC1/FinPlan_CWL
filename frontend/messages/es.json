@@ -4367,7 +4367,8 @@
       "antes": "Antes",
       "ahora": "Ahora",
       "delta": "Diferencia",
-      "totalMes": "Total del mes"
+      "totalMes": "Suma de todos los renglones",
+      "totalMesOjo": "Referencia para detectar cambios, NO un total del P&L: suma ingresos y gastos como si fueran lo mismo."
     },
     "final": {
       "titulo": "Pasar a Final",

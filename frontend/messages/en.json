@@ -4367,7 +4367,8 @@
       "antes": "Before",
       "ahora": "Now",
       "delta": "Difference",
-      "totalMes": "Month total"
+      "totalMes": "Sum of all rows",
+      "totalMesOjo": "A yardstick for spotting changes, NOT a P&L total: it adds revenue and expenses as if they were the same thing."
     },
     "final": {
       "titulo": "Pass to Final",
