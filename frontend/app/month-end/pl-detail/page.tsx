@@ -41,7 +41,7 @@ import { useSearchParams } from "next/navigation";
 
 import { getScenarios, getPLDetail, type Scenario, type PLDetail } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
-import { useEscenarioDe } from "@/lib/escenarioPreferido";
+import { elegir, useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
 import { bajarPLDetailExcel } from "@/lib/api";
 import Cierre from "./Cierre";
@@ -76,13 +76,36 @@ export default function PLDetailPage({ esPre = false }: { esPre?: boolean } = {}
   const [ambito, setAmbito] = useState<string>(
     AMBITOS.some(a => a.id === inicial) ? inicial : "consolidado");
   const [escenarios, setEscenarios] = useState<Scenario[]>([]);
+  /** En Pre-Closing el selector principal abre en el ESPEJO del Pre-Cierre.
+   *
+   * ⚠️ Memoizado: `useEscenarioDe` avisa que un `preferido` que cambia de
+   * identidad en cada render repite el efecto.
+   *
+   * Owner, 2026-09-10: «revisaste tab por tab que todos tengan sembrado las
+   * mismas versiones» — este era el unico que no. Abria en un BUDGET, con las
+   * tres ranuras de comparacion VACIAS. */
+  const preferido = useCallback(
+    (lista: Scenario[]) => esPre ? lista.find(x => x.es_precierre) : undefined,
+    [esPre]);
   const [scenarioId, setScenarioId] = useEscenarioDe(
-    "reports/pl-detail:budget", escenarios, "budget", undefined, true);
+    "reports/pl-detail:budget", escenarios, "budget", preferido, true);
   /** Hasta tres versiones mas. Owner, 2026-08-27: «tiene que haber al menos 2
    *  versiones mas —actual, budget, forecast, actual del año pasado— pero
    *  escogibles». Su cuadro de Full Year lleva exactamente cuatro columnas. */
   const [comparar, setComparar] = useState<string[]>(["", "", ""]);
   const cmp = useMemo(() => comparar.filter(Boolean), [comparar]);
+
+  /** Las tres ranuras de comparacion, con el MISMO orden que Pre-Closing:
+   *  Budget, Forecast, Actual del año pasado. Arrancaban vacias. */
+  useEffect(() => {
+    if (!esPre || !escenarios.length) return;
+    setComparar(v => v.some(Boolean) ? v : [
+      elegir(escenarios, "budget")?.id ?? "",
+      elegir(escenarios, "forecast")?.id ?? "",
+      escenarios.find(x => x.type === "ACTUAL" && !x.es_precierre
+        && x.year === (escenarios.find(y => y.es_precierre)?.year ?? 0) - 1)?.id ?? "",
+    ]);
+  }, [esPre, escenarios]);
   // ⚠️ En Pre-Closing arranca en MES, no en Full Year. Owner, 2026-09-10: «no
   // tienes que poner YTD ni Full Year, esto es solo para el mes». Un Full Year
   // que incluye un mes todavia en revision mezcla lo cerrado con lo que se
@@ -103,8 +126,10 @@ export default function PLDetailPage({ esPre = false }: { esPre?: boolean } = {}
   }, [sp]);
 
   useEffect(() => {
-    getScenarios(HOTEL_ID).then(setEscenarios).catch(() => setEscenarios([]));
-  }, []);
+    // ⚠️ Con `esPre` la lista INCLUYE el espejo del Pre-Cierre. Sin esto la
+    // pantalla no podia ni verlo: `/scenarios/` los excluye por defecto.
+    getScenarios(HOTEL_ID, esPre).then(setEscenarios).catch(() => setEscenarios([]));
+  }, [esPre]);
 
   const cargar = useCallback(async () => {
     if (!scenarioId) return;
