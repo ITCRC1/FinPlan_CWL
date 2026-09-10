@@ -148,10 +148,16 @@ async def crear(
         Precierre.mes == mes, Precierre.estado == "borrador"))).scalars().first()
     reemplazado = None
     if ya is not None:
-        ya.estado = "descartado"
         reemplazado = {"id": ya.id, "archivo": ya.archivo_nombre,
                        "subido_en": ya.creado_en.isoformat() if ya.creado_en else None}
-        await db.flush()
+    # ⚠️ **El borrador anterior NO se descarta todavía.** Antes se marcaba
+    # `descartado` con un `flush()` acá arriba, ANTES de leer el archivo — y
+    # `get_db()` no hace rollback al fallar. Si el archivo nuevo no se podía
+    # leer, la subida devolvía error y el mes se quedaba SIN borrador: el
+    # trabajo bueno se iba a la basura por un intento que nunca llegó a
+    # reemplazarlo. Pasó con el cierre de agosto 2026.
+    #
+    # Se descarta más abajo, recién cuando el archivo nuevo ya se leyó.
     vueltas = len((await db.execute(select(Precierre.id).where(
         Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
         Precierre.mes == mes))).all()) + 1
@@ -162,6 +168,11 @@ async def crear(
         leido = integrity_final.leer(data, tc, puente, grupo_de)
     except integrity_final.FormatoInesperado as e:
         raise ErrorApi(422, "precierre.formato", detalle=str(e))
+
+    # El archivo nuevo se leyó: ahora sí el anterior queda reemplazado.
+    if ya is not None:
+        ya.estado = "descartado"
+        await db.flush()
 
     # ── Los hallazgos DEL ARCHIVO se calculan ahora ─────────────────────────
     #
