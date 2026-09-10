@@ -64,8 +64,13 @@ const SEL: React.CSSProperties = {
  *  PRIMERO de ese tipo, y `GET /scenarios/` ordena por año descendente, así
  *  que el primer BUDGET de la lista es el Working **2035**. Cada sub-tab abría
  *  en un presupuesto real, vacío y de otro año — sin que nada fallara. */
-function primeroDe(escenarios: Scenario[], tipo: string): string {
-  const tres = sembrarTres(escenarios);
+function primeroDe(escenarios: Scenario[], tipo: string,
+                   /** Sembrar el espejo del Pre-Cierre en el papel de ACTUAL.
+                    *  Este sub-tab ignora `inicial` a proposito —ver el efecto
+                    *  de abajo— asi que sin esto abre en el Actual CERRADO
+                    *  aunque la pantalla este mirando el mes en revision. */
+                   espejo = false): string {
+  const tres = sembrarTres(escenarios, espejo);
   const id = tipo === "ACTUAL" ? tres.actual
     : tipo === "BUDGET" ? tres.budget
     : tipo === "FORECAST" ? tres.forecast : "";
@@ -212,9 +217,13 @@ function Tabla({ datos, columnas }: { datos: Datos; columnas: number[] }) {
   );
 }
 
-export default function ResumenDoceMeses({ escenarios, inicial }: {
+export default function ResumenDoceMeses({ escenarios, inicial,
+                                           esPre = false }: {
   escenarios: Scenario[];
   inicial?: string;
+  /** Pre-Closing: el panel de ACTUAL abre en el ESPEJO del
+   *  Pre-Cierre, no en el Actual cerrado. */
+  esPre?: boolean;
 }) {
   const [vActual, setVActual] = useState("");
   const [vBudget, setVBudget] = useState("");
@@ -225,9 +234,9 @@ export default function ResumenDoceMeses({ escenarios, inicial }: {
     // —la ranura 1 de la pantalla— queda de respaldo detrás de cada uno: casi
     // siempre trae el ACTUAL, y ponerlo primero abriría el Budget mostrando el
     // Actual, que es el defecto que ya se corrigió en el sub-tab de 12 meses.
-    setVActual(x => x || primeroDe(escenarios, "ACTUAL") || inicial || "");
+    setVActual(x => x || primeroDe(escenarios, "ACTUAL", esPre) || inicial || "");
     setVBudget(x => x || primeroDe(escenarios, "BUDGET") || inicial || "");
-  }, [escenarios, inicial]);
+  }, [escenarios, inicial, esPre]);
 
   const arriba = useResumen(vActual);
   const abajo = useResumen(vBudget);

@@ -70,7 +70,7 @@ const TD: React.CSSProperties = {
 };
 const TDL: React.CSSProperties = { padding: "3px 10px", fontSize: 12.5 };
 
-export default function PLDetailPage() {
+export default function PLDetailPage({ esPre = false }: { esPre?: boolean } = {}) {
   const sp = useSearchParams();
   const inicial = sp.get("ambito") || "consolidado";
   const [ambito, setAmbito] = useState<string>(
@@ -83,7 +83,11 @@ export default function PLDetailPage() {
    *  escogibles». Su cuadro de Full Year lleva exactamente cuatro columnas. */
   const [comparar, setComparar] = useState<string[]>(["", "", ""]);
   const cmp = useMemo(() => comparar.filter(Boolean), [comparar]);
-  const [horizonte, setHorizonte] = useState<Horizonte>("full");
+  // ⚠️ En Pre-Closing arranca en MES, no en Full Year. Owner, 2026-09-10: «no
+  // tienes que poner YTD ni Full Year, esto es solo para el mes». Un Full Year
+  // que incluye un mes todavia en revision mezcla lo cerrado con lo que se
+  // esta mirando.
+  const [horizonte, setHorizonte] = useState<Horizonte>(esPre ? "mes" : "full");
   /** «Cascada» es el reporte completo del libro; «Cierre» es el cuadro compacto
    *  que el owner usa cada mes, con los tres cortes lado a lado. */
   const [vista, setVista] = useState<"cascada" | "cierre">("cascada");
@@ -236,7 +240,7 @@ export default function PLDetailPage() {
 
         <nav aria-label="Corte" style={{ display: "inline-flex", borderRadius: 6,
              overflow: "hidden", border: "1px solid var(--border-medium)" }}>
-          {vista === "cierre" ? null : ([["mes", "Mes"], ["ytd", "YTD"], ["full", "Full Year"]] as const).map(
+          {vista === "cierre" || esPre ? null : ([["mes", "Mes"], ["ytd", "YTD"], ["full", "Full Year"]] as const).map(
             ([h, r], i) => (
               <button key={h} onClick={() => setHorizonte(h)}
                 style={{ ...btn(horizonte === h),

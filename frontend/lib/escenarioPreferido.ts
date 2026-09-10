@@ -34,6 +34,19 @@ export interface EscenarioMin {
   year: number;
   version: string;
   /**
+   * Espejo del borrador de Pre-Cierre (migración 140).
+   *
+   * ⚠️ **`elegir()` lo descarta SIEMPRE.** Un espejo es `type=ACTUAL` del
+   * mismo año que el de verdad, así que la regla generica podia devolver uno u
+   * otro segun el orden en que llegara la lista — y esa clase de resultado no
+   * se nota: sale un numero, y es el numero de un mes que todavia no esta
+   * cerrado. Quien quiera el espejo lo pide explicito con
+   * `sembrarTres(escenarios, true)`.
+   *
+   * Opcional porque no todos los endpoints la mandan.
+   */
+  es_precierre?: boolean;
+  /**
    * El forecast «Current»: el vivo, el que la base marca como vigente y al que
    * apuntan las cargas. Puede no venir según el endpoint, por eso es opcional.
    */
@@ -147,7 +160,9 @@ const norm = (v: string | undefined) => (v || "").trim().toLowerCase();
  */
 export function elegir<T extends EscenarioMin>(escenarios: T[], rol: Rol): T | undefined {
   const p = PREFERENCIA[rol];
-  const delTipo = escenarios.filter(e => e.type === p.type);
+  // ⚠️ Los espejos del Pre-Cierre quedan fuera de la regla generica. Ver
+  // `EscenarioMin.es_precierre`.
+  const delTipo = escenarios.filter(e => e.type === p.type && !e.es_precierre);
   if (!delTipo.length) return undefined;
 
   // El forecast «Current» le gana al año escrito: es el que la base marca como
@@ -367,11 +382,26 @@ export function useEscenarioDe<T extends EscenarioMin>(
  * caer en cualquier otro: una ranura vacía se ve vacía, y un escenario
  * equivocado se ve como un dato.
  */
-export function sembrarTres<T extends EscenarioMin>(escenarios: T[]): {
-  actual: string; budget: string; forecast: string;
-} {
+export function sembrarTres<T extends EscenarioMin>(
+  escenarios: T[],
+  /**
+   * Sembrar el ESPEJO del Pre-Cierre en el papel de «actual».
+   *
+   * Owner, 2026-09-10: *«necesito que siembres precierre como la primera
+   * opcion»* · *«todas sembradas en todos los tabs pero editables»*. Los
+   * sub-tabs que eligen su propia version —Auditoria, Doce Meses, Formato,
+   * Resumen 12— tienen que abrir en el mes que se esta revisando, no en el
+   * Actual cerrado.
+   *
+   * Si no hay espejo cae al ACTUAL de siempre: es mejor abrir en el cerrado
+   * que abrir en blanco.
+   */
+  preferirEspejo = false,
+): { actual: string; budget: string; forecast: string } {
+  const espejo = preferirEspejo
+    ? escenarios.find(e => e.es_precierre)?.id : undefined;
   return {
-    actual: elegir(escenarios, "actual")?.id ?? "",
+    actual: espejo ?? elegir(escenarios, "actual")?.id ?? "",
     budget: elegir(escenarios, "budget")?.id ?? "",
     forecast: elegir(escenarios, "forecast")?.id ?? "",
   };

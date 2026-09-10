@@ -604,21 +604,30 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
         // enero la pantalla cambiaba sola de escenarios sin que nadie tocara
         // nada, y el corte de un ciclo de planificacion lo decide el owner.
         if (esPre) {
-          // La comparacion que pidio el owner: el mes que se esta revisando,
-          // contra Forecast y Budget «principalmente», y el mismo mes del año
-          // pasado que «quizas sea tambien correcto».
+          // Owner, 2026-09-10: «necesito que siembres precierre como la primera
+          // opcion, sigue budget y despues forecast».
           //
-          // ⚠️ El espejo va PRIMERO y no se busca con `elegir()`: esa regla
-          // devuelve el ACTUAL preferido del año, que es el de verdad. Acá hace
-          // falta el espejo — el unico ACTUAL con `es_precierre`.
+          // El orden no es cosmetico: las columnas de variacion comparan las
+          // ranuras 1 y 2 por defecto (`varA=0`, `varB=1`), asi que con el
+          // espejo primero y el Budget segundo la pantalla abre mostrando
+          // justo lo que se pidio — «revisar solo mes rapido versus budget y
+          // forecast principalmente».
+          //
+          // ⚠️ El espejo no se busca con `elegir()`: esa regla devuelve el
+          // ACTUAL preferido del año, que es el de VERDAD. Aca hace falta el
+          // espejo — el unico ACTUAL con `es_precierre`.
           const espejo = all.find(sc => sc.es_precierre);
+          // El mismo mes del año pasado, que el owner marco como «quizas
+          // tambien correcto». Año exacto y sin aproximar: sembrar 2024 cuando
+          // se pidio 2025 seria una comparacion equivocada presentada como
+          // buena. Si no existe, la ranura queda vacia y se elige a mano.
           const actualPrevio = all.find(
             sc => sc.type === "ACTUAL" && !sc.es_precierre
                   && sc.year === (espejo?.year ?? year) - 1);
           setRanuras([
             espejo?.id ?? "",
-            elegir(all, "forecast")?.id ?? "",
             elegir(all, "budget")?.id ?? "",
+            elegir(all, "forecast")?.id ?? "",
             actualPrevio?.id ?? "",
           ]);
           return;
@@ -1044,11 +1053,22 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     return rev && x !== null ? x / rev : null;
   };
 
-  /** Los dos bloques del P&L Statement: el mes y el YTD. */
+  /** Los dos bloques del P&L Statement: el mes y el YTD.
+   *
+   * ⚠️ **En Pre-Closing queda SOLO el mes.** Owner, 2026-09-10: *«no tienes
+   * que poner YTD ni Full Year, esto es solo para el mes»*.
+   *
+   * Esconder el selector de horizonte no alcanzaba: los cuatro cuadros que
+   * arman `bloques` ignoran ese selector A PROPOSITO —su gracia es ver el mes
+   * y el YTD de un vistazo— asi que habia que sacarles el bloque.
+   *
+   * Y hay una razon de fondo: el acumulado de un mes que todavia no esta
+   * cerrado mezcla meses cerrados con uno que se esta revisando. Ese numero no
+   * es de nadie. En Cierre de Mes el YTD sigue entero, que es donde se usa. */
   const bloques = [
     { titulo: `${MESES[mes - 1]} ${year}`, h: "month" as const },
     { titulo: t("ytdA", { mes: MESES[mes - 1], year: String(year) }), h: "ytd" as const },
-  ];
+  ].filter(b => !esPre || b.h === "month");
 
   /** El cuadro del P&L Statement — lo usa la pantalla para su Excel y el Word
    *  para su capitulo. Uno solo, para que no puedan diferir. */
@@ -2383,7 +2403,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
         const bloques = [
           { titulo: `${MESES[mes - 1]} ${year}`, h: "month" as const },
           { titulo: t("ytdA", { mes: MESES[mes - 1], year: String(year) }), h: "ytd" as const },
-        ];
+        ].filter(b => !esPre || b.h === "month");
         const TH2: React.CSSProperties = { ...TH, fontSize: 12 };
         const BL = "2px solid var(--border-medium)";
 
@@ -2562,7 +2582,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
         const bloques = [
           { titulo: MESES[mes - 1] + " " + year, h: "month" as const },
           { titulo: t("ytdA", { mes: MESES[mes - 1], year: String(year) }), h: "ytd" as const },
-        ];
+        ].filter(b => !esPre || b.h === "month");
         const TH2: React.CSSProperties = { ...TH, fontSize: 12 };
         const BL = "2px solid var(--border-medium)";
 
@@ -3037,7 +3057,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
         const bloques = [
           { titulo: `${MESES[mes - 1]} ${year}`, h: "month" as const },
           { titulo: t("ytdA", { mes: MESES[mes - 1], year: String(year) }), h: "ytd" as const },
-        ];
+        ].filter(b => !esPre || b.h === "month");
 
         function bajarSummary() {
           bajarCuadros(`Summary_${MESES[mes - 1]}_${year}`, [cuadroSummary()])
@@ -3317,12 +3337,13 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
       })()}
 
       {vista === "doce" && (
-        <DoceMeses escenarios={escenarios} inicial={ranuras[0] || undefined}
+        <DoceMeses escenarios={escenarios} inicial={ranuras[0] || undefined} esPre={esPre}
                    compacto={compacto} />
       )}
 
       {vista === "resumen12" && (
-        <ResumenDoceMeses escenarios={escenarios} inicial={ranuras[0] || undefined} />
+        <ResumenDoceMeses escenarios={escenarios} inicial={ranuras[0] || undefined}
+                            esPre={esPre} />
       )}
 
       {vista === "formato" && (
@@ -3356,7 +3377,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
        * ese archivo advierte lo que cuesta— y además se comería el `COH_*` del
        * overhead, que es el error que ya dejó a Sistemas 937,33 corto.
        * Ver la nota `finplan-dos-vocabularios-de-linea`. */}
-      {vista === "utilidad" && <PLDetailEnCierre />}
+      {vista === "utilidad" && <PLDetailEnCierre esPre={esPre} />}
 
       {vista === "consulta" && (
         <div>

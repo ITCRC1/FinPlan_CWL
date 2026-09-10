@@ -71,8 +71,13 @@ const TDL: React.CSSProperties = { padding: "3px 10px", fontSize: 12 };
  *  PRIMERO de ese tipo, y `GET /scenarios/` ordena por año descendente, así
  *  que el primer BUDGET de la lista es el Working **2035**. Cada sub-tab abría
  *  en un presupuesto real, vacío y de otro año — sin que nada fallara. */
-function primeroDe(escenarios: Scenario[], tipo: string): string {
-  const tres = sembrarTres(escenarios);
+function primeroDe(escenarios: Scenario[], tipo: string,
+                   /** Sembrar el espejo del Pre-Cierre en el papel de ACTUAL.
+                    *  Este sub-tab ignora `inicial` a proposito —ver el efecto
+                    *  de abajo— asi que sin esto abre en el Actual CERRADO
+                    *  aunque la pantalla este mirando el mes en revision. */
+                   espejo = false): string {
+  const tres = sembrarTres(escenarios, espejo);
   const id = tipo === "ACTUAL" ? tres.actual
     : tipo === "BUDGET" ? tres.budget
     : tipo === "FORECAST" ? tres.forecast : "";
@@ -81,10 +86,14 @@ function primeroDe(escenarios: Scenario[], tipo: string): string {
   return id || escenarios.find(s => s.type === tipo)?.id || escenarios[0]?.id || "";
 }
 
-export default function DoceMeses({ escenarios, inicial, compacto = true }: {
+export default function DoceMeses({ escenarios, inicial, compacto = true,
+                                    esPre = false }: {
   escenarios: Scenario[];
   /** El escenario que la pantalla ya tenía elegido, para no arrancar en blanco. */
   inicial?: string;
+  /** Pre-Closing: el panel de ACTUAL abre en el ESPEJO del
+   *  Pre-Cierre, no en el Actual cerrado. */
+  esPre?: boolean;
   /** Esconder las líneas que están en cero los doce meses. Lo manda la pantalla,
    *  así el interruptor es uno solo para todos los sub-tabs. */
   compacto?: boolean;
@@ -109,9 +118,9 @@ export default function DoceMeses({ escenarios, inicial, compacto = true }: {
     // `inicial` es la ranura 1 de la pantalla, que casi siempre trae el ACTUAL:
     // el panel de Budget abria mostrando el Actual y habia que corregirlo a
     // mano cada vez. Se deja como respaldo, detras del BUDGET.
-    setVActual(x => x || primeroDe(escenarios, "ACTUAL"));
+    setVActual(x => x || primeroDe(escenarios, "ACTUAL", esPre));
     setVBudget(x => x || primeroDe(escenarios, "BUDGET") || inicial || "");
-  }, [escenarios, inicial]);
+  }, [escenarios, inicial, esPre]);
 
   const cargar = useCallback(async () => {
     if (!scenarioId) return;
