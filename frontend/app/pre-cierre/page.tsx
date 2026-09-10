@@ -124,6 +124,8 @@ export default function PreCierrePage() {
     }
   }
 
+  //: Qué le falta al formulario, en el orden en que se llena. `null` = listo.
+  const falta = !archivo ? t("faltaArchivo") : !tc ? t("faltaTc") : null;
   const criticos = hallazgos.filter(h => h.gravedad === "critico").length;
   const dl = id ? precierreExcelUrl(id) : null;
 
@@ -154,9 +156,21 @@ export default function PreCierrePage() {
             <input type="number" value={anio} onChange={e => setAnio(Number(e.target.value))}
                    style={{ ...input, width: 90 }} />
           </Campo>
-          <button onClick={subir} disabled={!archivo || !tc || subiendo} style={boton}>
+          {/* ⚠️ El botón DICE por qué no se puede, y se ve apagado.
+              Antes usaba `style={boton}` a secas: deshabilitado quedaba igual
+              de azul y con el cursor de mano, así que se clickeaba y no pasaba
+              nada. El tipo de cambio es el caso típico: su placeholder gris se
+              lee como un valor ya puesto. */}
+          <button onClick={subir} disabled={!!falta || subiendo}
+                  title={falta ?? undefined}
+                  style={{ ...boton, opacity: (falta || subiendo) ? 0.45 : 1,
+                           cursor: (falta || subiendo) ? "not-allowed" : "pointer" }}>
             {subiendo ? t("subiendo") : t("subir")}
           </button>
+          {falta && !subiendo && (
+            <span style={{ fontSize: 12, color: "var(--text-secondary)",
+                           alignSelf: "center" }}>{falta}</span>
+          )}
         </div>
         {lista.length > 0 && (
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>

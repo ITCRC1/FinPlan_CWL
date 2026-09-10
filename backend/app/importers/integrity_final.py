@@ -34,7 +34,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-#: El nombre de la hoja que entrega Integrity.
+#: El nombre con el que venía la hoja en el libro del owner. Es una
+#: PREFERENCIA, no un requisito: la hoja se elige por contenido en
+#: `_elegir_hoja()` — Integrity también la entrega como `Sheet1`.
 HOJA = "Final"
 
 #: Los encabezados que tiene que traer, y con los que se ubican las columnas.
@@ -172,6 +174,52 @@ def _parece_cuenta(v) -> bool:
     return partes[0].isdigit() and len(partes[0]) == 4 and all(p.isdigit() for p in partes[1:])
 
 
+def _tiene_encabezados(filas: list[tuple]) -> bool:
+    """¿Esta hoja trae la fila con «Mes Actual» y «Acumulado»?"""
+    for fila in filas:
+        textos = {_texto(v).lower() for v in fila}
+        if (ENCABEZADOS["mes"].lower() in textos
+                and ENCABEZADOS["acumulado"].lower() in textos):
+            return True
+    return False
+
+
+def _elegir_hoja(wb) -> tuple[str, list[tuple]]:
+    """Cuál de las hojas es el estado de resultados, y sus filas.
+
+    ⚠️ **No se elige por nombre.** El módulo nació exigiendo que se llamara
+    «Final», que es como venía el libro del owner. Pero Integrity la entrega
+    como `Sheet1` —y cualquier «Guardar como» de Excel también—, así que el
+    nombre no identifica nada: es el rótulo que quedó, no un dato del formato.
+
+    Se elige igual que la fila de encabezados y la columna de cuenta: **por
+    contenido**. La hoja del estado de resultados es la que trae «Mes Actual» y
+    «Acumulado» juntos. `Final` se prueba primero por si el libro trae varias
+    hojas con forma parecida y una es la buena de siempre.
+    """
+    orden = ([HOJA] if HOJA in wb.sheetnames else []) +             [n for n in wb.sheetnames if n != HOJA]
+    #: La que tiene encabezados PERO ninguna cuenta. Se guarda como segunda
+    #: opción: si al final no hay ninguna completa, devolverla deja que
+    #: `ubicar_encabezados` explique con precisión qué le falta, en vez de un
+    #: «ninguna hoja sirve» que no ayuda a nadie.
+    a_medias = None
+    for nombre in orden:
+        filas = list(wb[nombre].iter_rows(values_only=True))
+        if not _tiene_encabezados(filas):
+            continue
+        if any(_parece_cuenta(v) for f in filas for v in f):
+            return nombre, filas
+        if a_medias is None:
+            a_medias = (nombre, filas)
+    if a_medias is not None:
+        return a_medias
+    raise FormatoInesperado(
+        f"Ninguna hoja del libro trae «{ENCABEZADOS['mes']}» y "
+        f"«{ENCABEZADOS['acumulado']}» en la misma fila. "
+        f"Hojas: {', '.join(wb.sheetnames)}. "
+        f"¿Es el estado de resultados de Integrity?")
+
+
 def ubicar_encabezados(filas: list[tuple]) -> dict:
     """Dónde están las columnas, buscadas POR TEXTO.
 
@@ -205,7 +253,7 @@ def ubicar_encabezados(filas: list[tuple]) -> dict:
                 "acumulado": col_acum,
                 "descripcion": textos.get(ENCABEZADOS["descripcion"].lower())}
     raise FormatoInesperado(
-        f"La hoja «{HOJA}» no trae una fila con «{ENCABEZADOS['mes']}» y "
+        f"La hoja no trae una fila con «{ENCABEZADOS['mes']}» y "
         f"«{ENCABEZADOS['acumulado']}». ¿Es el estado de resultados de Integrity?")
 
 
@@ -305,16 +353,50 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
             "subdetalle": {k: v / tc for k, v in subdetalle.items()}}
 
 
+#: Firma de los `.xls` viejos (OLE2). No son ZIP, y `openpyxl` sólo lee ZIP.
+FIRMA_XLS_VIEJO = bytes.fromhex("d0cf11e0a1b11ae1")
+#: Firma de cualquier ZIP — y por lo tanto de un `.xlsx` sano.
+FIRMA_ZIP = b"PK"
+
+
+def _por_que_no_abrio(data: bytes) -> str:
+    """Por qué `openpyxl` no pudo abrirlo, dicho para quien subió el archivo.
+
+    Se mira la firma en vez del nombre: el nombre lo elige la persona y miente
+    —renombrar un `.xls` a `.xlsx` no lo convierte—, los primeros bytes no.
+    """
+    if data[:8] == FIRMA_XLS_VIEJO:
+        return ("El archivo está en el formato viejo de Excel (.xls) y este "
+                "lector sólo abre .xlsx. Abrilo en Excel y guardalo con "
+                "«Guardar como → Libro de Excel (*.xlsx)». Renombrar la "
+                "extensión no alcanza: es otro formato por dentro.")
+    if data[:2] != FIRMA_ZIP:
+        return ("El archivo no es un libro de Excel: no empieza como un .xlsx "
+                "ni como un .xls. Puede ser un CSV, un PDF o una descarga "
+                "incompleta.")
+    return ("El archivo dice ser .xlsx pero no se pudo abrir. Suele ser una "
+            "descarga cortada: bajalo de nuevo de Integrity y reintentá.")
+
+
 def leer(data: bytes, tc, puente: dict, grupo_de=None) -> dict:
     """El archivo crudo de Integrity → filas traducidas. Es la puerta del módulo."""
     import io as _io
     import openpyxl
     if tc is None:
         raise ValueError("El tipo de cambio es obligatorio: no se deduce del archivo.")
-    wb = openpyxl.load_workbook(_io.BytesIO(data), read_only=True, data_only=True)
-    if HOJA not in wb.sheetnames:
-        raise FormatoInesperado(
-            f"El archivo no trae la hoja «{HOJA}». Trae: {', '.join(wb.sheetnames)}.")
-    filas = list(wb[HOJA].iter_rows(values_only=True))
+    try:
+        wb = openpyxl.load_workbook(_io.BytesIO(data), read_only=True,
+                                    data_only=True)
+    except FormatoInesperado:
+        raise
+    except Exception as e:
+        # ⚠️ **Sin este try el 500 llega al navegador como «Failed to fetch».**
+        # Cuando la excepción sube sin manejar, la respuesta se corta y el
+        # browser no ve cabeceras CORS: reporta un fallo de red, no el 500. El
+        # usuario ve un error que no dice nada y no tiene forma de saber que el
+        # problema es su archivo. Pasó con un `.xls` de agosto 2026.
+        raise FormatoInesperado(_por_que_no_abrio(data)) from e
+    nombre_hoja, filas = _elegir_hoja(wb)
     cols = ubicar_encabezados(filas)
-    return {**mapear_filas(filas, cols, tc, puente, grupo_de), "columnas": cols}
+    return {**mapear_filas(filas, cols, tc, puente, grupo_de),
+            "columnas": cols, "hoja": nombre_hoja}

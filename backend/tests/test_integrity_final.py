@@ -333,3 +333,95 @@ def test_un_depto_sin_mapeo_se_reporta_con_su_monto(mapd):
     faltan = {x["depto"] for x in r["sin_mapeo"]}
     assert "0110" in faltan
     assert any(x["mes_usd"] != 0 for x in r["sin_mapeo"] if x["depto"] == "0110")
+
+
+# ─── El archivo real no siempre viene como el libro del owner ─────────────────
+#
+# Todo lo de acá salió de subir el cierre de agosto 2026 por la pantalla: cada
+# caso es un error que el usuario vio en pantalla, no uno imaginado.
+
+def _libro(hojas: dict[str, list[list]]) -> bytes:
+    """Un .xlsx armado a mano. `hojas` = {nombre: filas}."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    for nombre, filas in hojas.items():
+        ws = wb.create_sheet(nombre)
+        for f in filas:
+            ws.append(f)
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()
+
+
+CAB = ["Cuenta", "Descripción", "Mes Actual", "Acumulado"]
+FILAS_OK = [["4000-0110", "Habitaciones", "1,000.00", "-5,000.00"]]
+PUENTE_MIN = {"0110": {"nombre_integrity": "Hab", "destino_finplan": "0110"}}
+
+
+def test_un_xls_viejo_dice_que_hacer_en_vez_de_reventar():
+    """⚠️ Sin esto el 500 llega al navegador como «Failed to fetch».
+
+    `openpyxl` sólo abre ZIP; un `.xls` es OLE2 y tira `BadZipFile`. Al subir
+    sin manejar, la respuesta se corta y el browser no ve cabeceras CORS:
+    reporta un fallo de red y el usuario no tiene forma de saber que el
+    problema es su archivo. Pasó con el cierre de agosto 2026.
+    """
+    xls = bytes.fromhex("d0cf11e0a1b11ae1") + b"\x00" * 600
+    with pytest.raises(m.FormatoInesperado) as e:
+        m.leer(xls, TC_JULIO, PUENTE_MIN)
+    assert ".xls" in str(e.value) and ".xlsx" in str(e.value)
+
+
+def test_lo_que_no_es_un_libro_se_distingue_de_uno_cortado():
+    """Un PDF y un .xlsx truncado no se arreglan igual: hay que decir cuál es."""
+    with pytest.raises(m.FormatoInesperado) as pdf:
+        m.leer(b"%PDF-1.7" + b"\x00" * 600, TC_JULIO, PUENTE_MIN)
+    assert "no es un libro de Excel" in str(pdf.value)
+
+    with pytest.raises(m.FormatoInesperado) as cortado:
+        m.leer(b"PK\x03\x04" + b"\x00" * 40, TC_JULIO, PUENTE_MIN)
+    assert "descarga cortada" in str(cortado.value)
+
+
+def test_la_hoja_se_elige_por_contenido_y_no_por_nombre():
+    """Integrity la entrega como `Sheet1`, no como `Final`.
+
+    Exigir el nombre dejaba el mes afuera con «El archivo no trae la hoja
+    Final» — un error que sólo se resuelve renombrando a mano una hoja que
+    siempre se va a llamar igual.
+    """
+    r = m.leer(_libro({"Sheet1": [CAB] + FILAS_OK}), TC_JULIO, PUENTE_MIN)
+    assert r["hoja"] == "Sheet1"
+    assert len(r["filas"]) == 1
+
+
+def test_la_cola_de_filas_vacias_no_molesta():
+    """El archivo baja con centenares de filas vacías debajo del último dato."""
+    hoja = [CAB] + FILAS_OK + [[None, None, None, None]] * 200
+    r = m.leer(_libro({"Sheet1": hoja}), TC_JULIO, PUENTE_MIN)
+    assert len(r["filas"]) == 1
+    assert r["sin_cuenta"] == []      # vacío no es «fila sin cuenta»
+
+
+def test_se_saltan_las_hojas_vacias_y_las_de_resumen():
+    """La hoja buena es la que trae encabezados Y cuentas, esté donde esté."""
+    libro = {"Sheet1": [[None] * 4] * 30,        # vacía
+             "Resumen": [CAB],                    # encabezados, cero cuentas
+             "Detalle": [CAB] + FILAS_OK}         # la buena
+    assert m.leer(_libro(libro), TC_JULIO, PUENTE_MIN)["hoja"] == "Detalle"
+
+
+def test_final_se_prefiere_cuando_existe():
+    """Compatibilidad con el libro del owner: si está, manda."""
+    libro = {"Sheet1": [CAB] + FILAS_OK,
+             "Final": [CAB] + [["4000-0120", "F&B", "9.00", "-9.00"]]}
+    r = m.leer(_libro(libro), TC_JULIO, {})
+    assert r["hoja"] == "Final"
+    assert r["filas"][0]["cuenta"] == "4000-0120"
+
+
+def test_un_libro_entero_vacio_da_un_error_legible():
+    with pytest.raises(m.FormatoInesperado) as e:
+        m.leer(_libro({"Sheet1": [[None] * 4] * 20}), TC_JULIO, PUENTE_MIN)
+    assert "Ninguna hoja" in str(e.value)

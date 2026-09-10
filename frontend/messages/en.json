@@ -4326,6 +4326,8 @@
     "anio": "Year",
     "subir": "Upload and review",
     "subiendo": "Reading…",
+    "faltaArchivo": "Choose the Integrity file (.xlsx)",
+    "faltaTc": "Enter the exchange rate for the month",
     "cargado": "Loaded: {filas} rows translated.",
     "vueltaN": "Round {n}. Replaces “{archivo}”.",
     "todaviaNoEsta": "This is NOT in the system yet. No report reads it until you pass it to Final.",

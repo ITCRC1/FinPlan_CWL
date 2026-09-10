@@ -4326,6 +4326,8 @@
     "anio": "Año",
     "subir": "Subir y revisar",
     "subiendo": "Leyendo…",
+    "faltaArchivo": "Elegí el archivo de Integrity (.xlsx)",
+    "faltaTc": "Escribí el tipo de cambio del mes",
     "cargado": "Cargado: {filas} filas traducidas.",
     "vueltaN": "Vuelta {n}. Reemplaza a «{archivo}».",
     "todaviaNoEsta": "Esto todavía NO está en el sistema. Ningún reporte lo lee hasta que lo pases a Final.",
