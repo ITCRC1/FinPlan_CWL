@@ -119,8 +119,14 @@ def test_la_exclusion_es_solo_del_gasto_no_del_ingreso():
     puesto el INGRESO de la lavanderia: la venta del año bajaba 3,450 sin que
     nada lo dijera. El filtro tiene que mirar la clase primero."""
     src = io.open(RAIZ / "app" / "api" / "gasto_por_clase_api.py", encoding="utf-8").read()
-    assert 'cuenta[:1] in ("5", "6", "7") and dept in EXCLUIR_DE_GASTO' in src, (
+    # El conjunto se llama `excluir` desde el 2026-09-10 —lo decide el escenario,
+    # porque en el Pre-Cierre el allocation SI se ve (ver `_excluidos`)—, pero lo
+    # que esta prueba vigila no cambio: la clase de cuenta se mira PRIMERO.
+    assert 'cuenta[:1] in ("5", "6", "7") and dept in excluir' in src, (
         "el filtro de pozos de reparto dejo de mirar la clase de cuenta"
+    )
+    assert "excluir = _excluidos(escenario)" in src, (
+        "el conjunto a excluir dejo de depender del escenario"
     )
 
 

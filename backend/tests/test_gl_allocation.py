@@ -137,3 +137,25 @@ def test_el_modo_overhead_no_se_puede_pedir_desde_afuera():
     assert "parse_gl_detail(data, en_overhead=allocation_en_overhead(forced))" in src
     assert "en_overhead: bool = Query" not in src
     assert "en_overhead=True" not in src   # nadie lo fija a mano
+
+
+def test_el_gasto_por_clase_tambien_ve_el_allocation_en_precierre():
+    """Los dos caminos del GOP tienen que ver lo MISMO.
+
+    Owner, 2026-09-10: *«debe verlos como overhead los allocations»*. El cuadro
+    calcula el GOP por NATURALEZA (ingreso menos clases 5/6/7) y el motor por
+    DEPARTAMENTO. Desde que el espejo trae el gasto de allocation, el motor lo
+    veia y `gasto-por-clase` no: US$40.700,88 de agosto 2026 de descuadre entre
+    dos numeros que son el mismo, avisado en un banner que aparecia por diseno.
+    """
+    from app.api.gasto_por_clase_api import _excluidos, EXCLUIR_DE_GASTO
+
+    class _Esc:
+        def __init__(self, es_precierre):
+            self.es_precierre = es_precierre
+
+    assert _excluidos(_Esc(True)) == set()          # Pre-Cierre: los ve
+    assert _excluidos(_Esc(False)) == EXCLUIR_DE_GASTO
+    assert _excluidos(None) == EXCLUIR_DE_GASTO     # sin escenario, la regla de siempre
+    # Y la regla de siempre sigue siendo la de siempre.
+    assert EXCLUIR_DE_GASTO == {"0220", "0161", "0162"}

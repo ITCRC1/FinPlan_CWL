@@ -39,6 +39,7 @@ from app.engine import recalculate as recalc
 from app.models.actual_entry import ActualEntry
 from app.models.belowgop_account_entry import BelowGopAccountEntry
 from app.models.scenario import Scenario
+from app.importers.gl_detail_importer import allocation_en_overhead
 
 router = APIRouter()
 
@@ -89,6 +90,28 @@ FUSION_INGRESO = {"0161": "0162"}
 # (`pl_engine.ACTUAL_EXCLUDED_DEPTS`).
 EXCLUIR_DE_GASTO = {"0220", "0161", "0162"}
 
+
+def _excluidos(escenario) -> set[str]:
+    """Qué departamentos NO entran al gasto, para ESTE escenario.
+
+    En el PRE-CIERRE entran todos. Owner, 2026-09-10: *«debe verlos como
+    overhead los allocations»*.
+
+    Este cuadro calcula el GOP por NATURALEZA —ingreso menos las clases
+    5/6/7— y el motor lo calcula por DEPARTAMENTO. Tienen que dar lo mismo.
+    Desde que el espejo del Pre-Cierre trae el gasto de allocation (ver
+    `allocation_en_overhead`), el motor lo veía y este camino no: US$40.700,88
+    de agosto 2026 de diferencia entre dos números que son el mismo.
+
+    Un aviso de descuadre que aparece por diseño enseña a ignorarlo, y el día
+    que tenga razón nadie lo va a mirar.
+
+    Fuera del Pre-Cierre no cambia nada: en el P&L de verdad el reparto ya
+    viajó dentro de los departamentos que lo consumen, y mostrarlo aparte lo
+    contaría dos veces (ver el comentario de arriba).
+    """
+    return set() if allocation_en_overhead(escenario) else EXCLUIR_DE_GASTO
+
 # El nombre de cada clase, tal como lo escribe el owner en su cuadro.
 CLASES = {
     "payroll": "Total Payroll and Benefits",   # 6xxx
@@ -117,9 +140,11 @@ def _suma(destino: dict, clase: str, clave: str, mes: int, monto):
     serie[mes - 1] += float(monto)
 
 
-async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> list[dict]:
+async def _por_mes(session, scenario_id: str, detalle: dict | None = None,
+                   escenario=None) -> list[dict]:
     """Los cuatro totales, mes por mes. Si se pasa `detalle`, lo llena con la
     apertura por departamento (y por cuenta, para la clase 8)."""
+    excluir = _excluidos(escenario)
     filas = []
 
     # Clase 8 del presupuesto: vive en su propio checkbook, con la cuenta en la
@@ -167,7 +192,7 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
                 # ⚠️ Solo del GASTO. La primera version cortaba antes de mirar la
                 # clase y se llevaba puesto el INGRESO de la lavanderia: la venta
                 # del año bajaba 3,450 sin que nada lo dijera.
-                if cuenta[:1] in ("5", "6", "7") and dept in EXCLUIR_DE_GASTO:
+                if cuenta[:1] in ("5", "6", "7") and dept in excluir:
                     continue
                 if cuenta.startswith("5"):
                     cost += monto
@@ -190,9 +215,9 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None) -> li
             pbd = await recalc.payroll_by_dept(session, scenario_id, m)
             cbd = await recalc.cos_by_dept(session, scenario_id, m)
             obd = await recalc.opex_by_dept(session, scenario_id, m)
-            pbd = {d: v for d, v in pbd.items() if d not in EXCLUIR_DE_GASTO}
-            cbd = {d: v for d, v in cbd.items() if d not in EXCLUIR_DE_GASTO}
-            obd = {d: v for d, v in obd.items() if d not in EXCLUIR_DE_GASTO}
+            pbd = {d: v for d, v in pbd.items() if d not in excluir}
+            cbd = {d: v for d, v in cbd.items() if d not in excluir}
+            obd = {d: v for d, v in obd.items() if d not in excluir}
             payroll = sum(pbd.values(), ZERO)
             cost = sum(cbd.values(), ZERO)
             opex = sum(obd.values(), ZERO)
@@ -238,7 +263,7 @@ async def gasto_por_clase(
             if e is None:
                 continue   # un id que ya no existe no tumba la comparacion
             det: dict = {} if detalle else None
-            meses = await _por_mes(s, sid, det)
+            meses = await _por_mes(s, sid, det, escenario=e)
             salida.append({
                 "scenario_id": sid, "type": e.type,
                 "version": e.version, "year": e.year,
