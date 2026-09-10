@@ -325,6 +325,7 @@ export interface Scenario {
    *  ⚠️ No deducirlo del nombre. Estuvo escrito tres veces, cada una con su
    *  regex de subcadena, y por eso un `Working-VIEJO` quedaba imborrable. */
   protected?: boolean;
+  es_precierre?: boolean;
 }
 
 // ── Scenario data operations (planning) ───────────────────────────────────────
@@ -342,9 +343,16 @@ export async function recalculateScenario(scenarioId: string) {
   }>(`/pl/${scenarioId}/recalculate/`);
 }
 
-export async function getScenarios(hotelId: string): Promise<Scenario[]> {
-  // Backend serves all scenarios at /scenarios/; filter to this hotel.
-  const all = await api.get<Scenario[]>(`/scenarios/`);
+export async function getScenarios(
+  hotelId: string,
+  // ⚠️ Los espejos del Pre-Cierre NO salen por defecto. Un espejo es un ACTUAL
+  // del mismo año que el de verdad: si apareciera en los selectores, cada
+  // pantalla ofreceria dos versiones del mismo mes. Solo Pre-Closing lo pide.
+  // Ver migracion 140.
+  incluirPrecierre = false,
+): Promise<Scenario[]> {
+  const q = incluirPrecierre ? "?incluir_precierre=true" : "";
+  const all = await api.get<Scenario[]>(`/scenarios/${q}`);
   return all.filter(s => s.hotel_id === hotelId);
 }
 

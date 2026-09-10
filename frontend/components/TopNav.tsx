@@ -169,6 +169,15 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    // Tab de link directo, como el Dashboard: es UNA pantalla, no un menu con
+    // una sola opcion adentro.
+    //
+    // Va ANTES de Cierre de Mes porque es el paso que lo precede: se sube el
+    // mes en Escenarios → Pre-Cierre, se revisa aca en los 19 sub-tabs, y
+    // recien despues se cierra.
+    key: "preClosing", href: "/pre-closing", items: [],
+  },
+  {
     // Cierre de mes. Es su propio menu y no un item dentro de Reports porque va
     // a crecer: el owner ya adelanto que le va a colgar mas pantallas.
     key: "monthEnd",

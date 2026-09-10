@@ -289,9 +289,17 @@ async def list_scenarios(
     hotel_id: Optional[str] = Query(None),
     year: Optional[int] = Query(None),
     type: Optional[str] = Query(None),
+    # ⚠️ **Los espejos del Pre-Cierre se excluyen POR DEFECTO.** Un espejo es un
+    # ACTUAL del mismo año que el de verdad; si apareciera en los selectores,
+    # cada pantalla de la app ofreceria dos versiones del mismo mes y la
+    # pregunta «¿cual es el bueno?» no tendria respuesta. Solo Pre-Closing pide
+    # `incluir_precierre=true`. Ver migracion 140.
+    incluir_precierre: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Scenario).order_by(Scenario.year.desc(), Scenario.created_at.desc())
+    if not incluir_precierre:
+        stmt = stmt.where(Scenario.es_precierre.is_(False))
     if hotel_id:
         stmt = stmt.where(Scenario.hotel_id == hotel_id)
     if year:

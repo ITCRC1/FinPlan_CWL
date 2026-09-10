@@ -112,6 +112,82 @@ async def _filas(db: AsyncSession, precierre_id: str) -> list[dict]:
 
 # ─── Subir ────────────────────────────────────────────────────────────────────
 
+# ─── El espejo que hace legible el borrador ───────────────────────────────────
+#
+# Owner, 2026-09-10: los 19 sub-tabs del cierre tienen que poder mirar el mes
+# que se está revisando, sin pasarlo a Final.
+#
+# ⚠️ **No se toca ninguno de los ocho cargadores del P&L.** Cada uno consulta
+# por `scenario_id` en sus propias tablas y no hay punto único donde
+# interceptar; enseñarles una fuente nueva son ocho reescrituras y ocho
+# oportunidades de que el mismo mes dé un número distinto según el sub-tab.
+# El borrador se materializa en un escenario y los ocho lo leen sin saberlo.
+#
+# Ver migración 140 para el porqué de la bandera y sus tres límites.
+
+#: La versión del espejo. Es un nombre y no un id: se busca por
+#: (hotel, año, es_precierre), y esto es lo que se lee en pantalla.
+VERSION_ESPEJO = "Pre-Cierre"
+
+
+async def _espejo(db: AsyncSession, anio: int) -> Scenario:
+    """El escenario espejo de este año. Se crea la primera vez y se reusa.
+
+    **Uno por año, no uno por vuelta.** El owner avisó que «seguro se suban
+    varias antes de llegar a final»: con uno por vuelta, a la quinta habría
+    cinco ACTUAL del mismo año y Pre-Closing tendría que adivinar cuál mirar.
+    Con uno solo, la última subida sobreescribe el mes y no hay nada que
+    elegir.
+    """
+    esp = (await db.execute(select(Scenario).where(
+        Scenario.hotel_id == HOTEL_ID, Scenario.year == anio,
+        Scenario.es_precierre.is_(True)))).scalars().first()
+    if esp is not None:
+        return esp
+    esp = Scenario(hotel_id=HOTEL_ID, year=anio, type="ACTUAL",
+                   version=VERSION_ESPEJO, status="draft",
+                   es_precierre=True, source_mode="imported",
+                   source_file="pre-cierre", created_by="sistema")
+    db.add(esp)
+    await db.flush()
+    return esp
+
+
+async def _reflejar(db: AsyncSession, pc: Precierre, idioma: str) -> dict:
+    """Escribe el mes del borrador en el espejo, por la puerta de siempre.
+
+    Usa `_plantilla_para_importar` + `import_gl_detail`, igual que
+    `pasar-a-final`. No hay un segundo camino de escritura: es el mismo, con
+    otro destino.
+
+    ⚠️ **Un espejo roto no puede tumbar una subida que funcionó.** El borrador
+    es la fuente de verdad y ya está guardado; si esto falla, se devuelve el
+    error en la respuesta y la revisión sigue disponible en su propia pantalla.
+    """
+    from app.api.scenarios_api import import_gl_detail
+
+    esp = await _espejo(db, pc.anio)
+    datos = await _plantilla_para_importar(db, pc)
+
+    class _Archivo:
+        filename = f"precierre_espejo_{pc.anio}_{pc.mes:02d}.xlsx"
+
+        async def read(self):
+            return datos
+
+    # `mes_de_cierre` recorta al mes del borrador: un espejo de agosto no puede
+    # tocar julio. `merge=True` deja los otros meses como estaban.
+    # `confirmar_diferencias=True` a propósito: el espejo es para MIRAR, y un
+    # mes que todavía no cuadra es justamente el que hay que poder mirar. El
+    # bloqueo por cuadre sigue vivo donde importa, en `pasar-a-final`.
+    resultado = await import_gl_detail(
+        file=_Archivo(), dry_run=False, merge=True, scenario_id=esp.id,
+        confirmar_diferencias=True, mes_de_cierre=pc.mes, db=db, idioma=idioma)
+    bloques = resultado.get("blocks") or resultado.get("results") or []
+    return {"escenario_id": esp.id, "version": esp.version,
+            "escrito": bool(any(b.get("matched") for b in bloques))}
+
+
 @router.post("/precierre/", dependencies=[Depends(registro_de_subida)])
 async def crear(
     file: UploadFile = File(...),
@@ -222,8 +298,18 @@ async def crear(
             mes_usd=f["mes_usd"], acumulado_usd=f["acumulado_usd"]))
     await db.commit()
 
+    # El espejo, para que los 19 sub-tabs puedan mirar este mes sin pasarlo a
+    # Final. Si falla, la subida ya está: se dice y se sigue.
+    espejo: dict = {"escrito": False, "error": None}
+    try:
+        espejo = await _reflejar(db, pc, idioma)
+        await db.commit()
+    except Exception as e:            # noqa: BLE001 — ver docstring de _reflejar
+        await db.rollback()
+        espejo = {"escrito": False, "error": str(e)[:300]}
+
     return {"id": pc.id, "anio": anio, "mes": mes, "tc": float(tc),
-            "filas": len(leido["filas"]),
+            "filas": len(leido["filas"]), "espejo": espejo,
             # A cuál reemplazó y cuántas vueltas lleva el mes. Reemplazar sin
             # decirlo sería pisar en silencio; decirlo lo vuelve historia.
             "reemplaza_a": reemplazado, "vuelta": vueltas,

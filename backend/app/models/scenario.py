@@ -50,6 +50,16 @@ class Scenario(Base):
     # (the revenue engine); 'checkbook' = read direct USD amounts from RevenueEntry
     # (KPIs come from ScenarioStat). Default keeps existing scenarios on drivers.
     revenue_source: Mapped[str] = mapped_column(String(12), default="drivers")
+    #: Espejo del borrador de Pre-Cierre — ver migración 140.
+    #:
+    #: ⚠️ **No aparece en ningún selector de escenario.** `/api/scenarios/` lo
+    #: excluye salvo que se pida `incluir_precierre=true`, y sólo Pre-Closing lo
+    #: pide. Existe para que los ocho cargadores del P&L puedan leer el mes que
+    #: se está revisando sin que ninguno sepa que es un pre-cierre.
+    #:
+    #: Uno por hotel y año, sobreescrito en cada subida. Nunca se promueve a
+    #: ACTUAL: «Pasar a Final» escribe el de siempre.
+    es_precierre: Mapped[bool] = mapped_column(Boolean, default=False)
     source_file: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_by: Mapped[str] = mapped_column(String(100), default="")

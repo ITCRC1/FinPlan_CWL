@@ -25,6 +25,47 @@ def _leer(*partes) -> str:
     return io.open(os.path.join(RAIZ, *partes), encoding="utf-8").read()
 
 
+def _con_envoltorio(src: str, ruta: str) -> str:
+    """El fuente de la pantalla, siguiendo UN envoltorio si lo hay.
+
+    ⚠️ Este guard exigía los strings en `page.tsx`, y eso dejó de significar
+    «la pantalla monta la barra» el día que dos rutas empezaron a compartir una
+    pantalla: `/month-end/pl` y `/pre-closing` son la misma
+    `month-end/pl/Pantalla.tsx` con distinto `modo`, y sus `page.tsx` son tres
+    líneas que la renderizan. La barra está — en el archivo de al lado.
+
+    Se sigue **un solo** nivel y sólo por import relativo. Encadenar
+    envoltorios volvería a permitir esconder una pantalla sin barra detrás de
+    dos saltos, que es justo lo que este guard existe para atrapar.
+    """
+    if "<IrA " in src:
+        return src
+    relativo = ""
+    for linea in src.splitlines():
+        linea = linea.strip()
+        if linea.startswith("import ") and 'from "./' in linea:
+            relativo = linea.split('from "')[1].split('"')[0]
+            break
+    if not relativo:
+        return src
+    partes: list[str] = ruta.strip("/").split("/") + relativo.split("/")
+    limpio: list[str] = []
+    for parte in partes:
+        if parte in (".", ""):
+            continue
+        if parte == "..":
+            if limpio:
+                limpio.pop()
+            continue
+        limpio.append(parte)
+    for ext in (".tsx", ".ts"):
+        try:
+            return src + _leer("app", *limpio[:-1], limpio[-1] + ext)
+        except OSError:
+            continue
+    return src
+
+
 def _rutas() -> str:
     return _leer("lib", "rutas.ts")
 
@@ -204,7 +245,8 @@ def test_toda_pantalla_del_grafo_muestra_la_barra():
     origenes = {o for o, _, _, _ in _destinos()} - SIN_BARRA
     assert len(origenes) >= 30, f"el grafo encogió: {len(origenes)} orígenes"
     for r in sorted(origenes):
-        src = _leer("app", *r.strip("/").split("/"), "page.tsx")
+        src = _con_envoltorio(
+            _leer("app", *r.strip("/").split("/"), "page.tsx"), r)
         # Una barra sin escenario es válida: `/revenue/inventory`,
         # `/revenue/availability` y `/revenue/room-nights` son dato del HOTEL,
         # no de un escenario, así que no tienen ninguno que pasarle.
