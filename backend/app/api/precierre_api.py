@@ -26,6 +26,8 @@ habría dos versiones del mismo mes conviviendo.
 """
 from __future__ import annotations
 
+import pathlib
+import functools
 import hashlib
 import io
 import json
@@ -786,6 +788,54 @@ async def descartar(precierre_id: str, db: AsyncSession = Depends(get_db),
 # por orden: una ruta `/precierre/planilla-por-posicion/` habría entrado por
 # ahí con `precierre_id="planilla-por-posicion"` y contestado 404 sin que nada
 # dijera por qué.
+#: Los conceptos de nómina, tal como los escribe Integrity al principio de la
+#: descripción. No es una lista de adorno: es lo que hay que quitar para que
+#: quede el nombre del puesto. Integrity escribe el mismo concepto de varias
+#: formas —«SALARIES AND WAGES» y «SALARY AND WAGES»—, así que no se puede
+#: deducir de un prefijo común: se declara.
+_CONCEPTOS_AL_FRENTE = (
+    "SALARIES AND WAGES", "SALARY AND WAGES", "WAGES AND SALARIES",
+    "OVERTIME", "DAYS OFF LAB", "DAY OFF", "WORKED HOLIDAYS", "DISABILITIES",
+    "COMMISSIONS", "CCSS", "SOCIAL SECURITY", "13TH SALARY", "AGUINALDO",
+    "OCCUPATIONAL HAZARDS", "OCCUPATIONAL RISKS OF THE",
+    "PROVISION VACATIONS", "PROVISION VACATION", "VACATIONS TAKEN",
+    "CAFETERIA", "NOTICE AND SEVERANCE", "SEVERANCE", "INCENTIVE BONUS",
+    "HOUSING", "TRANSPORTATION", "OTHER BENEFITS",
+)
+
+
+def _sin_el_concepto(descripcion: str) -> str:
+    """La descripción del asiento sin el concepto de nómina adelante.
+
+    «SALARIES AND WAGES FRONT DESK AGENT» → «FRONT DESK AGENT».
+    «OVERTIME» → «» (esa fila no nombra a nadie).
+    """
+    t = " ".join((descripcion or "").split())
+    arriba = t.upper()
+    for c in sorted(_CONCEPTOS_AL_FRENTE, key=len, reverse=True):
+        if arriba.startswith(c):
+            return t[len(c):].strip(" -/")
+    return t
+
+
+@functools.lru_cache(maxsize=1)
+def _catalogo_de_posiciones() -> dict[str, str]:
+    """`501` → «FRONT DESK AGENT / RECEPTIONIST».
+
+    Sale de `seed_data/posiciones_integrity.json`, extraído de la hoja
+    `Planning` del catálogo del grupo. Es un ARCHIVO y no un join porque el
+    checkbook de planilla de la app usa su propio código de posición
+    (`0112-01`) — owner, 2026-09-10: *«acá en planning se nombra la posición
+    pero tiene otro control»*. Los dos sistemas no comparten espacio de
+    códigos.
+    """
+    from app.seed_data import semilla_del_grupo
+    try:
+        return (semilla_del_grupo("posiciones_integrity") or {})["posiciones"]
+    except Exception:      # noqa: BLE001 — sin catálogo se cae al nombre del mayor
+        return {}
+
+
 @router.get("/precierre/planilla-por-posicion/{anio}/{mes}/")
 async def planilla_por_posicion(
     anio: int,
@@ -830,6 +880,22 @@ async def planilla_por_posicion(
                (await db.execute(select(DepartmentCatalog))).scalars().all()}
     from app.api.consulta_api import CONCEPTOS
     rotulo_cuenta = {c: r for _campo, c, r in CONCEPTOS}
+    catalogo_pos = _catalogo_de_posiciones()
+
+    # El nombre que trae el propio mayor, para los códigos que el catálogo no
+    # tiene.
+    #
+    # ⚠️ Solo de la línea de SALARIO (6000). Es la que nombra el puesto —
+    # «SALARIES AND WAGES ROOM ATTENDANT»—; las demás repiten el concepto
+    # («OVERTIME») o traen variantes que no son un puesto («13th Sal
+    # Mandatory»), y ésa, por ser más larga, le ganaría al nombre de verdad.
+    del_mayor: dict[str, str] = {}
+    for f in filas:
+        if f.cuenta_base != 6000:
+            continue
+        n = _sin_el_concepto(f.descripcion)
+        if n and len(n) > len(del_mayor.get(f.posicion, "")):
+            del_mayor[f.posicion] = n
 
     return {
         "anio": anio, "mes": mes, "precierre_id": pc.id,
@@ -843,9 +909,23 @@ async def planilla_por_posicion(
             "cuenta": str(f.cuenta_base or ""),
             "cuenta_nombre": rotulo_cuenta.get(str(f.cuenta_base or ""), ""),
             "posicion": f.posicion,
-            # El nombre de la posición vive dentro de la descripción del mayor:
-            # el código `501` solo no le dice nada a nadie.
-            "posicion_nombre": f.descripcion,
+            # ⚠️ El NOMBRE de la posición, no la descripción del asiento.
+            #
+            # Owner, 2026-09-10: *«en algún lugar tenés el nombre de la
+            # posición; que donde diga Name vaya la posición y no ese texto
+            # repetitivo»*. Tenía razón: el mayor repite el concepto en cada
+            # fila («SALARIES AND WAGES FRONT DESK AGENT», «OVERTIME FRONT DESK
+            # AGENT»), y el concepto ya está en su propia columna.
+            #
+            # El orden importa: manda el CATÁLOGO —el mismo nombre para el
+            # mismo puesto en todos los departamentos y meses—; si no lo tiene,
+            # el que traiga el mayor; y si tampoco, se muestra el código solo.
+            # Inventar un nombre sería peor que no tenerlo.
+            "posicion_nombre": (catalogo_pos.get(f.posicion)
+                                or del_mayor.get(f.posicion, "")),
+            # La descripción cruda se conserva para el tooltip: es la prueba de
+            # de dónde salió el número.
+            "descripcion": f.descripcion,
             "cuenta_completa": f.cuenta,
             "fila": f.fila,
             "monto": round(float(f.mes_usd), 2),

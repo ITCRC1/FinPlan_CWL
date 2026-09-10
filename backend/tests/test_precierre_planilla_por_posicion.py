@@ -121,3 +121,51 @@ def test_vive_en_su_propia_tabla():
     # No lleva acumulado: es el detalle DEL MES (owner: «solo para actuales
     # del mes»), y un acumulado por posicion invitaria a sumarlo con el otro.
     assert "acumulado_usd" not in cols
+
+
+# ── El NOMBRE de la posicion ─────────────────────────────────────────────────
+
+def test_el_catalogo_traduce_el_codigo_de_posicion():
+    """Owner, 2026-09-10: *«en algun lugar tienes el nombre de la posicion»*.
+
+    Lo tenia: la hoja `Planning` del catalogo del grupo. `501` es
+    «FRONT DESK AGENT / RECEPTIONIST». El codigo solo no le dice nada a nadie.
+    """
+    from app.api.precierre_api import _catalogo_de_posiciones
+    cat = _catalogo_de_posiciones()
+    assert len(cat) >= 100
+    assert cat["501"] == "FRONT DESK AGENT / RECEPTIONIST"
+    assert cat["508"].startswith("ROOM ATTENDANT")
+
+
+def test_no_se_puede_cruzar_por_codigo_con_el_checkbook():
+    """Owner: *«aca en planning se nombra la posicion pero tiene otro
+    control»*. El checkbook usa `0112-01`; Integrity usa `501`. Por eso el
+    nombre se declara en un archivo y no sale de un join — un join por codigo
+    emparejaria puestos distintos sin fallar."""
+    from app.api.precierre_api import _catalogo_de_posiciones
+    assert all(c.isdigit() for c in _catalogo_de_posiciones())
+
+
+def test_le_saca_el_concepto_a_la_descripcion():
+    """El mayor repite el concepto en cada fila; el concepto ya tiene su
+    columna. Lo que queda es el puesto — y cuando no queda nada, nada."""
+    from app.api.precierre_api import _sin_el_concepto
+    assert _sin_el_concepto("SALARIES AND WAGES FRONT DESK AGENT") == "FRONT DESK AGENT"
+    assert _sin_el_concepto("SALARY AND WAGES NATURALIST GUIDE") == "NATURALIST GUIDE"
+    assert _sin_el_concepto("OVERTIME") == ""
+    # Integrity escribe el mismo concepto de varias formas: por eso la lista
+    # se declara y no se deduce de un prefijo comun (se probo: da vacio).
+    assert _sin_el_concepto("WAGES AND SALARIES ROOM ATTENDANT") == "ROOM ATTENDANT"
+
+
+def test_el_respaldo_del_mayor_sale_SOLO_de_la_linea_de_salario():
+    """La 6000 es la que nombra el puesto. Las demas repiten el concepto o
+    traen variantes que no son un puesto —«13th Sal Mandatory»— y esa, por ser
+    mas larga, le ganaria al nombre de verdad."""
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("del_mayor: dict[str, str] = {}")
+    assert "if f.cuenta_base != 6000:" in src[i:i + 400]

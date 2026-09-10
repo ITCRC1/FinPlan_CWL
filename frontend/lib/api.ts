@@ -805,8 +805,13 @@ export interface PlanillaPosicionFila {
   depto_integrity: string;
   cuenta: string; cuenta_nombre: string;
   posicion: string;
-  /** «SALARIES AND WAGES FRONT DESK AGENT» — el código `501` solo no dice nada. */
+  /** El NOMBRE del puesto: «FRONT DESK AGENT / RECEPTIONIST». Sale del
+   *  catálogo de posiciones; si no está, del propio mayor; y si tampoco, va
+   *  vacío y la pantalla muestra el código solo — inventarlo sería peor. */
   posicion_nombre: string;
+  /** La descripción cruda del asiento, para el tooltip: la prueba de dónde
+   *  salió el número. */
+  descripcion: string;
   cuenta_completa: string;
   fila: number;
   monto: number;

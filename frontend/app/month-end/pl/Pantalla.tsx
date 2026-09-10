@@ -3539,7 +3539,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
           <div>
             <p style={{ fontSize: 12, color: "var(--text-secondary)",
                         margin: "0 0 10px", maxWidth: 860, lineHeight: 1.6 }}>
-              {t("planillaPosIntro", { n: d.filas.length })}
+              {t.rich("planillaPosIntro", { ...bold, n: d.filas.length })}
             </p>
             <div className="fin-scroll-x">
               <table style={{ borderCollapse: "collapse", minWidth: 720 }}>
@@ -3571,8 +3571,19 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                            color: "var(--text-secondary)" }}>
                                 {f.posicion}
                               </td>
-                              <td style={TDL} title={f.cuenta_completa}>
-                                {f.posicion_nombre}
+                              {/* El NOMBRE del puesto, no la descripción del
+                                  asiento: ésa repite el concepto en cada fila
+                                  («OVERTIME FRONT DESK AGENT») y el concepto
+                                  ya tiene su propia columna. El tooltip
+                                  conserva la cuenta completa y el texto
+                                  original, que es la prueba del número. */}
+                              <td style={TDL}
+                                  title={`${f.cuenta_completa} · ${f.descripcion}`}>
+                                {f.posicion_nombre || (
+                                  <span style={{ color: "var(--text-secondary)" }}>
+                                    {t("posicionSinNombre")}
+                                  </span>
+                                )}
                               </td>
                               <td style={TD}>{usd(f.monto)}</td>
                             </tr>
@@ -3633,7 +3644,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
           <div>
             <p style={{ fontSize: 12, color: "var(--text-secondary)",
                         margin: "0 0 10px", maxWidth: 820, lineHeight: 1.6 }}>
-              {t("planillaCuentasIntro")}
+              {t.rich("planillaCuentasIntro", bold)}
             </p>
             {!planillaCtas ? (
               <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>

@@ -74,6 +74,21 @@ def tiene_semillas(hotel_id: str | None = None) -> bool:
     return (_RAIZ / (hotel_id or HOTEL_ID)).is_dir()
 
 
+def semilla_del_grupo(nombre: str):
+    """Una semilla que NO es por hotel: vive en la raiz de `seed_data`.
+
+    El catalogo de cuentas y el de posiciones son master data de TODO el grupo
+    —CLAUDE.md: «el catalogo es master data de todo el grupo y no se toca para
+    acomodar el plan de cuentas de una propiedad»—, asi que no cuelgan de
+    `<HOTEL_ID>/`. Se leen por aca, sin tipos convertidos, por la misma razon
+    que `semilla_cruda`: son LLAVES, no cantidades.
+    """
+    ruta = _RAIZ / f"{nombre}.json"
+    if not ruta.exists():
+        return None
+    return json.loads(ruta.read_text(encoding="utf-8"))
+
+
 def semilla_cruda(nombre: str, hotel_id: str | None = None):
     """La semilla `nombre` TAL COMO ESTA EN EL ARCHIVO, sin tocar los tipos.
 
