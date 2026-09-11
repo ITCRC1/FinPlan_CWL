@@ -2344,6 +2344,32 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   };
   const TD: React.CSSProperties = { padding: "5px 10px", textAlign: "right" };
   const TDL: React.CSSProperties = { padding: "5px 10px", textAlign: "left" };
+
+  /* ── Los dos niveles de total de los cuadros abiertos ──────────────────
+   *
+   * Owner, 2026-09-10: *«bordes y sombras a cada subtotal, un poco tenue,
+   * pero el total de departamento más visible, grueso, coloreado»*.
+   *
+   * En un cuadro de cientos de filas los subtotales son la unica forma de
+   * leerlo sin contar renglones. Los dos niveles tienen que distinguirse SIN
+   * MIRAR el texto: el de cuenta separa, el de departamento se busca de
+   * lejos. Si los dos gritaran igual, ninguno de los dos serviria.
+   *
+   * Viven aca y no copiados en cada tab: dos cuadros que muestran lo mismo
+   * con distinto peso visual se leen como si dijeran cosas distintas. */
+  const SUBTOTAL_CUENTA: React.CSSProperties = {
+    background: "var(--bg-surface)",
+    borderTop: "1px solid var(--border-medium)",
+    borderBottom: "1px solid var(--border-subtle)",
+    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.04)",
+  };
+  const TOTAL_DEPTO: React.CSSProperties = {
+    background: "var(--bg-elevated)",
+    borderTop: "2px solid var(--brand)",
+    borderBottom: "2px solid var(--border-medium)",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.10)",
+    color: "var(--brand)",
+  };
   const SEL: React.CSSProperties = {
     background: "var(--bg-surface)", color: "var(--text-primary)",
     border: "1px solid var(--border-medium)", borderRadius: 5,
@@ -3662,13 +3688,17 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                 <tbody>
                   {d.departamentos.map(dep => (
                     <Fragment key={dep.dept_code}>
-                      <tr style={{ background: "var(--bg-elevated)" }}>
-                        <td colSpan={3} style={{ ...TDL, fontWeight: 800 }}>
+                      <tr style={TOTAL_DEPTO}>
+                        <td colSpan={3} style={{ ...TDL, fontWeight: 800,
+                                                 fontSize: 13, color: "var(--brand)" }}>
                           {dep.dept_code} · {dep.dept_name}
                         </td>
-                        <td style={{ ...TD, fontWeight: 800 }}>{usd(dep.total)}</td>
+                        <td style={{ ...TD, fontWeight: 800, fontSize: 13,
+                                     color: "var(--brand)" }}>{usd(dep.total)}</td>
                         {d.comparar.map(c => (
-                          <td key={c.scenario_id} style={{ ...TD, fontWeight: 800 }}>
+                          <td key={c.scenario_id}
+                              style={{ ...TD, fontWeight: 800, fontSize: 13,
+                                       color: "var(--brand)" }}>
                             {usd(dep.otros[c.scenario_id] ?? 0)}
                           </td>
                         ))}
@@ -3700,20 +3730,17 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                               ))}
                             </tr>
                           ))}
-                          <tr>
+                          <tr style={SUBTOTAL_CUENTA}>
                             <td colSpan={3} style={{ ...TDL, paddingLeft: 22,
-                                                     fontSize: 11.5, fontWeight: 600,
+                                                     fontSize: 11.5, fontWeight: 700,
                                                      color: "var(--text-secondary)" }}>
                               {t("totalCuenta", { cuenta: cta.cuenta })}
                             </td>
-                            <td style={{ ...TD, fontWeight: 600,
-                                         borderTop: "1px solid var(--border-subtle)" }}>
+                            <td style={{ ...TD, fontWeight: 700 }}>
                               {usd(cta.total)}
                             </td>
                             {d.comparar.map(c => (
-                              <td key={c.scenario_id}
-                                  style={{ ...TD, fontWeight: 600,
-                                           borderTop: "1px solid var(--border-subtle)" }}>
+                              <td key={c.scenario_id} style={{ ...TD, fontWeight: 700 }}>
                                 {usd(cta.otros[c.scenario_id] ?? 0)}
                               </td>
                             ))}
@@ -3807,13 +3834,17 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                 <tbody>
                   {porDepto.map(dep => (
                     <Fragment key={dep.code}>
-                      <tr style={{ background: "var(--bg-elevated)" }}>
-                        <td colSpan={3} style={{ ...TDL, fontWeight: 800 }}>
+                      <tr style={TOTAL_DEPTO}>
+                        <td colSpan={3} style={{ ...TDL, fontWeight: 800,
+                                                 fontSize: 13, color: "var(--brand)" }}>
                           {dep.code} · {dep.nombre}
                         </td>
-                        <td style={{ ...TD, fontWeight: 800 }}>{usd(dep.total)}</td>
+                        <td style={{ ...TD, fontWeight: 800, fontSize: 13,
+                                     color: "var(--brand)" }}>{usd(dep.total)}</td>
                         {d.comparar.map(c => (
-                          <td key={c.scenario_id} style={{ ...TD, fontWeight: 800 }}>
+                          <td key={c.scenario_id}
+                              style={{ ...TD, fontWeight: 800, fontSize: 13,
+                                       color: "var(--brand)" }}>
                             {usd(dep.cuentas.reduce((s2, cta) => s2 + cta.filas.reduce(
                               (s3, f) => s3 + (f.otros[c.scenario_id] ?? 0), 0), 0))}
                           </td>
@@ -3859,20 +3890,17 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                               ))}
                             </tr>
                           ))}
-                          <tr>
+                          <tr style={SUBTOTAL_CUENTA}>
                             <td colSpan={3} style={{ ...TDL, paddingLeft: 22,
-                                                     fontSize: 11.5, fontWeight: 600,
+                                                     fontSize: 11.5, fontWeight: 700,
                                                      color: "var(--text-secondary)" }}>
                               {cta.cuenta} {cta.nombre}
                             </td>
-                            <td style={{ ...TD, fontWeight: 600,
-                                         borderTop: "1px solid var(--border-subtle)" }}>
+                            <td style={{ ...TD, fontWeight: 700 }}>
                               {usd(cta.total)}
                             </td>
                             {d.comparar.map(c => (
-                              <td key={c.scenario_id}
-                                  style={{ ...TD, fontWeight: 600,
-                                           borderTop: "1px solid var(--border-subtle)" }}>
+                              <td key={c.scenario_id} style={{ ...TD, fontWeight: 700 }}>
                                 {usd(cta.filas.reduce(
                                   (s2, f) => s2 + (f.otros[c.scenario_id] ?? 0), 0))}
                               </td>
