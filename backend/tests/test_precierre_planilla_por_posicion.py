@@ -346,3 +346,27 @@ def test_la_linea_del_reparto_se_rotula_y_no_se_reparte():
     assert 'f.sin_posicion ? (' in pant
     assert 't("sinPosicion")' in pant
     assert 't("posicionSinNombre")' in pant     # la otra sigue existiendo
+
+
+def test_una_cuenta_que_solo_tiene_el_presupuesto_igual_aparece():
+    """Owner, 2026-09-10: *«si no tiene detalle, al menos pongamos el total»*.
+
+    Una cuenta presupuestada que este mes no se movio no aparecia en ningun
+    lado: ni su linea ni su plata. Eso hacia que la columna de Budget del
+    DEPARTAMENTO fuera menor que el presupuesto de verdad — un numero mas
+    chico, sin nada que lo delatara.
+
+    Un gasto presupuestado que no se ejecuto es justo lo que una revision tiene
+    que ver, asi que entra con el mes en cero y su total al lado.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("# ── Y las cuentas que SOLO tiene el presupuesto")
+    cuerpo = src[i:i + 1400]
+    # Recorre las versiones comparadas y siembra la cuenta que falte.
+    assert "for mapa in comparar.values():" in cuerpo
+    assert 'dep["cuentas"].setdefault(int(cta_code)' in cuerpo
+    # Con `filas` vacia: no se inventa un detalle que el mes no trajo.
+    assert '"filas": [], "detalle": Decimal("0")' in cuerpo

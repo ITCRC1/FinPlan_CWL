@@ -1244,6 +1244,29 @@ async def gasto_por_detalle(
         dep["cuentas"].setdefault(base, {
             "cuenta": str(base), "filas": [], "detalle": Decimal("0")})
 
+    # ── Y las cuentas que SOLO tiene el presupuesto ──────────────────────
+    #
+    # Owner, 2026-09-10: *«si no tiene detalle, al menos pongamos el total»*.
+    #
+    # Una cuenta presupuestada que este mes no se movió no aparecía en ningún
+    # lado: ni su línea ni su plata. Eso hacía que la columna de Budget del
+    # departamento fuera MENOR que el presupuesto de verdad — un número más
+    # chico, sin nada que lo delatara, que es la peor forma de equivocarse.
+    #
+    # Ahora entran con el mes en cero y su total presupuestado al lado. Un
+    # gasto presupuestado que no se ejecutó es justo lo que una revisión tiene
+    # que ver.
+    for mapa in comparar.values():
+        for (dep_code, cta_code, _det) in mapa:
+            if not dep_code or not cta_code.isdigit():
+                continue
+            dep = deptos.setdefault(dep_code, {
+                "dept_code": dep_code,
+                "dept_name": nombres.get(dep_code, dep_code),
+                "cuentas": {}, "total": Decimal("0")})
+            dep["cuentas"].setdefault(int(cta_code), {
+                "cuenta": cta_code, "filas": [], "detalle": Decimal("0")})
+
     salida = []
     gran_total = Decimal("0")
     otros_gran: dict[str, float] = {}
