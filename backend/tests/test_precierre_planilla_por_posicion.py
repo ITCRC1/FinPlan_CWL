@@ -400,3 +400,36 @@ def test_el_total_por_cuenta_no_depende_de_que_el_nombre_apareje():
                     encoding="utf-8").read()
     assert "d.otros_por_depto[dep.code]" in pant
     assert "d.otros_por_cuenta[`${dep.code}|${cta.cuenta}`]" in pant
+
+
+def test_cada_reporte_filtra_SU_clase_de_cuenta():
+    """La tabla guarda el tercer nivel de las clases 5, 6 y 7 — es el mismo
+    segmento— asi que cada reporte tiene que filtrar la suya.
+
+    Sin el filtro, Payroll x Posicion mostraba tambien el gasto: planilla y
+    opex mezclados en el mismo cuadro, y el total dejaba de ser la planilla.
+    Owner, 2026-09-10: *«ahora tengo planilla y gastos opex, en que momento los
+    metimos»*. En el commit donde ampli el lector de la clase 6 a las 5/6/7 y
+    no ajuste esta consulta.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+
+    i = src.index("async def planilla_por_posicion")
+    planilla = src[i:src.index("async def gasto_por_detalle")]
+    assert "PrecierrePosicion.cuenta_base >= 6000" in planilla
+    assert "PrecierrePosicion.cuenta_base < 7000" in planilla
+
+    j = src.index("async def gasto_por_detalle")
+    gasto = src[j:]
+    assert "PrecierrePosicion.cuenta_base >= 7000" in gasto
+    assert "PrecierrePosicion.cuenta_base < 8000" in gasto
+
+    # Y que NINGUNA consulta de esa tabla se quede sin filtro de clase.
+    sueltas = src.count("select(PrecierrePosicion)")
+    con_filtro = src.count("PrecierrePosicion.cuenta_base >=")
+    assert sueltas == con_filtro, (
+        f"{sueltas} consultas a PrecierrePosicion y solo {con_filtro} filtran "
+        "por clase de cuenta: alguna mezcla planilla con gasto")

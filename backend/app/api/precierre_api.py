@@ -963,8 +963,18 @@ async def planilla_por_posicion(
                 "hay_detalle": False, "filas": [], "total": 0.0,
                 "motivo": "sin_borrador"}
 
+    # ⚠️ SOLO las cuentas 6. La tabla guarda el tercer nivel de las clases
+    # 5, 6 y 7 —es el mismo segmento— y sin este filtro este reporte mostraba
+    # tambien el gasto: planilla y opex mezclados en el mismo cuadro.
+    #
+    # Paso de verdad. La consulta se escribio cuando la tabla solo tenia
+    # cuentas 6, y al ampliar el lector a las 5 y 7 (para Opex x Detalle) no
+    # se ajusto el filtro. El owner lo vio en pantalla: «ahora tengo planilla y
+    # gastos opex, en que momento los metimos».
     filas = (await db.execute(select(PrecierrePosicion).where(
-        PrecierrePosicion.precierre_id == pc.id).order_by(
+        PrecierrePosicion.precierre_id == pc.id,
+        PrecierrePosicion.cuenta_base >= 6000,
+        PrecierrePosicion.cuenta_base < 7000).order_by(
         PrecierrePosicion.destino_finplan, PrecierrePosicion.cuenta_base,
         PrecierrePosicion.posicion))).scalars().all()
 
