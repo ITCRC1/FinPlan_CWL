@@ -745,11 +745,13 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   useEffect(() => {
     if (vista !== "planillaPosicion") return;
     let vivo = true;
-    getPlanillaPorPosicion(year, mes)
+    // Las otras ranuras van como comparacion. La 1 es el mes en revision y ya
+    // es la columna principal del cuadro.
+    getPlanillaPorPosicion(year, mes, ranuras.slice(1).filter(Boolean))
       .then(r => { if (vivo) setPlanillaPos(r); })
       .catch(() => { if (vivo) setPlanillaPos(null); });
     return () => { vivo = false; };
-  }, [vista, year, mes]);
+  }, [vista, year, mes, ranuras]);
 
   useEffect(() => {
     if (vista !== "planillaCuentas") return;
@@ -3771,6 +3773,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                   <th style={{ ...TH, textAlign: "left", minWidth: 90 }}>{t("posicion")}</th>
                   <th style={{ ...TH, textAlign: "left", minWidth: 330 }}>{t("nombre")}</th>
                   <th style={{ ...TH, minWidth: 130 }}>{MESES[mes - 1]} {year}</th>
+                  {d.comparar.map(c => (
+                    <th key={c.scenario_id} style={{ ...TH, minWidth: 130 }}>
+                      {c.version}
+                    </th>
+                  ))}
                 </tr></thead>
                 <tbody>
                   {porDepto.map(dep => (
@@ -3780,6 +3787,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                           {dep.code} · {dep.nombre}
                         </td>
                         <td style={{ ...TD, fontWeight: 800 }}>{usd(dep.total)}</td>
+                        {d.comparar.map(c => (
+                          <td key={c.scenario_id} style={{ ...TD, fontWeight: 800 }}>
+                            {usd(dep.cuentas.reduce((s2, cta) => s2 + cta.filas.reduce(
+                              (s3, f) => s3 + (f.otros[c.scenario_id] ?? 0), 0), 0))}
+                          </td>
+                        ))}
                       </tr>
                       {dep.cuentas.map(cta => (
                         <Fragment key={dep.code + cta.cuenta}>
@@ -3809,6 +3822,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                 )}
                               </td>
                               <td style={TD}>{usd(f.monto)}</td>
+                              {d.comparar.map(c => (
+                                <td key={c.scenario_id} style={TD}>
+                                  {usd(f.otros[c.scenario_id] ?? 0)}
+                                </td>
+                              ))}
                             </tr>
                           ))}
                           <tr>
@@ -3821,6 +3839,14 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                          borderTop: "1px solid var(--border-subtle)" }}>
                               {usd(cta.total)}
                             </td>
+                            {d.comparar.map(c => (
+                              <td key={c.scenario_id}
+                                  style={{ ...TD, fontWeight: 600,
+                                           borderTop: "1px solid var(--border-subtle)" }}>
+                                {usd(cta.filas.reduce(
+                                  (s2, f) => s2 + (f.otros[c.scenario_id] ?? 0), 0))}
+                              </td>
+                            ))}
                           </tr>
                         </Fragment>
                       ))}
@@ -3830,10 +3856,47 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                borderTop: "2px solid var(--border-medium)" }}>
                     <td colSpan={3} style={TDL}>{t("planillaCuentasTotal")}</td>
                     <td style={TD}>{usd(d.total)}</td>
+                    {d.comparar.map(c => (
+                      <td key={c.scenario_id} style={TD}>{usd(c.total)}</td>
+                    ))}
                   </tr>
                 </tbody>
               </table>
             </div>
+            {d.sin_pareja.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                {/* ⚠️ Lo que una version tiene y el mes NO.
+                    Se muestra en vez de esconderse: un puesto presupuestado
+                    que este mes no se pago es justo lo que hay que ver, y un
+                    nombre que no aparea delata que el puesto se llama
+                    distinto en los dos lados. */}
+                <p style={{ fontSize: 12, color: "var(--text-secondary)",
+                            margin: "0 0 6px", maxWidth: 860, lineHeight: 1.6 }}>
+                  {t.rich("planillaPosSinPareja", { ...bold, n: d.sin_pareja.length })}
+                </p>
+                <div className="fin-scroll-x">
+                  <table style={{ borderCollapse: "collapse", minWidth: 520 }}>
+                    <thead><tr>
+                      <th style={{ ...TH, textAlign: "left", minWidth: 150 }}>{t("version")}</th>
+                      <th style={{ ...TH, textAlign: "left", minWidth: 80 }}>{t("cuenta")}</th>
+                      <th style={{ ...TH, textAlign: "left", minWidth: 260 }}>{t("posicion")}</th>
+                      <th style={{ ...TH, minWidth: 120 }}>{MESES[mes - 1]} {year}</th>
+                    </tr></thead>
+                    <tbody>
+                      {d.sin_pareja.map((f, i) => (
+                        <tr key={i}>
+                          <td style={TDL}>{f.version}</td>
+                          <td style={{ ...TDL, fontVariantNumeric: "tabular-nums",
+                                       color: "var(--text-secondary)" }}>{f.cuenta}</td>
+                          <td style={TDL}>{f.puesto}</td>
+                          <td style={TD}>{usd(f.monto)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}

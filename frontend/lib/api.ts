@@ -815,6 +815,11 @@ export interface PlanillaPosicionFila {
   cuenta_completa: string;
   fila: number;
   monto: number;
+  /** Lo mismo en las otras versiones, apareado por cuenta + NOMBRE del puesto.
+   *  El Actual trae la posición de Integrity (`501`) y el Budget la del
+   *  checkbook (`0112-01`): no comparten códigos, y aparear por número
+   *  emparejaría puestos distintos sin fallar. */
+  otros: Record<string, number>;
 }
 export interface PlanillaPorPosicion {
   anio: number; mes: number; precierre_id: string | null;
@@ -827,6 +832,11 @@ export interface PlanillaPorPosicion {
   filas: PlanillaPosicionFila[];
   /** Lo calcula el backend. Sumar las filas dibujadas sería otra aritmética. */
   total: number;
+  comparar: { scenario_id: string; version: string; total: number }[];
+  /** Lo que una versión tiene y el mes NO. Se muestra: un puesto
+   *  presupuestado que este mes no se pagó es justo lo que hay que ver. */
+  sin_pareja: { scenario_id: string; version: string; cuenta: string;
+                puesto: string; monto: number }[];
 }
 // ── El gasto del mes, abierto por DEPARTAMENTO · CUENTA · DETALLE ───────────
 //
@@ -865,9 +875,11 @@ export async function getGastoPorDetalle(
 }
 
 export async function getPlanillaPorPosicion(
-  anio: number, mes: number,
+  anio: number, mes: number, scenarioIds: string[] = [],
 ): Promise<PlanillaPorPosicion> {
-  return api.get(`/precierre/planilla-por-posicion/${anio}/${mes}/`);
+  const ids = scenarioIds.filter(Boolean).join(",");
+  return api.get(`/precierre/planilla-por-posicion/${anio}/${mes}/`
+    + `?scenarios=${encodeURIComponent(ids)}`);
 }
 
 export async function getPlanillaPorCuenta(

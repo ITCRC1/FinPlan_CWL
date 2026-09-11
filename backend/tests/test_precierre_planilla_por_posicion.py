@@ -221,3 +221,52 @@ def test_el_gasto_por_detalle_cierra_contra_el_total_de_la_cuenta():
     # Y las cuentas sin detalle entran igual, o el total por departamento
     # dejaria de ser el del P&L.
     assert "Las cuentas del P&L que NO tienen detalle" in cuerpo
+
+
+# ── Budget y Forecast al lado, apareados por NOMBRE ──────────────────────────
+
+def test_el_apareo_es_por_nombre_y_no_por_codigo():
+    """Owner, 2026-09-10: *«hay una forma de poner el detalle a la par de
+    Budget y Forecast; estos fueron SUBIDOS, no se generaron por auxiliares»*.
+
+    Tenia razon: su planilla esta por puesto en `PayrollConceptEntry`. Pero el
+    codigo NO se puede usar: el Actual trae la posicion de Integrity (`501`) y
+    el presupuesto la del checkbook (`0112-01`). Aparear por numero
+    emparejaria puestos distintos SIN FALLAR, que es el modo de falla mas caro
+    de esta app. Lo unico que comparten es como se llama el puesto.
+    """
+    from app.api.precierre_api import _llave_de_puesto as k
+    # El mismo puesto escrito de dos maneras es el mismo puesto...
+    assert k("Reservations Agent") == k("RESERVATIONS AGENT")
+    assert k("FRONT DESK AGENT / RECEPTIONIST") == k("Front Desk Agent - Receptionist")
+    assert k("Capitan de Barco") == k("CAPITÁN DE BARCO")
+    # ...y uno distinto tiene que seguir siendo distinto.
+    assert k("Reservations Agent Supervisora") != k("Reservations Agent")
+    assert k("") == ""
+
+
+def test_la_posicion_sintetica_del_gl_no_se_aparea():
+    """`GL` es la posicion que inventa el importador del mayor para los
+    actuales: no nombra a nadie. Aparearla metería toda la planilla de un
+    departamento en una sola fila, con un nombre que no existe."""
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("async def _planilla_por_puesto")
+    assert '== "GL"' in src[i:i + 1200]
+
+
+def test_lo_que_no_aparea_se_muestra():
+    """Un puesto presupuestado que este mes no se pago es justo lo que hay que
+    ver. Y un nombre que no aparea delata que el puesto se llama distinto en
+    los dos lados — esconderlo dejaria el total sin explicar."""
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    assert '"sin_pareja"' in src
+    pant = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "..", "frontend",
+                                  "app", "month-end", "pl", "Pantalla.tsx"),
+                    encoding="utf-8").read()
+    assert "d.sin_pareja.length > 0" in pant

@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import pathlib
 import functools
+import re
+import unicodedata
 import hashlib
 import io
 import json
@@ -50,6 +52,8 @@ from app.revision import (nivel1_estructura, nivel2_coherencia,
                           nivel3_fuentes, nivel4_expectativa)
 from app.importers.registro_dep import registro_de_subida
 from app.models.department_catalog import DepartmentCatalog
+from app.models.payroll_position import PayrollPosition
+from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.precierre import Precierre, PrecierreFila, PrecierrePosicion
 from app.models.scenario import Scenario
 from app.textos import Idioma
@@ -836,10 +840,68 @@ def _catalogo_de_posiciones() -> dict[str, str]:
         return {}
 
 
+def _llave_de_puesto(nombre: str) -> str:
+    """El nombre del puesto, normalizado para poder aparearlo entre versiones.
+
+    ⚠️ Se aparea por NOMBRE y no por código, y eso hay que decirlo.
+
+    El Actual trae la posición del mayor de Integrity —el tercer nivel,
+    `501`—. El Budget y el Forecast se SUBEN con el código del checkbook
+    (`0112-01`): owner, 2026-09-10, *«acá en planning se nombra la posición
+    pero tiene otro control»*. Los dos sistemas no comparten espacio de
+    códigos, así que aparear por número emparejaría puestos distintos **sin
+    fallar** — el modo de falla más caro que tiene esta app.
+
+    Lo único que comparten es cómo se llama el puesto. Se normaliza lo que
+    varía sin cambiar el significado —mayúsculas, tildes, dobles espacios,
+    barras y guiones— y nada más: «Reservations Agent» y «RESERVATIONS AGENT»
+    son el mismo puesto; «Reservations Agent Supervisora» NO lo es, y tiene que
+    seguir sin serlo.
+    """
+    t = unicodedata.normalize("NFKD", (nombre or "").strip().upper())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = re.sub(r"[/\-]+", " ", t)
+    return " ".join(t.split())
+
+
+async def _planilla_por_puesto(db: AsyncSession, scenario_id: str,
+                               meses: set[int]) -> dict[tuple[str, str], float]:
+    """{(cuenta, llave de puesto): monto} de una versión del checkbook.
+
+    Es el mismo corte que el del mayor —cuenta × puesto— armado desde
+    `PayrollConceptEntry`, que es de donde sale el reporte de planilla por
+    departamento. Misma fuente, mismo filtro: si saliera de otro lado, los dos
+    cuadros dirían cosas distintas.
+    """
+    from app.api.consulta_api import CONCEPTOS
+
+    posiciones = {p.id: p for p in (await db.execute(select(PayrollPosition).where(
+        PayrollPosition.scenario_id == scenario_id))).scalars().all()}
+    out: dict[tuple[str, str], float] = {}
+    for e in (await db.execute(select(PayrollConceptEntry).where(
+            PayrollConceptEntry.scenario_id == scenario_id))).scalars().all():
+        if (e.month or 0) not in meses:
+            continue
+        p = posiciones.get(e.position_id)
+        # La posición sintética del GL no nombra a nadie: no se puede aparear.
+        if p is None or (p.position_code or "").strip() == "GL":
+            continue
+        llave = _llave_de_puesto(p.position_name)
+        if not llave:
+            continue
+        for campo, codigo, _rotulo in CONCEPTOS:
+            v = getattr(e, campo, None)
+            if v:
+                k = (codigo, llave)
+                out[k] = out.get(k, 0.0) + float(v)
+    return out
+
+
 @router.get("/precierre/planilla-por-posicion/{anio}/{mes}/")
 async def planilla_por_posicion(
     anio: int,
     mes: int,
+    scenarios: str = Query("", description="ids a comparar, separados por coma"),
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -897,11 +959,46 @@ async def planilla_por_posicion(
         if n and len(n) > len(del_mayor.get(f.posicion, "")):
             del_mayor[f.posicion] = n
 
+    # ── Las otras versiones, al lado ─────────────────────────────────────
+    #
+    # Owner, 2026-09-10: *«hay una forma de poner el detalle a la par de Budget
+    # y Forecast; estos fueron SUBIDOS, no se generaron por auxiliares»*. Tenía
+    # razón: su planilla está por puesto en `PayrollConceptEntry`, no salió de
+    # drivers. Se aparea por NOMBRE del puesto — ver `_llave_de_puesto`.
+    comparar: dict[str, dict[tuple[str, str], float]] = {}
+    etiquetas: dict[str, str] = {}
+    for sid in [x.strip() for x in scenarios.split(",") if x.strip()]:
+        esc = await db.get(Scenario, sid)
+        if esc is None:
+            continue
+        etiquetas[sid] = f"{esc.year} · {esc.type} {esc.version}".strip()
+        comparar[sid] = await _planilla_por_puesto(db, sid, {mes})
+
+    def _llave_fila(f) -> tuple[str, str]:
+        return (str(f.cuenta_base or ""),
+                _llave_de_puesto(catalogo_pos.get(f.posicion)
+                                 or del_mayor.get(f.posicion, "")))
+
+    vistas = {_llave_fila(f) for f in filas}
+    # Lo que una versión tiene y el mes NO: se dice, no se esconde. Un puesto
+    # presupuestado que este mes no se pagó es justo lo que hay que ver.
+    sin_pareja = []
+    for sid, mapa in comparar.items():
+        for (cta, llave), monto in sorted(mapa.items()):
+            if (cta, llave) not in vistas and abs(monto) >= 0.005:
+                sin_pareja.append({"scenario_id": sid, "version": etiquetas[sid],
+                                   "cuenta": cta, "puesto": llave,
+                                   "monto": round(monto, 2)})
+
     return {
         "anio": anio, "mes": mes, "precierre_id": pc.id,
         "subido": pc.creado_en.isoformat() if pc.creado_en else "",
         "hay_detalle": bool(filas),
         "motivo": "" if filas else "borrador_sin_detalle",
+        "comparar": [{"scenario_id": sid, "version": etiquetas[sid],
+                      "total": round(sum(m.values()), 2)}
+                     for sid, m in comparar.items()],
+        "sin_pareja": sin_pareja,
         "filas": [{
             "dept_code": f.destino_finplan,
             "dept_name": nombres.get(f.destino_finplan, f.destino_finplan),
@@ -929,6 +1026,9 @@ async def planilla_por_posicion(
             "cuenta_completa": f.cuenta,
             "fila": f.fila,
             "monto": round(float(f.mes_usd), 2),
+            # Lo mismo en las otras versiones, apareado por cuenta + puesto.
+            "otros": {sid: round(mapa.get(_llave_fila(f), 0.0), 2)
+                      for sid, mapa in comparar.items()},
         } for f in filas],
         "total": round(float(sum(f.mes_usd for f in filas)), 2),
     }
