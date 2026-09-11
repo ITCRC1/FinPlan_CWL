@@ -54,6 +54,7 @@ from app.importers.registro_dep import registro_de_subida
 from app.models.department_catalog import DepartmentCatalog
 from app.models.payroll_position import PayrollPosition
 from app.models.payroll_concept_entry import PayrollConceptEntry
+from app.models.opex_entry import OpexEntry
 from app.models.precierre import Precierre, PrecierreFila, PrecierrePosicion
 from app.models.scenario import Scenario
 from app.textos import Idioma
@@ -1034,10 +1035,40 @@ async def planilla_por_posicion(
     }
 
 
+def _llave_detalle(v) -> str:
+    """El código de detalle, normalizado. `800` de un lado y `800` del otro.
+
+    A diferencia del puesto, acá SÍ se aparea por código: el checkbook de gasto
+    usa las subcuentas 800-810 (CLAUDE.md §19.2) y el tercer nivel de Integrity
+    usa la misma numeración. Es la misma llave en los dos sistemas, no dos que
+    se parecen.
+    """
+    t = str(v or "").strip()
+    return str(int(t)) if t.isdigit() else t
+
+
+async def _gasto_por_detalle_del_checkbook(
+        db: AsyncSession, scenario_id: str, mes: int) -> dict[tuple[str, str, str], float]:
+    """{(depto, cuenta, detalle): monto} del checkbook de OPEX de una versión."""
+    col = ["jan", "feb", "mar", "apr", "may", "jun",
+           "jul", "aug", "sep", "oct", "nov", "dec"][mes - 1]
+    out: dict[tuple[str, str, str], float] = {}
+    for e in (await db.execute(select(OpexEntry).where(
+            OpexEntry.scenario_id == scenario_id))).scalars().all():
+        v = float(getattr(e, col, 0) or 0)
+        if not v:
+            continue
+        k = ((e.dept_code or "").strip(), (e.account_code or "").strip(),
+             _llave_detalle(e.detail_code))
+        out[k] = out.get(k, 0.0) + v
+    return out
+
+
 @router.get("/precierre/gasto-por-detalle/{anio}/{mes}/")
 async def gasto_por_detalle(
     anio: int,
     mes: int,
+    scenarios: str = Query("", description="ids a comparar, separados por coma"),
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -1101,6 +1132,23 @@ async def gasto_por_detalle(
     nombres = {d.dept_code: d.dept_name for d in
                (await db.execute(select(DepartmentCatalog))).scalars().all()}
 
+    # ── Las otras versiones, al lado ─────────────────────────────────────
+    #
+    # Owner, 2026-09-10: *«pongamos totales a la par, y la idea es tener algo
+    # con qué comparar»*.
+    #
+    # Acá el apareo es EXACTO, no por nombre: el checkbook de gasto usa las
+    # subcuentas 800-810 (CLAUDE.md §19.2) y el tercer nivel de Integrity usa
+    # la misma numeración. Es la misma llave en los dos sistemas.
+    comparar: dict[str, dict[tuple[str, str, str], float]] = {}
+    etiquetas: dict[str, str] = {}
+    for sid in [x.strip() for x in scenarios.split(",") if x.strip()]:
+        esc = await db.get(Scenario, sid)
+        if esc is None:
+            continue
+        etiquetas[sid] = f"{esc.year} · {esc.type} {esc.version}".strip()
+        comparar[sid] = await _gasto_por_detalle_del_checkbook(db, sid, mes)
+
     deptos: dict[str, dict] = {}
     for f in detalle:
         dep = deptos.setdefault(f.destino_finplan, {
@@ -1109,12 +1157,16 @@ async def gasto_por_detalle(
             "cuentas": {}, "total": Decimal("0")})
         cta = dep["cuentas"].setdefault(f.cuenta_base, {
             "cuenta": str(f.cuenta_base), "filas": [], "detalle": Decimal("0")})
+        llave = (f.destino_finplan, str(f.cuenta_base or ""),
+                 _llave_detalle(f.posicion))
         cta["filas"].append({
             "detalle": f.posicion,
             "nombre": f.descripcion,
             "cuenta_completa": f.cuenta,
             "fila": f.fila,
             "monto": round(float(f.mes_usd), 2),
+            "otros": {sid: round(m.get(llave, 0.0), 2)
+                      for sid, m in comparar.items()},
         })
         cta["detalle"] += f.mes_usd
 
@@ -1130,9 +1182,11 @@ async def gasto_por_detalle(
 
     salida = []
     gran_total = Decimal("0")
+    otros_gran: dict[str, float] = {}
     for dep_code in sorted(deptos):
         dep = deptos[dep_code]
         cuentas = []
+        otros_dep: dict[str, float] = {}
         for base in sorted(dep["cuentas"]):
             cta = dep["cuentas"][base]
             total = totales_cuenta.get((dep_code, base), cta["detalle"])
@@ -1141,16 +1195,34 @@ async def gasto_por_detalle(
             if abs(resto) >= Decimal("0.005"):
                 filas.append({"detalle": "", "nombre": "(sin detalle)",
                               "cuenta_completa": "", "fila": 0,
-                              "monto": round(float(resto), 2)})
+                              "monto": round(float(resto), 2),
+                              "otros": {sid: 0.0 for sid in comparar}})
+            # El total de la CUENTA en las otras versiones sale de sumar SU
+            # cuenta entera, no las filas que aparearon: el checkbook puede
+            # tener detalles que el mes no trajo, y esconderlos haría que la
+            # columna no fuera el total del presupuesto.
+            otros_cta = {sid: round(sum(
+                v for (dc, ac, _d), v in m.items()
+                if dc == dep_code and ac == cta["cuenta"]), 2)
+                for sid, m in comparar.items()}
             cuentas.append({"cuenta": cta["cuenta"], "filas": filas,
-                            "total": round(float(total), 2)})
+                            "total": round(float(total), 2),
+                            "otros": otros_cta})
             dep["total"] += total
+            for sid, v in otros_cta.items():
+                otros_dep[sid] = otros_dep.get(sid, 0.0) + v
         gran_total += dep["total"]
+        for sid, v in otros_dep.items():
+            otros_gran[sid] = otros_gran.get(sid, 0.0) + v
         salida.append({"dept_code": dep_code, "dept_name": dep["dept_name"],
                        "cuentas": cuentas,
-                       "total": round(float(dep["total"]), 2)})
+                       "total": round(float(dep["total"]), 2),
+                       "otros": {sid: round(v, 2) for sid, v in otros_dep.items()}})
 
     return {"anio": anio, "mes": mes, "precierre_id": pc.id,
             "hay_detalle": bool(detalle),
             "motivo": "" if detalle else "borrador_sin_detalle",
+            "comparar": [{"scenario_id": sid, "version": etiquetas[sid],
+                          "total": round(otros_gran.get(sid, 0.0), 2)}
+                         for sid in comparar],
             "departamentos": salida, "total": round(float(gran_total), 2)}

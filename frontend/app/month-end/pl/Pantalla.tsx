@@ -736,11 +736,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   useEffect(() => {
     if (vista !== "gastoDetalle") return;
     let vivo = true;
-    getGastoPorDetalle(year, mes)
+    getGastoPorDetalle(year, mes, ranuras.slice(1).filter(Boolean))
       .then(r => { if (vivo) setGastoDet(r); })
       .catch(() => { if (vivo) setGastoDet(null); });
     return () => { vivo = false; };
-  }, [vista, year, mes]);
+  }, [vista, year, mes, ranuras]);
 
   useEffect(() => {
     if (vista !== "planillaPosicion") return;
@@ -3653,6 +3653,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                   <th style={{ ...TH, textAlign: "left", minWidth: 80 }}>{t("detalle")}</th>
                   <th style={{ ...TH, textAlign: "left", minWidth: 330 }}>{t("nombre")}</th>
                   <th style={{ ...TH, minWidth: 130 }}>{MESES[mes - 1]} {year}</th>
+                  {d.comparar.map(c => (
+                    <th key={c.scenario_id} style={{ ...TH, minWidth: 130 }}>
+                      {c.version}
+                    </th>
+                  ))}
                 </tr></thead>
                 <tbody>
                   {d.departamentos.map(dep => (
@@ -3662,6 +3667,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                           {dep.dept_code} · {dep.dept_name}
                         </td>
                         <td style={{ ...TD, fontWeight: 800 }}>{usd(dep.total)}</td>
+                        {d.comparar.map(c => (
+                          <td key={c.scenario_id} style={{ ...TD, fontWeight: 800 }}>
+                            {usd(dep.otros[c.scenario_id] ?? 0)}
+                          </td>
+                        ))}
                       </tr>
                       {dep.cuentas.map(cta => (
                         <Fragment key={dep.dept_code + cta.cuenta}>
@@ -3683,6 +3693,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                 {f.nombre}
                               </td>
                               <td style={TD}>{usd(f.monto)}</td>
+                              {d.comparar.map(c => (
+                                <td key={c.scenario_id} style={TD}>
+                                  {usd(f.otros[c.scenario_id] ?? 0)}
+                                </td>
+                              ))}
                             </tr>
                           ))}
                           <tr>
@@ -3695,6 +3710,13 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                          borderTop: "1px solid var(--border-subtle)" }}>
                               {usd(cta.total)}
                             </td>
+                            {d.comparar.map(c => (
+                              <td key={c.scenario_id}
+                                  style={{ ...TD, fontWeight: 600,
+                                           borderTop: "1px solid var(--border-subtle)" }}>
+                                {usd(cta.otros[c.scenario_id] ?? 0)}
+                              </td>
+                            ))}
                           </tr>
                         </Fragment>
                       ))}
@@ -3704,6 +3726,9 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                borderTop: "2px solid var(--border-medium)" }}>
                     <td colSpan={3} style={TDL}>{t("gastoDetalleTotal")}</td>
                     <td style={TD}>{usd(d.total)}</td>
+                    {d.comparar.map(c => (
+                      <td key={c.scenario_id} style={TD}>{usd(c.total)}</td>
+                    ))}
                   </tr>
                 </tbody>
               </table>

@@ -849,10 +849,18 @@ export interface PlanillaPorPosicion {
 export interface GastoDetalleFila {
   detalle: string; nombre: string; cuenta_completa: string;
   fila: number; monto: number;
+  /** Lo mismo en las otras versiones, apareado por (depto, cuenta, detalle).
+   *  Acá el apareo es EXACTO: el checkbook usa las subcuentas 800-810 y el
+   *  tercer nivel de Integrity usa la misma numeración. */
+  otros: Record<string, number>;
 }
 export interface GastoDetalleCuenta {
   cuenta: string;
   filas: GastoDetalleFila[];
+  /** El total de la cuenta en cada versión: sale de SU cuenta entera, no de
+   *  las filas que aparearon — el checkbook puede tener detalles que el mes no
+   *  trajo, y esconderlos haría que la columna no fuera el presupuesto. */
+  otros: Record<string, number>;
   /** El total de la CUENTA, del nivel que suma el P&L. Las filas cierran
    *  contra él: cuando no llegan, viene una «(sin detalle)» con la diferencia. */
   total: number;
@@ -861,17 +869,21 @@ export interface GastoDetalleDepto {
   dept_code: string; dept_name: string;
   cuentas: GastoDetalleCuenta[];
   total: number;
+  otros: Record<string, number>;
 }
 export interface GastoPorDetalle {
   anio: number; mes: number; precierre_id: string | null;
   hay_detalle: boolean; motivo: string;
   departamentos: GastoDetalleDepto[];
   total: number;
+  comparar: { scenario_id: string; version: string; total: number }[];
 }
 export async function getGastoPorDetalle(
-  anio: number, mes: number,
+  anio: number, mes: number, scenarioIds: string[] = [],
 ): Promise<GastoPorDetalle> {
-  return api.get(`/precierre/gasto-por-detalle/${anio}/${mes}/`);
+  const ids = scenarioIds.filter(Boolean).join(",");
+  return api.get(`/precierre/gasto-por-detalle/${anio}/${mes}/`
+    + `?scenarios=${encodeURIComponent(ids)}`);
 }
 
 export async function getPlanillaPorPosicion(

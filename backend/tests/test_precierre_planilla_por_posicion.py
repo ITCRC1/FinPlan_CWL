@@ -270,3 +270,34 @@ def test_lo_que_no_aparea_se_muestra():
                                   "app", "month-end", "pl", "Pantalla.tsx"),
                     encoding="utf-8").read()
     assert "d.sin_pareja.length > 0" in pant
+
+
+def test_el_gasto_se_aparea_por_CODIGO_de_detalle():
+    """Acá sí se aparea por código, y la diferencia importa.
+
+    El checkbook de gasto usa las subcuentas 800-810 (CLAUDE.md §19.2) y el
+    tercer nivel de Integrity usa la MISMA numeracion: es la misma llave en los
+    dos sistemas, no dos que se parecen. (En planilla no se puede: el Actual
+    trae `501` y el presupuesto `0112-01`.)
+    """
+    from app.api.precierre_api import _llave_detalle
+    assert _llave_detalle("800") == "800"
+    assert _llave_detalle(" 0800 ") == "800"     # el cero de adelante no cambia el detalle
+    assert _llave_detalle(800) == "800"
+    assert _llave_detalle("") == ""
+    assert _llave_detalle("80A") == "80A"        # lo que no es numero se respeta
+
+
+def test_el_total_de_la_cuenta_comparada_sale_de_la_cuenta_entera():
+    """No de las filas que aparearon.
+
+    El checkbook puede tener detalles que el mes no trajo. Sumar solo lo que
+    apareo haria que la columna del presupuesto NO fuera el presupuesto — un
+    numero mas chico, sin nada que lo delate.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("otros_cta = {sid: round(sum(")
+    assert "if dc == dep_code and ac == cta[\"cuenta\"]" in src[i:i + 400]
