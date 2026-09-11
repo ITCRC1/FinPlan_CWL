@@ -932,3 +932,115 @@ async def planilla_por_posicion(
         } for f in filas],
         "total": round(float(sum(f.mes_usd for f in filas)), 2),
     }
+
+
+@router.get("/precierre/gasto-por-detalle/{anio}/{mes}/")
+async def gasto_por_detalle(
+    anio: int,
+    mes: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """El gasto del mes abierto por DEPARTAMENTO · CUENTA · DETALLE.
+
+    Owner, 2026-09-10: *«te vas al tercer nivel de gastos, `7310-0110-800`
+    ROOMS / LAUNDRY AND DRY CLEANING […] por departamento y por detalle repetís
+    la cuenta y me das un total por cuenta, pero hacés el split por detalle»* ·
+    *«y un total de gasto por departamento»*.
+
+    Es el gemelo de `planilla-por-posicion`: el mismo tercer segmento de la
+    cuenta, que en las 6 es el puesto y en las 7 es el detalle del gasto.
+
+    ## El renglón «(sin detalle)»
+
+    ⚠️ **Cada cuenta cierra contra su propio total**, y cuando el detalle no
+    llega —o se pasa— se agrega una línea con la diferencia en vez de dejar un
+    subtotal que no cuadra. Sub-filas que no suman su total es el defecto más
+    caro de un cuadro contable: se ve bien y no dice la verdad.
+
+    No es hipotético. En agosto 2026, `7105-0180` (A&G Contract Services) trae
+    un detalle que suma **$11.196,00 MÁS** que la cuenta. Es una inconsistencia
+    del archivo de Integrity, no del cálculo, y este reporte la muestra en vez
+    de repartirla.
+    """
+    pc = (await db.execute(select(Precierre).where(
+        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
+        Precierre.mes == mes).order_by(
+        Precierre.creado_en.desc()))).scalars().first()
+    if pc is None:
+        return {"anio": anio, "mes": mes, "precierre_id": None,
+                "hay_detalle": False, "departamentos": [], "total": 0.0,
+                "motivo": "sin_borrador"}
+
+    detalle = (await db.execute(select(PrecierrePosicion).where(
+        PrecierrePosicion.precierre_id == pc.id,
+        PrecierrePosicion.cuenta_base >= 7000,
+        PrecierrePosicion.cuenta_base < 8000).order_by(
+        PrecierrePosicion.destino_finplan, PrecierrePosicion.cuenta_base,
+        PrecierrePosicion.posicion))).scalars().all()
+
+    # El total de cada cuenta sale del nivel `cuenta-departamento`, que es el
+    # que suma el P&L. El detalle se compara CONTRA él, no al revés.
+    totales_cuenta: dict[tuple[str, int], Decimal] = {}
+    for f in (await db.execute(select(PrecierreFila).where(
+            PrecierreFila.precierre_id == pc.id))).scalars().all():
+        if f.cuenta_base and 7000 <= f.cuenta_base < 8000:
+            k = (f.destino_finplan, f.cuenta_base)
+            totales_cuenta[k] = totales_cuenta.get(k, Decimal("0")) + f.mes_usd
+
+    nombres = {d.dept_code: d.dept_name for d in
+               (await db.execute(select(DepartmentCatalog))).scalars().all()}
+
+    deptos: dict[str, dict] = {}
+    for f in detalle:
+        dep = deptos.setdefault(f.destino_finplan, {
+            "dept_code": f.destino_finplan,
+            "dept_name": nombres.get(f.destino_finplan, f.destino_finplan),
+            "cuentas": {}, "total": Decimal("0")})
+        cta = dep["cuentas"].setdefault(f.cuenta_base, {
+            "cuenta": str(f.cuenta_base), "filas": [], "detalle": Decimal("0")})
+        cta["filas"].append({
+            "detalle": f.posicion,
+            "nombre": f.descripcion,
+            "cuenta_completa": f.cuenta,
+            "fila": f.fila,
+            "monto": round(float(f.mes_usd), 2),
+        })
+        cta["detalle"] += f.mes_usd
+
+    # Las cuentas del P&L que NO tienen detalle: van igual, con una sola línea.
+    # Esconderlas haría que el total por departamento no fuera el del P&L.
+    for (dep_code, base), total in totales_cuenta.items():
+        dep = deptos.setdefault(dep_code, {
+            "dept_code": dep_code,
+            "dept_name": nombres.get(dep_code, dep_code),
+            "cuentas": {}, "total": Decimal("0")})
+        dep["cuentas"].setdefault(base, {
+            "cuenta": str(base), "filas": [], "detalle": Decimal("0")})
+
+    salida = []
+    gran_total = Decimal("0")
+    for dep_code in sorted(deptos):
+        dep = deptos[dep_code]
+        cuentas = []
+        for base in sorted(dep["cuentas"]):
+            cta = dep["cuentas"][base]
+            total = totales_cuenta.get((dep_code, base), cta["detalle"])
+            resto = total - cta["detalle"]
+            filas = list(cta["filas"])
+            if abs(resto) >= Decimal("0.005"):
+                filas.append({"detalle": "", "nombre": "(sin detalle)",
+                              "cuenta_completa": "", "fila": 0,
+                              "monto": round(float(resto), 2)})
+            cuentas.append({"cuenta": cta["cuenta"], "filas": filas,
+                            "total": round(float(total), 2)})
+            dep["total"] += total
+        gran_total += dep["total"]
+        salida.append({"dept_code": dep_code, "dept_name": dep["dept_name"],
+                       "cuentas": cuentas,
+                       "total": round(float(dep["total"]), 2)})
+
+    return {"anio": anio, "mes": mes, "precierre_id": pc.id,
+            "hay_detalle": bool(detalle),
+            "motivo": "" if detalle else "borrador_sin_detalle",
+            "departamentos": salida, "total": round(float(gran_total), 2)}

@@ -359,7 +359,7 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
                 m_crc = monto_mes(cuenta, crudo_m, f[cols["acumulado"]]
                                   if cols["acumulado"] < len(f) else None)
                 subdetalle[padre] = subdetalle.get(padre, ZERO) + m_crc
-                # ⚠️ En las cuentas 6 este nivel ES LA POSICIÓN.
+                # ⚠️ Este nivel es el TERCER SEGMENTO, y se guarda entero.
                 #
                 # `6000-0111-501` = concepto 6000, depto 0111, posición 501
                 # (Front Desk Agent) — CLAUDE.md §12.1. Owner, 2026-09-10: *«la
@@ -373,7 +373,13 @@ def mapear_filas(filas: list[tuple], cols: dict, tc, puente: dict,
                 # Verificado sobre agosto 2026: las 116 cuentas de planilla
                 # suman EXACTAMENTE lo mismo por posición que a nivel de
                 # cuenta. No es un total nuevo: es el mismo, abierto.
-                if cuenta[:1] == "6" and m_crc != ZERO:
+                #
+                # En las cuentas 6 es la POSICIÓN: `6000-0111-501` = concepto,
+                # depto, Front Desk Agent. En las 7 es el DETALLE del gasto:
+                # `7310-0110-800` = Rooms / Laundry and Dry Cleaning (owner,
+                # 2026-09-10). Las 5 casi no lo usan —2 de 7 cuentas en agosto—
+                # y se guardan igual: si un mes aparece, está.
+                if cuenta[:1] in ("5", "6", "7") and m_crc != ZERO:
                     # El departamento sale del PADRE: `depto_de` lee una cuenta
                     # de dos segmentos, y ésta tiene tres.
                     dep = depto_de(padre)

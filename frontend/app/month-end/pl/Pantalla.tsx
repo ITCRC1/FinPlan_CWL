@@ -27,7 +27,7 @@ import {
   getAuditoria, getPLDetail, getComentariosPL, guardarComentarioPL,
   getEstadisticasCierre, getDetalleDeCelda,
   getConsultaCatalogo, correrConsulta, bajarConsultaExcel, getPLDoceMeses,
-  getPlanillaPorCuenta, getPlanillaPorPosicion,
+  getPlanillaPorCuenta, getPlanillaPorPosicion, getGastoPorDetalle,
   type ConsultaFila, type ConsultaCatalogo, type FbDetalle, type FbMes, type IngresoDetalle,
   type AuditoriaCuadre, type PLDetailFila, type EstadisticasCierre,
   type Scenario, type PLCompareVersion, type PLColumn, type GastoEscenario,
@@ -105,6 +105,9 @@ const VISTAS = [
   // quién lo cobra: «un reporte grande porque desgrana toda la cuenta y
   // departamento».
   { key: "planillaPosicion" },
+  // El gemelo para el gasto: el mismo tercer segmento, que en las 6 es el
+  // puesto y en las 7 es el detalle (owner, 2026-09-10).
+  { key: "gastoDetalle" },
 ] as const;
 type Vista = typeof VISTAS[number]["key"];
 
@@ -449,6 +452,8 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     useState<Awaited<ReturnType<typeof getPlanillaPorCuenta>> | null>(null);
   const [planillaPos, setPlanillaPos] =
     useState<Awaited<ReturnType<typeof getPlanillaPorPosicion>> | null>(null);
+  const [gastoDet, setGastoDet] =
+    useState<Awaited<ReturnType<typeof getGastoPorDetalle>> | null>(null);
   /** El P&L Statement, abierto por departamento.
    *
    *  Owner, 2026-09-02: *«podés con un click llevarlo de totales a
@@ -728,6 +733,15 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   // que se quedó en el mes anterior es peor que uno vacío.
   // Solo el MES en revisión: este detalle sale del borrador del Pre-Cierre,
   // no de un escenario, así que no depende de las ranuras ni del horizonte.
+  useEffect(() => {
+    if (vista !== "gastoDetalle") return;
+    let vivo = true;
+    getGastoPorDetalle(year, mes)
+      .then(r => { if (vivo) setGastoDet(r); })
+      .catch(() => { if (vivo) setGastoDet(null); });
+    return () => { vivo = false; };
+  }, [vista, year, mes]);
+
   useEffect(() => {
     if (vista !== "planillaPosicion") return;
     let vivo = true;
@@ -1893,7 +1907,116 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     flow: async () => (ranuras[varA] && ranuras[varB] ? [cuadroFlow()] : []),
     summary: async () => (ranuras[varA] && ranuras[varB] ? [cuadroSummary()] : []),
     pl: async () => [cuadroPL()],
+    // ⚠️ Los dos piden SU dato con `await`, no leen el estado de la pantalla.
+    //
+    // Los sub-tabs de planilla cargan al abrirse, y el Excel se baja sin
+    // abrirlos: leyendo el estado saldrían dos hojas vacías. Owner,
+    // 2026-08-27: «el excel no baja lo que está viendo».
+    planillaCuentas: async () => [await cuadroPlanillaCuentas()],
+    planillaPosicion: async () => await cuadroPlanillaPosicion(),
+    gastoDetalle: async () => await cuadroGastoDetalle(),
   };
+
+  /** El gasto por DEPARTAMENTO · CUENTA · DETALLE, para el Excel.
+   *
+   *  Una sola columna de monto: es el mes en revisión y no hay contra qué
+   *  compararlo — un presupuesto no se digita por detalle del mayor. */
+  async function cuadroGastoDetalle(): Promise<Cuadro[]> {
+    const d = await getGastoPorDetalle(year, mes);
+    if (!d.hay_detalle) return [];
+    const filas: FilaCuadro[] = [];
+    for (const dep of d.departamentos) {
+      filas.push({ label: `${dep.dept_code} · ${dep.dept_name}`, es_total: true,
+                   valores: [dep.total] });
+      for (const cta of dep.cuentas) {
+        for (const f of cta.filas) {
+          filas.push({ label: `${cta.cuenta}  ${f.detalle || "—"}  ${f.nombre}`,
+                       nivel: 1, valores: [f.monto] });
+        }
+        filas.push({ label: t("totalCuenta", { cuenta: cta.cuenta }), nivel: 1,
+                     es_total: true, valores: [cta.total] });
+      }
+    }
+    filas.push({ label: t("gastoDetalleTotal"), es_total: true,
+                 valores: [d.total] });
+    return [{
+      titulo: t("tab_gastoDetalle"),
+      subtitulo: `${MESES[mes - 1]} ${year} · USD`,
+      columnas: [
+        { label: t("detalle"), ancho: 60, formato: "texto" },
+        { label: `${MESES[mes - 1]} ${year}`, ancho: 18, formato: "usd2" },
+      ],
+      filas,
+    }];
+  }
+
+  /** La planilla por CUENTA, para el Excel. Los 17 conceptos × versión. */
+  async function cuadroPlanillaCuentas(): Promise<Cuadro> {
+    const ids = ranuras.filter(Boolean);
+    const d = await getPlanillaPorCuenta(ids, mes, horizonte);
+    const filas: FilaCuadro[] = d.cuentas
+      .filter(c => usadas.some(u => Math.abs(
+        d.escenarios.find(e => e.scenario_id === u.id)?.montos[c.account_code] ?? 0) >= 0.005))
+      .map(c => ({
+        label: `${c.account_code}  ${c.nombre}`,
+        valores: usadas.map(u =>
+          d.escenarios.find(e => e.scenario_id === u.id)?.montos[c.account_code] ?? 0),
+      }));
+    filas.push({
+      label: t("planillaCuentasTotal"), es_total: true,
+      // El TOTAL del backend, no la suma de las filas: sumar acá sería otra
+      // aritmética, y el día que se agregue un concepto dejaría de cuadrar.
+      valores: usadas.map(u =>
+        d.escenarios.find(e => e.scenario_id === u.id)?.total ?? null),
+    });
+    return {
+      titulo: t("tab_planillaCuentas"),
+      subtitulo: `${periodo} ${year} · USD`,
+      columnas: [
+        { label: t("cuenta"), ancho: 34, formato: "texto" },
+        ...usadas.map(u => ({ label: etiqueta(u.id), ancho: 18,
+                              formato: "usd2" as const })),
+      ],
+      filas,
+    };
+  }
+
+  /** La planilla por POSICIÓN. Una sola columna: es el mes en revisión, y no
+   *  hay contra qué compararlo — un presupuesto no se planea por posición. */
+  async function cuadroPlanillaPosicion(): Promise<Cuadro[]> {
+    const d = await getPlanillaPorPosicion(year, mes);
+    if (!d.hay_detalle) return [];
+    const filas: FilaCuadro[] = [];
+    let depActual = "";
+    let ctaActual = "";
+    for (const f of d.filas) {
+      if (f.dept_code !== depActual) {
+        depActual = f.dept_code; ctaActual = "";
+        filas.push({ label: `${f.dept_code} · ${f.dept_name}`, es_total: true,
+                     valores: [null] });
+      }
+      if (f.cuenta !== ctaActual) {
+        ctaActual = f.cuenta;
+        filas.push({ label: `${f.cuenta}  ${f.cuenta_nombre}`, nivel: 1,
+                     valores: [null] });
+      }
+      filas.push({
+        label: `${f.posicion}  ${f.posicion_nombre || t("posicionSinNombre")}`,
+        nivel: 2, valores: [f.monto],
+      });
+    }
+    filas.push({ label: t("planillaCuentasTotal"), es_total: true,
+                 valores: [d.total] });
+    return [{
+      titulo: t("tab_planillaPosicion"),
+      subtitulo: `${MESES[mes - 1]} ${year} · USD`,
+      columnas: [
+        { label: t("posicion"), ancho: 46, formato: "texto" },
+        { label: `${MESES[mes - 1]} ${year}`, ancho: 18, formato: "usd2" },
+      ],
+      filas,
+    }];
+  }
 
   /** Los cuadros del Resumen 12m: uno por versión.
    *
@@ -3486,6 +3609,101 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
        * overhead, que es el error que ya dejó a Sistemas 937,33 corto.
        * Ver la nota `finplan-dos-vocabularios-de-linea`. */}
       {vista === "utilidad" && <PLDetailEnCierre esPre={esPre} />}
+
+      {vista === "gastoDetalle" && (() => {
+        /* El gasto del mes por DEPARTAMENTO · CUENTA · DETALLE.
+         *
+         * ⚠️ Cada cuenta cierra contra SU total —el del nivel que suma el
+         * P&L—. Cuando el detalle no llega, o se pasa, el backend agrega una
+         * fila «(sin detalle)» con la diferencia. Sub-filas que no suman su
+         * total es el defecto mas caro de un cuadro contable: se ve bien y no
+         * dice la verdad. En agosto 2026 la 7105-0180 trae $11.196,00 MAS en
+         * el detalle que en la cuenta, y eso se ve. */
+        const d = gastoDet;
+        if (!d) return (
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            {tc("loading")}
+          </div>
+        );
+        if (!d.hay_detalle) return (
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 760,
+                      lineHeight: 1.6 }}>
+            {d.motivo === "sin_borrador"
+              ? t("planillaPosSinBorrador", { mes: MESES[mes - 1], year })
+              : t("planillaPosSinDetalle")}
+          </p>
+        );
+        return (
+          <div>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)",
+                        margin: "0 0 10px", maxWidth: 860, lineHeight: 1.6 }}>
+              {t.rich("gastoDetalleIntro", bold)}
+            </p>
+            <div className="fin-scroll-x">
+              <table style={{ borderCollapse: "collapse", minWidth: 720 }}>
+                <thead><tr>
+                  <th style={{ ...TH, textAlign: "left", minWidth: 90 }}>{t("cuenta")}</th>
+                  <th style={{ ...TH, textAlign: "left", minWidth: 80 }}>{t("detalle")}</th>
+                  <th style={{ ...TH, textAlign: "left", minWidth: 330 }}>{t("nombre")}</th>
+                  <th style={{ ...TH, minWidth: 130 }}>{MESES[mes - 1]} {year}</th>
+                </tr></thead>
+                <tbody>
+                  {d.departamentos.map(dep => (
+                    <Fragment key={dep.dept_code}>
+                      <tr style={{ background: "var(--bg-elevated)" }}>
+                        <td colSpan={3} style={{ ...TDL, fontWeight: 800 }}>
+                          {dep.dept_code} · {dep.dept_name}
+                        </td>
+                        <td style={{ ...TD, fontWeight: 800 }}>{usd(dep.total)}</td>
+                      </tr>
+                      {dep.cuentas.map(cta => (
+                        <Fragment key={dep.dept_code + cta.cuenta}>
+                          {cta.filas.map((f, i) => (
+                            <tr key={dep.dept_code + cta.cuenta + f.detalle + i}>
+                              <td style={{ ...TDL, paddingLeft: 22,
+                                           fontVariantNumeric: "tabular-nums",
+                                           color: "var(--text-secondary)" }}>
+                                {/* La cuenta se repite en cada detalle: es lo
+                                    que el owner pidio para poder leerlo de
+                                    corrido sin perder la referencia. */}
+                                {cta.cuenta}
+                              </td>
+                              <td style={{ ...TDL, fontVariantNumeric: "tabular-nums",
+                                           color: "var(--text-secondary)" }}>
+                                {f.detalle || "—"}
+                              </td>
+                              <td style={TDL} title={f.cuenta_completa}>
+                                {f.nombre}
+                              </td>
+                              <td style={TD}>{usd(f.monto)}</td>
+                            </tr>
+                          ))}
+                          <tr>
+                            <td colSpan={3} style={{ ...TDL, paddingLeft: 22,
+                                                     fontSize: 11.5, fontWeight: 600,
+                                                     color: "var(--text-secondary)" }}>
+                              {t("totalCuenta", { cuenta: cta.cuenta })}
+                            </td>
+                            <td style={{ ...TD, fontWeight: 600,
+                                         borderTop: "1px solid var(--border-subtle)" }}>
+                              {usd(cta.total)}
+                            </td>
+                          </tr>
+                        </Fragment>
+                      ))}
+                    </Fragment>
+                  ))}
+                  <tr style={{ fontWeight: 800,
+                               borderTop: "2px solid var(--border-medium)" }}>
+                    <td colSpan={3} style={TDL}>{t("gastoDetalleTotal")}</td>
+                    <td style={TD}>{usd(d.total)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {vista === "planillaPosicion" && (() => {
         /* La planilla del mes abierta por DEPARTAMENTO · CUENTA · POSICIÓN.

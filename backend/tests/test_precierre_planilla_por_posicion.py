@@ -169,3 +169,52 @@ def test_el_respaldo_del_mayor_sale_SOLO_de_la_linea_de_salario():
                                  "precierre_api.py"), encoding="utf-8").read()
     i = src.index("del_mayor: dict[str, str] = {}")
     assert "if f.cuenta_base != 6000:" in src[i:i + 400]
+
+
+# ── El gemelo del gasto: el tercer nivel de las 7xxx ─────────────────────────
+
+def test_el_tercer_nivel_tambien_se_guarda_para_el_gasto():
+    """Owner, 2026-09-10: *«te vas al tercer nivel de gastos, 7310-0110-800
+    ROOMS / LAUNDRY AND DRY CLEANING»*.
+
+    Es el MISMO segmento que la posicion: en las 6 es el puesto, en las 7 es el
+    detalle del gasto. Una sola lectura, un solo lugar donde guardarlo.
+    """
+    libro = [
+        ["7310-0110", "ROOMS / LAUNDRY AND DRY CLEANING", "600000", "600000"],
+        ["7310-0110-800", "ROOMS / LAUNDRY AND DRY CLEANING", "600000", "600000"],
+        ["6000-0111", "SALARIES AND WAGES FRONT DESK", "100000", "100000"],
+        ["6000-0111-501", "SALARIES AND WAGES FRONT DESK AGENT", "100000", "100000"],
+    ]
+    puente = {**PUENTE, "0110": {"nombre_integrity": "Hab",
+                                 "destino_finplan": "0110"}}
+    r = m.leer(_libro(libro), TC, puente)
+    clases = {str(p["cuenta_base"])[0] for p in r["posiciones"]}
+    assert clases == {"6", "7"}
+    gasto = next(p for p in r["posiciones"] if str(p["cuenta_base"]) == "7310")
+    assert gasto["posicion"] == "800"
+    assert gasto["destino_finplan"] == "0110"
+    assert gasto["mes_usd"] == Decimal("1200")     # 600000 / 500
+
+
+def test_el_gasto_por_detalle_cierra_contra_el_total_de_la_cuenta():
+    """El endpoint agrega «(sin detalle)» cuando el detalle no da su cuenta.
+
+    No es hipotetico: en agosto 2026 la `7105-0180` trae un detalle que suma
+    US$11.196,00 MAS que la cuenta. Es una inconsistencia del archivo de
+    Integrity, y el reporte la MUESTRA en vez de repartirla — sub-filas que no
+    suman su total es el defecto mas caro de un cuadro contable: se ve bien y
+    no dice la verdad.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("async def gasto_por_detalle")
+    cuerpo = src[i:]
+    assert '"(sin detalle)"' in cuerpo
+    # El total manda el nivel que suma el P&L, no la suma del detalle.
+    assert "totales_cuenta.get((dep_code, base), cta[\"detalle\"])" in cuerpo
+    # Y las cuentas sin detalle entran igual, o el total por departamento
+    # dejaria de ser el del P&L.
+    assert "Las cuentas del P&L que NO tienen detalle" in cuerpo

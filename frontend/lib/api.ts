@@ -828,6 +828,42 @@ export interface PlanillaPorPosicion {
   /** Lo calcula el backend. Sumar las filas dibujadas sería otra aritmética. */
   total: number;
 }
+// ── El gasto del mes, abierto por DEPARTAMENTO · CUENTA · DETALLE ───────────
+//
+// Owner, 2026-09-10: «el tercer nivel de gastos, 7310-0110-800 ROOMS / LAUNDRY
+// AND DRY CLEANING […] un total por cuenta pero el split por detalle» y «un
+// total de gasto por departamento».
+//
+// El gemelo de la planilla por posición: el mismo tercer segmento, que en las
+// 6 es el puesto y en las 7 es el detalle del gasto.
+export interface GastoDetalleFila {
+  detalle: string; nombre: string; cuenta_completa: string;
+  fila: number; monto: number;
+}
+export interface GastoDetalleCuenta {
+  cuenta: string;
+  filas: GastoDetalleFila[];
+  /** El total de la CUENTA, del nivel que suma el P&L. Las filas cierran
+   *  contra él: cuando no llegan, viene una «(sin detalle)» con la diferencia. */
+  total: number;
+}
+export interface GastoDetalleDepto {
+  dept_code: string; dept_name: string;
+  cuentas: GastoDetalleCuenta[];
+  total: number;
+}
+export interface GastoPorDetalle {
+  anio: number; mes: number; precierre_id: string | null;
+  hay_detalle: boolean; motivo: string;
+  departamentos: GastoDetalleDepto[];
+  total: number;
+}
+export async function getGastoPorDetalle(
+  anio: number, mes: number,
+): Promise<GastoPorDetalle> {
+  return api.get(`/precierre/gasto-por-detalle/${anio}/${mes}/`);
+}
+
 export async function getPlanillaPorPosicion(
   anio: number, mes: number,
 ): Promise<PlanillaPorPosicion> {
