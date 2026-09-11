@@ -301,3 +301,48 @@ def test_el_total_de_la_cuenta_comparada_sale_de_la_cuenta_entera():
                                  "precierre_api.py"), encoding="utf-8").read()
     i = src.index("otros_cta = {sid: round(sum(")
     assert "if dc == dep_code and ac == cta[\"cuenta\"]" in src[i:i + 400]
+
+
+def test_el_total_incluye_lo_que_ninguna_posicion_cobra():
+    """Owner, 2026-09-10: *«que pegue a un vistazo»*.
+
+    El detalle por posicion sale del mayor —US$227.497,60 en agosto—; Payroll
+    x Cuenta dice US$251.819,00. La diferencia son los US$24.321,93 de la 6025
+    Cafeteria, que NO EXISTE en el archivo de Integrity: no es planilla
+    posteada, es el reparto que el sistema carga a cada departamento. Nadie la
+    cobra, asi que no tiene posicion.
+
+    Se agrega como linea rotulada en vez de repartirla entre los puestos:
+    repartirla haria que el total pegara INVENTANDO plata que nadie cobro.
+
+    El faltante se mide contra la MISMA fuente que usa Payroll x Cuenta
+    —`PayrollConceptEntry` del espejo— asi que los dos tabs cierran en el mismo
+    numero por construccion, no por coincidencia.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    i = src.index("sin_posicion: list[dict] = []")
+    cuerpo = src[i:i + 2500]
+    # Mide contra el espejo, que es de donde sale Payroll x Cuenta.
+    assert "Scenario.es_precierre.is_(True)" in cuerpo
+    assert "PayrollConceptEntry.month == mes" in cuerpo
+    # El total suma las dos partes, y el desglose viaja para poder explicarlo.
+    assert '"total_con_posicion"' in src and '"total_sin_posicion"' in src
+    j = src.index('"total": round(float(sum(f.mes_usd for f in filas))')
+    assert 'sum(r["monto"] for r in sin_posicion)' in src[j:j + 220]
+
+
+def test_la_linea_del_reparto_se_rotula_y_no_se_reparte():
+    """Una fila sin puesto tiene que DECIR que es un reparto. Dejarla con el
+    nombre en blanco la haria pasar por un puesto sin nombre, que es otra cosa
+    —esa existe y se llama «(sin nombre en el catalogo)»."""
+    import io as _io
+    import os as _os
+    pant = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "..", "frontend",
+                                  "app", "month-end", "pl", "Pantalla.tsx"),
+                    encoding="utf-8").read()
+    assert 'f.sin_posicion ? (' in pant
+    assert 't("sinPosicion")' in pant
+    assert 't("posicionSinNombre")' in pant     # la otra sigue existiendo

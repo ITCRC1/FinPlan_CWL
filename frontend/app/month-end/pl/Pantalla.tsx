@@ -3840,7 +3840,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                                   original, que es la prueba del número. */}
                               <td style={TDL}
                                   title={`${f.cuenta_completa} · ${f.descripcion}`}>
-                                {f.posicion_nombre || (
+                                {f.sin_posicion ? (
+                                  <span style={{ color: "var(--text-secondary)",
+                                                 fontStyle: "italic" }}>
+                                    {t("sinPosicion")}
+                                  </span>
+                                ) : f.posicion_nombre || (
                                   <span style={{ color: "var(--text-secondary)" }}>
                                     {t("posicionSinNombre")}
                                   </span>
@@ -3885,6 +3890,16 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                       <td key={c.scenario_id} style={TD}>{usd(c.total)}</td>
                     ))}
                   </tr>
+                  {d.total_sin_posicion !== 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ ...TDL, fontSize: 11.5,
+                                               color: "var(--text-secondary)" }}>
+                        {t("planillaPosDesglose", {
+                          conPos: usd(d.total_con_posicion),
+                          sinPos: usd(d.total_sin_posicion) })}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

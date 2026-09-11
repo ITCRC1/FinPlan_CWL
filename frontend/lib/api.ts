@@ -820,6 +820,11 @@ export interface PlanillaPosicionFila {
    *  checkbook (`0112-01`): no comparten códigos, y aparear por número
    *  emparejaría puestos distintos sin fallar. */
   otros: Record<string, number>;
+  /** `true` = lo que la planilla tiene y NINGUNA posición cobra: el reparto de
+   *  cafetería (6025), que no existe en el mayor de Integrity. Se muestra
+   *  rotulado para que el total pegue con Payroll x Cuenta sin inventar plata
+   *  por posición. */
+  sin_posicion: boolean;
 }
 export interface PlanillaPorPosicion {
   anio: number; mes: number; precierre_id: string | null;
@@ -830,8 +835,12 @@ export interface PlanillaPorPosicion {
   hay_detalle: boolean;
   motivo: string;
   filas: PlanillaPosicionFila[];
-  /** Lo calcula el backend. Sumar las filas dibujadas sería otra aritmética. */
+  /** Lo calcula el backend. Sumar las filas dibujadas sería otra aritmética.
+   *  INCLUYE las líneas sin posición, para que pegue con Payroll x Cuenta. */
   total: number;
+  /** El desglose del total, por si hace falta explicarlo. */
+  total_con_posicion: number;
+  total_sin_posicion: number;
   comparar: { scenario_id: string; version: string; total: number }[];
   /** Lo que una versión tiene y el mes NO. Se muestra: un puesto
    *  presupuestado que este mes no se pagó es justo lo que hay que ver. */

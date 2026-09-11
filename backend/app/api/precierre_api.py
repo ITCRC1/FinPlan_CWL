@@ -980,6 +980,63 @@ async def planilla_por_posicion(
                 _llave_de_puesto(catalogo_pos.get(f.posicion)
                                  or del_mayor.get(f.posicion, "")))
 
+    # ── Lo que la planilla tiene y NINGUNA posición cobra ─────────────────
+    #
+    # Owner, 2026-09-10: *«que pegue a un vistazo»*.
+    #
+    # El detalle por posición sale del mayor y suma US$227.497,60 en agosto; el
+    # tab Payroll x Cuenta dice US$251.819,00. La diferencia son los
+    # US$24.321,93 de la 6025 Cafetería, que **no existe en el archivo de
+    # Integrity**: no es planilla posteada, es el reparto de cafetería que el
+    # sistema carga a cada departamento. Nadie la cobra, así que no tiene
+    # posición — y por eso el detalle no podía llegar al total.
+    #
+    # En vez de dejar dos números sin explicación, se agrega la línea que
+    # falta, rotulada. Repartirla entre las posiciones habría hecho que el
+    # total pegara inventando plata que nadie cobró: eso sí sería mentir.
+    #
+    # El faltante se mide contra la MISMA fuente que usa Payroll x Cuenta
+    # —`PayrollConceptEntry` del espejo—, así que los dos tabs cierran en el
+    # mismo número por construcción y no por coincidencia.
+    cubierto: dict[tuple[str, str], Decimal] = {}
+    for f in filas:
+        k = (f.destino_finplan, str(f.cuenta_base or ""))
+        cubierto[k] = cubierto.get(k, Decimal("0")) + f.mes_usd
+
+    sin_posicion: list[dict] = []
+    esp = (await db.execute(select(Scenario).where(
+        Scenario.hotel_id == HOTEL_ID, Scenario.year == anio,
+        Scenario.es_precierre.is_(True)))).scalars().first()
+    if esp is not None:
+        from app.api.consulta_api import CONCEPTOS
+        rotulo = {c: r for _campo, c, r in CONCEPTOS}
+        total_mes: dict[tuple[str, str], Decimal] = {}
+        for e in (await db.execute(select(PayrollConceptEntry).where(
+                PayrollConceptEntry.scenario_id == esp.id,
+                PayrollConceptEntry.month == mes))).scalars().all():
+            for campo, codigo, _r in CONCEPTOS:
+                v = getattr(e, campo, None)
+                if v:
+                    k = ((e.dept_code or "").strip(), codigo)
+                    total_mes[k] = total_mes.get(k, Decimal("0")) + Decimal(str(v))
+        for (dep, cta), total in sorted(total_mes.items()):
+            resto = total - cubierto.get((dep, cta), Decimal("0"))
+            if abs(resto) < Decimal("0.005"):
+                continue
+            sin_posicion.append({
+                "dept_code": dep,
+                "dept_name": nombres.get(dep, dep),
+                "depto_integrity": "",
+                "cuenta": cta,
+                "cuenta_nombre": rotulo_cuenta.get(cta, ""),
+                "posicion": "",
+                "posicion_nombre": "",
+                "cuenta_completa": "",
+                "fila": 0,
+                "monto": round(float(resto), 2),
+                "sin_posicion": True,
+            })
+
     vistas = {_llave_fila(f) for f in filas}
     # Lo que una versión tiene y el mes NO: se dice, no se esconde. Un puesto
     # presupuestado que este mes no se pagó es justo lo que hay que ver.
@@ -1030,8 +1087,15 @@ async def planilla_por_posicion(
             # Lo mismo en las otras versiones, apareado por cuenta + puesto.
             "otros": {sid: round(mapa.get(_llave_fila(f), 0.0), 2)
                       for sid, mapa in comparar.items()},
-        } for f in filas],
-        "total": round(float(sum(f.mes_usd for f in filas)), 2),
+            "sin_posicion": False,
+        } for f in filas] + [
+            {**r, "otros": {sid: 0.0 for sid in comparar}} for r in sin_posicion],
+        # El total incluye lo que ninguna posición cobra: así pega con Payroll
+        # x Cuenta de un vistazo, que es lo que el owner pidió.
+        "total": round(float(sum(f.mes_usd for f in filas))
+                       + sum(r["monto"] for r in sin_posicion), 2),
+        "total_con_posicion": round(float(sum(f.mes_usd for f in filas)), 2),
+        "total_sin_posicion": round(sum(r["monto"] for r in sin_posicion), 2),
     }
 
 
