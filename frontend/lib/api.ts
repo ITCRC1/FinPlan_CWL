@@ -842,6 +842,11 @@ export interface PlanillaPorPosicion {
   total_con_posicion: number;
   total_sin_posicion: number;
   comparar: { scenario_id: string; version: string; total: number }[];
+  /** Lo que se sabe SIN aparear nombres: por «depto|cuenta» y por depto. El
+   *  departamento y la cuenta son los mismos en los dos sistemas, así que
+   *  estos totales son exactos aunque el nombre del puesto no coincida. */
+  otros_por_cuenta: Record<string, Record<string, number>>;
+  otros_por_depto: Record<string, Record<string, number>>;
   /** Lo que una versión tiene y el mes NO. Se muestra: un puesto
    *  presupuestado que este mes no se pagó es justo lo que hay que ver. */
   sin_pareja: { scenario_id: string; version: string; cuenta: string;

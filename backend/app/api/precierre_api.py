@@ -865,6 +865,35 @@ def _llave_de_puesto(nombre: str) -> str:
     return " ".join(t.split())
 
 
+async def _planilla_por_cuenta_dep(
+        db: AsyncSession, scenario_id: str,
+        meses: set[int]) -> dict[tuple[str, str], float]:
+    """{(departamento, cuenta): monto} de una versión del checkbook.
+
+    ⚠️ Este corte NO necesita aparear nada: el departamento y la cuenta son
+    los mismos en los dos sistemas. Por eso es el que se muestra en los
+    subtotales, y el del puesto —que sí depende de que el nombre coincida—
+    queda para la línea de detalle.
+
+    Owner, 2026-09-10, viendo la columna de Budget en cero: *«por qué no está
+    acá al menos el total»*. Tenía razón: que el nombre del puesto no apareje
+    no es razón para no mostrar lo que sí se sabe.
+    """
+    from app.api.consulta_api import CONCEPTOS
+    out: dict[tuple[str, str], float] = {}
+    for e in (await db.execute(select(PayrollConceptEntry).where(
+            PayrollConceptEntry.scenario_id == scenario_id))).scalars().all():
+        if (e.month or 0) not in meses:
+            continue
+        dep = (e.dept_code or "").strip()
+        for campo, codigo, _r in CONCEPTOS:
+            v = getattr(e, campo, None)
+            if v:
+                k = (dep, codigo)
+                out[k] = out.get(k, 0.0) + float(v)
+    return out
+
+
 async def _planilla_por_puesto(db: AsyncSession, scenario_id: str,
                                meses: set[int]) -> dict[tuple[str, str], float]:
     """{(cuenta, llave de puesto): monto} de una versión del checkbook.
@@ -967,6 +996,7 @@ async def planilla_por_posicion(
     # razón: su planilla está por puesto en `PayrollConceptEntry`, no salió de
     # drivers. Se aparea por NOMBRE del puesto — ver `_llave_de_puesto`.
     comparar: dict[str, dict[tuple[str, str], float]] = {}
+    por_cuenta: dict[str, dict[tuple[str, str], float]] = {}
     etiquetas: dict[str, str] = {}
     for sid in [x.strip() for x in scenarios.split(",") if x.strip()]:
         esc = await db.get(Scenario, sid)
@@ -974,6 +1004,7 @@ async def planilla_por_posicion(
             continue
         etiquetas[sid] = f"{esc.year} · {esc.type} {esc.version}".strip()
         comparar[sid] = await _planilla_por_puesto(db, sid, {mes})
+        por_cuenta[sid] = await _planilla_por_cuenta_dep(db, sid, {mes})
 
     def _llave_fila(f) -> tuple[str, str]:
         return (str(f.cuenta_base or ""),
@@ -1053,9 +1084,22 @@ async def planilla_por_posicion(
         "subido": pc.creado_en.isoformat() if pc.creado_en else "",
         "hay_detalle": bool(filas),
         "motivo": "" if filas else "borrador_sin_detalle",
+        # ⚠️ El total de cada versión sale del corte por CUENTA, no de sumar
+        # los puestos que aparearon: si un nombre no coincide, el total del
+        # presupuesto no puede cambiar por eso.
         "comparar": [{"scenario_id": sid, "version": etiquetas[sid],
-                      "total": round(sum(m.values()), 2)}
-                     for sid, m in comparar.items()],
+                      "total": round(sum(por_cuenta[sid].values()), 2)}
+                     for sid in comparar],
+        # Lo que se sabe SIN aparear: por (departamento, cuenta) y por
+        # departamento. Es lo que se muestra en los subtotales.
+        "otros_por_cuenta": {
+            f"{dep}|{cta}": {sid: round(m.get((dep, cta), 0.0), 2)
+                             for sid, m in por_cuenta.items()}
+            for dep, cta in {k for m in por_cuenta.values() for k in m}},
+        "otros_por_depto": {
+            dep: {sid: round(sum(v for (d, _c), v in m.items() if d == dep), 2)
+                  for sid, m in por_cuenta.items()}
+            for dep in {d for m in por_cuenta.values() for (d, _c) in m}},
         "sin_pareja": sin_pareja,
         "filas": [{
             "dept_code": f.destino_finplan,

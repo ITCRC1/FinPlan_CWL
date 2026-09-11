@@ -3845,8 +3845,10 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                           <td key={c.scenario_id}
                               style={{ ...TD, fontWeight: 800, fontSize: 13,
                                        color: "var(--brand)" }}>
-                            {usd(dep.cuentas.reduce((s2, cta) => s2 + cta.filas.reduce(
-                              (s3, f) => s3 + (f.otros[c.scenario_id] ?? 0), 0), 0))}
+                            {/* El total del departamento sale del corte por
+                                cuenta —exacto, sin aparear nombres—, no de
+                                sumar los puestos que aparearon. */}
+                            {usd(d.otros_por_depto[dep.code]?.[c.scenario_id] ?? 0)}
                           </td>
                         ))}
                       </tr>
@@ -3901,8 +3903,8 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                             </td>
                             {d.comparar.map(c => (
                               <td key={c.scenario_id} style={{ ...TD, fontWeight: 700 }}>
-                                {usd(cta.filas.reduce(
-                                  (s2, f) => s2 + (f.otros[c.scenario_id] ?? 0), 0))}
+                                {usd(d.otros_por_cuenta[`${dep.code}|${cta.cuenta}`]
+                                  ?.[c.scenario_id] ?? 0)}
                               </td>
                             ))}
                           </tr>

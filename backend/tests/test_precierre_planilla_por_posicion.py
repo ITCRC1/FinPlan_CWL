@@ -370,3 +370,33 @@ def test_una_cuenta_que_solo_tiene_el_presupuesto_igual_aparece():
     assert 'dep["cuentas"].setdefault(int(cta_code)' in cuerpo
     # Con `filas` vacia: no se inventa un detalle que el mes no trajo.
     assert '"filas": [], "detalle": Decimal("0")' in cuerpo
+
+
+def test_el_total_por_cuenta_no_depende_de_que_el_nombre_apareje():
+    """Owner, 2026-09-10, viendo la columna de Budget en CERO: *«por que no
+    esta aca al menos el total»*.
+
+    El nombre del puesto puede no coincidir —el catalogo dice «FRONT DESK
+    AGENT / RECEPTIONIST» y el checkbook «Front Desk Agent»— y entonces la
+    linea de detalle sale en cero, que es correcto: no se sabe.
+
+    Pero el DEPARTAMENTO y la CUENTA son los mismos en los dos sistemas. Ese
+    total es exacto sin aparear nada, y por eso los subtotales salen de ahi.
+    Dejarlos en cero por un nombre que no calza seria esconder un dato que se
+    sabe.
+    """
+    import io as _io
+    import os as _os
+    src = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "app", "api",
+                                 "precierre_api.py"), encoding="utf-8").read()
+    assert "async def _planilla_por_cuenta_dep" in src
+    assert '"otros_por_cuenta"' in src and '"otros_por_depto"' in src
+    # Y el total de la version sale de ahi, no de sumar los puestos apareados.
+    i = src.index('"comparar": [{"scenario_id": sid, "version": etiquetas[sid],')
+    assert "sum(por_cuenta[sid].values())" in src[i:i + 300]
+
+    pant = _io.open(_os.path.join(_os.path.dirname(__file__), "..", "..", "frontend",
+                                  "app", "month-end", "pl", "Pantalla.tsx"),
+                    encoding="utf-8").read()
+    assert "d.otros_por_depto[dep.code]" in pant
+    assert "d.otros_por_cuenta[`${dep.code}|${cta.cuenta}`]" in pant
