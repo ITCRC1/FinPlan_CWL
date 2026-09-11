@@ -3616,9 +3616,14 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
          * ⚠️ Cada cuenta cierra contra SU total —el del nivel que suma el
          * P&L—. Cuando el detalle no llega, o se pasa, el backend agrega una
          * fila «(sin detalle)» con la diferencia. Sub-filas que no suman su
-         * total es el defecto mas caro de un cuadro contable: se ve bien y no
-         * dice la verdad. En agosto 2026 la 7105-0180 trae $11.196,00 MAS en
-         * el detalle que en la cuenta, y eso se ve. */
+         * total es el defecto mas caro de un cuadro contable: se ve bien y
+         * no dice la verdad.
+         *
+         * ⚠️ Hoy la linea no aparece nunca: las 1.020 relaciones padre-hijo
+         * del archivo de agosto cuadran al centavo. Es una RED, no un
+         * hallazgo. (Un primer barrido dijo que ocho no cuadraban y estaba
+         * mal medido: sumaba el mes en crudo, sin la regla de signo, y una
+         * devolucion se contaba al reves.) */
         const d = gastoDet;
         if (!d) return (
           <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>

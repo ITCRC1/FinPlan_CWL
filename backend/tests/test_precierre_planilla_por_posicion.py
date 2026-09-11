@@ -200,11 +200,14 @@ def test_el_tercer_nivel_tambien_se_guarda_para_el_gasto():
 def test_el_gasto_por_detalle_cierra_contra_el_total_de_la_cuenta():
     """El endpoint agrega «(sin detalle)» cuando el detalle no da su cuenta.
 
-    No es hipotetico: en agosto 2026 la `7105-0180` trae un detalle que suma
-    US$11.196,00 MAS que la cuenta. Es una inconsistencia del archivo de
-    Integrity, y el reporte la MUESTRA en vez de repartirla — sub-filas que no
-    suman su total es el defecto mas caro de un cuadro contable: se ve bien y
-    no dice la verdad.
+    Hoy no hay ningun caso: las 1.020 relaciones padre-hijo del archivo de
+    agosto 2026 cuadran al centavo. El renglon es una RED, no un hallazgo.
+
+    Un primer barrido dijo que ocho no cuadraban —entre ellas `7105-0180` por
+    US$11.196,00— y estaba MAL MEDIDO: sumaba la columna del mes en crudo, sin
+    la regla de signo. Un ingreso viene con el acumulado en negativo y una
+    DEVOLUCION en positivo, asi que en crudo se contaba al reves. Con
+    `monto_mes` las ocho desaparecen.
     """
     import io as _io
     import os as _os

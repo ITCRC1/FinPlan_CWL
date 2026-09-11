@@ -958,10 +958,20 @@ async def gasto_por_detalle(
     subtotal que no cuadra. Sub-filas que no suman su total es el defecto más
     caro de un cuadro contable: se ve bien y no dice la verdad.
 
-    No es hipotético. En agosto 2026, `7105-0180` (A&G Contract Services) trae
-    un detalle que suma **$11.196,00 MÁS** que la cuenta. Es una inconsistencia
-    del archivo de Integrity, no del cálculo, y este reporte la muestra en vez
-    de repartirla.
+    ⚠️ **Hoy no hay ningún caso, y eso hay que decirlo.** Barridas las 1.020
+    relaciones padre-hijo del archivo de agosto 2026 —todas las clases, todos
+    los niveles— cuadran al centavo. Este renglón es una RED, no un hallazgo.
+
+    Un primer barrido dijo que ocho no cuadraban, entre ellas `7105-0180` por
+    $11.196,00. Estaba mal medido: sumaba la columna del mes en crudo, sin la
+    regla de signo. En el mayor de Integrity un ingreso viene con el acumulado
+    en negativo, y una DEVOLUCIÓN viene en positivo —`4000-0110-001` «Best
+    Available Rate»—, así que sumar en crudo la contaba al revés y el padre
+    parecía no cuadrar. Con `monto_mes`, que es la regla que usa el P&L, las
+    ocho desaparecen.
+
+    Queda escrito porque el error es fácil de repetir y cuesta caro: acusar de
+    descuadre a un libro que está bien.
     """
     pc = (await db.execute(select(Precierre).where(
         Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
