@@ -68,6 +68,15 @@ export default function PreCierrePage() {
   const [estado, setEstado] = useState<string>("");
   const [hallazgos, setHallazgos] = useState<PrecierreHallazgo[]>([]);
   const [cambios, setCambios] = useState<PrecierreCambios | null>(null);
+  /**
+   * Contra qué vuelta se compara. `""` = la inmediatamente anterior.
+   *
+   * Owner, 2026-09-11, con veintiuna vueltas de agosto: las dos últimas eran el
+   * mismo archivo al mismo TC, así que «qué cambió» decía «sin cambios» con
+   * razón — y el cambio que le importaba, el TC de 453,06 a 453,68, había
+   * quedado cinco vueltas atrás. «No lo veo… la diferencia.»
+   */
+  const [contra, setContra] = useState("");
   const [sinRevisar, setSinRevisar] = useState<string[]>([]);
   const [comparativos, setComparativos] = useState<Record<string, string>>({});
   const [umbralMonto, setUmbralMonto] = useState(5000);
@@ -103,7 +112,7 @@ export default function PreCierrePage() {
       const [d, h, c] = await Promise.all([
         verPrecierre(pid),
         hallazgosPrecierre(pid, { umbralMonto, umbralPct }),
-        cambiosPrecierre(pid),
+        cambiosPrecierre(pid, contra || undefined),
       ]);
       setHoja(d.hoja);
       setEstado(d.estado);
@@ -114,7 +123,7 @@ export default function PreCierrePage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [umbralMonto, umbralPct]);
+  }, [umbralMonto, umbralPct, contra]);
 
   useEffect(() => { if (id) void cargar(id); }, [id, cargar]);
 
@@ -216,7 +225,7 @@ export default function PreCierrePage() {
                 descartado» y eran indistinguibles: no había forma de saber cuál
                 era cuál, ni de notar que faltaba el vivo (owner, 2026-09-11). */}
             {lista.slice(0, 8).map(p => (
-              <button key={p.id} onClick={() => setId(p.id)}
+              <button key={p.id} onClick={() => { setContra(""); setId(p.id); }}
                       style={{ ...chip, ...(p.id === id ? chipActivo : {}),
                                ...(p.estado === "borrador"
                                    ? { fontWeight: 700,
@@ -264,7 +273,9 @@ export default function PreCierrePage() {
           {pestana === "hoja" && dl && (
             <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t} />
           )}
-          {pestana === "cambios" && <Cambios datos={cambios} t={t} />}
+          {pestana === "cambios" && (
+            <Cambios datos={cambios} t={t} contra={contra} setContra={setContra} />
+          )}
           {pestana === "descargas" && dl && <Descargas dl={dl} t={t} />}
 
           {/* ── Pasar a Final ─────────────────────────────────────────────── */}
@@ -522,13 +533,48 @@ function Hoja({ filas, hojaExcelUrl, t }: {
  * en ningún total, porque el total baja con ella. Es el único de los tres
  * grupos que hay que leer aunque esté vacío.
  */
-function Cambios({ datos, t }: {
+/** El selector de vuelta. Se pinta igual haya o no con qué comparar: si la
+ *  primera vuelta del mes no tiene contra quién, el desplegable igual explica
+ *  por qué no hay nada abajo. */
+function ElegirVuelta({ datos, contra, setContra }: {
+  datos: PrecierreCambios;
+  contra: string;
+  setContra: (v: string) => void;
+}) {
+  const vueltas = datos.vueltas ?? [];
+  if (!vueltas.length) return null;
+  const rotulo = (v: { creado_en: string | null; tc: number; estado: string }) =>
+    `${v.creado_en ? new Date(v.creado_en).toLocaleString(
+      undefined, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+      : "—"} · TC ${v.tc}`;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
+                  flexWrap: "wrap", fontSize: 12.5 }}>
+      <span style={{ color: "var(--text-secondary)" }}>Comparar contra:</span>
+      <select value={contra} onChange={e => setContra(e.target.value)}
+              className="fin-input" style={{ fontSize: 12.5, padding: "4px 8px" }}>
+        <option value="">La vuelta anterior</option>
+        {vueltas.map(v => (
+          <option key={v.id} value={v.id}>{rotulo(v)}</option>
+        ))}
+      </select>
+      <span style={{ color: "var(--text-secondary)" }}>
+        {vueltas.length + 1} vueltas este mes
+      </span>
+    </div>
+  );
+}
+
+function Cambios({ datos, t, contra, setContra }: {
   datos: PrecierreCambios | null;
   t: ReturnType<typeof useTranslations>;
+  contra: string;
+  setContra: (v: string) => void;
 }) {
   if (!datos) return null;
   if (!datos.anterior) {
     return <div style={caja}>
+      <ElegirVuelta datos={datos} contra={contra} setContra={setContra} />
       <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
         {t("cambios.primera")}
       </p>
@@ -546,6 +592,7 @@ function Cambios({ datos, t }: {
 
   return (
     <div style={caja}>
+      <ElegirVuelta datos={datos} contra={contra} setContra={setContra} />
       <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
         {t("cambios.contra", { archivo: datos.anterior.archivo, cuando })}
       </p>

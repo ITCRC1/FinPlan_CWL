@@ -5386,10 +5386,16 @@ export interface PrecierreCambio {
   cuenta: string; descripcion: string; depto: string; categoria: string;
   fila: number; mes_usd: number; mes_usd_antes: number | null; delta?: number;
 }
+export interface PrecierreVuelta {
+  id: string; archivo: string; estado: string; tc: number;
+  creado_en: string | null;
+}
 export interface PrecierreCambios {
   precierre_id: string;
   anterior: { id: string; archivo: string; estado: string; tc: number;
               creado_en: string | null } | null;
+  /** Las otras vueltas del mismo mes: las opciones contra las que comparar. */
+  vueltas?: PrecierreVuelta[];
   tc_cambio?: boolean;
   movidas: PrecierreCambio[];
   nuevas: PrecierreCambio[];
@@ -5397,8 +5403,16 @@ export interface PrecierreCambios {
   total_antes: number | null; total_ahora: number | null;
   delta_total: number | null;
 }
-export function cambiosPrecierre(id: string): Promise<PrecierreCambios> {
-  return api.get(`/precierre/${id}/cambios/`);
+/**
+ * `contra` elige la vuelta con la que medir. Vacío = la inmediatamente anterior.
+ *
+ * Con veintiuna vueltas del mismo mes, «la anterior» suele ser el mismo archivo
+ * subido de nuevo y la comparación dice «sin cambios» con razón, mientras el
+ * cambio que importa quedó cinco vueltas atrás (owner, 2026-09-11).
+ */
+export function cambiosPrecierre(id: string, contra?: string): Promise<PrecierreCambios> {
+  const q = contra ? `?contra=${encodeURIComponent(contra)}` : "";
+  return api.get(`/precierre/${id}/cambios/${q}`);
 }
 
 /**

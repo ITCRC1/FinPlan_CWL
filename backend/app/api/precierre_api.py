@@ -529,9 +529,12 @@ async def espejo_al_dia(anio: int, mes: int, db: AsyncSession = Depends(get_db),
 
 
 @router.get("/precierre/{precierre_id}/cambios/")
-async def cambios(precierre_id: str, db: AsyncSession = Depends(get_db),
+async def cambios(precierre_id: str,
+                  contra: str = Query("", description="id de la vuelta contra la "
+                                      "que comparar; vacío = la anterior"),
+                  db: AsyncSession = Depends(get_db),
                   _=Depends(get_current_user)):
-    """Qué cambió respecto de la subida anterior del MISMO mes.
+    """Qué cambió respecto de OTRA subida del MISMO mes.
 
     Se compara cuenta por cuenta, que es la llave del mayor. Tres clases de
     cambio, y las tres importan por razones distintas:
@@ -545,18 +548,48 @@ async def cambios(precierre_id: str, db: AsyncSession = Depends(get_db),
 
     Si es la primera vuelta del mes, `anterior` viene en `null` y las tres
     listas vacías: no hay contra qué comparar y no se inventa una base.
+
+    ## Contra CUÁL vuelta
+
+    Por defecto, la inmediatamente anterior. Pero `contra` permite elegir
+    cualquiera del mismo mes, y eso es lo que vuelve útil la comparación cuando
+    el mes lleva muchas vueltas.
+
+    Owner, 2026-09-11, con veintiuna vueltas de agosto: las dos últimas tenían
+    el mismo archivo y el mismo TC, así que la comparación decía «sin cambios»
+    —y tenía razón—, mientras el cambio que le importaba (el TC de 453,06 a
+    453,68) había quedado cinco vueltas atrás. *«No lo veo… la diferencia.»*
+
+    La lista de vueltas contra las que se puede comparar viaja en `vueltas`, así
+    que la pantalla no tiene que ir a buscarla aparte.
     """
     pc = await _traer(db, precierre_id)
 
-    prev = (await db.execute(
+    # Las otras vueltas del mismo mes, la más nueva primero. Se devuelven
+    # siempre: son las opciones del selector.
+    hermanas = (await db.execute(
         select(Precierre)
         .where(Precierre.hotel_id == pc.hotel_id, Precierre.anio == pc.anio,
-               Precierre.mes == pc.mes, Precierre.id != pc.id,
-               Precierre.creado_en <= pc.creado_en)
-        .order_by(Precierre.creado_en.desc()))).scalars().first()
+               Precierre.mes == pc.mes, Precierre.id != pc.id)
+        .order_by(Precierre.creado_en.desc(), Precierre.id.desc()))).scalars().all()
+    vueltas = [{"id": h.id, "archivo": h.archivo_nombre, "estado": h.estado,
+                "tc": h.tc,
+                "creado_en": h.creado_en.isoformat() if h.creado_en else None}
+               for h in hermanas]
+
+    if contra:
+        prev = next((h for h in hermanas if h.id == contra), None)
+        if prev is None:
+            raise ErrorApi(404, "precierre.vuelta_desconocida")
+    else:
+        # La anterior EN EL TIEMPO, no cualquiera: comparar contra una posterior
+        # daría los deltas al revés y nadie lo notaría.
+        prev = next((h for h in hermanas
+                     if h.creado_en and pc.creado_en and h.creado_en <= pc.creado_en),
+                    None)
 
     if prev is None:
-        return {"precierre_id": precierre_id, "anterior": None,
+        return {"precierre_id": precierre_id, "anterior": None, "vueltas": vueltas,
                 "movidas": [], "nuevas": [], "ausentes": [],
                 "total_antes": None, "total_ahora": None, "delta_total": None}
 
@@ -589,6 +622,7 @@ async def cambios(precierre_id: str, db: AsyncSession = Depends(get_db),
     total_ahora = sum((f["mes_usd"] for f in ahora.values()), Decimal("0"))
     return {
         "precierre_id": precierre_id,
+        "vueltas": vueltas,
         "anterior": {"id": prev.id, "archivo": prev.archivo_nombre,
                      "estado": prev.estado, "tc": prev.tc,
                      "creado_en": prev.creado_en.isoformat() if prev.creado_en else None},
