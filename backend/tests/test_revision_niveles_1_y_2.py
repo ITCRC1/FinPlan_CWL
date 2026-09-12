@@ -277,3 +277,59 @@ def test_el_subdetalle_de_julio_suma_sus_padres():
     r = m.leer(FIXTURE.read_bytes(), TC, puente, lambda d: None)
     assert len(r["subdetalle"]) > 300
     assert n2.subdetalle_que_no_suma_su_padre(r["filas"], r["subdetalle"]) == []
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LAS TRES LISTAS DE CUENTAS 8xxx TIENEN QUE DECIR LO MISMO
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Hay tres definiciones de «que cuenta va en que renglon» bajo el GOP:
+#
+#   1. `account_mapping` (el seed)            -> lo usa el espejo / el P&L
+#   2. `pl_engine.NONOP_ACCOUNT_LINE`         -> lo usa el motor
+#   3. `revision_mes_xlsx.BAJO_GOP`           -> lo usa el CUADRO DEL BORRADOR
+#
+# La 1 y la 2 ya estaban atadas (`test_seed_manda_sobre_mapeo`). La 3 no, y se
+# habia quedado atras: la `8015` estaba en `None` y la `8010` ni figuraba.
+#
+# Owner, 2026-09-11, comparando las dos pantallas del mismo mes: «subi y me da
+# esto... y el tab del reporting pre-Closing da diferente». Eran US$5.604,76 —
+# 8015 (2.872,67) + 8010 (2.732,09)— que el borrador no sumaba. Y ese cuadro
+# alimenta los controles de «Pasar a Final», asi que la verificacion de cierre
+# comparaba contra un total corto.
+
+def test_el_cuadro_del_borrador_no_pierde_ninguna_8xxx():
+    from app.engine.pl_engine import NONOP_ACCOUNT_LINE
+    from app.export.revision_mes_xlsx import BAJO_GOP
+
+    cableadas = {c for cuentas in BAJO_GOP.values() if cuentas for c in cuentas}
+    del_motor = {int(c) for c in NONOP_ACCOUNT_LINE}
+    faltan = del_motor - cableadas
+    assert not faltan, (
+        f"el cuadro del borrador no suma estas cuentas 8xxx: {sorted(faltan)}. "
+        "Su plata no aparece en ninguna fila y el control de cierre queda corto")
+
+
+def test_ninguna_cuenta_del_borrador_esta_en_dos_renglones():
+    """Sumarla dos veces seria el error opuesto, y mas dificil de ver."""
+    from app.export.revision_mes_xlsx import BAJO_GOP
+
+    visto: dict[int, str] = {}
+    for etiqueta, cuentas in BAJO_GOP.items():
+        for c in cuentas or ():
+            assert c not in visto, f"la {c} esta en «{visto[c]}» y en «{etiqueta}»"
+            visto[c] = etiqueta
+
+
+def test_el_seguro_y_las_patentes_llegan_a_su_fila():
+    """Las dos que se perdian, con el monto de agosto 2026."""
+    from app.export.revision_mes_xlsx import valores_completos
+
+    filas = [fila(cuenta="8015-0240", base=8015, destino="0250", mes=2872.67),
+             fila(cuenta="8010-0240", base=8010, destino="0250", mes=2732.09),
+             fila(cuenta="8000-0240", base=8000, destino="0250", mes=2316.12)]
+    v = valores_completos(filas)
+    assert v["PROPERTY INSURANCE"] == D("2872.67")
+    # La 8010 es alias historico de RENT en el motor: va con la 8000.
+    assert v["TOTAL RENTA AND MANAGEMENT FEE"] == D("2316.12") + D("2732.09")
+    assert v["TOTAL Owners Expenses"] == D("2872.67") + D("2316.12") + D("2732.09")

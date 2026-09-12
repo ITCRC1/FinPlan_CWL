@@ -85,20 +85,37 @@ OVERHEADS: list[tuple[str, str]] = [
 
 #: Las líneas de abajo del GOP y la cuenta de la que sale cada una. Verificado
 #: contra las seis cuentas clase 8 de julio 2026.
-BAJO_GOP: dict[str, int | None] = {
-    "RENT": 8000,
-    "MANAGEMENT FEES (3%)": 8005,
+#: ⚠️ **Cada cuenta 8xxx del motor tiene que estar en ALGUNA fila de acá.**
+#:
+#: Esto es la TERCERA lista de «qué cuenta va en qué renglón», junto con
+#: `account_mapping` (el mapeo) y `pl_engine.NONOP_ACCOUNT_LINE` (el motor). Las
+#: tres tienen que decir lo mismo, y lo blinda
+#: `test_el_cuadro_del_borrador_no_pierde_ninguna_8xxx`.
+#:
+#: Hasta el 2026-09-11 esta lista estaba incompleta y el cuadro del borrador
+#: PERDÍA plata en silencio: la `8015` (seguro) estaba en `None` y la `8010`
+#: (patentes y bienes inmuebles) ni figuraba. En agosto 2026 eran US$5.604,76
+#: que el borrador no mostraba y el espejo sí — el owner los vio como una
+#: diferencia entre las dos pantallas. Las `8030`/`8035`/`8045`/`8050` tenían el
+#: mismo agujero; ese mes daban cero, así que nadie lo había notado.
+#:
+#: Son TUPLAS porque un renglón puede recibir más de una cuenta: la `8010` es
+#: alias histórico de RENT en el motor, y respetarlo es lo que mantiene las tres
+#: listas de acuerdo.
+BAJO_GOP: dict[str, tuple[int, ...] | None] = {
+    "RENT": (8000, 8010),
+    "MANAGEMENT FEES (3%)": (8005,),
     "MANAGEMENT FEES (5%) Royalties": None,
-    "PROPERTIES INSURANCE": None,
-    "OTHER EXPENSES": 8025,
-    "CAPITAL RESERVE": 8020,
+    "PROPERTIES INSURANCE": (8015,),
+    "OTHER EXPENSES": (8025,),
+    "CAPITAL RESERVE": (8020,),
     "LARGE CAPITAL EXPENDITURE": None,
-    "DEPRECIATION": 8040,
-    "Income Tax (30%)": 8060,
-    "BAC INTERESES PRESTAMO": None,
+    "DEPRECIATION": (8040,),
+    "Income Tax (30%)": (8060,),
+    "BAC INTERESES PRESTAMO": (8035, 8050),
     "B.C.R. INTERESES PRESTAMO": None,
-    "LEASING CAMION": None,
-    "PERDIDAS FINANCIERAS": None,
+    "LEASING CAMION": (8030,),
+    "PERDIDAS FINANCIERAS": (8045, 8090),
 }
 
 #: Las filas de estadísticas del encabezado.
@@ -137,10 +154,10 @@ def valores_desde_precierre(filas: list[dict]) -> dict[str, Decimal]:
         sumar(f"oh.{etiqueta}",
               lambda f, grupo=grupo: f["categoria"] != "No Operativo"
               and f["grupo"] == grupo)
-    for etiqueta, cuenta in BAJO_GOP.items():
+    for etiqueta, cuentas in BAJO_GOP.items():
         v[f"bg.{etiqueta}"] = (
-            sum((f["mes_usd"] for f in filas if f["cuenta_base"] == cuenta), ZERO)
-            if cuenta is not None else ZERO)
+            sum((f["mes_usd"] for f in filas if f["cuenta_base"] in cuentas), ZERO)
+            if cuentas else ZERO)
     return v
 
 
