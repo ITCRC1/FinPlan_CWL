@@ -620,8 +620,44 @@ async def cambios(precierre_id: str,
 
     total_antes = sum((f["mes_usd"] for f in antes.values()), Decimal("0"))
     total_ahora = sum((f["mes_usd"] for f in ahora.values()), Decimal("0"))
+
+    # ── El P&L lado a lado ──────────────────────────────────────────────────
+    #
+    # Owner, 2026-09-11: «espero ver una tabla comparativa y la varianza».
+    #
+    # La comparación por CUENTA de arriba contesta «qué se movió» —es la que
+    # sirve para ir a buscar el posteo—, pero no se lee de un vistazo: son
+    # códigos del mayor. Esto es la misma hoja de revisión que él mira a ojo
+    # (Rooms, F&B, … GOP, Net Profit), con las dos vueltas al lado y la
+    # varianza en plata y en porcentaje.
+    #
+    # Se calcula con `valores_completos`, el mismo que arma la pestaña «Month
+    # review». Si se calculara distinto, las dos pestañas podrían discrepar
+    # sobre el mismo mes y no habría forma de saber cuál creer.
+    v_antes = revision.valores_completos(list(antes.values()))
+    v_ahora = revision.valores_completos(list(ahora.values()))
+    hoja = []
+    for fila_, etiqueta, clave in revision.PLAN:
+        if not clave:
+            # Los títulos de sección viajan igual: sin ellos la tabla pierde la
+            # estructura que hace que se lea sola.
+            hoja.append({"fila": fila_, "etiqueta": etiqueta, "clave": None,
+                         "antes": None, "ahora": None, "var": None, "var_pct": None})
+            continue
+        a = Decimal(str(v_antes.get(clave, 0) or 0))
+        b = Decimal(str(v_ahora.get(clave, 0) or 0))
+        var = b - a
+        hoja.append({
+            "fila": fila_, "etiqueta": etiqueta, "clave": clave,
+            "antes": float(a), "ahora": float(b), "var": float(var),
+            # Sin base no hay porcentaje. Devolver 100% o infinito seria
+            # inventar una variacion que nadie puede interpretar.
+            "var_pct": (float(var / abs(a)) if a else None),
+        })
+
     return {
         "precierre_id": precierre_id,
+        "hoja": hoja,
         "vueltas": vueltas,
         "anterior": {"id": prev.id, "archivo": prev.archivo_nombre,
                      "estado": prev.estado, "tc": prev.tc,

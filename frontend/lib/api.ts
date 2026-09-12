@@ -5396,6 +5396,11 @@ export interface PrecierreCambios {
               creado_en: string | null } | null;
   /** Las otras vueltas del mismo mes: las opciones contra las que comparar. */
   vueltas?: PrecierreVuelta[];
+  /** El P&L de las dos vueltas lado a lado, en el layout de la hoja de
+   *  revisión. `clave` en null = título de sección. */
+  hoja?: { fila: number; etiqueta: string; clave: string | null;
+           antes: number | null; ahora: number | null;
+           var: number | null; var_pct: number | null }[];
   tc_cambio?: boolean;
   movidas: PrecierreCambio[];
   nuevas: PrecierreCambio[];

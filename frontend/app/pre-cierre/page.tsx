@@ -565,6 +565,80 @@ function ElegirVuelta({ datos, contra, setContra }: {
   );
 }
 
+/**
+ * El P&L de las dos vueltas, lado a lado, con la varianza.
+ *
+ * Owner, 2026-09-11: «espero ver una tabla comparativa y la varianza».
+ *
+ * La comparación por CUENTA que va más abajo contesta «qué se movió» y es la
+ * que sirve para ir a buscar el posteo — pero son códigos del mayor y no se lee
+ * de un vistazo. Esta es la misma hoja que él revisa a ojo (Rooms, F&B, … GOP,
+ * Net Profit) con las dos columnas al lado.
+ *
+ * Se ocultan las filas que están en cero en las dos vueltas: en una hoja de 71
+ * renglones, los vacíos entierran los que se movieron.
+ */
+function ComparativoPL({ datos }: { datos: PrecierreCambios }) {
+  const hoja = datos.hoja ?? [];
+  if (!hoja.length) return null;
+  const vivas = hoja.filter(f => !f.clave
+    || (f.antes ?? 0) !== 0 || (f.ahora ?? 0) !== 0);
+  if (vivas.length < 2) return null;
+  return (
+    <section style={{ marginBottom: 18 }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>
+        P&amp;L comparado
+      </h3>
+      <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+              <th style={th}>Línea</th>
+              <th style={{ ...th, textAlign: "right" }}>Antes</th>
+              <th style={{ ...th, textAlign: "right" }}>Ahora</th>
+              <th style={{ ...th, textAlign: "right" }}>Var $</th>
+              <th style={{ ...th, textAlign: "right" }}>Var %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vivas.map(f => {
+              if (!f.clave) {
+                return (
+                  <tr key={`s-${f.fila}`}>
+                    <td colSpan={5} style={{ ...td, fontWeight: 700, paddingTop: 10 }}>
+                      {f.etiqueta}
+                    </td>
+                  </tr>
+                );
+              }
+              const v = f.var ?? 0;
+              const movio = Math.abs(v) >= 0.005;
+              return (
+                <tr key={`l-${f.fila}`} style={{ borderTop: "1px solid var(--border)" }}>
+                  <td style={td}>{f.etiqueta}</td>
+                  <td style={tdNum}>{usd(f.antes ?? 0)}</td>
+                  <td style={tdNum}>{usd(f.ahora ?? 0)}</td>
+                  <td style={{ ...tdNum, fontWeight: movio ? 700 : 400,
+                               color: !movio ? "var(--text-secondary)"
+                                 : v < 0 ? COLOR.critico : COLOR.info }}>
+                    {movio ? (v > 0 ? "+" : "") + usd(v) : "—"}
+                  </td>
+                  <td style={{ ...tdNum,
+                               color: !movio ? "var(--text-secondary)"
+                                 : v < 0 ? COLOR.critico : COLOR.info }}>
+                    {f.var_pct == null || !movio ? "—"
+                      : (f.var_pct > 0 ? "+" : "") + (f.var_pct * 100).toFixed(2) + "%"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function Cambios({ datos, t, contra, setContra }: {
   datos: PrecierreCambios | null;
   t: ReturnType<typeof useTranslations>;
@@ -593,6 +667,7 @@ function Cambios({ datos, t, contra, setContra }: {
   return (
     <div style={caja}>
       <ElegirVuelta datos={datos} contra={contra} setContra={setContra} />
+      <ComparativoPL datos={datos} />
       <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
         {t("cambios.contra", { archivo: datos.anterior.archivo, cuando })}
       </p>
