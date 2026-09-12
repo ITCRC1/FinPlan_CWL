@@ -40,7 +40,13 @@ def cuentas_sin_mapeo(filas: list[dict], linea_de) -> list:
         acc = huerfanas.setdefault(k, {"monto": ZERO, "refs": []})
         acc["monto"] += f["mes_usd"]
         acc["refs"].append({"fila": f["fila"], "cuenta": f["cuenta"],
-                            "nombre": f["descripcion"]})
+                            "nombre": f["descripcion"],
+                            # El depto y el monto van en CADA referencia para que
+                            # la pantalla las muestre como tabla y no como texto:
+                            # «no subió» sin el monto al lado no se puede priorizar.
+                            "depto": f["destino_finplan"],
+                            "monto": float(f["mes_usd"]),
+                            "motivo": "sin_renglon"})
     if not huerfanas:
         return []
     total = sum((v["monto"] for v in huerfanas.values()), ZERO)
@@ -59,6 +65,68 @@ def cuentas_sin_mapeo(filas: list[dict], linea_de) -> list:
                   "cuenta no debe reportarse.",
         monto=total, nivel=NIVEL,
         referencias=[r for v in huerfanas.values() for r in v["refs"]])]
+
+
+def cuentas_en_linea_prestada(filas: list[dict], como_de) -> list:
+    """Cuentas que llegan a una línea que NO es la suya.
+
+    El resolvedor tiene un último recurso: si no hay regla para (departamento,
+    cuenta), toma **cualquier regla que use esa cuenta** — la del departamento
+    de número más bajo. La plata entra al P&L, el total cuadra, y el renglón es
+    el de otro departamento.
+
+    ⚠️ **Esto es peor que perderse.** Una cuenta sin renglón deja un hueco que
+    tarde o temprano alguien nota; una cuenta en el renglón ajeno no deja
+    ninguno: los totales cuadran, no hay error, no hay alerta, y la plata cambió
+    de línea sola. Es el modo de falla que `CLAUDE.md` marca como el más caro
+    del sistema.
+
+    Agosto 2026: la `5501` (costo de lavandería, departamento 0162) caía en
+    `COS_INNOCEANA` por este camino — US$150,09 reportados como costo de
+    Innoceana. Sólo apareció buscándola a mano.
+
+    `como_de(depto, cuenta)` devuelve cómo resolvió: `exact`, `parent`,
+    `FALLBACK` o vacío. Sólo el `FALLBACK` es préstamo: `parent` es una regla
+    declarada a propósito en el departamento madre.
+    """
+    prestadas: dict[tuple, dict] = {}
+    for f in filas:
+        if not f["mes_usd"]:
+            continue
+        cuenta = str(f["cuenta_base"] or "")
+        linea, como = como_de(f["destino_finplan"], cuenta)
+        if como != "FALLBACK" or not linea:
+            continue
+        k = (cuenta, f["destino_finplan"])
+        acc = prestadas.setdefault(k, {"monto": ZERO, "linea": linea, "refs": []})
+        acc["monto"] += f["mes_usd"]
+        acc["refs"].append({"fila": f["fila"], "cuenta": f["cuenta"],
+                            "nombre": f["descripcion"],
+                            "depto": f["destino_finplan"],
+                            "monto": float(f["mes_usd"]),
+                            "linea": linea,
+                            "motivo": "renglon_prestado"})
+    if not prestadas:
+        return []
+    total = sum((v["monto"] for v in prestadas.values()), ZERO)
+    cuales = ", ".join(f"{c} ({d}) → {v['linea']}"
+                       for (c, d), v in sorted(prestadas.items())[:8])
+    return [hallazgo(
+        "cuenta_en_linea_prestada",
+        "Cuentas que llegan a la línea de otro departamento",
+        "critico" if total else "aviso",
+        f"{len(prestadas)} combinaciones de cuenta y departamento no tienen "
+        f"regla propia y entraron por descarte: {cuales}"
+        + ("…" if len(prestadas) > 8 else ""),
+        porque="La plata SÍ entra al P&L, así que todos los totales cuadran — "
+               "pero en el renglón de otro departamento. No hay error ni alerta "
+               "que lo delate: sólo se ve comparando el P&L por departamento "
+               "contra el mayor.",
+        que_hacer="Agregar en Mapeo de cuentas la regla de ESE departamento "
+                  "para esa cuenta, o confirmar que el renglón actual es el que "
+                  "corresponde.",
+        monto=total, nivel=NIVEL,
+        referencias=[r for v in prestadas.values() for r in v["refs"]])]
 
 
 def departamentos_sin_puente(sin_mapeo: list[dict]) -> list:
@@ -155,13 +223,15 @@ def lineas_obligatorias_vacias(valores: dict, obligatorias: list[str],
 
 def revisar(filas: list[dict], *, linea_de=None, sin_mapeo=None,
             vistas_antes=None, valores=None, obligatorias=None,
-            etiqueta_de=None) -> list:
+            etiqueta_de=None, como_de=None) -> list:
     """Los cuatro chequeos del nivel. Lo que no reciba su contexto, no corre —
     en silencio y a propósito: un chequeo sin datos no puede decir nada, y
     hacerlo fallar sería confundir «no se pudo mirar» con «está mal»."""
     out = []
     if linea_de is not None:
         out += cuentas_sin_mapeo(filas, linea_de)
+    if como_de is not None:
+        out += cuentas_en_linea_prestada(filas, como_de)
     out += departamentos_sin_puente(sin_mapeo or [])
     out += cuentas_nuevas(filas, vistas_antes or set())
     if valores is not None and obligatorias:

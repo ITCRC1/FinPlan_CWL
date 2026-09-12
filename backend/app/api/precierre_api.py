@@ -271,12 +271,24 @@ async def crear(
         regla, _como = resolver(depto, cuenta)
         return (regla or {}).get("report_line_code", "") if regla else ""
 
+    def como_de(depto: str, cuenta: str) -> tuple[str, str]:
+        """La línea Y por qué camino se llegó a ella.
+
+        `linea_de` sola no alcanza para el hallazgo de renglón prestado: una
+        cuenta que resuelve por descarte TIENE línea, así que por ahí se ve
+        igual que una bien mapeada. La diferencia está en el `como`.
+        """
+        regla, como = resolver(depto, cuenta)
+        return ((regla or {}).get("report_line_code", "") if regla else "",
+                como or "")
+
     fuentes = {r.dept_code for r in
                (await db.execute(select(DepartmentCatalog).where(
                    DepartmentCatalog.is_allocation_source.is_(True)))).scalars().all()}
     vistas = await _cuentas_de_meses_anteriores(db, anio, mes)
     del_archivo = (
         nivel1_estructura.revisar(leido["filas"], linea_de=linea_de,
+                                  como_de=como_de,
                                   sin_mapeo=leido["sin_mapeo"],
                                   vistas_antes=vistas)
         + nivel2_coherencia.revisar(leido["filas"], tc=tc,

@@ -56,6 +56,50 @@ def test_si_todas_mapean_no_hay_hallazgo():
     assert n1.cuentas_sin_mapeo([fila()], lambda d, c: "OPEX_ADMIN") == []
 
 
+# ── Renglón prestado: la cuenta SÍ llega, pero a la línea de otro ───────────
+#
+# Agosto 2026: la `5501` (costo de lavandería, 0162) caía en `COS_INNOCEANA`
+# porque el resolvedor, sin regla propia, toma la del `dept_code` mas bajo que
+# use esa cuenta. El total cuadraba y nadie se enteraba.
+
+def test_una_cuenta_que_cae_por_descarte_se_reporta():
+    h = n1.cuentas_en_linea_prestada(
+        [fila(cuenta="5501-0162", base=5501, destino="0162", mes=150.09)],
+        lambda d, c: ("COS_INNOCEANA", "FALLBACK"))
+    assert len(h) == 1
+    assert h[0].clave == "cuenta_en_linea_prestada"
+    assert h[0].gravedad == "critico"
+    assert h[0].monto == D("150.09")
+    assert "COS_INNOCEANA" in h[0].detalle
+    assert h[0].referencias[0]["linea"] == "COS_INNOCEANA"
+    assert h[0].referencias[0]["depto"] == "0162"
+
+
+def test_la_regla_exacta_y_la_de_la_madre_no_son_prestamo():
+    """`parent` es una regla declarada a proposito en el departamento madre —
+    no es descarte. Reportarla seria ruido en cada subida."""
+    for como in ("exact", "parent"):
+        assert n1.cuentas_en_linea_prestada(
+            [fila(mes=5000)], lambda d, c: ("OPEX_ADMIN", como)) == []
+
+
+def test_sin_linea_no_es_prestamo_sino_perdida():
+    """Ese caso ya lo cuenta `cuentas_sin_mapeo`; contarlo dos veces duplicaria
+    el monto que ve el owner."""
+    assert n1.cuentas_en_linea_prestada(
+        [fila(mes=5000)], lambda d, c: ("", "")) == []
+
+
+def test_las_referencias_traen_monto_y_depto_para_poder_verse_en_tabla():
+    """La pantalla las muestra como tabla ordenada por monto; sin estos dos
+    campos volveria a ser un volcado de JSON que no contesta «cual falta»."""
+    h = n1.cuentas_sin_mapeo([fila(mes=5000)], lambda d, c: "")
+    ref = h[0].referencias[0]
+    assert ref["monto"] == 5000.0
+    assert ref["depto"] == "0180"
+    assert ref["motivo"] == "sin_renglon"
+
+
 def test_un_depto_sin_puente_dice_cuanta_plata_es():
     h = n1.departamentos_sin_puente([{"depto": "0999", "mes_usd": D("1234.5"),
                                       "cuentas": ["4000-0999"]}])

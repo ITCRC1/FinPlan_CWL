@@ -259,6 +259,81 @@ export default function PreCierrePage() {
 
 /* ── Hallazgos ─────────────────────────────────────────────────────────────── */
 
+/**
+ * El detalle de un hallazgo, como TABLA cuando habla de cuentas.
+ *
+ * Antes era `JSON.stringify(...slice(0, 30))`. Owner, 2026-09-11: «solo que me
+ * diga qué cuentas no están subiendo cuando estoy en proceso de subida». Un
+ * volcado de JSON recortado a 30 no contesta esa pregunta: no se puede leer de
+ * un vistazo, no se puede ordenar por monto y, si son más de 30, esconde
+ * justamente las que faltan.
+ *
+ * Se muestran TODAS, ordenadas por monto descendente — lo que más plata mueve
+ * primero — dentro de un contenedor con scroll propio. Las referencias que no
+ * hablan de cuentas (por ejemplo `{ linea: "REV_ROOMS" }`) siguen cayendo al
+ * volcado de siempre: inventarles columnas sería peor.
+ */
+function Referencias({ filas }: { filas: Array<Record<string, unknown>> }) {
+  const esDeCuentas = filas.length > 0 && filas.every(f => "cuenta" in f);
+  if (!esDeCuentas) {
+    return <pre style={pre}>{JSON.stringify(filas.slice(0, 30), null, 1)}</pre>;
+  }
+  const conLinea = filas.some(f => f.linea);
+  const orden = [...filas].sort(
+    (a, b) => Math.abs(Number(b.monto ?? 0)) - Math.abs(Number(a.monto ?? 0)));
+  const total = orden.reduce((s, f) => s + Number(f.monto ?? 0), 0);
+  const th: React.CSSProperties = {
+    textAlign: "left", padding: "4px 8px", fontSize: 11, fontWeight: 700,
+    textTransform: "uppercase", letterSpacing: .3, color: "var(--text-secondary)",
+    borderBottom: "1px solid var(--border-medium)", position: "sticky", top: 0,
+    background: "var(--bg-surface)",
+  };
+  const td: React.CSSProperties = {
+    padding: "3px 8px", borderBottom: "1px solid var(--border-subtle)",
+    whiteSpace: "nowrap",
+  };
+  const num: React.CSSProperties = {
+    ...td, textAlign: "right", fontVariantNumeric: "tabular-nums",
+    fontFamily: "var(--font-mono)",
+  };
+  return (
+    <div style={{ maxHeight: 320, overflow: "auto", marginTop: 6,
+                  border: "1px solid var(--border-subtle)", borderRadius: 4 }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+        <thead>
+          <tr>
+            <th style={th}>Cuenta</th>
+            <th style={th}>Depto</th>
+            <th style={th}>Descripción</th>
+            {conLinea && <th style={th}>Cayó en</th>}
+            <th style={{ ...th, textAlign: "right" }}>US$</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orden.map((f, i) => (
+            <tr key={`${String(f.cuenta)}-${i}`}>
+              <td style={{ ...td, fontFamily: "var(--font-mono)" }}>{String(f.cuenta ?? "")}</td>
+              <td style={{ ...td, fontFamily: "var(--font-mono)" }}>{String(f.depto ?? "")}</td>
+              <td style={{ ...td, whiteSpace: "normal" }}>{String(f.nombre ?? "")}</td>
+              {conLinea && <td style={td}>{String(f.linea ?? "")}</td>}
+              <td style={num}>{usd(Number(f.monto ?? 0))}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td style={{ ...td, fontWeight: 700 }} colSpan={conLinea ? 4 : 3}>
+              {orden.length} filas
+            </td>
+            <td style={{ ...num, fontWeight: 700 }}>{usd(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+
 function Hallazgos({ hallazgos, sinRevisar, comparativos, umbralMonto, umbralPct,
                      setUmbralMonto, setUmbralPct, abierto, setAbierto, t }: {
   hallazgos: PrecierreHallazgo[]; sinRevisar: string[];
@@ -326,9 +401,7 @@ function Hallazgos({ hallazgos, sinRevisar, comparativos, umbralMonto, umbralPct
                   <summary style={{ cursor: "pointer" }}>
                     {t("verDetalle", { n: h.referencias.length })}
                   </summary>
-                  <pre style={pre}>
-                    {JSON.stringify(h.referencias.slice(0, 30), null, 1)}
-                  </pre>
+                  <Referencias filas={h.referencias} />
                 </details>
               )}
             </div>
