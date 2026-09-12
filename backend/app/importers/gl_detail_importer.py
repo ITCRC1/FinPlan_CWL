@@ -355,7 +355,24 @@ def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
 
         # Cuenta 4xxx de "Distribución" = allocation interna para dejar el depto en
         # cero; NO es ingreso → fuera del revenue (confirmado con el usuario 2026-06-27).
-        if es_contrapartida_de_allocation(code, acct_name):
+        #
+        # ⚠️ En Pre-Cierre (`en_overhead`) NO se salta: se enruta a GASTO.
+        #
+        # El modo Pre-Cierre deja entrar el gasto de 0220/0161 para que se vea en
+        # su línea de overhead. Si además se tira el crédito, la línea queda coja:
+        # el gasto bruto se ve una vez en overhead y otra vez repartido (6025,
+        # 7310, 7685) dentro de cada departamento. En agosto 2026 eso infló el
+        # gasto en US$27.414,69 y hundió la utilidad neta en lo mismo.
+        #
+        # Se enruta a `opex` y no a `revenue` a propósito: el monto es un crédito
+        # (negativo) y su regla de mapeo apunta a OH_CAFETERIA / OH_LAUNDRY, que
+        # son líneas de GASTO. Metido en revenue sería un ingreso negativo — el
+        # total cuadraría igual y estaría en la sección equivocada.
+        #
+        # Fuera del Pre-Cierre nada cambia: ALLOCATION_EXCLUDE saca el gasto y
+        # este `continue` saca el crédito, que es el par que siempre funcionó.
+        reparto_a_overhead = es_contrapartida_de_allocation(code, acct_name)
+        if reparto_a_overhead and not en_overhead:
             continue
 
         for blk in blocks:
@@ -442,7 +459,8 @@ def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
                    # como venia ordenado el archivo, y reordenar por criterio
                    # propio le obliga a cruzar dos listas cada vez que compara.
                    "fila": r0 + 1}
-            target_list = {"4": "revenue", "5": "costs", "7": "opex", "8": "belowgop"}[cls]
+            target_list = ("opex" if reparto_a_overhead else
+                           {"4": "revenue", "5": "costs", "7": "opex", "8": "belowgop"}[cls])
             blk[target_list].append(row)
 
     for blk in blocks:

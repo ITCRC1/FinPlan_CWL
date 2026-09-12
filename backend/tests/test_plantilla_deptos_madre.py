@@ -161,11 +161,24 @@ def test_las_cuentas_de_distribucion_SI_se_muestran_en_su_departamento():
 
 
 def test_el_parser_ignora_la_distribucion_al_subir():
-    """La garantía de que mostrarlas no duplica el reparto."""
-    import inspect
+    """La garantía de que mostrarlas no duplica el reparto.
 
-    from app.importers import gl_detail_importer
+    Se mide LEYENDO un libro, no leyendo el código: la prueba anterior buscaba
+    un `continue` a 120 caracteres de un `if`, y se rompía con cualquier
+    reescritura aunque el comportamiento fuera el mismo.
 
-    src = inspect.getsource(gl_detail_importer)
-    i = src.index("if es_contrapartida_de_allocation(code, acct_name):")
-    assert "continue" in src[i:i + 120], "el parser tiene que saltarlas al leer"
+    ⚠️ Esto vale para la subida NORMAL. En el espejo del Pre-Cierre
+    (`en_overhead=True`) la contrapartida **sí entra**, como GASTO, para netear
+    sobre la misma línea de overhead donde ya está el gasto bruto. Lo blindan
+    `test_el_credito_de_reparto_netea_en_pre_cierre` y sus vecinas, en
+    `test_gl_allocation.py`.
+    """
+    from app.importers.gl_detail_importer import parse_gl_detail
+    from tests.test_gl_allocation import FILAS_CON_REPARTO, _plantilla
+
+    blk = parse_gl_detail(_plantilla(FILAS_CON_REPARTO))[0]
+    cuentas = {f["account_code"] for k in ("revenue", "costs", "opex", "belowgop")
+               for f in blk.get(k, [])}
+    assert "7065" in cuentas, "el gasto de un depto normal tiene que entrar"
+    assert "4999" not in cuentas, (
+        f"la contrapartida de reparto no puede entrar en una subida normal: {sorted(cuentas)}")

@@ -159,3 +159,94 @@ def test_el_gasto_por_clase_tambien_ve_el_allocation_en_precierre():
     assert _excluidos(None) == EXCLUIR_DE_GASTO     # sin escenario, la regla de siempre
     # Y la regla de siempre sigue siendo la de siempre.
     assert EXCLUIR_DE_GASTO == {"0220", "0161", "0162"}
+
+
+# ── El crédito del reparto, cuando YA está posteado ──────────────────────────
+#
+# Agosto 2026 fue el primer mes en que Integrity posteó la distribución: el
+# archivo trajo `4999-0220` por −US$24.321,92 y `4999-0161` por −US$3.092,77, y
+# el mismo monto repartido a los departamentos (6025, 7310, 7685).
+#
+# El parser saltaba la contrapartida SIEMPRE. Fuera del Pre-Cierre eso es
+# correcto y es el par que siempre funcionó: `ALLOCATION_EXCLUDE` saca el gasto
+# y el salto saca el crédito. Pero en el espejo del Pre-Cierre el gasto SÍ entra
+# — y si el crédito no, la plata se cuenta dos veces: una en la línea de
+# overhead del departamento de reparto y otra dentro de cada departamento que
+# recibió su parte. En agosto eran US$27.414,69 de gasto inflado y la misma
+# utilidad neta de menos.
+
+BLOQUE = "Actual 2026"
+DEPTOS = {"0110": "Habitaciones", "0161": "Lavanderia", "0220": "Cafeteria"}
+
+
+def _plantilla(filas):
+    """El libro REAL de FinPlan — el mismo que arma el Pre-Cierre para el espejo.
+
+    `_gl_book` no sirve para esto: con filas armadas a mano la detección de
+    columnas por contenido elige mal la del NOMBRE, y la contrapartida se
+    reconoce justamente por el texto («distribu»).
+    """
+    from app.export.detail_excel import build_detail_workbook
+    accts = [{"clase": clase, "grupo": "X", "dept_code": dept, "cuenta": cta,
+              "nombre": nombre, "vals": {(BLOQUE, 1): float(monto)}, "orden": None}
+             for dept, cta, nombre, clase, monto in filas]
+    return build_detail_workbook([BLOQUE], accts, {}, DEPTOS)
+
+
+FILAS_CON_REPARTO = [
+    ("0220", "5420", "COST OF FOOD CAFETERIA - STAFF", "Cost", 12943.90),
+    ("0220", "4999", "Expense Distribution", "Revenue", -24321.92),
+    ("0161", "7320", "Laundry supplies", "Opex", 2133.55),
+    ("0161", "4999", "Expense Distribution", "Revenue", -3092.77),
+    ("0110", "7065", "Cleaning Supplies", "Opex", 1000.00),
+]
+
+
+def _por_cuenta(blk):
+    return {(k, r["account_code"]): sum(r["months"].values())
+            for k in ("revenue", "costs", "opex", "belowgop")
+            for r in blk.get(k, [])}
+
+
+def test_el_credito_de_reparto_no_entra_en_la_subida_normal():
+    """Sin Pre-Cierre: ni el gasto del depto de reparto ni su crédito."""
+    blk = parse_gl_detail(_plantilla(FILAS_CON_REPARTO))[0]
+    fuera = _por_cuenta(blk)
+    assert not [k for k in fuera if k[1] == "4999"], (
+        f"la contrapartida no puede entrar en una subida normal: {sorted(fuera)}")
+    assert ("costs", "5420") not in fuera, "y el gasto del 0220 tampoco"
+    assert ("opex", "7065") in fuera, "un depto normal sí entra"
+
+
+def test_el_credito_de_reparto_netea_en_pre_cierre():
+    """Con `en_overhead`: entra, y entra como GASTO para netear la misma línea.
+
+    En `revenue` cuadraría el total y estaría en la sección equivocada: su regla
+    de mapeo apunta a OH_CAFETERIA / OH_LAUNDRY, que son líneas de gasto.
+    """
+    blk = parse_gl_detail(_plantilla(FILAS_CON_REPARTO), en_overhead=True)[0]
+    fuera = _por_cuenta(blk)
+
+    assert not [k for k in fuera if k[0] == "revenue" and k[1] == "4999"], (
+        "el crédito de reparto NO puede quedar como ingreso negativo")
+    creditos = {k for k in fuera if k[1] == "4999"}
+    assert creditos == {("opex", "4999")}, f"tiene que ir a gasto: {creditos}"
+    # `_por_cuenta` junta los dos departamentos en una llave; el total es el par.
+    total = sum(sum(r["months"].values()) for r in blk["opex"]
+                if r["account_code"] == "4999")
+    assert round(total, 2) == -27414.69
+
+    # Y el gasto bruto de los dos deptos de reparto entra, como siempre en este
+    # modo: es lo que el crédito netea.
+    assert ("costs", "5420") in fuera
+    assert ("opex", "7320") in fuera
+
+
+def test_el_departamento_del_credito_se_conserva():
+    """Cada crédito tiene que quedar en SU departamento: si los dos cayeran en
+    uno solo, netearían la línea equivocada y la otra quedaría inflada."""
+    blk = parse_gl_detail(_plantilla(FILAS_CON_REPARTO), en_overhead=True)[0]
+    por_dept = {r["dept_code"]: sum(r["months"].values())
+                for r in blk["opex"] if r["account_code"] == "4999"}
+    assert round(por_dept["0220"], 2) == -24321.92
+    assert round(por_dept["0161"], 2) == -3092.77

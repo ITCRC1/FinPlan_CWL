@@ -165,10 +165,18 @@ def test_el_0162_entra_por_la_5603_y_no_por_la_5301(deptos, con_gasto_propio):
                if r.get("dept_code") == "0162"
                and r["account_code"][:1] in ("5", "7")
                and r["account_code"] not in reparto}
-    assert propias == {"5603"}, (
-        "el 0162 tiene que entrar por la 5603 y solo por ella. Si aparecio otra "
+    assert propias == {"5603", "5501"}, (
+        "el 0162 entra por la 5603 y la 5501, y por ninguna mas. Si aparecio otra "
         f"cuenta ({sorted(propias)}), revisa si de verdad se digita o la escribe "
         "un motor — es como se colo la 5301 la primera vez")
+
+
+# La `5501` se sumo el 2026-09-11 (migracion 144). Pasa el mismo examen que la
+# `5603`: NO esta en `cuentas_de_reparto()` —el motor escribe 4999, 6025, 6000,
+# 7310, 7685 y 5301, no esta— asi que es una cuenta del mayor que alguien postea.
+# Llego con el cierre de agosto 2026 como `5501-0160`, y el puente manda el 0160
+# al 0162; sin regla propia caia por descarte a COS_INNOCEANA, o sea el costo de
+# lavanderia se reportaba como costo de Innoceana.
 
 
 @pytest.mark.parametrize("dept", ["280", "0250"])

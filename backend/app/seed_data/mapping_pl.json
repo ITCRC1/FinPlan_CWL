@@ -20347,6 +20347,57 @@
       "sign_rule": "Aggregate to line as positive display value; calculations subtract expense lines at subtotal level.",
       "notes": "Cuenta real de Integrity. El mapeo se sembro con numeros de plantilla USALI que Integrity no usa (2026-09-10).",
       "dept_code": "0155"
+    },
+    {
+      "active_status": "YES",
+      "report_id": "P&L_DETAIL_OWNERS",
+      "report_line_code": "RENT",
+      "report_line_name": "RENT",
+      "report_section": "OWNER / NON-OP EXPENSES",
+      "display_order": 86,
+      "source_origin": "Below GOP",
+      "source_department": "Departamento de Property Expenses",
+      "account_code": "8010",
+      "account_name_example": "PROPERTY EXPENSES - TAXES & PERMITS",
+      "financial_nature": "Expense",
+      "rollup_operator": "SUM",
+      "sign_rule": "Aggregate to line as positive display value; calculations subtract expense lines at subtotal level.",
+      "notes": "Impuesto de bienes inmuebles y canon de zona maritima (subcuentas 800 y 801). NO tenia regla en NINGUN departamento: resolvia a DROP y la plata desaparecia del P&L sin aviso. Agosto 2026: US$2.735,83. Va con las demas 8xxx del 0250, que es el destino del 0240 de Integrity segun el puente. La linea es RENT porque el motor (pl_engine.NONOP_ACCOUNT_LINE) ya trataba la 8010 como alias historico de RENT; separarlas mandaria la misma cuenta a dos renglones segun el camino.",
+      "dept_code": "0250"
+    },
+    {
+      "active_status": "YES",
+      "report_id": "P&L_DETAIL_OWNERS",
+      "report_line_code": "COS_LAUNDRY",
+      "report_line_name": "Laundry Cost",
+      "report_section": "COST OF SALES",
+      "display_order": 47,
+      "source_origin": "Cost",
+      "source_department": "Laundry Revenue",
+      "account_code": "5501",
+      "account_name_example": "LAUNDRY COSTS",
+      "financial_nature": "Expense",
+      "rollup_operator": "SUM",
+      "sign_rule": "Aggregate to line as positive display value; calculations subtract expense lines at subtotal level.",
+      "notes": "El 0160 de Integrity aterriza en el 0162 por el puente. Sin esta regla el 5501 caia por FALLBACK a COS_INNOCEANA -el 0155 es el dept_code mas bajo con regla para el 5501- y el costo de lavanderia aparecia como costo de Innoceana. Agosto 2026: US$150,09. GEMELA de la del 0161, igual que la pareja del 5603.",
+      "dept_code": "0162"
+    },
+    {
+      "active_status": "YES",
+      "report_id": "P&L_DETAIL_OWNERS",
+      "report_line_code": "COS_LAUNDRY",
+      "report_line_name": "Laundry Cost",
+      "report_section": "COST OF SALES",
+      "display_order": 47,
+      "source_origin": "Cost",
+      "source_department": "Departamento de Lavanderia",
+      "account_code": "5501",
+      "account_name_example": "LAUNDRY COSTS",
+      "financial_nature": "Expense",
+      "rollup_operator": "SUM",
+      "sign_rule": "Aggregate to line as positive display value; calculations subtract expense lines at subtotal level.",
+      "notes": "GEMELA de la regla del 0162. El GL trae UN solo departamento 'Lavanderia' y segun el segmento cae en 0161 o en 0162; las dos apuntan a COS_LAUNDRY. Mismo par que tienen el 5603 y las 4700/4701/4702.",
+      "dept_code": "0161"
     }
   ]
 }
