@@ -370,9 +370,24 @@ async def _cuentas_de_meses_anteriores(db: AsyncSession, anio: int, mes: int) ->
 
 @router.get("/precierre/")
 async def listar(db: AsyncSession = Depends(get_db), _=Depends(get_current_user)):
+    """Las vueltas, **la más nueva primero**.
+
+    ⚠️ El orden tiene que incluir `creado_en`. Sin él, entre las vueltas del
+    MISMO mes el orden lo decidía Postgres —o sea, ninguno— y la pantalla, que
+    muestra sólo las primeras ocho, podía dejar afuera el borrador vivo.
+
+    Owner, 2026-09-11, con diez vueltas de agosto: los ocho chips decían
+    «descartado» y no había forma de abrir el que estaba en revisión. Parecía
+    que la subida no se había aplicado; se había aplicado y no se podía ver.
+
+    `id` de segundo criterio: dos vueltas del mismo segundo existen —subir dos
+    veces seguidas es el flujo normal acá— y empatar volvería a dejar el orden
+    en manos del motor.
+    """
     filas = (await db.execute(select(Precierre).where(
         Precierre.hotel_id == HOTEL_ID).order_by(
-        Precierre.anio.desc(), Precierre.mes.desc()))).scalars().all()
+        Precierre.anio.desc(), Precierre.mes.desc(),
+        Precierre.creado_en.desc(), Precierre.id.desc()))).scalars().all()
     return {"precierres": [
         {"id": p.id, "anio": p.anio, "mes": p.mes, "estado": p.estado,
          "tc": float(p.tc), "archivo": p.archivo_nombre,

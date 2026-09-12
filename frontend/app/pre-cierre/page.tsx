@@ -80,6 +80,23 @@ export default function PreCierrePage() {
 
   useEffect(() => { void recargarLista(); }, [recargarLista]);
 
+  /**
+   * Abrir solo el borrador VIVO, sin tener que buscarlo entre los chips.
+   *
+   * Owner, 2026-09-11: con diez vueltas de agosto los ocho chips visibles
+   * decían «descartado» y no había ninguno seleccionado, así que la pantalla se
+   * veía vacía y parecía que la subida no había entrado. El orden del backend ya
+   * pone el más nuevo primero; esto además lo ABRE.
+   *
+   * Solo cuando no hay nada elegido: si el owner clickeó una vuelta vieja a
+   * propósito, no se la movemos abajo de los pies.
+   */
+  useEffect(() => {
+    if (id || !lista.length) return;
+    const vivo = lista.find(p => p.estado === "borrador") ?? lista[0];
+    if (vivo) setId(vivo.id);
+  }, [lista, id]);
+
   const cargar = useCallback(async (pid: string) => {
     setError(null);
     try {
@@ -107,6 +124,11 @@ export default function PreCierrePage() {
     try {
       const r = await subirPrecierre(archivo, { tc, mes, anio });
       setId(r.id);
+      // Owner, 2026-09-11: «necesito que cada vez que suba se guarde la versión
+      // anterior y compare qué tanto cambió versus la versión, y la varianza».
+      // Eso ya se calcula; lo que faltaba era llegar. En la primera vuelta del
+      // mes no hay contra qué comparar, así que se queda en hallazgos.
+      if (r.reemplaza_a) setPestana("cambios");
       setAviso(r.reemplaza_a
         ? t("vueltaN", { n: r.vuelta, archivo: r.reemplaza_a.archivo })
         : t("cargado", { filas: r.filas }));
@@ -179,10 +201,21 @@ export default function PreCierrePage() {
         </div>
         {lista.length > 0 && (
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {/* ⚠️ La HORA y el TC en el chip, no solo el mes y el estado.
+                Con diez vueltas del mismo mes todos decían «Agosto 2026 ·
+                descartado» y eran indistinguibles: no había forma de saber cuál
+                era cuál, ni de notar que faltaba el vivo (owner, 2026-09-11). */}
             {lista.slice(0, 8).map(p => (
               <button key={p.id} onClick={() => setId(p.id)}
-                      style={{ ...chip, ...(p.id === id ? chipActivo : {}) }}>
-                {MESES[p.mes - 1]} {p.anio} · {t(`estado.${p.estado}`)}
+                      style={{ ...chip, ...(p.id === id ? chipActivo : {}),
+                               ...(p.estado === "borrador"
+                                   ? { fontWeight: 700,
+                                       borderColor: "var(--brand)" } : {}) }}>
+                {MESES[p.mes - 1]} {p.anio}
+                {p.creado_en ? " · " + new Date(p.creado_en).toLocaleTimeString(
+                  undefined, { hour: "2-digit", minute: "2-digit" }) : ""}
+                {p.tc ? ` · ${p.tc}` : ""}
+                {" · "}{t(`estado.${p.estado}`)}
               </button>
             ))}
           </div>
