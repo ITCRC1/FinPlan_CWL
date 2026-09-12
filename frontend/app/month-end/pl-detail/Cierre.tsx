@@ -70,19 +70,40 @@ const TD: React.CSSProperties = {
 const TDL: React.CSSProperties = { padding: "3px 9px", fontSize: 12 };
 const IZQ: React.CSSProperties = { borderLeft: "2px solid var(--border-medium)" };
 
-export default function Cierre({ datos, mes }: { datos: PLDetail; mes: number }) {
+/** Los tres cortes del cuadro. `mes` es el único que siempre se puede mirar. */
+export type CorteCierre = "mes" | "ytd" | "full";
+
+export default function Cierre({ datos, mes, cortesVisibles }: {
+  datos: PLDetail; mes: number; cortesVisibles?: CorteCierre[];
+}) {
   const vs = datos.versiones;
   const n = vs.length;
   const hayVar = n >= 2;
   const porBloque = n + (hayVar ? 2 : 0);
 
-  const cortes = [
-    { id: "mes", rotulo: MESES[mes - 1], idx: [mes - 1] },
-    { id: "ytd", rotulo: `YTD ${MESES[mes - 1]}`,
+  /**
+   * Los tres cortes, filtrados por lo que el owner quiera ver.
+   *
+   * Owner, 2026-09-11, sobre el Pre-Cierre: «yo solo quiero el análisis del
+   * mes», tachando YTD y Full Year en la pantalla. Tenía razón y es más que
+   * preferencia: el espejo del Pre-Cierre trae UN mes, así que su YTD y su Full
+   * Year son ese mismo mes disfrazado — y al lado de un Budget de doce meses
+   * daban varianzas de −94% que no significan nada.
+   *
+   * Se filtra y no se borra: cuando el espejo tenga varios meses cerrados el
+   * acumulado vuelve a decir algo, y ahí se prenden de nuevo.
+   */
+  const TODOS = [
+    { id: "mes" as const, rotulo: MESES[mes - 1], idx: [mes - 1] },
+    { id: "ytd" as const, rotulo: `YTD ${MESES[mes - 1]}`,
       idx: Array.from({ length: mes }, (_, i) => i) },
-    { id: "full", rotulo: "Full Year",
+    { id: "full" as const, rotulo: "Full Year",
       idx: Array.from({ length: 12 }, (_, i) => i) },
   ];
+  // Si el filtro llega vacío se muestra el MES: una tabla sin una sola columna
+  // de datos es peor que no haber filtrado.
+  const pedidos = cortesVisibles?.length ? cortesVisibles : (["mes", "ytd", "full"] as CorteCierre[]);
+  const cortes = TODOS.filter(c => pedidos.includes(c.id));
 
   const suma = (serie: number[] | null | undefined, idx: number[]) =>
     serie ? idx.reduce((s, i) => s + (serie[i] ?? 0), 0) : null;

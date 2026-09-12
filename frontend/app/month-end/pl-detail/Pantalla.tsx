@@ -44,7 +44,7 @@ import { HOTEL_ID } from "@/lib/hotel";
 import { elegir, useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
 import { bajarPLDetailExcel } from "@/lib/api";
-import Cierre from "./Cierre";
+import Cierre, { type CorteCierre } from "./Cierre";
 
 const AMBITOS = [
   { id: "consolidado", rotulo: "Consolidado", ayuda: "Hotel + Club Madresal" },
@@ -125,6 +125,22 @@ export default function PLDetail({ esPre = false }: { esPre?: boolean }) {
   // que incluye un mes todavia en revision mezcla lo cerrado con lo que se
   // esta mirando.
   const [horizonte, setHorizonte] = useState<Horizonte>(esPre ? "mes" : "full");
+
+  /**
+   * Qué cortes muestra el cuadro «Cierre». En Pre-Closing arranca SOLO el mes.
+   *
+   * Owner, 2026-09-11: *«yo solo quiero el análisis del mes»*, tachando YTD y
+   * Full Year. En el espejo del Pre-Cierre esas dos columnas son el mismo mes
+   * repetido —el espejo trae un mes— y al lado de un Budget de doce meses
+   * producían varianzas de −94% que no son ninguna noticia.
+   *
+   * Es un filtro de pantalla, no una amputación: los tres botones siguen ahí y
+   * el día que el espejo tenga varios meses cerrados, el acumulado se prende de
+   * nuevo con un clic. Fuera de Pre-Closing no cambia nada: los tres, como
+   * siempre.
+   */
+  const [cortes, setCortes] = useState<CorteCierre[]>(
+    esPre ? ["mes"] : ["mes", "ytd", "full"]);
   /** «Cascada» es el reporte completo del libro; «Cierre» es el cuadro compacto
    *  que el owner usa cada mes, con los tres cortes lado a lado. */
   const [vista, setVista] = useState<"cascada" | "cierre">("cascada");
@@ -234,6 +250,98 @@ export default function PLDetail({ esPre = false }: { esPre?: boolean }) {
   const hayVar = (datos?.versiones.length ?? 0) >= 2;
   const anchoCols = ventana.length + (datos?.versiones.length ?? 1) + (hayVar ? 2 : 0);
 
+  /**
+   * El mes, el escenario y las versiones a comparar — ARRIBA y ABAJO.
+   *
+   * Owner, 2026-09-11: «ocupo que siempre aparezca el mes, budget y forecast
+   * arriba y abajo… que estén esclavas pero editables». El reporte es largo:
+   * al llegar al pie había que subir hasta el encabezado para cambiar de mes y
+   * volver a bajar.
+   *
+   * Son ESCLAVAS porque no hay estado duplicado: las dos copias leen y escriben
+   * el mismo `useState`. Cambiar el mes abajo mueve el de arriba en el mismo
+   * render, y no existe el estado en que digan cosas distintas.
+   *
+   * `donde` sólo desempata las `key` de React entre las dos copias.
+   */
+  const barraSelectores = (donde: "arriba" | "abajo") => (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  marginBottom: 14 }}>
+      <nav aria-label="Vista" style={{ display: "inline-flex", borderRadius: 6,
+           overflow: "hidden", border: "1px solid var(--border-medium)" }}>
+        {([["cascada", "Cascada"], ["cierre", "Cierre (mes · YTD · año)"]] as const)
+          .map(([x, r], i) => (
+            <button key={`${donde}-${x}`} onClick={() => setVista(x)}
+              style={{ ...btn(vista === x),
+                       borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+              {r}
+            </button>
+          ))}
+      </nav>
+
+      {vista === "cierre" && (
+        <nav aria-label="Columnas del cierre"
+             style={{ display: "inline-flex", borderRadius: 6, overflow: "hidden",
+                      border: "1px solid var(--border-medium)" }}>
+          {([["mes", "Mes"], ["ytd", "YTD"], ["full", "Año"]] as const).map(([c, r], i) => (
+            <button key={`${donde}-col-${c}`}
+              onClick={() => setCortes(v => v.includes(c)
+                // Nunca dejarlo vacío: sin una sola columna la tabla no dice nada.
+                ? (v.length > 1 ? v.filter(x => x !== c) : v)
+                : (["mes", "ytd", "full"] as CorteCierre[]).filter(
+                    x => x === c || v.includes(x)))}
+              title={`Mostrar u ocultar la columna ${r}`}
+              style={{ ...btn(cortes.includes(c)),
+                       borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+              {r}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <nav aria-label="Corte" style={{ display: "inline-flex", borderRadius: 6,
+           overflow: "hidden", border: "1px solid var(--border-medium)" }}>
+        {vista === "cierre" || esPre ? null : ([["mes", "Mes"], ["ytd", "YTD"], ["full", "Full Year"]] as const).map(
+          ([h, r], i) => (
+            <button key={`${donde}-${h}`} onClick={() => setHorizonte(h)}
+              style={{ ...btn(horizonte === h),
+                       borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+              {r}
+            </button>
+          ))}
+      </nav>
+
+      {(horizonte !== "full" || vista === "cierre") && (
+        <select value={mes} onChange={e => setMes(Number(e.target.value))}
+          className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
+          {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+        </select>
+      )}
+
+      <select value={scenarioId} onChange={e => setScenarioId(e.target.value)}
+        className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
+        {escenarios.map(s => (
+          <option key={s.id} value={s.id}>{s.year} · {s.type} {s.version}</option>
+        ))}
+      </select>
+
+      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>vs</span>
+      {comparar.map((c, i) => (
+        <select key={`${donde}-${i}`} value={c}
+          onChange={e => setComparar(v => v.map((x, j) => j === i ? e.target.value : x))}
+          className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
+          <option value="">{i === 0 ? "— sin comparación —" : "— +versión —"}</option>
+          {escenarios
+            .filter(s => s.id !== scenarioId && !comparar.some((o, j) => o === s.id && j !== i))
+            .map(s => (
+              <option key={s.id} value={s.id}>{s.year} · {s.type} {s.version}</option>
+            ))}
+        </select>
+      ))}
+    </div>
+  );
+
+
   return (
     <div style={{ padding: "18px 22px" }}>
       <IrA esc={scenarioId} />
@@ -263,60 +371,7 @@ export default function PLDetail({ esPre = false }: { esPre?: boolean }) {
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                    marginBottom: 14 }}>
-        <nav aria-label="Vista" style={{ display: "inline-flex", borderRadius: 6,
-             overflow: "hidden", border: "1px solid var(--border-medium)" }}>
-          {([["cascada", "Cascada"], ["cierre", "Cierre (mes · YTD · año)"]] as const)
-            .map(([x, r], i) => (
-              <button key={x} onClick={() => setVista(x)}
-                style={{ ...btn(vista === x),
-                         borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
-                {r}
-              </button>
-            ))}
-        </nav>
-
-        <nav aria-label="Corte" style={{ display: "inline-flex", borderRadius: 6,
-             overflow: "hidden", border: "1px solid var(--border-medium)" }}>
-          {vista === "cierre" || esPre ? null : ([["mes", "Mes"], ["ytd", "YTD"], ["full", "Full Year"]] as const).map(
-            ([h, r], i) => (
-              <button key={h} onClick={() => setHorizonte(h)}
-                style={{ ...btn(horizonte === h),
-                         borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
-                {r}
-              </button>
-            ))}
-        </nav>
-
-        {(horizonte !== "full" || vista === "cierre") && (
-          <select value={mes} onChange={e => setMes(Number(e.target.value))}
-            className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
-            {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
-        )}
-
-        <select value={scenarioId} onChange={e => setScenarioId(e.target.value)}
-          className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
-          {escenarios.map(s => (
-            <option key={s.id} value={s.id}>{s.year} · {s.type} {s.version}</option>
-          ))}
-        </select>
-
-        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>vs</span>
-        {comparar.map((c, i) => (
-          <select key={i} value={c}
-            onChange={e => setComparar(v => v.map((x, j) => j === i ? e.target.value : x))}
-            className="fin-input" style={{ fontSize: 12.5, padding: "5px 8px" }}>
-            <option value="">{i === 0 ? "— sin comparación —" : "— +versión —"}</option>
-            {escenarios
-              .filter(s => s.id !== scenarioId && !comparar.some((o, j) => o === s.id && j !== i))
-              .map(s => (
-                <option key={s.id} value={s.id}>{s.year} · {s.type} {s.version}</option>
-              ))}
-          </select>
-        ))}
-      </div>
+      {barraSelectores("arriba")}
 
       {error && (
         <div style={{ padding: 10, borderRadius: 5, fontSize: 12.5, marginBottom: 12,
@@ -378,7 +433,7 @@ export default function PLDetail({ esPre = false }: { esPre?: boolean }) {
             </table>
           )}
 
-          {vista === "cierre" ? <Cierre datos={datos} mes={mes} /> : (
+          {vista === "cierre" ? <Cierre datos={datos} mes={mes} cortesVisibles={cortes} /> : (
           <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
             <table className="fin-table" style={{ minWidth: 300 + anchoCols * 95 }}>
               <thead>
@@ -484,6 +539,12 @@ export default function PLDetail({ esPre = false }: { esPre?: boolean }) {
               Diferencia {datos.control.diferencia.toFixed(2)}
               {Math.abs(datos.control.diferencia) < 0.01 ? " ✓" : " ⚠"}
             </span>
+          </div>
+
+          {/* La MISMA barra del encabezado, al pie. Ver `barraSelectores`. */}
+          <div style={{ marginTop: 18, paddingTop: 14,
+                        borderTop: "1px solid var(--border-medium)" }}>
+            {barraSelectores("abajo")}
           </div>
         </>
       )}
