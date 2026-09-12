@@ -5362,6 +5362,10 @@ export async function subirPrecierre(
 ): Promise<{ id: string; filas: number; vuelta: number;
              reemplaza_a: { archivo: string; subido_en: string } | null;
              sin_mapeo: { depto: string; mes_usd: number }[];
+             // El espejo es lo que lee Pre-Closing. Si no quedó escrito, el mes
+             // se guardó igual pero ESE TAB sigue con los números viejos — y
+             // hasta el 2026-09-11 nadie leía este campo.
+             espejo?: { escrito: boolean; error?: string | null };
              hallazgos: PrecierreHallazgo[] }> {
   const form = new FormData();
   form.append("file", archivo);
@@ -5395,6 +5399,25 @@ export interface PrecierreCambios {
 }
 export function cambiosPrecierre(id: string): Promise<PrecierreCambios> {
   return api.get(`/precierre/${id}/cambios/`);
+}
+
+/**
+ * ¿El tab de Pre-Closing muestra la última subida, o una anterior?
+ *
+ * Pre-Closing no lee el borrador: lee el ESPEJO, que se escribe aparte y puede
+ * quedar atrás sin que nada lo delate. Esto compara los dos totales del mes.
+ */
+export interface PrecierreEspejo {
+  anio: number; mes: number;
+  hay_borrador: boolean;
+  al_dia: boolean;
+  borrador?: { id: string; archivo: string; tc: number;
+               subido_en: string | null; total: number };
+  espejo?: { id: string | null; total: number };
+  diferencia?: number;
+}
+export function espejoAlDia(anio: number, mes: number): Promise<PrecierreEspejo> {
+  return api.get(`/precierre/${anio}/${mes}/espejo/`);
 }
 
 export function listarPrecierres(): Promise<{ precierres: PrecierreResumen[] }> {

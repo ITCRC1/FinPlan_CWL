@@ -124,6 +124,16 @@ export default function PreCierrePage() {
     try {
       const r = await subirPrecierre(archivo, { tc, mes, anio });
       setId(r.id);
+      // ⚠️ El espejo, DICHO. Hasta el 2026-09-11 la respuesta traía
+      // `{escrito: false, error: "..."}` y el frontend no leía ese campo en
+      // ninguna parte: si el espejo no quedaba, la subida se veía perfecta y el
+      // tab de Pre-Closing seguía con los números viejos, en silencio. Es
+      // exactamente el «a veces subo y no se refleja» del owner.
+      if (r.espejo && r.espejo.escrito === false) {
+        setError("El mes se guardó, pero el tab de Pre-Closing NO quedó "
+                 + "actualizado: " + (r.espejo.error || "no se pudo escribir el espejo")
+                 + ". Volvé a subir; si se repite, pasame este texto.");
+      }
       // Owner, 2026-09-11: «necesito que cada vez que suba se guarde la versión
       // anterior y compare qué tanto cambió versus la versión, y la varianza».
       // Eso ya se calcula; lo que faltaba era llegar. En la primera vuelta del

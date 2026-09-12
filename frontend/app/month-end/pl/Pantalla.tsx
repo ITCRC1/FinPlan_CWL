@@ -28,6 +28,7 @@ import {
   getEstadisticasCierre, getDetalleDeCelda,
   getConsultaCatalogo, correrConsulta, bajarConsultaExcel, getPLDoceMeses,
   getPlanillaPorCuenta, getPlanillaPorPosicion, getGastoPorDetalle,
+  espejoAlDia, type PrecierreEspejo,
   type ConsultaFila, type ConsultaCatalogo, type FbDetalle, type FbMes, type IngresoDetalle,
   type AuditoriaCuadre, type PLDetailFila, type EstadisticasCierre,
   type Scenario, type PLCompareVersion, type PLColumn, type GastoEscenario,
@@ -577,6 +578,30 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
    */
   // Una llave por modo: Pre-Closing y Cierre de Mes se eligen distinto y
   // compartir la memoria haria que cada visita a una desordenara la otra.
+  /**
+   * ¿Este tab está mostrando la última subida del mes, o una anterior?
+   *
+   * Pre-Closing no lee el borrador: lee el ESPEJO, un escenario que se escribe
+   * aparte y puede quedar atrás sin que nada lo delate — la subida responde
+   * bien y el tab sigue con los números viejos.
+   *
+   * Owner, 2026-09-11: «necesito que cada vez que suba se aplique… sino no haga
+   * nada con ese tab» · «me da la impresión que a veces subo y los cambios no
+   * se reflejan». Esto es esa garantía: el tab no puede mostrar plata vieja sin
+   * decirlo.
+   *
+   * `null` = todavía no se sabe. No se avisa nada mientras no se sepa: un aviso
+   * que parpadea en cada carga se vuelve invisible.
+   */
+  const [espejo, setEspejo] = useState<PrecierreEspejo | null>(null);
+  useEffect(() => {
+    if (!esPre) { setEspejo(null); return; }
+    let vivo = true;
+    espejoAlDia(year, mes).then(r => { if (vivo) setEspejo(r); })
+      .catch(() => { if (vivo) setEspejo(null); });
+    return () => { vivo = false; };
+  }, [esPre, year, mes]);
+
   const MEMORIA = esPre ? "finplan.pre-closing.pl" : "finplan.month-end.pl";
   const guardado = useRef<Record<string, unknown> | null>(null);
 
@@ -2443,6 +2468,31 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
           padding: "8px 12px", marginBottom: 10, fontSize: 12.5,
           color: "#B54708",
         }}>{t("espejoAviso")}</div>
+      )}
+      {/* ⚠️ ROJO y arriba de todo: este tab está mostrando OTRA subida.
+          No es un detalle de presentación — es la diferencia entre leer el
+          cierre de hoy y leer el de hace tres horas creyendo que es el de hoy. */}
+      {esPre && espejo && espejo.hay_borrador && !espejo.al_dia && (
+        <div style={{
+          background: "#FEF3F2", border: "1px solid #FDA29B", borderRadius: 8,
+          padding: "10px 12px", marginBottom: 10, fontSize: 12.5,
+          color: "#B42318", fontWeight: 600,
+        }}>
+          ⚠ Este tab NO está mostrando la última subida de{" "}
+          {MESES[mes - 1]} {year}.
+          {espejo.borrador?.subido_en && (
+            <> La última se subió a las{" "}
+              {new Date(espejo.borrador.subido_en).toLocaleTimeString(
+                undefined, { hour: "2-digit", minute: "2-digit" })}
+              {espejo.borrador.tc ? ` (TC ${espejo.borrador.tc})` : ""}.</>
+          )}
+          {typeof espejo.diferencia === "number" && (
+            <> Difieren en US$ {Math.abs(espejo.diferencia).toLocaleString(
+              undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.</>
+          )}
+          {" "}Volvé a subir el mes en Pre-Cierre; si vuelve a pasar, el aviso
+          de la pantalla de subida dice por qué.
+        </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t("titulo")}</h1>

@@ -38,7 +38,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -47,6 +47,7 @@ from app.engine import pl_engine
 from app.errores import ErrorApi
 from app.export import precierre_xlsx, revision_mes_xlsx as revision
 from app.hotel_actual import HOTEL_ID
+from app.models.actual_entry import ActualEntry
 from app.importers import integrity_final
 from app.revision import (nivel1_estructura, nivel2_coherencia,
                           nivel3_fuentes, nivel4_expectativa)
@@ -160,6 +161,21 @@ async def _espejo(db: AsyncSession, anio: int) -> Scenario:
     return esp
 
 
+#: Las columnas de mes de `ActualEntry`, en orden. Mismo vocabulario que
+#: `scenarios_api._GL_MONTHS`: si se separan, la verificación leería otro mes.
+_COL_MES = ["jan", "feb", "mar", "apr", "may", "jun",
+            "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
+class EspejoNoCuadra(Exception):
+    """El espejo no quedó escrito, o quedó escrito con otra plata.
+
+    Tiene nombre propio para que la subida pueda distinguirla de un error
+    cualquiera y contarla como lo que es: la razón por la que el tab de
+    Pre-Closing no puede mostrar este mes.
+    """
+
+
 async def _reflejar(db: AsyncSession, pc: Precierre, idioma: str) -> dict:
     """Escribe el mes del borrador en el espejo, por la puerta de siempre.
 
@@ -191,8 +207,32 @@ async def _reflejar(db: AsyncSession, pc: Precierre, idioma: str) -> dict:
         file=_Archivo(), dry_run=False, merge=True, scenario_id=esp.id,
         confirmar_diferencias=True, mes_de_cierre=pc.mes, db=db, idioma=idioma)
     bloques = resultado.get("blocks") or resultado.get("results") or []
-    return {"escenario_id": esp.id, "version": esp.version,
-            "escrito": bool(any(b.get("matched") for b in bloques))}
+    if not any(b.get("matched") for b in bloques):
+        raise EspejoNoCuadra("el importador no apareó ninguna cuenta")
+
+    # ── Verificar, no confiar ───────────────────────────────────────────────
+    #
+    # Que no haya explotado no prueba que haya escrito. Se relee lo que quedó en
+    # el espejo y se compara contra el borrador: si no cuadran, esto NO se
+    # escribió, por mucho que la llamada haya vuelto sin error.
+    #
+    # La tolerancia es de un dólar. El borrador guarda cada fila redondeada a dos
+    # decimales y el espejo agrupa por (departamento, cuenta), así que unos
+    # centavos de diferencia son aritmética normal — en agosto 2026, tres
+    # centavos sobre 247 filas. Un dólar deja pasar eso y no deja pasar nada que
+    # importe.
+    del_borrador = sum((f["mes_usd"] for f in await _filas(db, pc.id)), Decimal(0))
+    del_espejo = (await db.execute(select(
+        func.sum(getattr(ActualEntry, _COL_MES[pc.mes - 1]))).where(
+        ActualEntry.scenario_id == esp.id))).scalar() or Decimal(0)
+    dif = abs(Decimal(str(del_espejo)) - del_borrador)
+    if dif > Decimal("1.00"):
+        raise EspejoNoCuadra(
+            f"el espejo quedó en {float(del_espejo):,.2f} y el borrador dice "
+            f"{float(del_borrador):,.2f} — difieren en {float(dif):,.2f}")
+
+    return {"escenario_id": esp.id, "version": esp.version, "escrito": True,
+            "total": float(del_borrador)}
 
 
 @router.post("/precierre/", dependencies=[Depends(registro_de_subida)])
@@ -426,6 +466,66 @@ async def detalle(precierre_id: str, db: AsyncSession = Depends(get_db),
 #: Por debajo de esto no es un cambio, es la división por el tipo de cambio.
 #: Los montos se guardan con seis decimales a propósito (ver el modelo).
 RUIDO = Decimal("0.01")
+
+
+@router.get("/precierre/{anio}/{mes}/espejo/")
+async def espejo_al_dia(anio: int, mes: int, db: AsyncSession = Depends(get_db),
+                        _=Depends(get_current_user)):
+    """¿El tab de Pre-Closing está mostrando ESTA subida, o una anterior?
+
+    ## Por qué existe
+
+    Pre-Closing no lee el borrador: lee el **espejo**, un escenario aparte que
+    se escribe después de guardar. Esa escritura puede fallar, y al fallar no
+    rompe nada visible — la subida responde bien, el borrador queda con los
+    números nuevos, y el tab sigue mostrando los viejos. Nadie se entera.
+
+    Owner, 2026-09-11: *«me da la impresión que a veces subo y los cambios no se
+    reflejan»* · *«necesito que cada vez que suba se aplique… sino no haga nada
+    con ese tab»*.
+
+    No se puede lograr que una escritura nunca falle. Lo que sí se puede es que
+    **el tab no pueda mentir**: se comparan los dos totales y, si no coinciden,
+    la pantalla lo dice en vez de dibujar números viejos como si tal cosa.
+
+    ## Compara PLATA, no una marca
+
+    Un sello —«este espejo salió de la subida X»— se puede quedar pegado aunque
+    la escritura haya entrado a medias. El total del mes no: si el espejo tiene
+    otra plata que el borrador, algo pasó, sea lo que sea.
+
+    Tolerancia de un dólar, por la misma razón que en `_reflejar`: el redondeo a
+    dos decimales de cada fila da centavos de diferencia — tres, sobre 247 filas,
+    en agosto 2026.
+    """
+    if not 1 <= mes <= 12:
+        raise ErrorApi(422, "precierre.mes_invalido")
+    pc = (await db.execute(select(Precierre).where(
+        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio,
+        Precierre.mes == mes, Precierre.estado.in_(("borrador", "pasado_a_final")))
+        .order_by(Precierre.creado_en.desc(), Precierre.id.desc()))).scalars().first()
+    if pc is None:
+        return {"anio": anio, "mes": mes, "hay_borrador": False, "al_dia": True}
+
+    del_borrador = sum((f["mes_usd"] for f in await _filas(db, pc.id)), Decimal(0))
+    esp = (await db.execute(select(Scenario).where(
+        Scenario.hotel_id == HOTEL_ID, Scenario.year == anio,
+        Scenario.es_precierre.is_(True)))).scalars().first()
+    del_espejo = Decimal(0)
+    if esp is not None:
+        del_espejo = Decimal(str((await db.execute(select(
+            func.sum(getattr(ActualEntry, _COL_MES[mes - 1]))).where(
+            ActualEntry.scenario_id == esp.id))).scalar() or 0))
+    dif = del_espejo - del_borrador
+    return {
+        "anio": anio, "mes": mes, "hay_borrador": True,
+        "al_dia": bool(esp is not None and abs(dif) <= Decimal("1.00")),
+        "borrador": {"id": pc.id, "archivo": pc.archivo_nombre, "tc": float(pc.tc),
+                     "subido_en": pc.creado_en.isoformat() if pc.creado_en else None,
+                     "total": float(del_borrador)},
+        "espejo": {"id": esp.id if esp else None, "total": float(del_espejo)},
+        "diferencia": float(dif),
+    }
 
 
 @router.get("/precierre/{precierre_id}/cambios/")

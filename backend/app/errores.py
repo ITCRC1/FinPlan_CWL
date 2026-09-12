@@ -231,6 +231,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "precierre.sin_puente": {
         "es": "Esta propiedad no tiene cargado el mapeo de departamentos de Integrity (`mapd_integrity.json`). Sin él no se sabe a qué departamento de FinPlan va cada código.",
         "en": "This property has no Integrity department bridge loaded (`mapd_integrity.json`). Without it there is no way to know which FinPlan department each code belongs to."},
+    "precierre.mes_invalido": {
+        "es": "El mes tiene que estar entre 1 y 12.",
+        "en": "The month must be between 1 and 12."},
     "precierre.formato": {
         "es": "No se pudo leer el estado de resultados de Integrity: {detalle}",
         "en": "Integrity's income statement could not be read: {detalle}"},
