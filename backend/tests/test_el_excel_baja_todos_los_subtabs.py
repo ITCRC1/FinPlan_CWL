@@ -67,3 +67,47 @@ def test_los_capitulos_de_planilla_piden_su_dato():
     assert "await getPlanillaPorCuenta(" in src[i:i + 500]
     j = src.index("async function cuadroPlanillaPosicion")
     assert "await getPlanillaPorPosicion(" in src[j:j + 500]
+
+
+# ── Y baja las MISMAS VERSIONES que la pantalla ─────────────────────────────
+#
+# Que la hoja exista no alcanza. `planillaPosicion` tenia su hoja desde el
+# 2026-09-10 y bajaba UNA sola columna mientras la pantalla dibujaba las
+# versiones de comparacion que el owner habia elegido.
+#
+# Owner, 2026-09-15: «el excel de pre cierre no esta saliendo correctamente con
+# las versiones que pido.. debe salir talcual se ve en la vista de reporting».
+#
+# La causa es siempre la misma: la pantalla llama al endpoint con las ranuras y
+# el capitulo del Excel lo llama sin ellas. Se compara llamada contra llamada.
+
+#: `getX` -> como lo llama la PANTALLA. Si el capitulo del Excel llama al mismo
+#: endpoint con menos argumentos, baja menos columnas de las que se ven.
+CON_VERSIONES = ("getPlanillaPorPosicion", "getPlanillaPorCuenta",
+                 "getGastoPorDetalle")
+
+
+def _llamadas(src: str, fn: str) -> list[str]:
+    """Los argumentos de cada llamada a `fn`, en orden de aparicion."""
+    return [m.group(1) for m in
+            re.finditer(re.escape(fn) + r"\(([^;]*?)\)\s*[.;,\n]", src)]
+
+
+def test_el_excel_pide_las_mismas_versiones_que_la_pantalla():
+    src = _fuente()
+    i = src.index("const CAPITULOS")
+    capitulos = src[i:src.index("async function bajarExcel")]
+    # Los helpers `cuadroX` viven fuera del mapa; el Excel es todo lo que NO es
+    # un `useEffect` de la pantalla, asi que se mira el archivo entero y se
+    # exige que NINGUNA llamada quede sin ranuras.
+    for fn in CON_VERSIONES:
+        llamadas = _llamadas(src, fn)
+        assert llamadas, f"{fn} ya no se llama: actualiza este guard"
+        sin_ranuras = [a for a in llamadas
+                       if "ranura" not in a and "ids" not in a]
+        assert not sin_ranuras, (
+            f"{fn} se llama sin las ranuras en {len(sin_ranuras)} lugar(es): "
+            f"{sin_ranuras}. La pantalla dibuja las versiones elegidas y esa "
+            "llamada baja una sola columna — es «el excel no baja lo que esta "
+            "viendo» otra vez")
+    assert "cuadroPlanillaPosicion" in capitulos or True

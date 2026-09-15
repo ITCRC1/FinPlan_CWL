@@ -1944,34 +1944,53 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     gastoDetalle: async () => await cuadroGastoDetalle(),
   };
 
-  /** El gasto por DEPARTAMENTO · CUENTA · DETALLE, para el Excel.
+  /** El gasto por DEPARTAMENTO · CUENTA · DETALLE, **con las versiones de la
+   *  pantalla**.
    *
-   *  Una sola columna de monto: es el mes en revisión y no hay contra qué
-   *  compararlo — un presupuesto no se digita por detalle del mayor. */
+   *  ⚠️ Mismo defecto y misma fecha que `cuadroPlanillaPosicion`: bajaba UNA
+   *  columna porque cuando se escribió no había con qué comparar, y siguió
+   *  igual después de que la pantalla ganara Budget y Forecast.
+   *
+   *  La comparación **no baja al DETALLE**, igual que en pantalla: el checkbook
+   *  numera sus detalles por su cuenta. Lo exacto —y lo que se compara— son los
+   *  totales por CUENTA y por DEPARTAMENTO, que salen de la cuenta entera del
+   *  presupuesto y no de los detalles que aparearon. */
   async function cuadroGastoDetalle(): Promise<Cuadro[]> {
-    const d = await getGastoPorDetalle(year, mes);
+    const d = await getGastoPorDetalle(year, mes, ranuras.slice(1).filter(Boolean));
     if (!d.hay_detalle) return [];
+    const comp = d.comparar ?? [];
+    const vacias = comp.map(() => null);
     const filas: FilaCuadro[] = [];
     for (const dep of d.departamentos) {
-      filas.push({ label: `${dep.dept_code} · ${dep.dept_name}`, es_total: true,
-                   valores: [dep.total] });
+      filas.push({
+        label: `${dep.dept_code} · ${dep.dept_name}`, es_total: true,
+        valores: [dep.total, ...comp.map(c => dep.otros?.[c.scenario_id] ?? 0)],
+      });
       for (const cta of dep.cuentas) {
         for (const f of cta.filas) {
           filas.push({ label: `${cta.cuenta}  ${f.detalle || "—"}  ${f.nombre}`,
-                       nivel: 1, valores: [f.monto] });
+                       // El detalle no compara: vacío, no cero. Ver
+                       // `cuadroPlanillaPosicion`.
+                       nivel: 1, valores: [f.monto, ...vacias] });
         }
-        filas.push({ label: t("totalCuenta", { cuenta: cta.cuenta }), nivel: 1,
-                     es_total: true, valores: [cta.total] });
+        filas.push({
+          label: t("totalCuenta", { cuenta: cta.cuenta }), nivel: 1, es_total: true,
+          valores: [cta.total, ...comp.map(c => cta.otros?.[c.scenario_id] ?? 0)],
+        });
       }
     }
-    filas.push({ label: t("gastoDetalleTotal"), es_total: true,
-                 valores: [d.total] });
+    filas.push({
+      label: t("gastoDetalleTotal"), es_total: true,
+      valores: [d.total, ...comp.map(c => c.total)],
+    });
     return [{
       titulo: t("tab_gastoDetalle"),
       subtitulo: `${MESES[mes - 1]} ${year} · USD`,
       columnas: [
         { label: t("detalle"), ancho: 60, formato: "texto" },
         { label: `${MESES[mes - 1]} ${year}`, ancho: 18, formato: "usd2" },
+        ...comp.map(c => ({ label: etiqueta(c.scenario_id), ancho: 18,
+                            formato: "usd2" as const })),
       ],
       filas,
     }];
@@ -2008,38 +2027,70 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     };
   }
 
-  /** La planilla por POSICIÓN. Una sola columna: es el mes en revisión, y no
-   *  hay contra qué compararlo — un presupuesto no se planea por posición. */
+  /** La planilla por POSICIÓN, **con las mismas versiones que la pantalla**.
+   *
+   *  ⚠️ Este capítulo bajaba UNA sola columna. El comentario que tenía —«no hay
+   *  contra qué compararlo: un presupuesto no se planea por posición»— era
+   *  cierto cuando se escribió, y dejó de serlo el día que la pantalla ganó las
+   *  columnas de Budget y Forecast. Nadie volvió a tocar el Excel.
+   *
+   *  Owner, 2026-09-15: *«el excel de pre cierre no está saliendo correctamente
+   *  con las versiones que pido… debe salir tal cual se ve en la vista de
+   *  reporting»*. Es la tercera vez que este proyecto paga por un Excel que no
+   *  es la pantalla (ver `cuadroEstado`, 2026-08-27).
+   *
+   *  La comparación **no baja al puesto**, igual que en pantalla: el checkbook
+   *  usa su propio código de posición y los nombres no aparean. Lo que sí es
+   *  exacto —y es lo que se compara— son los totales por DEPARTAMENTO, por
+   *  CUENTA y el general: esos códigos son los mismos en los dos sistemas.
+   */
   async function cuadroPlanillaPosicion(): Promise<Cuadro[]> {
-    const d = await getPlanillaPorPosicion(year, mes);
+    // Las MISMAS ranuras que la pantalla: la 1 es el mes en revisión y ya es la
+    // columna principal; el resto van como comparación.
+    const d = await getPlanillaPorPosicion(year, mes, ranuras.slice(1).filter(Boolean));
     if (!d.hay_detalle) return [];
+    const comp = d.comparar ?? [];
+    const vacias = comp.map(() => null);
     const filas: FilaCuadro[] = [];
     let depActual = "";
     let ctaActual = "";
     for (const f of d.filas) {
       if (f.dept_code !== depActual) {
         depActual = f.dept_code; ctaActual = "";
-        filas.push({ label: `${f.dept_code} · ${f.dept_name}`, es_total: true,
-                     valores: [null] });
+        filas.push({
+          label: `${f.dept_code} · ${f.dept_name}`, es_total: true,
+          valores: [null, ...comp.map(c =>
+            d.otros_por_depto?.[f.dept_code]?.[c.scenario_id] ?? 0)],
+        });
       }
       if (f.cuenta !== ctaActual) {
         ctaActual = f.cuenta;
-        filas.push({ label: `${f.cuenta}  ${f.cuenta_nombre}`, nivel: 1,
-                     valores: [null] });
+        filas.push({
+          label: `${f.cuenta}  ${f.cuenta_nombre}`, nivel: 1,
+          valores: [null, ...comp.map(c =>
+            d.otros_por_cuenta?.[`${f.dept_code}|${f.cuenta}`]?.[c.scenario_id] ?? 0)],
+        });
       }
       filas.push({
         label: `${f.posicion}  ${f.posicion_nombre || t("posicionSinNombre")}`,
-        nivel: 2, valores: [f.monto],
+        // El puesto no compara: la celda va vacía y no en cero. Un cero se lee
+        // como «el presupuesto no tiene a nadie en ese puesto», que es una
+        // afirmación que este cuadro no puede hacer.
+        nivel: 2, valores: [f.monto, ...vacias],
       });
     }
-    filas.push({ label: t("planillaCuentasTotal"), es_total: true,
-                 valores: [d.total] });
+    filas.push({
+      label: t("planillaCuentasTotal"), es_total: true,
+      valores: [d.total, ...comp.map(c => c.total)],
+    });
     return [{
       titulo: t("tab_planillaPosicion"),
       subtitulo: `${MESES[mes - 1]} ${year} · USD`,
       columnas: [
         { label: t("posicion"), ancho: 46, formato: "texto" },
         { label: `${MESES[mes - 1]} ${year}`, ancho: 18, formato: "usd2" },
+        ...comp.map(c => ({ label: etiqueta(c.scenario_id), ancho: 18,
+                            formato: "usd2" as const })),
       ],
       filas,
     }];
