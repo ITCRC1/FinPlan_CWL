@@ -22,6 +22,16 @@ def _suma(filas) -> Decimal:
     return sum((f["mes_usd"] for f in filas), ZERO)
 
 
+def _como_se_ve(cuenta: str, deptos_integrity: set, destino: str) -> str:
+    """`5201-0151 → 0165` — primero lo que el owner puede buscar en su archivo.
+
+    El destino sólo se agrega cuando es distinto; repetirlo cuando coinciden
+    llenaría el aviso de flechas que no dicen nada.
+    """
+    d = "/".join(sorted(x for x in deptos_integrity if x)) or "?"
+    return f"{cuenta}-{d}" + (f" → {destino}" if destino and destino not in deptos_integrity else "")
+
+
 def cuentas_sin_mapeo(filas: list[dict], linea_de) -> list:
     """Cuentas que no llegan a ninguna línea del P&L.
 
@@ -37,27 +47,41 @@ def cuentas_sin_mapeo(filas: list[dict], linea_de) -> list:
         if linea_de(f["destino_finplan"], cuenta):
             continue
         k = (cuenta, f["destino_finplan"])
-        acc = huerfanas.setdefault(k, {"monto": ZERO, "refs": []})
+        acc = huerfanas.setdefault(k, {"monto": ZERO, "refs": [], "deptos": set()})
         acc["monto"] += f["mes_usd"]
+        # ⚠️ El departamento de INTEGRITY, que es el que él tiene delante.
+        #
+        # Owner, 2026-09-15: «me da este 0165 como error… lo que no sé es que en
+        # lo que estoy subiendo esta combinación no está». Tenía razón: su
+        # archivo dice `5201-0151` y el aviso decía `5201 (0165)`, que es el
+        # destino en FinPlan DESPUÉS del puente. Buscaba el 0165 en su archivo y
+        # no existía. Un aviso tiene que nombrar algo que se pueda buscar.
+        acc["deptos"].add(f["depto"] or "?")
         acc["refs"].append({"fila": f["fila"], "cuenta": f["cuenta"],
                             "nombre": f["descripcion"],
                             # El depto y el monto van en CADA referencia para que
                             # la pantalla las muestre como tabla y no como texto:
                             # «no subió» sin el monto al lado no se puede priorizar.
-                            "depto": f["destino_finplan"],
+                            "depto": f["depto"],
+                            "destino": f["destino_finplan"],
                             "monto": float(f["mes_usd"]),
                             "motivo": "sin_renglon"})
     if not huerfanas:
         return []
     total = sum((v["monto"] for v in huerfanas.values()), ZERO)
-    cuales = ", ".join(f"{c} ({d})" for (c, d) in sorted(huerfanas)[:8])
+    cuales = ", ".join(
+        _como_se_ve(c, huerfanas[(c, d)]["deptos"], d)
+        for (c, d) in sorted(huerfanas)[:8])
     return [hallazgo(
         "cuenta_sin_mapeo",
         "Cuentas que no llegan a ninguna línea del P&L",
         "critico" if total else "aviso",
         f"{len(huerfanas)} combinaciones de cuenta y departamento no resuelven a "
         f"ninguna línea del reporte: {cuales}"
-        + ("…" if len(huerfanas) > 8 else ""),
+        + ("…" if len(huerfanas) > 8 else "")
+        + " (la cuenta va con su departamento de Integrity, tal como está en el "
+          "archivo; la flecha apunta al departamento de FinPlan al que lo "
+          "traduce el puente)",
         porque="Su plata entra al total del departamento pero no aparece en "
                "ninguna línea del P&L. El reporte cuadra consigo mismo y la "
                "diferencia sólo se ve comparando contra otra cosa.",
@@ -98,19 +122,23 @@ def cuentas_en_linea_prestada(filas: list[dict], como_de) -> list:
         if como != "FALLBACK" or not linea:
             continue
         k = (cuenta, f["destino_finplan"])
-        acc = prestadas.setdefault(k, {"monto": ZERO, "linea": linea, "refs": []})
+        acc = prestadas.setdefault(k, {"monto": ZERO, "linea": linea,
+                                       "refs": [], "deptos": set()})
         acc["monto"] += f["mes_usd"]
+        acc["deptos"].add(f["depto"] or "?")   # el de Integrity, ver `_como_se_ve`
         acc["refs"].append({"fila": f["fila"], "cuenta": f["cuenta"],
                             "nombre": f["descripcion"],
-                            "depto": f["destino_finplan"],
+                            "depto": f["depto"],
+                            "destino": f["destino_finplan"],
                             "monto": float(f["mes_usd"]),
                             "linea": linea,
                             "motivo": "renglon_prestado"})
     if not prestadas:
         return []
     total = sum((v["monto"] for v in prestadas.values()), ZERO)
-    cuales = ", ".join(f"{c} ({d}) → {v['linea']}"
-                       for (c, d), v in sorted(prestadas.items())[:8])
+    cuales = ", ".join(
+        f"{_como_se_ve(c, v['deptos'], d)} cae en {v['linea']}"
+        for (c, d), v in sorted(prestadas.items())[:8])
     return [hallazgo(
         "cuenta_en_linea_prestada",
         "Cuentas que llegan a la línea de otro departamento",

@@ -333,6 +333,10 @@ function Referencias({ filas }: { filas: Array<Record<string, unknown>> }) {
     return <pre style={pre}>{JSON.stringify(filas.slice(0, 30), null, 1)}</pre>;
   }
   const conLinea = filas.some(f => f.linea);
+  // ⚠️ El departamento de INTEGRITY y el de FinPlan, en columnas distintas.
+  // El aviso decía sólo el de FinPlan y el owner buscaba ese código en su
+  // archivo, donde no existe (2026-09-15). Ver `_como_se_ve` en el backend.
+  const conDestino = filas.some(f => f.destino && f.destino !== f.depto);
   const orden = [...filas].sort(
     (a, b) => Math.abs(Number(b.monto ?? 0)) - Math.abs(Number(a.monto ?? 0)));
   const total = orden.reduce((s, f) => s + Number(f.monto ?? 0), 0);
@@ -358,6 +362,7 @@ function Referencias({ filas }: { filas: Array<Record<string, unknown>> }) {
           <tr>
             <th style={th}>Cuenta</th>
             <th style={th}>Depto</th>
+            {conDestino && <th style={th}>En FinPlan</th>}
             <th style={th}>Descripción</th>
             {conLinea && <th style={th}>Cayó en</th>}
             <th style={{ ...th, textAlign: "right" }}>US$</th>
@@ -368,6 +373,12 @@ function Referencias({ filas }: { filas: Array<Record<string, unknown>> }) {
             <tr key={`${String(f.cuenta)}-${i}`}>
               <td style={{ ...td, fontFamily: "var(--font-mono)" }}>{String(f.cuenta ?? "")}</td>
               <td style={{ ...td, fontFamily: "var(--font-mono)" }}>{String(f.depto ?? "")}</td>
+              {conDestino && (
+                <td style={{ ...td, fontFamily: "var(--font-mono)",
+                             color: "var(--text-secondary)" }}>
+                  {String(f.destino ?? "")}
+                </td>
+              )}
               <td style={{ ...td, whiteSpace: "normal" }}>{String(f.nombre ?? "")}</td>
               {conLinea && <td style={td}>{String(f.linea ?? "")}</td>}
               <td style={num}>{usd(Number(f.monto ?? 0))}</td>
@@ -376,7 +387,8 @@ function Referencias({ filas }: { filas: Array<Record<string, unknown>> }) {
         </tbody>
         <tfoot>
           <tr>
-            <td style={{ ...td, fontWeight: 700 }} colSpan={conLinea ? 4 : 3}>
+            <td style={{ ...td, fontWeight: 700 }}
+                colSpan={3 + (conDestino ? 1 : 0) + (conLinea ? 1 : 0)}>
               {orden.length} filas
             </td>
             <td style={{ ...num, fontWeight: 700 }}>{usd(total)}</td>

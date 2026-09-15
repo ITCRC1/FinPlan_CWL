@@ -64,7 +64,8 @@ def test_si_todas_mapean_no_hay_hallazgo():
 
 def test_una_cuenta_que_cae_por_descarte_se_reporta():
     h = n1.cuentas_en_linea_prestada(
-        [fila(cuenta="5501-0162", base=5501, destino="0162", mes=150.09)],
+        [fila(cuenta="5501-0160", base=5501, depto="0160", destino="0162",
+              mes=150.09)],
         lambda d, c: ("COS_INNOCEANA", "FALLBACK"))
     assert len(h) == 1
     assert h[0].clave == "cuenta_en_linea_prestada"
@@ -72,7 +73,10 @@ def test_una_cuenta_que_cae_por_descarte_se_reporta():
     assert h[0].monto == D("150.09")
     assert "COS_INNOCEANA" in h[0].detalle
     assert h[0].referencias[0]["linea"] == "COS_INNOCEANA"
-    assert h[0].referencias[0]["depto"] == "0162"
+    # El de INTEGRITY, que es el que aparece en el archivo del owner; el de
+    # FinPlan va aparte. Ver `test_la_referencia_trae_los_DOS_departamentos`.
+    assert h[0].referencias[0]["depto"] == "0160"
+    assert h[0].referencias[0]["destino"] == "0162"
 
 
 def test_la_regla_exacta_y_la_de_la_madre_no_son_prestamo():
@@ -88,6 +92,51 @@ def test_sin_linea_no_es_prestamo_sino_perdida():
     el monto que ve el owner."""
     assert n1.cuentas_en_linea_prestada(
         [fila(mes=5000)], lambda d, c: ("", "")) == []
+
+
+# ── El aviso tiene que nombrar algo que se pueda BUSCAR ─────────────────────
+#
+# Owner, 2026-09-15, subiendo agosto: «me da este 0165 como error.. lo que no se
+# es que en lo que estoy subiendo esta combinacion no esta». Tenia razon: su
+# archivo dice `5201-0151` y el aviso decia `5201 (0165)` — el destino en
+# FinPlan DESPUES del puente. Buscaba el 0165 en su archivo y no existia.
+
+def _fila_retail(mes=-128.61):
+    return {"fila": 20, "cuenta": "5201-0151", "cuenta_base": 5201,
+            "descripcion": "CLOTHING COST STORE", "depto": "0151",
+            "destino_finplan": "0165", "grupo": "RETAIL",
+            "categoria": "Costo de Ventas", "mes_usd": D(str(mes)),
+            "acumulado_usd": D(str(mes))}
+
+
+def test_el_aviso_nombra_la_cuenta_como_esta_en_el_archivo():
+    h = n1.cuentas_sin_mapeo([_fila_retail()], lambda d, c: "")
+    assert "5201-0151" in h[0].detalle, (
+        "tiene que decir el departamento de Integrity: es el unico que el owner "
+        "puede buscar en su archivo")
+    assert "0165" in h[0].detalle, "y el destino de FinPlan, para poder mapearla"
+
+
+def test_el_renglon_prestado_tambien_nombra_el_departamento_de_integrity():
+    h = n1.cuentas_en_linea_prestada(
+        [_fila_retail()], lambda d, c: ("COS_INNOCEANA", "FALLBACK"))
+    assert "5201-0151" in h[0].detalle
+    assert "COS_INNOCEANA" in h[0].detalle
+
+
+def test_cuando_los_dos_departamentos_coinciden_no_se_repite():
+    """Una flecha que apunta al mismo codigo no dice nada y llena el aviso."""
+    f = dict(_fila_retail(), depto="0180", destino_finplan="0180")
+    h = n1.cuentas_sin_mapeo([f], lambda d, c: "")
+    assert "5201-0180" in h[0].detalle
+    assert "→ 0180" not in h[0].detalle
+
+
+def test_la_referencia_trae_los_DOS_departamentos():
+    """La tabla los muestra en columnas distintas."""
+    r = n1.cuentas_sin_mapeo([_fila_retail()], lambda d, c: "")[0].referencias[0]
+    assert r["depto"] == "0151", "el de Integrity, el que se busca"
+    assert r["destino"] == "0165", "y a donde lo manda el puente"
 
 
 def test_las_referencias_traen_monto_y_depto_para_poder_verse_en_tabla():
