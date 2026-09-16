@@ -90,7 +90,9 @@ ES_CONTRAPARTIDA_DE_ALLOCATION = sa.and_(
 
 
 async def _filas_que_sobreviven(db, target, merge: bool,
-                                meses_del_archivo: list[int]) -> dict[int, list[dict]]:
+                                meses_del_archivo: list[int],
+                                trae_contrapartida: dict[str, set[int]] | None = None,
+                                ) -> dict[int, list[dict]]:
     """Las filas de `ActualEntry` que van a SEGUIR ahí después de esta carga.
 
     Consolidar «solo lo que trae el archivo» da un número que el reporte nunca
@@ -112,8 +114,24 @@ async def _filas_que_sobreviven(db, target, merge: bool,
     ⚠️ Esto tiene que decir EXACTAMENTE lo que hace el escritor. Si se separan,
     la puerta compara contra un consolidado que el reporte nunca va a dar y
     bloquea una carga correcta (o deja pasar una mala).
+
+    ## `trae_contrapartida` — la excepción de la excepción
+
+    «Sobreviven porque el archivo no puede traerlas» dejó de ser cierto en
+    agosto 2026: es el primer mes en que Integrity postea el reparto él mismo
+    (`4999-0220`, `4999-0161`). Sostener además la vieja —la que se cargó a mano
+    cuando el mayor no la traía— deja el crédito DOS VECES.
+
+    Se midió: la verificación de cierre bloqueó por **US$16.974,00**, que es
+    exactamente el reparto de agosto. Owner, 2026-09-15: *«todo será tal como
+    revisé el pre cierre»*.
+
+    Así que una contrapartida vieja sobrevive **salvo** que el archivo traiga
+    una para ESE departamento y ESE mes. Los meses en que el mayor no la
+    postea —enero a julio— no se mueven.
     """
     from app.importers.gl_detail_importer import es_contrapartida_de_allocation
+    trae = trae_contrapartida or {}
     filas = (await db.execute(select(ActualEntry).where(
         ActualEntry.scenario_id == target.id))).scalars().all()
     tocados = set(meses_del_archivo or [])
@@ -122,7 +140,12 @@ async def _filas_que_sobreviven(db, target, merge: bool,
         contrapartida = es_contrapartida_de_allocation(e.account_code, e.account_name)
         if not merge and not contrapartida:
             continue
+        # El archivo ya trae la contrapartida de este departamento: la vieja
+        # deja de ser insustituible y se comporta como cualquier otra fila.
+        cede = trae.get(e.dept_code) or set()
         for m in range(1, 13):
+            if contrapartida and m in cede and m in tocados:
+                continue
             if merge and m in tocados and not contrapartida:
                 continue
             v = e.get_month(m)
@@ -1697,6 +1720,7 @@ async def import_gl_detail(
     demás meses ya cargados — para subir solo el mes que cerrás."""
     from app.importers.gl_detail_importer import (
         parse_gl_detail, filas_sin_cuenta, es_contrapartida_de_allocation,
+        contrapartidas_del_archivo,
         allocation_en_overhead)
     from app.importers import verificacion as verificacion_mod
     data = await file.read()
@@ -1801,7 +1825,9 @@ async def import_gl_detail(
             continue
         upload_months = sorted({mi for key in ("revenue", "opex", "costs", "belowgop", "payroll")
                                 for r in blk.get(key, []) for mi in r["months"].keys()})
-        extra = await _filas_que_sobreviven(db, target, merge, upload_months)
+        extra = await _filas_que_sobreviven(
+            db, target, merge, upload_months,
+            contrapartidas_del_archivo(blk))
         con = consolidate_block(blk, mappings, report_lines, filas_extra=extra)
         consolidados[i] = con
         av = aviso_de_moneda(con["stats"])
@@ -2111,10 +2137,19 @@ async def import_gl_detail(
                 #
                 # Es el camino que usa la pantalla de carga (manda merge=true), o sea el
                 # que se recorre TODOS los meses con CADA hotel. Owner (2026-08-16): sí.
+                # ⚠️ Esto tiene que decir EXACTAMENTE lo que calcula
+                # `_filas_que_sobreviven`. La contrapartida vieja sobrevive,
+                # salvo que el archivo traiga una para su departamento y ese
+                # mes — ahí se pone en cero como cualquier otra fila, o el
+                # crédito del reparto queda contado dos veces.
+                cede_ae = contrapartidas_del_archivo(blk)
                 for e in existing_ae:
-                    if es_contrapartida_de_allocation(e.account_code, e.account_name):
-                        continue
+                    es_contra = es_contrapartida_de_allocation(e.account_code,
+                                                               e.account_name)
+                    meses_que_ceden = cede_ae.get(e.dept_code) or set()
                     for mi_ in touched:
+                        if es_contra and mi_ not in meses_que_ceden:
+                            continue
                         e.set_month(mi_, Decimal("0"))
                 await db.execute(sa_delete(ActualPLLine).where(
                     ActualPLLine.scenario_id == target.id, ActualPLLine.month.in_(touched)))

@@ -274,6 +274,19 @@ def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
                    # las desconocidas se tiraban calladas; ahora se recogen y
                    # quien llama decide.
                    "stats_9": [],
+                   # Las contrapartidas de reparto QUE TRAE EL ARCHIVO.
+                   #
+                   # ⚠️ No suman en ningun total: fuera del Pre-Cierre se
+                   # saltan, como siempre. Se anotan porque su PRESENCIA es un
+                   # dato: significa que el mayor ya postea el reparto de ese
+                   # departamento, y entonces la contrapartida vieja —la que
+                   # alguien cargo a mano cuando el archivo no las traia— no
+                   # puede sobrevivir encima, o el credito queda dos veces.
+                   #
+                   # Owner, 2026-09-15, cerrando agosto: la verificacion
+                   # bloqueo por US$16.974,00, que es exactamente el reparto
+                   # del mes contado dos veces.
+                   "contrapartidas": [],
                    # El bloque de VERIFICACION de arriba: {codigo: {mes: monto}}.
                    # Es un CONTROL, no un origen — no suma en ningun total y
                    # nadie lo escribe en la base. Ver `app/importers/verificacion.py`.
@@ -372,8 +385,6 @@ def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
         # Fuera del Pre-Cierre nada cambia: ALLOCATION_EXCLUDE saca el gasto y
         # este `continue` saca el crédito, que es el par que siempre funcionó.
         reparto_a_overhead = es_contrapartida_de_allocation(code, acct_name)
-        if reparto_a_overhead and not en_overhead:
-            continue
 
         for blk in blocks:
             # Clase 9 = estadísticas. Las tres de siempre (9010/9020/9060)
@@ -438,6 +449,14 @@ def parse_gl_detail(data: bytes, en_overhead: bool = False) -> list[dict]:
                     months[m] = float(v)
             if not months:
                 continue
+            # La contrapartida de reparto, fuera del Pre-Cierre: se ANOTA y se
+            # salta. Anotarla es lo que permite que la vieja ceda el lugar; ver
+            # `contrapartidas` arriba y `contrapartidas_del_archivo`.
+            if reparto_a_overhead and not en_overhead:
+                blk["contrapartidas"].append({
+                    "dept_code": dcode, "account_code": code,
+                    "account_name": acct_name, "months": months})
+                continue
             if cls == "6":
                 concept = CONCEPT_BY_ACCT.get(code)
                 if not concept:
@@ -492,6 +511,29 @@ def es_contrapartida_de_allocation(account_code, account_name) -> bool:
     # delante — que es el error que seria peor que el original.
     return (str(account_code or "").startswith("4")
             and "distribu" in str(account_name or "").lower())
+
+
+def contrapartidas_del_archivo(blk: dict) -> dict[str, set[int]]:
+    """`{departamento: {meses}}` donde el ARCHIVO ya trae su contrapartida.
+
+    Es la senal de que el mayor empezo a postear el reparto de ese
+    departamento. Mientras no la traia, FinPlan sostenia la contrapartida a
+    mano y por eso sobrevive a cada carga (`_filas_que_sobreviven`). Cuando el
+    archivo la trae, sostener tambien la vieja cuenta el credito DOS VECES.
+
+    Agosto 2026 fue el primer mes: la verificacion de cierre bloqueo por
+    US$16.974,00 — el reparto del mes, exacto, duplicado.
+
+    En modo Pre-Cierre la lista viene vacia a proposito: ahi la contrapartida
+    no se salta, entra como gasto y netea sola. Devolver algo haria que el
+    espejo tambien borrara la vieja, y el espejo no escribe el Actual.
+    """
+    fuera: dict[str, set[int]] = {}
+    for r in blk.get("contrapartidas") or []:
+        if not r.get("dept_code"):
+            continue
+        fuera.setdefault(r["dept_code"], set()).update(int(m) for m in r["months"])
+    return fuera
 
 
 def filas_sin_cuenta(blocks: list[dict]) -> list[dict]:
