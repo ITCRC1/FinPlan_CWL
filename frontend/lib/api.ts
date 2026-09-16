@@ -5443,11 +5443,19 @@ export function listarPrecierres(): Promise<{ precierres: PrecierreResumen[] }> 
   return api.get("/precierre/");
 }
 
-export function verPrecierre(id: string): Promise<{
+/**
+ * La hoja de revisión. `moneda` la muestra en colones tal como vino del mayor.
+ *
+ * No es una conversión de pantalla: son los colones guardados fila por fila, y
+ * por eso cuadran contra Integrity al céntimo. `hay_crc=false` = esta vuelta se
+ * subió antes de que hubiera dónde guardarlos y la hoja viene en CERO.
+ */
+export function verPrecierre(id: string, moneda: "USD" | "CRC" = "USD"): Promise<{
   id: string; anio: number; mes: number; estado: string; tc: number;
+  moneda: "USD" | "CRC"; hay_crc: boolean;
   hoja: PrecierreFilaHoja[]; filas: number;
 }> {
-  return api.get(`/precierre/${id}/`);
+  return api.get(`/precierre/${id}/?moneda=${moneda}`);
 }
 
 export function hallazgosPrecierre(id: string, opts?: {

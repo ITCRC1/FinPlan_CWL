@@ -65,6 +65,15 @@ export default function PreCierrePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [hoja, setHoja] = useState<PrecierreFilaHoja[]>([]);
+  /**
+   * En qué moneda se mira la hoja de revisión.
+   *
+   * Owner, 2026-09-15: *«una parte donde yo pueda verlo en CRC o en USD»*. El
+   * colón no se convierte en pantalla: viene guardado fila por fila tal como
+   * lo trajo Integrity, así que cuadra contra el mayor al céntimo.
+   */
+  const [moneda, setMoneda] = useState<"USD" | "CRC">("USD");
+  const [hayCrc, setHayCrc] = useState(true);
   const [estado, setEstado] = useState<string>("");
   const [hallazgos, setHallazgos] = useState<PrecierreHallazgo[]>([]);
   const [cambios, setCambios] = useState<PrecierreCambios | null>(null);
@@ -110,11 +119,12 @@ export default function PreCierrePage() {
     setError(null);
     try {
       const [d, h, c] = await Promise.all([
-        verPrecierre(pid),
+        verPrecierre(pid, moneda),
         hallazgosPrecierre(pid, { umbralMonto, umbralPct }),
         cambiosPrecierre(pid, contra || undefined),
       ]);
       setHoja(d.hoja);
+      setHayCrc(d.hay_crc !== false);
       setEstado(d.estado);
       setHallazgos(h.hallazgos);
       setCambios(c);
@@ -123,7 +133,7 @@ export default function PreCierrePage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [umbralMonto, umbralPct, contra]);
+  }, [umbralMonto, umbralPct, contra, moneda]);
 
   useEffect(() => { if (id) void cargar(id); }, [id, cargar]);
 
@@ -280,7 +290,8 @@ export default function PreCierrePage() {
               abierto={abierto} setAbierto={setAbierto} t={t} />
           )}
           {pestana === "hoja" && dl && (
-            <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t} />
+            <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t}
+                  moneda={moneda} setMoneda={setMoneda} hayCrc={hayCrc} />
           )}
           {pestana === "cambios" && (
             <Cambios datos={cambios} t={t} contra={contra} setContra={setContra} />
@@ -506,10 +517,17 @@ function Hallazgos({ hallazgos, sinRevisar, comparativos, umbralMonto, umbralPct
 
 /* ── La hoja de revisión ───────────────────────────────────────────────────── */
 
-function Hoja({ filas, hojaExcelUrl, t }: {
+function Hoja({ filas, hojaExcelUrl, t, moneda, setMoneda, hayCrc }: {
   filas: PrecierreFilaHoja[]; hojaExcelUrl: string;
   t: ReturnType<typeof useTranslations>;
+  moneda: "USD" | "CRC"; setMoneda: (m: "USD" | "CRC") => void; hayCrc: boolean;
 }) {
+  /** Los colones NO llevan decimales ni el signo de dólar. Un `$` delante de
+   *  un monto en colones es exactamente el error que hace que alguien lea
+   *  58.346 como cincuenta y ocho mil dólares. */
+  const monto = (n: number) => moneda === "CRC"
+    ? "₡" + n.toLocaleString(undefined, { maximumFractionDigits: 0 })
+    : usd(n);
   return (
     // `fin-scroll-x`: la convención de la app para un contenedor que scrollea
     // en horizontal. Sin ella el encabezado pegajoso se corre 44px y tapa la
@@ -522,10 +540,37 @@ function Hoja({ filas, hojaExcelUrl, t }: {
         </p>
         {/* La descarga va ACÁ, junto al cuadro. Mandar al usuario a otra
             pestaña para bajar lo que está mirando es una pestaña de más. */}
-        <a href={hojaExcelUrl} style={{ fontSize: 13, whiteSpace: "nowrap" }}>
-          {t("bajarEstaHoja")}
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* El selector de moneda. El colón NO se convierte acá: viene
+              guardado fila por fila tal como lo trajo Integrity, por eso cuadra
+              contra el mayor al céntimo (owner, 2026-09-15). */}
+          <nav aria-label="Moneda" style={{ display: "inline-flex",
+               borderRadius: 6, overflow: "hidden",
+               border: "1px solid var(--border-medium)" }}>
+            {(["USD", "CRC"] as const).map((m, i) => (
+              <button key={m} onClick={() => setMoneda(m)}
+                style={{ all: "unset", cursor: "pointer", padding: "3px 10px",
+                         fontSize: 12, fontWeight: moneda === m ? 700 : 400,
+                         background: moneda === m ? "var(--bg-elevated)" : "transparent",
+                         borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+                {m}
+              </button>
+            ))}
+          </nav>
+          <a href={hojaExcelUrl} style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+            {t("bajarEstaHoja")}
+          </a>
+        </div>
       </div>
+      {/* ⚠️ Una vuelta vieja no tiene los colones guardados y la hoja sale en
+          CERO. Decirlo importa: un cero en una hoja de cierre se lee como «no
+          hubo movimiento», que es lo contrario de lo que pasa. */}
+      {moneda === "CRC" && !hayCrc && (
+        <div style={{ padding: "8px 12px", borderRadius: 6, marginBottom: 10,
+                      background: "var(--bg-warning, #FFFAEB)", fontSize: 12.5 }}>
+          {t("sinColones")}
+        </div>
+      )}
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
         <tbody>
           {filas.map(f => {
@@ -538,7 +583,7 @@ function Hoja({ filas, hojaExcelUrl, t }: {
                 <td style={{ padding: "5px 10px", textAlign: "right",
                              fontVariantNumeric: "tabular-nums",
                              fontWeight: total ? 700 : 400 }}>
-                  {f.actual == null ? "" : usd(f.actual)}
+                  {f.actual == null ? "" : monto(f.actual)}
                 </td>
               </tr>
             );

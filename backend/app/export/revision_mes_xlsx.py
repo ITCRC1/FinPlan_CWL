@@ -132,16 +132,26 @@ def _d(v) -> Decimal:
 
 # ─── Los valores de la columna Actual ─────────────────────────────────────────
 
-def valores_desde_precierre(filas: list[dict]) -> dict[str, Decimal]:
+def valores_desde_precierre(filas: list[dict], campo: str = "mes_usd") -> dict[str, Decimal]:
     """Las claves de la hoja, calculadas desde las filas ya traducidas.
 
     `filas` es lo que devuelve `integrity_final.leer()`: cada una con su
     `categoria`, su `grupo` de FinPlan y su `mes_usd`.
+
+    `campo` elige la MONEDA: `mes_usd` (el default, y lo único que usan los
+    controles de cierre) o `mes_crc` para mirar la misma hoja en colones, tal
+    como viene del mayor de Integrity. Owner, 2026-09-15: *«una parte donde yo
+    pueda verlo en CRC o en USD»*.
+
+    ⚠️ Una fila sin ese campo suma CERO, no rompe: las subidas anteriores al
+    2026-09-15 no guardaron el colón. Que la hoja salga en cero es lo correcto
+    —no hay dato— y quien la pide se entera por `hay_crc`, no por una excepción
+    a mitad de camino.
     """
     v: dict[str, Decimal] = {}
 
     def sumar(clave, cond):
-        v[clave] = sum((f["mes_usd"] for f in filas if cond(f)), ZERO)
+        v[clave] = sum((_d(f.get(campo)) for f in filas if cond(f)), ZERO)
 
     for etiqueta, grupos in DIVISIONES:
         g = set(grupos)
@@ -156,7 +166,7 @@ def valores_desde_precierre(filas: list[dict]) -> dict[str, Decimal]:
               and f["grupo"] == grupo)
     for etiqueta, cuentas in BAJO_GOP.items():
         v[f"bg.{etiqueta}"] = (
-            sum((f["mes_usd"] for f in filas if f["cuenta_base"] in cuentas), ZERO)
+            sum((_d(f.get(campo)) for f in filas if f["cuenta_base"] in cuentas), ZERO)
             if cuentas else ZERO)
     return v
 
@@ -277,12 +287,12 @@ def valores_desde_lineas_pl(lineas: dict) -> dict[str, Decimal]:
     return v
 
 
-def valores_completos(filas: list[dict]) -> dict[str, Decimal]:
+def valores_completos(filas: list[dict], campo: str = "mes_usd") -> dict[str, Decimal]:
     """Las claves de la hoja **con la cascada ya resuelta** — divisiones y
     totales. Es lo que consume cualquiera que quiera los números sin dibujar el
     Excel: `valores_desde_precierre` sola devuelve el detalle y deja los totales
     sin calcular, que fue exactamente el error de la primera corrida."""
-    return _totales(valores_desde_precierre(filas))
+    return _totales(valores_desde_precierre(filas, campo))
 
 
 def _totales(v: dict[str, Decimal]) -> dict[str, Decimal]:

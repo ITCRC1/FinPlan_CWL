@@ -115,7 +115,10 @@ async def _filas(db: AsyncSession, precierre_id: str) -> list[dict]:
              "descripcion": f.descripcion, "depto": f.depto,
              "destino_finplan": f.destino_finplan, "grupo": f.grupo or None,
              "categoria": f.categoria, "mes_usd": f.mes_usd,
-             "acumulado_usd": f.acumulado_usd} for f in filas]
+             "acumulado_usd": f.acumulado_usd,
+             # Nulo en lo subido antes del 2026-09-15: no habia donde guardarlo.
+             "mes_crc": f.mes_crc, "acumulado_crc": f.acumulado_crc}
+            for f in filas]
 
 
 # ─── Subir ────────────────────────────────────────────────────────────────────
@@ -354,7 +357,11 @@ async def crear(
             cuenta_base=f["cuenta_base"], descripcion=f["descripcion"][:200],
             depto=f["depto"], destino_finplan=f["destino_finplan"],
             grupo=f["grupo"] or "", categoria=f["categoria"],
-            mes_usd=f["mes_usd"], acumulado_usd=f["acumulado_usd"]))
+            mes_usd=f["mes_usd"], acumulado_usd=f["acumulado_usd"],
+            # El colón TAL COMO VIENE DEL MAYOR. El importador siempre lo tuvo
+            # —es de donde sale el dólar— y hasta hoy lo tiraba. Ver la nota del
+            # modelo: `usd × tc` no lo reconstruye.
+            mes_crc=f.get("mes_crc"), acumulado_crc=f.get("acumulado_crc")))
     # La planilla abierta por POSICIÓN — el tercer nivel de las cuentas 6.
     #
     # No entra a ningún total: el nivel `concepto-departamento` de arriba ya
@@ -365,7 +372,8 @@ async def crear(
             precierre_id=pc.id, fila=pz["fila"], cuenta=pz["cuenta"],
             cuenta_base=pz["cuenta_base"], posicion=pz["posicion"],
             depto=pz["depto"], destino_finplan=pz["destino_finplan"],
-            descripcion=pz["descripcion"][:200], mes_usd=pz["mes_usd"]))
+            descripcion=pz["descripcion"][:200], mes_usd=pz["mes_usd"],
+            mes_crc=pz.get("mes_crc")))
     await db.commit()
 
     # El espejo, para que los 19 sub-tabs puedan mirar este mes sin pasarlo a
@@ -437,15 +445,40 @@ async def listar(db: AsyncSession = Depends(get_db), _=Depends(get_current_user)
 
 
 @router.get("/precierre/{precierre_id}/")
-async def detalle(precierre_id: str, db: AsyncSession = Depends(get_db),
+async def detalle(precierre_id: str,
+                  moneda: str = Query("USD", pattern="^(USD|CRC)$",
+                                      description="En qué moneda ver la hoja"),
+                  db: AsyncSession = Depends(get_db),
                   _=Depends(get_current_user)):
-    """La hoja de revisión del mes, en la misma forma que el tab del owner."""
+    """La hoja de revisión del mes, en la misma forma que el tab del owner.
+
+    ## `moneda=CRC` — la misma hoja, tal como viene del mayor
+
+    Owner, 2026-09-15: *«qué tal si queremos ver pre-cierre en colones
+    también… una vez subido, una parte donde yo pueda verlo en CRC o en USD»*.
+
+    No es una conversión de la pantalla: son los colones que trajo Integrity,
+    guardados fila por fila (ver `PrecierreFila.mes_crc`). Por eso el total en
+    colones cuadra contra el mayor al céntimo, cosa que `usd × tc` no haría.
+
+    `hay_crc` dice si esta vuelta los tiene. Las subidas anteriores al
+    2026-09-15 no, y la hoja sale en cero: la pantalla lo avisa en vez de
+    mostrar un cero que se leería como «no hubo movimiento». Se arregla
+    subiendo el mes otra vez.
+    """
     pc = await _traer(db, precierre_id)
     filas = await _filas(db, precierre_id)
-    valores = revision.valores_completos(filas)
+    campo = "mes_crc" if moneda == "CRC" else "mes_usd"
+    hay_crc = any(f.get("mes_crc") is not None for f in filas)
+    valores = revision.valores_completos(filas, campo)
     return {
         "id": pc.id, "anio": pc.anio, "mes": pc.mes, "estado": pc.estado,
         "tc": float(pc.tc),
+        "moneda": moneda,
+        # ⚠️ Con `moneda=CRC` y `hay_crc=false` la hoja viene en CERO. No es un
+        # error ni un mes vacío: es una vuelta subida antes de que hubiera dónde
+        # guardar el colón.
+        "hay_crc": hay_crc,
         "hoja": [{"fila": f, "etiqueta": e, "clave": c,
                   "actual": float(valores.get(c, 0)) if c else None}
                  for f, e, c in revision.PLAN],

@@ -135,6 +135,24 @@ class PrecierreFila(Base):
     mes_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
     acumulado_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
 
+    #: El monto TAL COMO VIENE DE INTEGRITY, en colones.
+    #:
+    #: Owner, 2026-09-15: *«qué tal si queremos ver pre-cierre en colones
+    #: también… una vez subido, una parte donde yo pueda verlo en CRC o en
+    #: USD»*.
+    #:
+    #: El importador siempre lo calculó —es de donde sale el dólar— y lo tiraba
+    #: antes de guardar. Se guarda porque **reconstruirlo no da lo mismo**: el
+    #: dólar está redondeado, así que `usd × tc` se corre unos colones por fila
+    #: y no cuadra contra el mayor. Y cuadrar contra el mayor es justamente
+    #: para lo que sirve mirarlo en colones.
+    #:
+    #: NULO en las subidas anteriores al 2026-09-15: ahí no había dónde
+    #: guardarlo. La pantalla lo dice en vez de inventar un número.
+    mes_crc: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    acumulado_crc: Mapped[Decimal | None] = mapped_column(Numeric(18, 6),
+                                                          nullable=True)
+
     def __repr__(self) -> str:
         return f"<PrecierreFila {self.cuenta} ${self.mes_usd}>"
 
@@ -190,6 +208,10 @@ class PrecierrePosicion(Base):
     #: Seis decimales, por la misma razón que en `PrecierreFila`: el dólar sale
     #: de dividir colones y redondear antes de sumar acumula deriva.
     mes_usd: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    #: El colón, por la misma razón que en `PrecierreFila`. Nulo en lo subido
+    #: antes del 2026-09-15.
+    mes_crc: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
 
     def __repr__(self) -> str:
         return f"<PrecierrePosicion {self.cuenta} ${self.mes_usd}>"
