@@ -4426,6 +4426,9 @@
     "bajarEstaHoja": "Download this sheet",
     "archivadas": "No upload is ever deleted. Superseded rounds are kept whole — their rows, their position detail and the file checksum — and open with one click.",
     "descartarOjo": "“Supersede” does not delete: it marks this round as superseded and leaves it archived, like the previous ones.",
-    "sinColones": "This round was uploaded before the system stored colones, so the sheet comes out at zero. It is not that there was no activity: there is no data. Upload the month again — with the same exchange rate — and it is stored exactly."
+    "sinColones": "This round was uploaded before the system stored colones, so the sheet comes out at zero. It is not that there was no activity: there is no data. Upload the month again — with the same exchange rate — and it is stored exactly.",
+    "verificacionQueHacer": "The control totals in the file do not match what the detail consolidates. Review the rows below: if the detail is right and the difference is expected, use the “Pass even if verification does not tie” button — closing that way is recorded.",
+    "verificacionBloquea": "blocks the normal close",
+    "verificacionAviso": "warning, does not block"
   }
 }

@@ -5486,7 +5486,20 @@ export async function pasarPrecierreAFinal(id: string, opts?: {
   const res = await fetch(`${BASE}/precierre/${id}/pasar-a-final/?${q}`, {
     method: "POST", headers: authHeaders(),
   });
-  if (!res.ok) throw await errorLegible(res);
+  if (!res.ok) {
+    // ⚠️ El informe de verificación, NO un error pelado.
+    //
+    // El backend manda bucket por bucket —lo que declara el archivo, lo que
+    // consolida el detalle y la diferencia— y hasta el 2026-09-15 esta función
+    // lo tiraba: el owner veía «los totales de control no coinciden» sin saber
+    // CUÁL no coincide ni por cuánto. La pantalla de import-actuals ya lo
+    // mostraba; ésta no. Mismo informe, misma clase de error.
+    try {
+      const j = await res.clone().json();
+      if (j?.detail?.bloques) throw new ErrorDeVerificacion(j.detail as VerificacionBloqueada);
+    } catch (e) { if (e instanceof ErrorDeVerificacion) throw e; }
+    throw await errorLegible(res);
+  }
   return res.json();
 }
 

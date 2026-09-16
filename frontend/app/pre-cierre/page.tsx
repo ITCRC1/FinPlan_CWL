@@ -27,6 +27,7 @@ import { useTranslations } from "next-intl";
 
 import {
   precierreExcelUrl, cambiosPrecierre, descartarPrecierre,
+  ErrorDeVerificacion, type VerificacionBloqueada,
   hallazgosPrecierre, listarPrecierres,
   pasarPrecierreAFinal, subirPrecierre, verPrecierre,
   type PrecierreCambios, type PrecierreFilaHoja, type PrecierreHallazgo,
@@ -91,6 +92,10 @@ export default function PreCierrePage() {
   const [umbralMonto, setUmbralMonto] = useState(5000);
   const [umbralPct, setUmbralPct] = useState(10);
   const [abierto, setAbierto] = useState<string | null>(null);
+  /** El informe de la verificación cuando «Pasar a Final» bloquea. Trae bucket
+   *  por bucket lo que declara el archivo, lo que da el detalle y la
+   *  diferencia — el backend siempre lo mandó y esta pantalla lo tiraba. */
+  const [bloqueo, setBloqueo] = useState<VerificacionBloqueada | null>(null);
 
   const recargarLista = useCallback(async () => {
     try { setLista((await listarPrecierres()).precierres); } catch { /* nada */ }
@@ -170,12 +175,14 @@ export default function PreCierrePage() {
   async function pasarAFinal(confirmar: boolean) {
     if (!id) return;
     setError(null); setAviso(null);
+    setBloqueo(null);
     try {
       const r = await pasarPrecierreAFinal(id, { confirmarDiferencias: confirmar });
       setAviso(t("pasado", { n: r.hallazgos_abiertos ?? 0 }));
       setEstado("pasado_a_final");
       await recargarLista();
     } catch (e) {
+      if (e instanceof ErrorDeVerificacion) { setBloqueo(e.informe); return; }
       setError(e instanceof Error ? e.message : String(e));
     }
   }
@@ -253,6 +260,7 @@ export default function PreCierrePage() {
 
       {aviso && <Nota tono="ok">{aviso}</Nota>}
       {error && <Nota tono="mal">{error}</Nota>}
+      {bloqueo && <Verificacion informe={bloqueo} t={t} />}
 
       {id && (
         <>
@@ -706,6 +714,69 @@ function ComparativoPL({ datos }: { datos: PrecierreCambios }) {
         </table>
       </div>
     </section>
+  );
+}
+
+/**
+ * El informe de la verificación que bloqueó «Pasar a Final».
+ *
+ * Owner, 2026-09-15: *«apreté el botón y me dio este error»*. El mensaje decía
+ * «los totales de control no coinciden con el detalle — revisá bucket por
+ * bucket» y no mostraba NINGÚN bucket: el informe venía en la respuesta y esta
+ * pantalla lo descartaba.
+ *
+ * Dice, por cada control que no cuadra: lo que declara el archivo, lo que
+ * consolida el detalle, la diferencia, y los meses culpables.
+ */
+function Verificacion({ informe, t }: {
+  informe: VerificacionBloqueada;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const lineas = informe.bloques.flatMap(b =>
+    (b.verificacion?.lineas ?? []).filter(L => !L.cuadra));
+  return (
+    <div style={{ ...caja, borderLeft: `4px solid ${COLOR.critico}`,
+                  background: FONDO.critico, marginBottom: 12 }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>{informe.error}</div>
+      <p style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 10 }}>
+        {t("verificacionQueHacer")}
+      </p>
+      {lineas.length > 0 && (
+        <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "var(--text-secondary)" }}>
+                <th style={th}>Control</th>
+                <th style={{ ...th, textAlign: "right" }}>Declara el archivo</th>
+                <th style={{ ...th, textAlign: "right" }}>Da el detalle</th>
+                <th style={{ ...th, textAlign: "right" }}>Diferencia</th>
+                <th style={th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineas.map((L, i) => (
+                <tr key={`${L.etiqueta}-${i}`}
+                    style={{ borderTop: "1px solid var(--border)" }}>
+                  <td style={{ ...td, fontWeight: L.bloquea ? 700 : 400 }}>
+                    {L.etiqueta}
+                  </td>
+                  <td style={tdNum}>{usd(L.archivo)}</td>
+                  <td style={tdNum}>{usd(L.detalle)}</td>
+                  <td style={{ ...tdNum, fontWeight: 700,
+                               color: L.dif < 0 ? COLOR.critico : COLOR.info }}>
+                    {L.dif > 0 ? "+" : ""}{usd(L.dif)}
+                  </td>
+                  <td style={{ ...td, fontSize: 11.5,
+                               color: L.bloquea ? COLOR.critico : "var(--text-secondary)" }}>
+                    {L.bloquea ? t("verificacionBloquea") : t("verificacionAviso")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

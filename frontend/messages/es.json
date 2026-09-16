@@ -4426,6 +4426,9 @@
     "bajarEstaHoja": "Bajar esta hoja",
     "archivadas": "Ninguna subida se borra nunca. Las reemplazadas quedan completas — sus filas, su detalle por posición y el checksum del archivo — y se abren con un clic.",
     "descartarOjo": "«Reemplazar» no borra: marca esta vuelta como reemplazada y la deja archivada, igual que las anteriores.",
-    "sinColones": "Esta vuelta se subió antes de que el sistema guardara los colones, así que la hoja sale en cero. No es que no haya movimiento: es que no hay dato. Volvé a subir el mes —con el mismo tipo de cambio— y queda guardado exacto."
+    "sinColones": "Esta vuelta se subió antes de que el sistema guardara los colones, así que la hoja sale en cero. No es que no haya movimiento: es que no hay dato. Volvé a subir el mes —con el mismo tipo de cambio— y queda guardado exacto.",
+    "verificacionQueHacer": "Los totales de control que trae el archivo no coinciden con lo que consolida el detalle. Revisá los renglones de abajo: si el detalle está bien y la diferencia es esperada, usá el botón «Pasar aunque la verificación no cuadre» — queda registrado que se cerró así.",
+    "verificacionBloquea": "bloquea el cierre normal",
+    "verificacionAviso": "aviso, no bloquea"
   }
 }
