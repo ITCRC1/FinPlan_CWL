@@ -43,7 +43,7 @@ from app.api._llega_al_pl import llega_al_pl, modo_ingresos
 from app.db import get_db
 from app.models.scenario import Scenario
 from app.models.hotel import Hotel
-from app.models.room_type_config import RoomTypeConfig
+from app.models.room_type_config import RoomTypeConfig, aplica_en
 from app.models.component_label import (
     ComponentLabel, ETIQUETAS_POR_DEFECTO, KIND_PACKAGE,
 )
@@ -127,9 +127,12 @@ async def get_room_types(
     =true trae también las ocultas (para gestionarlas en Master Data).
     Si se pasa `scenario_id` y ese escenario tiene master data propia, se usan
     sus valores (units por tipo / meses cerrados / pax)."""
+    # El año del ESCENARIO, no el de hoy: el Budget 2027 se arma en octubre de
+    # 2026 y ahí las categorías nuevas SÍ tienen que estar (owner, 2026-09-16).
+    _esc = await db.get(Scenario, scenario_id) if scenario_id else None
     stmt = select(RoomTypeConfig).where(RoomTypeConfig.hotel_id == hotel_id)
     if not include_inactive:
-        stmt = stmt.where(RoomTypeConfig.active == True)  # noqa: E712
+        stmt = stmt.where(aplica_en(getattr(_esc, "year", None)))
     rows = (await db.execute(stmt.order_by(RoomTypeConfig.sort_order))).scalars().all()
     hotel = await db.get(Hotel, hotel_id)
 
@@ -427,7 +430,10 @@ async def _load_revenue_data(scenario_id: str, db: AsyncSession) -> dict:
     rt_q = await db.execute(
         select(RoomTypeConfig).where(
             RoomTypeConfig.hotel_id == (await db.get(Scenario, scenario_id)).hotel_id,
-            RoomTypeConfig.active == True,  # noqa: E712 — ocultar propaga a todo el revenue
+            # `aplica_en` y no `active` a secas: ocultar propaga a todo el
+            # revenue, y una categoría que abre en 2027 no puede entrar al
+            # cálculo de 2026 (owner, 2026-09-16).
+            aplica_en((await db.get(Scenario, scenario_id)).year),
         ).order_by(RoomTypeConfig.sort_order)
     )
 
@@ -1017,7 +1023,7 @@ async def export_balance_sheet_excel(
 OTROS_ROOMS = "Other Rooms Revenue"   # ingreso de habitaciones sin tipo asociado
 
 
-async def _canonical_room_types(db: AsyncSession) -> list[tuple[str, int]]:
+async def _canonical_room_types(db: AsyncSession, anio: int | None = None) -> list[tuple[str, int]]:
     """Tipos de habitación activos de ESTA propiedad, de la base.
 
     Antes salían de `CWL_ROOM_TYPES`, los seis de Corcovado con sus 30
@@ -1032,19 +1038,23 @@ async def _canonical_room_types(db: AsyncSession) -> list[tuple[str, int]]:
     """
     filas = (await db.execute(
         select(RoomTypeConfig)
-        .where(RoomTypeConfig.hotel_id == HOTEL_ID, RoomTypeConfig.active == True)  # noqa: E712
+        .where(RoomTypeConfig.hotel_id == HOTEL_ID, aplica_en(anio))
         .order_by(RoomTypeConfig.sort_order)
     )).scalars().all()
     return [(f.name, f.units) for f in filas] + [(OTROS_ROOMS, 0)]
 
 
-async def _otb_units(db: AsyncSession) -> int:
-    """Inventario de la propiedad. Estaba clavado en 30 —el de Corcovado— así
-    que la ocupación y el RevPAR del On The Books de cualquier otro hotel
-    salían mal, y nada lo advertía."""
+async def _otb_units(db: AsyncSession, anio: int | None = None) -> int:
+    """Inventario de la propiedad EN ESE AÑO. Estaba clavado en 30 —el de
+    Corcovado— así que la ocupación y el RevPAR del On The Books de cualquier
+    otro hotel salían mal, y nada lo advertía.
+
+    El año importa por lo mismo: una categoría que abre en 2027 no puede sumar
+    al inventario de 2026, o baja la ocupación de un año en el que esas
+    habitaciones no existían."""
     total = (await db.execute(
         select(func.coalesce(func.sum(RoomTypeConfig.units), 0))
-        .where(RoomTypeConfig.hotel_id == HOTEL_ID, RoomTypeConfig.active == True)  # noqa: E712
+        .where(RoomTypeConfig.hotel_id == HOTEL_ID, aplica_en(anio))
     )).scalar_one()
     return int(total or 0)
 
@@ -1062,7 +1072,7 @@ async def get_room_stats_entry(scenario_id: str, month: int, db: AsyncSession = 
         ActualRoomStat.scenario_id == scenario_id, ActualRoomStat.month == month))).scalars().all()}
     days = calendar.monthrange(scenario.year, month)[1]
     rows = []
-    for nm, units in await _canonical_room_types(db):
+    for nm, units in await _canonical_room_types(db, scenario.year):
         ex = existing.get(nm)
         rows.append({"room_type_name": nm, "units": units, "nights_available": units * days,
                      "nights_occupied": float(ex.nights_occupied) if ex else 0.0,
@@ -1130,7 +1140,7 @@ async def get_on_the_books(
     rows_db = {e.month: e for e in (await db.execute(select(OnTheBooksEntry).where(
         OnTheBooksEntry.hotel_id == hotel, OnTheBooksEntry.week == week,
         OnTheBooksEntry.year == anio))).scalars().all()}
-    unidades = await _otb_units(db)
+    unidades = await _otb_units(db, anio)
     months = []
     for m in range(1, 13):
         e = rows_db.get(m)
@@ -1223,7 +1233,7 @@ async def get_otb_pacing(scenario_id: str, year: int | None = Query(None), db: A
         select(OnTheBooksEntry.week).where(
             OnTheBooksEntry.hotel_id == hotel, OnTheBooksEntry.year == anio).distinct()
     )).scalars().all()})
-    unidades = await _otb_units(db)
+    unidades = await _otb_units(db, anio)
     snapshots = []
     for wk in weeks:
         rows = (await db.execute(select(OnTheBooksEntry).where(
@@ -1347,7 +1357,7 @@ async def get_daily_occ(
         OtbDailyOcc.hotel_id == hotel, OtbDailyOcc.week == week,
         OtbDailyOcc.year == anio))).scalars().all()
     by = {(r.month, r.day): float(r.rooms_sold) for r in recs}
-    inv = await _otb_units(db)
+    inv = await _otb_units(db, anio)
     months = []
     for m in range(1, 13):
         ndays = calendar.monthrange(anio, m)[1]
@@ -2585,7 +2595,7 @@ async def get_rack_rates(scenario_id: str, db: AsyncSession = Depends(get_db)):
     rts = (await db.execute(
         select(RoomTypeConfig)
         .where(RoomTypeConfig.hotel_id == scenario.hotel_id,
-               RoomTypeConfig.active == True)  # noqa: E712
+               aplica_en(scenario.year))
         .order_by(RoomTypeConfig.sort_order)
     )).scalars().all()
     cards = (await db.execute(

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Integer, ForeignKey, Boolean
+from sqlalchemy import String, Integer, ForeignKey, Boolean, or_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
@@ -40,7 +40,38 @@ class RoomTypeConfig(Base):
     pax_max: Mapped[int] = mapped_column(Integer, default=2)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    #: Desde qué AÑO existe esta categoría. `None` = desde siempre.
+    #:
+    #: `active` es un sí/no sin fecha: apagar una categoría que todavía no abrió
+    #: la esconde también del año en que SÍ va a abrir, y alguien tiene que
+    #: acordarse de encenderla. Esto lo resuelve solo.
+    #:
+    #: Owner, 2026-09-16, viendo «Villas Deluxe» y «Residencia» en la carga de
+    #: agosto 2026: *«esto no aplica todavía para el 2026»* · *«sí está para 2027
+    #: pero no para 2026»*. Mientras aparecían sumaban noches DISPONIBLES sin
+    #: sumar unidades, así que inflaban el denominador: la ocupación y el RevPAR
+    #: del mes salían más bajos de lo real.
+    vigente_desde_anio: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
     hotel: Mapped["Hotel"] = relationship("Hotel", back_populates="room_types")
 
     def __repr__(self) -> str:
         return f"<RoomType {self.short_name} ×{self.units}>"
+
+
+def aplica_en(anio: int | None):
+    """Condición SQL: la categoría está activa Y ya existe en `anio`.
+
+    Se usa en TODAS las consultas que conocen el año. Un `active == True` suelto
+    deja pasar categorías que todavía no abrieron — y el síntoma es un KPI un
+    poco bajo, que nadie lee como defecto.
+
+    `anio=None` (una consulta sin año) cae en el comportamiento viejo: solo
+    `active`. Es mejor que inventar un año.
+    """
+    if anio is None:
+        return RoomTypeConfig.active == True          # noqa: E712
+    return (RoomTypeConfig.active == True) & (        # noqa: E712
+        or_(RoomTypeConfig.vigente_desde_anio.is_(None),
+            RoomTypeConfig.vigente_desde_anio <= anio))

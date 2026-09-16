@@ -28,7 +28,7 @@ from app.db import get_db
 from app.models.scenario import Scenario
 from app.models.allocation_entry import AllocationEntry
 from app.models.department_catalog import DepartmentCatalog
-from app.models.room_type_config import RoomTypeConfig
+from app.models.room_type_config import RoomTypeConfig, aplica_en
 from app.models.opex_entry import OpexEntry
 from app.models.cost_entry import CostEntry
 from app.models.payroll_concept_entry import PayrollConceptEntry
@@ -165,7 +165,7 @@ async def rooms_por_set(scenario_id: str, db: AsyncSession = Depends(get_db)):
     # ── Ingreso y noches, por categoría → set ────────────────────────────────
     rt = (await db.execute(select(RoomTypeConfig).where(
         RoomTypeConfig.hotel_id == scenario.hotel_id,
-        RoomTypeConfig.active == True,  # noqa: E712
+        aplica_en(scenario.year),
     ).order_by(RoomTypeConfig.sort_order))).scalars().all()
     set_de_rt = {t.id: ((t.dept_code or ROOMS) if (t.dept_code or ROOMS) in sets
                         else STANDARD) for t in rt}
