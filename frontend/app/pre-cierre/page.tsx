@@ -249,6 +249,15 @@ export default function PreCierrePage() {
           {estado !== "pasado_a_final" && (
             <Nota tono="ojo">{t("todaviaNoEsta")}</Nota>
           )}
+          {/* ⚠️ Owner, 2026-09-15: «aca pareciera que el resultado no esta
+              resguardado.. y que en cualquier momento se puede borrar».
+              No lo esta: no hay UN SOLO DELETE sobre precierre en todo el
+              backend, y «descartar» solo cambia una etiqueta. Lo que fallaba
+              era la pantalla, que decia lo contrario de lo que pasa. */}
+          <p style={{ fontSize: 12, color: "var(--text-secondary)",
+                      margin: "-4px 0 10px" }}>
+            {t("archivadas")}
+          </p>
 
           <nav style={{ display: "flex", gap: 4, margin: "18px 0 12px" }}>
             {(["hallazgos", "hoja", "cambios", "descargas"] as Pestana[]).map(p => (
@@ -296,10 +305,14 @@ export default function PreCierrePage() {
                 <button onClick={() => pasarAFinal(true)} style={botonSecundario}>
                   {t("final.pasarConfirmando")}
                 </button>
+                {/* El titulo dice lo que HACE —marcar como reemplazada— y el
+                    `title` explica que no borra. El boton decia «Descartar
+                    este borrador», que se lee como destruir, y no destruye
+                    nada: cambia una etiqueta. */}
                 <button onClick={async () => {
                   if (!id) return;
                   await descartarPrecierre(id); setId(null); await recargarLista();
-                }} style={botonSuave}>
+                }} style={botonSuave} title={t("descartarOjo")}>
                   {t("final.descartar")}
                 </button>
               </div>

@@ -4356,7 +4356,7 @@
     "faltaTc": "Escribí el tipo de cambio del mes",
     "cargado": "Cargado: {filas} filas traducidas.",
     "vueltaN": "Vuelta {n}. Reemplaza a «{archivo}».",
-    "todaviaNoEsta": "Esto todavía NO está en el sistema. Ningún reporte lo lee hasta que lo pases a Final.",
+    "todaviaNoEsta": "Guardado y archivado — con su archivo, su tipo de cambio y su hora. Lo que todavía NO pasó es al escenario ACTUAL: hasta que lo pases a Final, ningún otro reporte de la app lo lee.",
     "umbrales": "Reportar desvíos mayores a",
     "sinHallazgos": "Sin hallazgos con estos umbrales.",
     "sinRevisar": "Lo que esta corrida NO pudo revisar",
@@ -4368,7 +4368,7 @@
     "estado": {
       "borrador": "en revisión",
       "pasado_a_final": "final",
-      "descartado": "descartado"
+      "descartado": "reemplazada"
     },
     "gravedad": {
       "critico": "Crítico",
@@ -4402,7 +4402,7 @@
       "conHallazgos": "Quedan {n} hallazgos abiertos ({criticos} críticos). Ninguno impide cerrar, pero queda registrado con cuáles se cerró el mes.",
       "pasar": "Pasar a Final",
       "pasarConfirmando": "Pasar aunque la verificación no cuadre",
-      "descartar": "Descartar este borrador"
+      "descartar": "Marcar esta vuelta como reemplazada"
     },
     "dl": {
       "detalle": {
@@ -4423,6 +4423,8 @@
       }
     },
     "pasado": "Pasado a Final con {n} hallazgos abiertos, que quedan registrados.",
-    "bajarEstaHoja": "Bajar esta hoja"
+    "bajarEstaHoja": "Bajar esta hoja",
+    "archivadas": "Ninguna subida se borra nunca. Las reemplazadas quedan completas — sus filas, su detalle por posición y el checksum del archivo — y se abren con un clic.",
+    "descartarOjo": "«Reemplazar» no borra: marca esta vuelta como reemplazada y la deja archivada, igual que las anteriores."
   }
 }

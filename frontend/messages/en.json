@@ -4356,7 +4356,7 @@
     "faltaTc": "Enter the exchange rate for the month",
     "cargado": "Loaded: {filas} rows translated.",
     "vueltaN": "Round {n}. Replaces “{archivo}”.",
-    "todaviaNoEsta": "This is NOT in the system yet. No report reads it until you pass it to Final.",
+    "todaviaNoEsta": "Saved and archived — with its file, its exchange rate and its time. What has NOT happened yet is the write to the ACTUAL scenario: until you pass it to Final, no other report in the app reads it.",
     "umbrales": "Report deviations above",
     "sinHallazgos": "No findings at these thresholds.",
     "sinRevisar": "What this run could NOT check",
@@ -4368,7 +4368,7 @@
     "estado": {
       "borrador": "under review",
       "pasado_a_final": "final",
-      "descartado": "discarded"
+      "descartado": "superseded"
     },
     "gravedad": {
       "critico": "Critical",
@@ -4402,7 +4402,7 @@
       "conHallazgos": "{n} findings are still open ({criticos} critical). None of them blocks closing, but which ones were open is recorded.",
       "pasar": "Pass to Final",
       "pasarConfirmando": "Pass even if verification does not tie",
-      "descartar": "Discard this draft"
+      "descartar": "Mark this round as superseded"
     },
     "dl": {
       "detalle": {
@@ -4423,6 +4423,8 @@
       }
     },
     "pasado": "Passed to Final with {n} open findings, which are recorded.",
-    "bajarEstaHoja": "Download this sheet"
+    "bajarEstaHoja": "Download this sheet",
+    "archivadas": "No upload is ever deleted. Superseded rounds are kept whole — their rows, their position detail and the file checksum — and open with one click.",
+    "descartarOjo": "“Supersede” does not delete: it marks this round as superseded and leaves it archived, like the previous ones."
   }
 }
