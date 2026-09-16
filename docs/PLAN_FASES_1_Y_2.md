@@ -49,7 +49,7 @@ cd frontend && npx vercel deploy --prod --yes
 **Verificar que el backend nuevo está arriba** (no confiar en el reloj):
 
 ```bash
-curl -s https://finplan-cwl-production.up.railway.app/openapi.json \
+curl -s https://finplancwl-backend.up.railway.app/openapi.json \
   | python -c "import json,sys; print([p for p in json.load(sys.stdin)['paths'] if 'RUTA_NUEVA' in p])"
 ```
 

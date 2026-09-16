@@ -58,11 +58,17 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 comparte, quien tenga ese archivo puede leer el P&L de esa propiedad. Tratala
 como la contraseña que es.
 
+⚠️ **Y ojo con la URL.** El backend de Corcovado es
+`finplancwl-backend.up.railway.app`. Existe además un
+`finplan-cwl-production.up.railway.app` que **sigue respondiendo 200 contra otra
+base de datos, ocho migraciones atrás** — esta guía lo tenía como ejemplo hasta
+el 2026-09-16. Un dueño que apunte ahí se lleva números viejos sin enterarse.
+
 ### Ejemplo
 
 ```bash
 curl -H "x-api-key: $CONSOLIDADO_API_KEY" \
-  "https://finplan-cwl-production.up.railway.app/api/consolidado/propia/?year=2027&tipo=BUDGET"
+  "https://finplancwl-backend.up.railway.app/api/consolidado/propia/?year=2027&tipo=BUDGET"
 ```
 
 ### El contrato
