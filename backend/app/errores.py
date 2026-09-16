@@ -100,6 +100,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     #
     # ⚠️ Esta sola clave reemplaza TRES redacciones que convivían en el código
     # («month debe estar entre 1 y 12», «month must be 1–12», «month 1..12»).
+    "rango.invalido": {
+        "es": "El rango de meses no es válido: ambos entre 1 y 12, y el mes inicial no puede ser mayor que el final",
+        "en": "Invalid month range: both between 1 and 12, and the first month cannot be later than the last"},
     "mes.fuera_de_rango": {
         "es": "El mes debe estar entre 1 y 12",
         "en": "Month must be between 1 and 12"},

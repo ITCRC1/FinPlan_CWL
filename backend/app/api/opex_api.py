@@ -132,6 +132,43 @@ def _group_by_account(entries: list[OpexEntry]) -> list[dict]:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@router.post("/opex/{scenario_id}/recalcular-tc/")
+async def recalcular_opex_al_tc(scenario_id: str, db: AsyncSession = Depends(get_db)):
+    """Vuelve a pasar a dolares las lineas de OPEX en colones, al TC del escenario.
+
+    ⚠️ **No existia.** El frontend lo declaro el 2026-09-08 (`1c251e5`) y el
+    backend nunca lo tuvo.
+
+    **Por que hace falta.** El dolar de una linea en colones se calcula al
+    importarla o editarla, con el TC de ESE momento. Si despues cambia el tipo
+    de cambio del escenario, esas lineas quedan con el dolar viejo: los colones
+    dicen una cosa y el P&L otra, sin error y sin aviso. Esto las refresca
+    todas de una.
+
+    Una linea en dolares NO se toca — convertirla seria inventarle un efecto
+    cambiario que no tiene.
+
+    Es `_derivar_importadas`, el mismo paso que corre al importar y el mismo
+    que hace el recalculo del escenario. No hay una segunda conversion.
+    """
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    scenario.assert_editable()
+
+    from app.models.exchange_rate import ExchangeRate, get_tc_for_month
+    rates = (await db.execute(
+        select(ExchangeRate).where(ExchangeRate.scenario_id == scenario_id)
+    )).scalars().all()
+    if not rates:
+        raise ErrorApi(422, "tc.sin_tipos_de_cambio")
+
+    n = await _derivar_importadas(db, scenario_id)
+    await db.commit()
+    return {
+        "lineas_en_colones": n,
+        "tc_por_mes": {str(m): str(get_tc_for_month(rates, m)) for m in range(1, 13)},
+    }
+
+
 @router.post("/opex/{scenario_id}/import/")
 async def import_all_opex(scenario_id: str, db: AsyncSession = Depends(get_db)):
     """

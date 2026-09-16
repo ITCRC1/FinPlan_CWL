@@ -28,6 +28,7 @@ from app.models.scenario import Scenario, ScenarioLockedError
 from app.models.pl_manual_input import PLManualInput
 from app.models.historical_kpi import HistoricalKpi
 from app.models.scenario_stat import ScenarioStat
+from app.models.club_membership_stat import ClubMembershipStat
 from app.models.cashflow_params import CashFlowParams
 from app.models.tax_params import TaxParams
 from app.engine import recalculate as recalc
@@ -486,6 +487,158 @@ async def get_pl_monthly(scenario_id: str):
             "annual": annual,
             "annual_kpis": full["kpis"],
         }
+
+
+@router.get("/pl/{scenario_id}/doce-meses/")
+async def get_pl_doce_meses(scenario_id: str):
+    """Los doce meses del escenario, para el sub-tab «12m Summary».
+
+    ⚠️ **Este endpoint NO existía.** El frontend lo llamaba desde el
+    2026-09-08 —cuando el Cierre de Mes de CWL se puso al día con las otras
+    propiedades (`1c251e5`)— y el backend nunca lo tuvo: la pantalla mostraba
+    `API 404: {"detail":"Not Found"}` y las doce columnas en guiones.
+
+    Owner, 2026-09-16: *«qué pasó con todos los datos… ningún full year está
+    saliendo bien»*. No era el dato: era una pantalla pidiendo una puerta que
+    no existe.
+
+    Es la MISMA fuente que `/pl/{id}/monthly/` —`_monthly_results`, el único
+    lugar donde se arma el P&L mensual— con los nombres que la pantalla espera:
+    `meses` en vez de `months`, y la etiqueta del escenario, que ahí se muestra
+    como encabezado. Duplicar el cálculo sería tener dos P&L que pueden
+    discrepar; esto es una fachada, no un segundo motor.
+    """
+    async with get_session() as session:
+        scenario = await _get_scenario_or_404(session, scenario_id)
+        monthly = await _monthly_results(session, scenario)
+        return {
+            "scenario_id": scenario_id,
+            "escenario": _scenario_label(scenario),
+            "year": scenario.year,
+            "meses": [{
+                "month": m["month"],
+                "kpis": m["kpis"],
+                "lines": [_line_to_dict(ln, m["kpis"]) for ln in m["lines"]],
+            } for m in monthly],
+        }
+
+
+@router.get("/pl/{scenario_id}/estadisticas/")
+async def get_estadisticas_cierre(scenario_id: str, desde: int = 1, hasta: int = 12):
+    """La banda de KPIs del Cierre para un RANGO de meses.
+
+    ⚠️ **Tampoco existía.** Entró al frontend con el mismo commit que
+    `doce-meses` (`1c251e5`, 2026-09-08) y el backend nunca lo tuvo: la banda
+    salía vacía en los cuatro sub-tabs. Owner, 2026-09-02: *«ponlo en todos los
+    sub tabs»*.
+
+    **No es `/pl/{id}/stats/`.** Aquél devuelve las filas crudas mes a mes;
+    esto es el AGREGADO del rango, que es otra cuenta: las noches se suman, la
+    ocupación se recalcula sobre los totales y el ADR se pondera por noches
+    ocupadas. Promediar doce ADR a secas le daría el mismo peso a un mes lleno
+    que a uno cerrado.
+
+    Van DOS tarifas a propósito, y no son la misma:
+
+    - `adr` sale de las estadísticas del escenario — la tarifa que se cargó.
+    - `adr_derivado` es ingreso de habitaciones ÷ noches ocupadas.
+
+    Difieren cuando el ingreso trae cuentas que NO ocupan habitación (4001
+    cancelaciones, 4002 no-show). Derivar la tarifa de la línea consolidada la
+    infla en silencio, porque el ADR no tiene contra qué cuadrar; por eso el
+    reporte usa `adr` y `adr_derivado` queda al lado para ver la diferencia.
+    Mismo par en RevPAR: `revpar` = ADR × ocupación; `revpar_bruto` reparte el
+    ingreso completo entre las noches disponibles.
+    """
+    if not 1 <= desde <= 12 or not 1 <= hasta <= 12 or desde > hasta:
+        raise ErrorApi(422, "rango.invalido")
+    async with get_session() as session:
+        scenario = await _get_scenario_or_404(session, scenario_id)
+        monthly = await _monthly_results(session, scenario)
+        sel = [m for m in monthly if desde <= m["month"] <= hasta]
+
+        avail = sum(m["kpis"]["rooms_available"] for m in sel)
+        occ = sum(m["kpis"]["rooms_occupied"] for m in sel)
+        guests = sum(m["kpis"]["guests"] for m in sel)
+        ocupacion = (occ / avail) if avail else 0.0
+
+        def _linea(code: str) -> float:
+            return sum(float(ln.amount_usd) for m in sel for ln in m["lines"]
+                       if ln.line_code == code)
+
+        rooms_revenue = _linea("REV_ROOMS")
+
+        # Ponderado por noches ocupadas — ver `_aggregate_selected`.
+        pond = sum(m["kpis"].get("adr", 0.0) * m["kpis"]["rooms_occupied"]
+                   for m in sel)
+        adr = (pond / occ) if (pond and occ) else 0.0
+        adr_derivado = (rooms_revenue / occ) if occ else 0.0
+
+        return {
+            "scenario_id": scenario_id,
+            "escenario": _scenario_label(scenario),
+            "year": scenario.year,
+            "desde": desde, "hasta": hasta,
+            "rooms_available": avail,
+            "rooms_occupied": round(occ, 2),
+            "guests": round(guests, 2),
+            "occupancy_pct": round(ocupacion, 6),
+            "rooms_revenue": round(rooms_revenue, 2),
+            "adr": round(adr, 2),
+            "adr_derivado": round(adr_derivado, 2),
+            "revpar": round(adr * ocupacion, 2),
+            "revpar_bruto": round(rooms_revenue / avail, 2) if avail else 0.0,
+            **await _club_del_rango(session, scenario_id, desde, hasta,
+                                    revenue=_linea("REV_CLUB")),
+        }
+
+
+async def _club_del_rango(session, scenario_id: str, desde: int, hasta: int,
+                          *, revenue: float) -> dict:
+    """Los socios del Club en el rango, o TODO en `null` si no hay Club.
+
+    `null` ≠ cero: una propiedad sin Club no tiene que mostrar «0 socios».
+    Ver `ClubMembershipStat` — esto es de Amarena y se apaga solo el día que el
+    departamento 260 se desmarque en Provisionamiento.
+
+    **Nada de esto se suma como si fuera plata.** Los socios son un saldo:
+
+    - `club_total` y `club_pagando_cierre` son el ÚLTIMO mes del rango, no la
+      suma. Sumar doce meses daría 1.500 socios donde hay 129.
+    - `club_pagando` es el promedio de los meses CON socios. Owner, 2026-09-02:
+      *«quiero que me des un promedio de los meses y no que sume»*, y los meses
+      en cero quedan fuera — Amarena abrió el Club en marzo, e incluir enero y
+      febrero bajaría el promedio de 103 a 74.
+    - `club_socios_mes` sí es la suma, porque es el DENOMINADOR de la cuota:
+      la cuota promedio se pondera por socios-mes, no por meses.
+    """
+    vacio = dict.fromkeys(
+        ("club_pagando", "club_pagando_cierre", "club_meses_con_socios",
+         "club_total", "club_socios_mes", "club_revenue",
+         "club_cuota_promedio"))
+    filas = (await session.execute(
+        select(ClubMembershipStat)
+        .where(ClubMembershipStat.scenario_id == scenario_id,
+               ClubMembershipStat.month >= desde,
+               ClubMembershipStat.month <= hasta)
+        .order_by(ClubMembershipStat.month)
+    )).scalars().all()
+    if not filas:
+        return vacio
+
+    con_socios = [f for f in filas if f.pagando]
+    socios_mes = sum(f.pagando for f in filas)
+    ultimo = filas[-1]
+    return {
+        "club_pagando": (round(sum(f.pagando for f in con_socios) / len(con_socios), 2)
+                         if con_socios else 0),
+        "club_pagando_cierre": ultimo.pagando,
+        "club_meses_con_socios": len(con_socios),
+        "club_total": ultimo.total,
+        "club_socios_mes": socios_mes,
+        "club_revenue": round(revenue, 2),
+        "club_cuota_promedio": round(revenue / socios_mes, 2) if socios_mes else 0.0,
+    }
 
 
 @router.get("/pl/{scenario_id}/ytd/{month}/")
