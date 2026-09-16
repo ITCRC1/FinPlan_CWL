@@ -38,6 +38,35 @@ export function authHeaders(): Record<string, string> {
  * tiene el mismo problema: sin esto el archivo sale en el idioma del NAVEGADOR
  * y no en el del selector de la app, y nadie entiende por qué.
  */
+/**
+ * Baja un archivo protegido PIDIENDOLO, no navegando a una URL con el token.
+ *
+ * ⚠️ `dlUrl` arma el link con el token que hay **cuando se dibuja la
+ * pantalla**, y el token vive 10 minutos. Pasado ese rato el `<a href>` apunta
+ * a una URL vencida: el backend contesta 401 en JSON, el navegador lo abre y no
+ * baja nada — sin error, sin aviso, sin archivo.
+ *
+ * Owner, 2026-09-15: *«no baja nada en el upload file»*.
+ *
+ * Acá el token se lee en el MOMENTO DEL CLIC y el fallo se ve.
+ */
+export async function bajarArchivo(path: string, nombre?: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  // El nombre que manda el servidor, si lo manda: es el que lleva el mes.
+  const cd = res.headers.get("content-disposition") || "";
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  a.download = nombre || (m ? decodeURIComponent(m[1]) : "descarga.xlsx");
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function dlUrl(path: string): string {
   const t = getToken();
   const q = new URLSearchParams();
@@ -5516,9 +5545,11 @@ export async function descartarPrecierre(id: string): Promise<{ estado: string }
  * El nombre sigue la convencion de la app para los helpers de descarga
  * (`...ExcelUrl`), que es por lo que `test_todo_baja_a_excel` reconoce que una
  * pantalla deja bajar lo que muestra. */
+/** Las RUTAS, sin token. Se bajan con `bajarArchivo`, que lo lee al hacer clic
+ *  — ver el comentario de `bajarArchivo`. */
 export const precierreExcelUrl = (id: string) => ({
-  detalle: dlUrl(`/precierre/${id}/detalle.xlsx`),
-  hoja: dlUrl(`/precierre/${id}/hoja.xlsx`),
-  filas: dlUrl(`/precierre/${id}/filas.xlsx`),
-  listado: dlUrl(`/precierre/listado.xlsx`),
+  detalle: `/precierre/${id}/detalle.xlsx`,
+  hoja: `/precierre/${id}/hoja.xlsx`,
+  filas: `/precierre/${id}/filas.xlsx`,
+  listado: `/precierre/listado.xlsx`,
 });

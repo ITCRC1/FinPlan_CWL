@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import {
-  precierreExcelUrl, cambiosPrecierre, descartarPrecierre,
+  precierreExcelUrl, cambiosPrecierre, descartarPrecierre, bajarArchivo,
   ErrorDeVerificacion, type VerificacionBloqueada,
   hallazgosPrecierre, listarPrecierres,
   pasarPrecierreAFinal, subirPrecierre, verPrecierre,
@@ -565,9 +565,13 @@ function Hoja({ filas, hojaExcelUrl, t, moneda, setMoneda, hayCrc }: {
               </button>
             ))}
           </nav>
-          <a href={hojaExcelUrl} style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+          {/* Mismo motivo que en `Descargas`: con el token incrustado el
+              link se vence y no baja nada, sin avisar. */}
+          <button onClick={() => { void bajarArchivo(hojaExcelUrl); }}
+                  style={{ all: "unset", cursor: "pointer", fontSize: 13,
+                           whiteSpace: "nowrap", color: "var(--brand)" }}>
             {t("bajarEstaHoja")}
-          </a>
+          </button>
         </div>
       </div>
       {/* ⚠️ Una vuelta vieja no tiene los colones guardados y la hoja sale en
@@ -905,6 +909,14 @@ function Descargas({ dl, t }: {
   dl: ReturnType<typeof precierreExcelUrl>;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const [fallo, setFallo] = useState<string | null>(null);
+  /** El clic pide el archivo con el token FRESCO. Un `<a href>` con el token
+   *  incrustado se vence a los 10 minutos y no baja nada, en silencio. */
+  const bajar = async (ruta: string) => {
+    setFallo(null);
+    try { await bajarArchivo(ruta); }
+    catch (e) { setFallo(e instanceof Error ? e.message : String(e)); }
+  };
   const items: [keyof typeof dl, string][] = [
     ["detalle", "dl.detalle"], ["hoja", "dl.hoja"],
     ["filas", "dl.filas"], ["listado", "dl.listado"],
@@ -912,14 +924,22 @@ function Descargas({ dl, t }: {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       {items.map(([k, clave]) => (
-        <a key={k} href={dl[k]} style={{ ...caja, textDecoration: "none",
-                                         display: "block", color: "inherit" }}>
+        <button key={k} onClick={() => { void bajar(dl[k]); }}
+                style={{ ...caja, textAlign: "left", width: "100%",
+                         cursor: "pointer", font: "inherit", color: "inherit",
+                         display: "block" }}>
           <div style={{ fontWeight: 600 }}>{t(`${clave}.titulo`)}</div>
           <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
             {t(`${clave}.que`)}
           </div>
-        </a>
+        </button>
       ))}
+      {fallo && (
+        <div style={{ ...caja, borderLeft: `4px solid ${COLOR.critico}`,
+                      background: FONDO.critico, fontSize: 13 }}>
+          {fallo}
+        </div>
+      )}
     </div>
   );
 }
