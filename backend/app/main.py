@@ -87,19 +87,31 @@ app = FastAPI(
 # ⚠️ **Es una lista exacta y no un comodín `*.up.railway.app`, a propósito.**
 # Con `allow_credentials=True`, un comodín deja que CUALQUIER app alojada en ese
 # dominio compartido —de cualquier persona— haga peticiones con la cookie de
-# sesión de quien la abra. El regex de Vercel ya arrastra ese problema; no hay
-# por qué repetirlo con Railway ahora que cada propiedad tiene su propia URL.
+# sesión de quien la abra.
+#
+# Ese comodín EXISTIÓ acá, para Vercel: `https://.*\.vercel\.app`. Se quitó el
+# 2026-09-16, junto con el origen fijo `finplan-cwl.vercel.app`, por dos razones
+# que se juntaron:
+#
+#   1. El frontend se mudó a Railway. `finplan-cwl.vercel.app` sigue en pie pero
+#      apunta a un backend viejo, contra OTRA base — o sea que además de abrir
+#      un agujero, el origen que habilitaba ya no es la app.
+#   2. `vercel.app` es un dominio compartido: el comodín le daba acceso con
+#      credenciales a cualquier app de cualquier persona alojada ahí. El propio
+#      comentario de arriba lo marcaba como problema arrastrado.
+#
+# ⚠️ **Si alguna propiedad todavía sirve su frontend desde Vercel, hay que
+# ponerle su URL EXACTA en `CORS_ORIGINS` antes de desplegar esto.** Sin eso el
+# navegador le bloquea cada llamada — el backend responde bien y la pantalla se
+# queda vacía, que es de los sintomas más difíciles de leer.
 _ORIGENES = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000", "http://localhost:3002",
-        "https://finplan-cwl.vercel.app",
         *_ORIGENES,
     ],
-    # Allow any Vercel deployment (production + preview URLs) for this project.
-    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
