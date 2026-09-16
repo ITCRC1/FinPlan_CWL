@@ -87,10 +87,14 @@ export default function OperationRoomStatsPage() {
       const res = await saveRoomStatsEntry(rsId, month, payload);
       // ⚠️ «5 filas» no se lee como un problema; «5 de 6» sí.
       //
-      // En agosto 2026 se guardaron 5 de 6 —«5 Elements Treehouse» no vendió—
-      // y con la fila que faltó se fueron sus 155 noches DISPONIBLES: la
-      // ocupación del acumulado salía 46,8 % en vez de 45,8 %. El aviso decía
-      // «Saved Aug: 5 rows» y no había con qué compararlo.
+      // En agosto 2026 se guardó una categoría de menos: la que no vendió nada
+      // quedó en blanco y el guardado la saltaba. Con esa fila se fueron sus
+      // noches DISPONIBLES, y la ocupación del acumulado salió un punto MÁS
+      // ALTA de lo real. El aviso decía «5 rows» y no había con qué comparar.
+      //
+      // (La categoría no se nombra acá a propósito: este frontend lo comparten
+      //  los cuatro hoteles y el inventario de cada uno sale de la base —
+      //  `test_tipos_de_habitacion_de_la_base` lo vigila, comentarios incluidos.)
       const esperadas = res.categorias;
       setEntryMsg(
         esperadas != null && res.rows_saved < esperadas
