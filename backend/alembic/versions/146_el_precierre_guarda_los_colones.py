@@ -25,6 +25,11 @@ que se archive»*— y ahí queda exacto.
 Seis decimales, igual que las columnas en USD: redondear antes de sumar
 acumula deriva (ver la nota de `PrecierreFila.mes_usd`).
 
+⚠️ Las tablas son `precierre_fila` y `precierre_posicion`, en SINGULAR. La
+primera version de esta migracion uso el plural, `alembic upgrade` reviento y el
+backend no arranco: 502 en produccion. Lo blinda
+`test_las_migraciones_nombran_tablas_que_existen`.
+
 Revision ID: 146
 Revises: 145
 """
@@ -38,15 +43,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("precierre_filas",
+    op.add_column("precierre_fila",
                   sa.Column("mes_crc", sa.Numeric(18, 6), nullable=True))
-    op.add_column("precierre_filas",
+    op.add_column("precierre_fila",
                   sa.Column("acumulado_crc", sa.Numeric(18, 6), nullable=True))
-    op.add_column("precierre_posiciones",
+    op.add_column("precierre_posicion",
                   sa.Column("mes_crc", sa.Numeric(18, 6), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("precierre_posiciones", "mes_crc")
-    op.drop_column("precierre_filas", "acumulado_crc")
-    op.drop_column("precierre_filas", "mes_crc")
+    op.drop_column("precierre_posicion", "mes_crc")
+    op.drop_column("precierre_fila", "acumulado_crc")
+    op.drop_column("precierre_fila", "mes_crc")
