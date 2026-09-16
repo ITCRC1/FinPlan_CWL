@@ -85,7 +85,18 @@ export default function OperationRoomStatsPage() {
     try {
       const payload = entryRows.map(r => ({ room_type_name: r.room_type_name, units: r.units, nights_occupied: numF(r.no), revenue: numF(r.rev), pax: numF(r.pax) }));
       const res = await saveRoomStatsEntry(rsId, month, payload);
-      setEntryMsg(t("guardadoMes", { mes: MONTHS[month-1], filas: res.rows_saved }));
+      // ⚠️ «5 filas» no se lee como un problema; «5 de 6» sí.
+      //
+      // En agosto 2026 se guardaron 5 de 6 —«5 Elements Treehouse» no vendió—
+      // y con la fila que faltó se fueron sus 155 noches DISPONIBLES: la
+      // ocupación del acumulado salía 46,8 % en vez de 45,8 %. El aviso decía
+      // «Saved Aug: 5 rows» y no había con qué compararlo.
+      const esperadas = res.categorias;
+      setEntryMsg(
+        esperadas != null && res.rows_saved < esperadas
+          ? `⚠ ${MONTHS[month - 1]}: se guardaron ${res.rows_saved} de ${esperadas} categorías. `
+            + "Las que falten no suman noches disponibles y la ocupación sale más alta de lo real."
+          : t("guardadoMes", { mes: MONTHS[month - 1], filas: res.rows_saved }));
       const d = await getRevenueByRoomType(rsId); setRs(d); setYear(d.year);
       setEditing(false);
     } catch (e) { setEntryMsg(`Error: ${e instanceof Error ? e.message : String(e)}`); }

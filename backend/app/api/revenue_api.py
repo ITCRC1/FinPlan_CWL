@@ -1109,17 +1109,36 @@ async def put_room_stats_entry(
     days = calendar.monthrange(scenario.year, month)[1]
     await db.execute(delete(ActualRoomStat).where(
         ActualRoomStat.scenario_id == scenario_id, ActualRoomStat.month == month))
+    # ⚠️ Una categoría SIN ventas igual se guarda. Sus habitaciones existieron
+    # y estuvieron disponibles: lo que no hubo fue huéspedes.
+    #
+    # Antes la fila vacía se saltaba, y con ella se iban sus NOCHES
+    # DISPONIBLES. Owner, 2026-09-16: el acumulado enero-agosto daba 7.135
+    # noches cuando 30 unidades × 243 días son 7.290. Faltaban 155 = 5 unidades
+    # × 31 días: «5 Elements Treehouse» no vendió nada en agosto, quedó en
+    # blanco, y el mes guardó 5 filas en vez de 6.
+    #
+    # El daño es que va en la dirección que no se sospecha: al achicarse el
+    # DENOMINADOR, la ocupación y el RevPAR salen MÁS ALTOS de lo real — 46,8 %
+    # en vez de 45,8 %. Un número malo se revisa; uno favorable se acepta.
+    #
+    # Lo que sí se descarta es la fila sin unidades («Other Rooms Revenue» y
+    # cualquier otra sin inventario): esa no aporta disponibilidad, y guardarla
+    # vacía sería una fila de ruido.
     saved = 0
     for r in body.rows:
-        if not (r.nights_occupied or r.revenue or r.pax):
-            continue  # fila vacía
+        if not (r.units or 0) and not (r.nights_occupied or r.revenue or r.pax):
+            continue  # sin inventario y sin movimiento: no es una fila
         db.add(ActualRoomStat(
             scenario_id=scenario_id, room_type_name=r.room_type_name, month=month,
             units=r.units, nights_available=(r.units or 0) * days,
             nights_occupied=r.nights_occupied, revenue=r.revenue, pax=r.pax))
         saved += 1
     await db.commit()
-    return {"saved": True, "month": month, "rows_saved": saved}
+    # `categorias` es cuántas TENÍA que guardar. Que la pantalla pueda decir
+    # «5 de 6» en vez de «5 filas» es la diferencia entre notarlo y no notarlo.
+    return {"saved": True, "month": month, "rows_saved": saved,
+            "categorias": sum(1 for r in body.rows if (r.units or 0))}
 
 
 

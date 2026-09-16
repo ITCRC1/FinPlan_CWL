@@ -3593,7 +3593,12 @@ export async function getRoomStatsEntry(scenarioId: string, month: number): Prom
   return api.get<RoomStatsEntry>(`/scenarios/${scenarioId}/room-stats-entry/${month}/`);
 }
 export async function saveRoomStatsEntry(scenarioId: string, month: number,
-  rows: { room_type_name: string; units: number; nights_occupied: number; revenue: number; pax: number }[]): Promise<{ saved: boolean; month: number; rows_saved: number }> {
+  rows: { room_type_name: string; units: number; nights_occupied: number; revenue: number; pax: number }[],
+): Promise<{ saved: boolean; month: number; rows_saved: number;
+             /** Cuántas TENÍA que guardar: las categorías con inventario. Si
+              *  `rows_saved` es menor, falta una y sus noches disponibles no
+              *  entran al denominador de la ocupación. */
+             categorias?: number }> {
   return api.put(`/scenarios/${scenarioId}/room-stats-entry/${month}/`, { rows });
 }
 
