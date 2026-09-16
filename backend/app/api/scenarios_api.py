@@ -1342,8 +1342,24 @@ def _scenario_summary(s: Scenario) -> dict:
 def _match_block_target(scenarios, typ, year):
     """Escenario destino de un bloque del upload. Para FORECAST prefiere el marcado
     como 'Current' (is_current_forecast) — sin ambigüedad cuando hay varias versiones;
-    si no hay marcado, cae al más reciente. Para ACTUAL/BUDGET: el más reciente."""
-    matches = [s for s in scenarios if s.type == typ and s.year == year]
+    si no hay marcado, cae al más reciente. Para ACTUAL/BUDGET: el más reciente.
+
+    ⚠️ **El espejo del Pre-Cierre NO es un destino que se elija por descarte.**
+
+    El espejo es `type="ACTUAL"`, `year=2026` y `es_precierre=True`, así que
+    entraba en `matches` como cualquier otro Actual — y como se creó el
+    2026-09-10, era el MÁS RECIENTE y ganaba el desempate por `created_at`.
+
+    Consecuencia: «Pasar a Final» escribía **en el espejo**, que es el mismo
+    lugar que ya mira la pantalla de revisión, y el Actual de verdad nunca
+    recibía el mes. Owner, 2026-09-15: *«el pase a final no funciona… voy y
+    busco la información y no veo nada»*. No veía nada porque no había nada.
+
+    Al espejo se le escribe **nombrándolo**, con `scenario_id` — es lo que hace
+    `_reflejar`. Nunca por descarte.
+    """
+    matches = [s for s in scenarios if s.type == typ and s.year == year
+               and not getattr(s, "es_precierre", False)]
     if not matches:
         return None
     if typ == "FORECAST":
