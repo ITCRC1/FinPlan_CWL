@@ -19,7 +19,7 @@ from decimal import Decimal
 
 from sqlalchemy import select, delete, func
 
-from app.models.scenario import Scenario
+from app.models.scenario import Scenario, actual_de_verdad
 from app.models.exchange_rate import ExchangeRate, get_tc_for_month
 from app.models.payroll_position import PayrollPosition
 from app.models.payroll_concept_entry import PayrollConceptEntry
@@ -496,13 +496,20 @@ async def nonop_line_seeds_for_month(
 
 # ─── Rolling forecast: linked ACTUAL scenario ─────────────────────────────────
 async def linked_actual_scenario(session, scenario: Scenario) -> Scenario | None:
-    """The ACTUAL scenario for the same hotel + year (most recent if several)."""
+    """El ACTUAL del mismo hotel + año (el más reciente si hay varios).
+
+    ⚠️ **Sin el espejo del Pre-Cierre.** Ver `scenario.actual_de_verdad`: el
+    espejo es `type="ACTUAL"`, trae un solo mes y es lo ÚLTIMO creado, así que
+    este `order_by(created_at desc)` lo elegía siempre. De acá salen los meses
+    cerrados de todo forecast: apuntando al espejo, esos meses reportaban CERO
+    y el año quedaba sin los actuales ya ganados.
+    """
     return (await session.execute(
         select(Scenario)
         .where(
             Scenario.hotel_id == scenario.hotel_id,
             Scenario.year == scenario.year,
-            Scenario.type == "ACTUAL",
+            actual_de_verdad(),
         )
         .order_by(Scenario.created_at.desc())
     )).scalars().first()

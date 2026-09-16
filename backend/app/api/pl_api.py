@@ -24,7 +24,8 @@ from app.api._cashflow_criterios import (cargar_criterios, cargar_overrides_wc,
 from app.engine.renta_anual import renta_liquidacion
 from app.db import get_session
 from app.errores import ErrorApi
-from app.models.scenario import Scenario, ScenarioLockedError
+from app.models.scenario import (Scenario, ScenarioLockedError,
+                                 actual_de_verdad)
 from app.models.pl_manual_input import PLManualInput
 from app.models.historical_kpi import HistoricalKpi
 from app.models.scenario_stat import ScenarioStat
@@ -926,7 +927,7 @@ async def _wc_calibration(session, scenario) -> dict:
     Busca el escenario ACTUAL del mismo hotel+año con Balance Sheet cargado."""
     actual = (await session.execute(select(Scenario).where(
         Scenario.hotel_id == scenario.hotel_id, Scenario.year == scenario.year,
-        Scenario.type == "ACTUAL"))).scalars().first()
+        actual_de_verdad()))).scalars().first()
     if actual is None:
         return {}
     bs = (await session.execute(select(BalanceSheetLine).where(
@@ -1724,7 +1725,7 @@ async def get_balance_sheet_projection(scenario_id: str, months: int = 24):
 
         # ancla: el balance real MÁS RECIENTE cargado (cualquier Actual del hotel)
         act_ids = [a.id for a in (await session.execute(select(Scenario).where(
-            Scenario.hotel_id == scenario.hotel_id, Scenario.type == "ACTUAL"))).scalars().all()]
+            Scenario.hotel_id == scenario.hotel_id, actual_de_verdad()))).scalars().all()]
         anchor_lines, anchor_month, ay = [], 0, scenario.year
         bs_all = []
         if act_ids:

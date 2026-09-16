@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, or_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
@@ -88,3 +88,32 @@ class Scenario(Base):
 
     def __repr__(self) -> str:
         return f"<Scenario {self.type} {self.version} {self.year} [{self.status}]>"
+
+
+def actual_de_verdad():
+    """Condición SQL: un ACTUAL real, NO el espejo del Pre-Cierre.
+
+    ⚠️ **El espejo del Pre-Cierre también es `type="ACTUAL"`.** Se crea así a
+    propósito (`precierre_api._espejo`) para que el P&L lo calcule con el mismo
+    motor que un cierre de verdad, y se distingue por `es_precierre=True`.
+
+    Pero contiene UN SOLO MES: el que se está pre-cerrando. Cualquier consulta
+    que pida «el ACTUAL del hotel y el año» y no lo excluya se lo puede llevar
+    —y si además ordena por `created_at desc`, se lo lleva SIEMPRE, porque el
+    espejo es lo último que se creó.
+
+    Lo que eso rompe: `recalculate.linked_actual_scenario` alimenta los meses
+    CERRADOS de todo forecast. Apuntando al espejo, once de los doce meses no
+    tienen dato y el P&L los reporta en CERO — sin error. Owner, 2026-09-16:
+    *«por qué las versiones de forecast ninguna tiene revenue de actuales»*. No
+    era el forecast: era de dónde estaba leyendo los actuales.
+
+    Es la MISMA trampa que ya se había arreglado en
+    `scenarios_api._match_block_target` (el Pase a Final escribía sobre el
+    espejo). Aquélla era el lado de escritura; ésta, el de lectura.
+
+    Un `es_precierre` NULL —filas viejas, anteriores a la columna— cuenta como
+    real: el espejo siempre se guarda con el flag puesto.
+    """
+    return (Scenario.type == "ACTUAL") & or_(
+        Scenario.es_precierre.is_(False), Scenario.es_precierre.is_(None))
