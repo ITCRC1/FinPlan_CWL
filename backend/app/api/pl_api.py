@@ -409,10 +409,20 @@ def _aggregate_selected(sel: list[dict], *, lo_subido_manda: bool = False,
     # drivers) y nunca pasó por las cuentas. Se agrega ponderando por noches
     # ocupadas, que es lo único correcto: el promedio simple de doce meses le
     # daría el mismo peso a un mes lleno que a uno cerrado.
-    adr_ponderado = sum(m["kpis"].get("adr", 0.0) * m["kpis"]["rooms_occupied"]
-                        for m in sel)
+    #
+    # ⚠️ Un mes SIN tarifa cargada no promedia como cero. `adr=0` con noches
+    # vendidas no quiere decir «se vendio a cero»: quiere decir que no se sabe.
+    # Metido en el denominador arrastra el promedio hacia abajo en silencio.
+    # Owner, 2026-09-16: junio y julio del ACTUAL 2026 no traen tarifa, y esas
+    # 395 noches —11.3% del YTD— bajaban el ADR de $587.89 a $521.39.
+    # Mismo criterio que los socios del Club (`_club_del_rango`): se promedian
+    # los meses que TIENEN el dato, no todos.
+    con_tarifa = [m for m in sel if m["kpis"].get("adr", 0.0)]
+    occ_con_tarifa = sum(m["kpis"]["rooms_occupied"] for m in con_tarifa)
+    adr_ponderado = sum(m["kpis"]["adr"] * m["kpis"]["rooms_occupied"]
+                        for m in con_tarifa)
     if adr_ponderado:
-        adr = adr_ponderado / occ if occ else 0.0
+        adr = adr_ponderado / occ_con_tarifa if occ_con_tarifa else 0.0
     else:
         # Sin ADR en las estadísticas no hay de dónde sacarlo: se deriva de la
         # línea, como antes. Es el caso de un escenario sin `scenario_stats`
@@ -569,10 +579,16 @@ async def get_estadisticas_cierre(scenario_id: str, desde: int = 1, hasta: int =
 
         rooms_revenue = _linea("REV_ROOMS")
 
-        # Ponderado por noches ocupadas — ver `_aggregate_selected`.
-        pond = sum(m["kpis"].get("adr", 0.0) * m["kpis"]["rooms_occupied"]
-                   for m in sel)
-        adr = (pond / occ) if (pond and occ) else 0.0
+        # Ponderado por noches ocupadas, y SOLO sobre los meses que traen
+        # tarifa — ver `_aggregate_selected`. Un mes sin ADR no vendio a cero:
+        # no se sabe a cuanto vendio, y meterlo baja el promedio en silencio.
+        con_tarifa = [m for m in sel if m["kpis"].get("adr", 0.0)]
+        occ_ct = sum(m["kpis"]["rooms_occupied"] for m in con_tarifa)
+        pond = sum(m["kpis"]["adr"] * m["kpis"]["rooms_occupied"]
+                   for m in con_tarifa)
+        adr = (pond / occ_ct) if (pond and occ_ct) else 0.0
+        sin_tarifa = [m["month"] for m in sel
+                      if m["kpis"]["rooms_occupied"] and not m["kpis"].get("adr", 0.0)]
         adr_derivado = (rooms_revenue / occ) if occ else 0.0
 
         return {
@@ -587,6 +603,10 @@ async def get_estadisticas_cierre(scenario_id: str, desde: int = 1, hasta: int =
             "rooms_revenue": round(rooms_revenue, 2),
             "adr": round(adr, 2),
             "adr_derivado": round(adr_derivado, 2),
+            #: Meses con noches vendidas y SIN tarifa cargada. El `adr` de
+            #: arriba los deja fuera: si esta lista no esta vacia, el promedio
+            #: no cubre todo el periodo y falta cargar esas tarifas.
+            "adr_meses_sin_tarifa": sin_tarifa,
             "revpar": round(adr * ocupacion, 2),
             "revpar_bruto": round(rooms_revenue / avail, 2) if avail else 0.0,
             **await _club_del_rango(session, scenario_id, desde, hasta,
