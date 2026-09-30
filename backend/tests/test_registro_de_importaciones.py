@@ -203,7 +203,14 @@ def _rutas_de_subida() -> tuple[list[str], list[str]]:
 
 # ⚠️ `validate_upload` sólo VALIDA y no escribe. Registrarla haría que la
 # subida real después chocara contra su propia validación.
-NO_REGISTRAN = {"audit_api.py:validate_upload"}
+NO_REGISTRAN = {
+    "audit_api.py:validate_upload",
+    # Dry run: dice qué es cada archivo y qué corte trae, y no guarda nada.
+    # Registrar acá anotaría una subida que nunca ocurrió.
+    "pacing_api.py:preview",
+    # No es una ruta — es el helper que ambas usan para leer los XML.
+    "pacing_api.py:_leer",
+}
 
 
 def test_TODA_puerta_de_subida_QUE_ESCRIBE_registra_el_archivo():

@@ -37,6 +37,7 @@ from app.db import get_db
 from app.engine import pacing as motor
 from app.errores import ErrorApi
 from app.hotel_actual import HOTEL_ID
+from app.importers.registro_dep import registro_de_subida
 from app.importers import pacing_xml as px
 from app.models.pacing import (
     KINDS, ONSITE_MODOS, PacingConfig, PacingReservation, PacingResvLoad, PacingSnapshot)
@@ -99,7 +100,8 @@ async def preview(files: list[UploadFile] = File(...)):
     return {"archivos": [_publico(a) for a in await _leer(files)]}
 
 
-@router.post("/pacing/upload")
+@router.post("/pacing/upload",
+             dependencies=[Depends(registro_de_subida)])
 async def upload(
     files: list[UploadFile] = File(...),
     #: JSON opcional `{"<nombre de archivo>": "rooms"|"total"}` para corregir la
