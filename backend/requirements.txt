@@ -1,7 +1,16 @@
 fastapi>=0.110.0
 python-multipart>=0.0.9
 uvicorn[standard]>=0.27.0
-sqlalchemy>=2.0.0
+# El extra `asyncio` NO es decorativo: arrastra `greenlet`, sin el cual
+# `sqlalchemy.ext.asyncio` no importa. Todo este backend es async, y
+# `alembic/env.py` lo usa en la PRIMERA linea del arranque.
+#
+# 2026-09-30: un build nuevo resolvio SQLAlchemy sin greenlet y el deploy
+# murio en `alembic upgrade head`. Como el Procfile encadena con `&&`,
+# uvicorn nunca arranco: 502 en todo, incluido el login («Failed to
+# fetch»). El commit de ese dia no habia tocado requirements — solo se
+# reinstalaron las dependencias, que es lo unico que hace falta.
+sqlalchemy[asyncio]>=2.0.0
 asyncpg>=0.29.0
 alembic>=1.13.0
 python-dotenv>=1.0.0
