@@ -760,6 +760,31 @@ MENSAJES: dict[str, dict[str, str]] = {
     "rooms.reparto_supera_100": {
         "es": "El mes {mes} reparte {pct}% del costo de Rooms. No se puede pasar del 100%: lo que no se asigna es lo que le queda a Rooms Standard.",
         "en": "Month {mes} allocates {pct}% of the Rooms cost. It cannot go above 100%: whatever is not allocated is what stays with Rooms Standard."},
+    # ── PACING ────────────────────────────────────────────────────────────────
+    "pacing.nada_valido": {
+        "es": "Ninguno de los archivos es un History & Forecast ni un Reservations Entered On de Opera.",
+        "en": "None of the files is an Opera History & Forecast or Reservations Entered On report."},
+    "pacing.kind_invalido": {
+        "es": "Tipo de archivo «{kind}» inválido: tiene que ser rooms o total.",
+        "en": "Invalid file type «{kind}»: it must be rooms or total."},
+    "pacing.foto_no_encontrada": {
+        "es": "Esa foto de Opera ya no existe.",
+        "en": "That Opera snapshot no longer exists."},
+    "pacing.config_invalida": {
+        "es": "La configuración del pacing no tiene el formato esperado ({campo}).",
+        "en": "The pacing configuration is not in the expected format ({campo})."},
+    "pacing.doce_meses": {
+        "es": "{campo} tiene que traer exactamente 12 meses.",
+        "en": "{campo} must have exactly 12 months."},
+    "pacing.onsite_modo": {
+        "es": "Modo de consumo en sitio «{modo}» inválido: pct o ratio.",
+        "en": "Invalid on-site spend mode «{modo}»: pct or ratio."},
+    "pacing.onsite_pct": {
+        "es": "El porcentaje de consumo en sitio tiene que estar entre 0 y 100.",
+        "en": "The on-site spend percentage must be between 0 and 100."},
+    "pacing.pl_incompleto": {
+        "es": "El P&L de ese escenario no trae los 12 meses; no se puede tomar como meta.",
+        "en": "That scenario's P&L does not have all 12 months; it cannot be used as the target."},
 }
 
 

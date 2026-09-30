@@ -207,6 +207,28 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    // PACING (2026-09-30): las fotos de Opera y las reservas, contra el año
+    // anterior, el STLY y la meta. Grupo propio porque es donde el owner arma
+    // el presupuesto de ingresos: «ahí voy a hacer el presupuesto».
+    key: "pacing",
+    items: [
+      { key: "pacingAnalysis", header: true },
+      { key: "pacingResumen", href: "/pacing/resumen" },
+      { key: "pacingPosicion", href: "/pacing/posicion" },
+      { key: "pacingComparativo", href: "/pacing/comparativo" },
+      { key: "pacingMeta", href: "/pacing/meta" },
+      { key: "pacingBudget", header: true },
+      { key: "pacingPresupuesto", href: "/pacing/presupuesto" },
+      { key: "pacingDetail", header: true },
+      { key: "pacingCurva", href: "/pacing/curva" },
+      { key: "pacingPickup", href: "/pacing/pickup" },
+      { key: "pacingCancelaciones", href: "/pacing/cancelaciones" },
+      { key: "pacingAlertas", href: "/pacing/alertas" },
+      { key: "pacingData", header: true },
+      { key: "pacingCargas", href: "/pacing/cargas" },
+    ],
+  },
+  {
     // Break-E: el punto de equilibrio. Grupo propio y no un item de Reportes
     // porque tiene sub-pantallas y una barra de contexto propia (escenario +
     // version de dato), no es una vista mas del P&L.

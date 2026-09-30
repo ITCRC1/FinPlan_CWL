@@ -139,3 +139,6 @@ from app.models.import_registro import ImportBatch, ImportFile, ESTADOS, MODOS
 # Guillermo Fase 1: configuración, latido, manifiesto y cola de excepciones.
 from app.models.guillermo import (
     GuillermoConfig, GuillermoHeartbeat, ExpectedReport, ImportException)
+# Módulo PACING (2026-09-30): fotos de Opera, reservas y configuración.
+from app.models.pacing import (
+    PacingSnapshot, PacingReservation, PacingResvLoad, PacingConfig)

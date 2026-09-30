@@ -5558,3 +5558,130 @@ export const precierreExcelUrl = (id: string) => ({
   filas: `/precierre/${id}/filas.xlsx`,
   listado: `/precierre/listado.xlsx`,
 });
+
+// ── PACING (2026-09-30) ──────────────────────────────────────────────────────
+// Fotos History & Forecast y Reservations Entered On de Opera, de la PROPIEDAD
+// (no del escenario). El cálculo vive en `backend/app/engine/pacing.py`.
+
+export type PacingKind = "rooms" | "total";
+export type PacingEscenario = "avail" | "add" | "mult" | "otb";
+export type PacingFuente = "auto" | "snap" | "resv" | "rm";
+
+export interface PacingArchivo {
+  nombre: string;
+  tipo?: "history_forecast" | "reservations";
+  error?: string; detalle?: string;
+  as_of?: string; has_forecast?: boolean; date_from?: string; date_to?: string;
+  total_revenue?: number; dias?: number;
+  kind?: PacingKind; kind_detectado?: "par" | "confirmar"; reemplazo?: boolean;
+  cuenta?: number; descartadas_pi?: number; min_ins?: string | null; max_ins?: string | null;
+  nuevas?: number; actualizadas?: number;
+}
+
+export interface PacingSnapshotRow {
+  id: string; kind: PacingKind; as_of: string; date_from: string; date_to: string;
+  has_forecast: boolean; file_name: string | null; total_revenue: number; dias: number;
+  uploaded_at: string | null; uploaded_by: string | null;
+}
+
+export interface PacingResvSummary {
+  cuenta: number; activas: number; canceladas: number; desde: string | null; hasta: string | null;
+  cargas: { id: string; file_name: string | null; cuenta: number; nuevas: number; actualizadas: number;
+            descartadas_pi: number; min_ins: string | null; max_ins: string | null;
+            uploaded_at: string | null; uploaded_by: string | null }[];
+}
+
+export interface PacingYearBlock {
+  rn?: number[]; rooms?: number[]; total?: number[]; avail?: number[];
+  asOf?: string; source?: string; actualMonths?: number; scenario_id?: string; tomado?: string;
+  [k: string]: unknown;
+}
+export interface PacingConfig {
+  stly: { years: Record<string, PacingYearBlock> };
+  meta: { years: Record<string, PacingYearBlock> };
+  onsite_mode: "pct" | "ratio"; onsite_pct: number;
+  updated_at?: string | null; updated_by?: string | null;
+}
+
+export interface PacingRow {
+  i: number; cap: number; otb_rn: number; otb_rev: number; adr: number; occ: number; grp: number;
+  st_rn: number | null; st_rev: number | null; pace: number | null; base_pace: number | null; bloqueos: number;
+  tasa: number | null; ly_rn: number; ly_rev: number; ly_adr: number; ly_h: number; ly_n: number;
+  pick: number; proj: number; proj_rev: number; proj_occ: number; cap_ly: number; cerrado: boolean;
+  ly_de_reservas: boolean; ly_alcance: boolean; falta: number; asegurado: number; ly_cerrado_hotel: boolean;
+  canc_max: number; en_sitio?: number; proj_rev_reservado?: number; estado: string;
+}
+export interface PacingTot {
+  cap: number; otb_rn: number; otb_rev: number; st_rn: number; st_rev: number; ly_rn: number; ly_rev: number;
+  pick: number; proj: number; proj_rev: number; grp: number; base_pace: number; bloqueos: number; falta: number;
+  adr: number; pace: number | null; occ: number; proj_occ: number; asegurado: number; ly_adr: number;
+  proj_rev_reservado?: number; en_sitio?: number;
+}
+export interface PacingMeta {
+  rn: number[]; avail: number[]; rev: number[]; total: number[]; rooms: number[];
+  source?: string; actual_months: number; scenario_id?: string | null;
+}
+export interface PacingAlerta { nivel: "corregir" | "revisar" | "info"; clave: string; datos: Record<string, number | string | boolean | null> }
+export interface PacingAnalisis {
+  vacio: boolean; anio?: number; anios: number[]; kind?: PacingKind; corte?: string | null;
+  escenario?: PacingEscenario; fuente?: PacingFuente; en_sitio?: { modo: string; pct: number };
+  posicion?: { T: number; kind: PacingKind; corte: string; rows: PacingRow[]; tot: PacingTot; escenario: string;
+               st: { src: string; as_of: string | null; gap: number | null; source?: string; migracion?: string | null } | null;
+               rc: number };
+  meta_anterior?: PacingMeta | null;
+  cierre_meta?: { year: number; meta: PacingMeta | null;
+                  filas: { i: number; base: string; meta_rn: number; meta_rev: number; otb_rn: number; otb_rev: number;
+                           pick: number; proj: number; proj_rev: number; en_sitio: number; cerrado: boolean }[];
+                  ytd: { meta_rn: number; meta_rev: number; rn: number; rev: number };
+                  total: { meta_rn: number; meta_rev: number; rn: number; rev: number; otb_rn: number; otb_rev: number; en_sitio: number } } | null;
+  curva?: { xs: string[]; anio: (number | null)[]; anterior: (number | null)[]; hoy_anio: number; hoy_anterior: number;
+            hitos: { fecha: string; deberia: number }[]; migracion: string | null } | null;
+  pickup?: { ventanas: { dias: number; anio: { rn: number; tarifa: number; canceladas: number; migracion: boolean };
+                         anterior: { rn: number; tarifa: number; canceladas: number; migracion: boolean } }[];
+             ultimos_30_por_mes: number[] } | null;
+  canales?: { canal: string; rn: number; tarifa: number; rn_anterior: number }[];
+  cancelaciones?: { anterior: { a: number; x: number; b: number[]; mig: number }[]; anio: { a: number; x: number; b: number[]; mig: number }[] };
+  historico?: { anio: number; meses: { rn: number; rev: number; n: number; dias: number }[] }[];
+  evolucion?: { id: string | null; as_of: string; rn: number; rev: number; has_forecast: boolean; file_name: string | null }[];
+  alertas?: PacingAlerta[];
+  fotos: { id: string | null; kind: PacingKind; as_of: string; file_name: string | null; has_forecast: boolean }[];
+  reservas: { cuenta: number; desde: string | null; hasta: string | null };
+  config: PacingConfig;
+}
+export interface PacingFlagged {
+  reservas: { id: string; guest: string | null; arr: string; nts: number; rms: number; amt: number; noche: number;
+              mediana_mes: number | null; potencial: number; rate: string | null; ch: string | null;
+              grupo: string | null; ins: string; motivo: "sin_tarifa" | "tarifa_baja" | "cortesia" }[];
+  potencial: number;
+}
+
+async function pacingForm<T>(path: string, files: File[], extra?: Record<string, string>): Promise<T> {
+  const form = new FormData();
+  files.forEach(f => form.append("files", f));
+  Object.entries(extra ?? {}).forEach(([k, v]) => form.append(k, v));
+  const res = await fetch(`${BASE}${path}`, { method: "POST", body: form, headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+export const pacingPreview = (files: File[]) =>
+  pacingForm<{ archivos: PacingArchivo[] }>(`/pacing/preview`, files);
+export const pacingUpload = (files: File[], kinds?: Record<string, PacingKind>) =>
+  pacingForm<{ archivos: PacingArchivo[] }>(`/pacing/upload`, files, kinds ? { kinds: JSON.stringify(kinds) } : undefined);
+export const getPacingSnapshots = () => api.get<PacingSnapshotRow[]>(`/pacing/snapshots`);
+export const deletePacingSnapshot = (id: string) => api.delete<{ ok: boolean }>(`/pacing/snapshots/${id}`);
+export const getPacingResvSummary = () => api.get<PacingResvSummary>(`/pacing/reservations/summary`);
+export const deletePacingReservations = () => api.delete<{ ok: boolean }>(`/pacing/reservations`);
+export const getPacingFlagged = (year?: number, month?: number) =>
+  api.get<PacingFlagged>(`/pacing/reservations/flagged?${new URLSearchParams({
+    ...(year ? { year: String(year) } : {}), ...(month ? { month: String(month) } : {}) })}`);
+export const getPacingConfig = () => api.get<PacingConfig>(`/pacing/config`);
+export const putPacingConfig = (body: Partial<Pick<PacingConfig, "stly" | "meta" | "onsite_mode" | "onsite_pct">>) =>
+  api.put<PacingConfig>(`/pacing/config`, body);
+export const pacingMetaFromScenario = (scenarioId: string, year?: number) => {
+  const qs = year ? `?year=${year}` : "";
+  return api.post<{ anio: number; meta: PacingYearBlock }>(`/pacing/meta-from-scenario/${scenarioId}${qs}`);
+};
+export const getPacingAnalisis = (p: { year?: number; kind?: PacingKind; escenario?: PacingEscenario; fuente?: PacingFuente }) =>
+  api.get<PacingAnalisis>(`/pacing/analisis?${new URLSearchParams(
+    Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])))}`);
