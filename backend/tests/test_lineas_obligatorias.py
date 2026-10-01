@@ -29,14 +29,82 @@ def _pl(codes_con_dato, meses=TODOS, monto=1000.0):
     return {m: {c: monto for c in codes_con_dato} for m in meses}
 
 
+#: Una lista de LABORATORIO, para los tests del motor.
+#:
+#: ⚠️ Los tests de comportamiento no pueden colgar de la lista real: es
+#: distinta en cada propiedad y en una recien abierta esta VACIA a proposito
+#: —Ojochal no tiene historico—. Con la lista del repo, el mismo motor quedaba
+#: «probado» en tres repos y sin probar en el cuarto, que es justo donde un
+#: cambio pasaria sin que nadie lo note.
+#:
+#: Los tests que SI miran la lista del repo son los de identidad y magnitud, y
+#: esos se saltan solo cuando la propiedad no tiene historico.
+LAB = {
+    "lineas": [
+        {"line_code": "OH_UTILITIES", "nombre": "Utilities", "seccion": "OVERHEAD",
+         "donde_se_carga": "OPEX", "pantalla": "/opex", "departamentos": ["0210"],
+         "reglas_de_mapeo": 3, "historico": {"2025": 90000.0},
+         "referencia_usd": 90000.0, "referencia_anio": 2025},
+        {"line_code": "REV_ROOMS", "nombre": "Rooms Revenue", "seccion": "REVENUES",
+         "donde_se_carga": "Ingresos", "pantalla": "/revenue", "departamentos": ["0110"],
+         "reglas_de_mapeo": 5, "historico": {"2025": 500000.0},
+         "referencia_usd": 500000.0, "referencia_anio": 2025},
+    ],
+    "criterio": {}, "generado": "2026-10-01", "_nota": [], "hotel": "Laboratorio",
+}
+
+
+@pytest.fixture
+def lab(monkeypatch):
+    """Le pone al motor la lista de laboratorio, pase lo que pase en el repo."""
+    monkeypatch.setattr(obligatorias, "lista", lambda: LAB)
+    return LAB
+
+
+def _sin_lista_propia():
+    """La propiedad no tiene historico: su lista vacia es correcta."""
+    return not obligatorias.lista()["lineas"]
+
+
 # ── La lista ──────────────────────────────────────────────────────────────────
 
-def test_la_lista_existe_y_tiene_lo_que_el_owner_midio():
-    """Los seis agujeros del 2027 que el owner midio el 2026-08-16 estan."""
-    codes = {L["line_code"] for L in obligatorias.lista()["lineas"]}
-    for c in ("OH_UTILITIES", "COS_TOURS", "COS_TRANSPORTATION", "COS_RETAIL",
-              "RENT", "PROPERTY_INSURANCE", "DEPRECIATION"):
-        assert c in codes, f"{c} tiene historico y regla de mapeo: tiene que obligar"
+def test_la_lista_es_de_ESTE_hotel():
+    """⚠️ **El modo de falla mas caro de esta lista: ser de otra propiedad.**
+
+    El archivo viajo con el molde al clonar el proyecto. Las cuatro propiedades
+    —Amarena, CWL, Oxygen y Gardens— tuvieron el MISMO archivo, con el mismo
+    sha, durante mes y medio: el de CWL. Amarena mostraba «31 de 33 lineas en
+    cero, valen 5.573.133 USD en el historico» citando un REV_ROOMS de 1,6
+    millones de un hotel de 30 villas, cuando el suyo son 162 mil.
+
+    No fallaba nada. El aviso se veia perfecto y ordenaba mal las prioridades.
+
+    Por eso la lista dice de quien es, y esto lo comprueba. Si alguien vuelve a
+    copiar el archivo entre repos, falla aca y no en una reunion.
+    """
+    from app.hotel_actual import HOTEL_ID
+
+    cfg = obligatorias.lista()
+    assert cfg.get("hotel"), "la lista no dice de que hotel es"
+    # El historico tiene que ser de esta propiedad: se compara el codigo del
+    # despliegue contra el nombre que quedo escrito al generarla.
+    esperado = {"AMA": "Amarena", "CWL": "CWL", "OXI": "Oxygen", "OJO": "Ojochal"}
+    pista = esperado.get(HOTEL_ID.upper())
+    if pista:
+        assert pista.lower() in cfg["hotel"].lower(), (
+            f"la lista dice «{cfg['hotel']}» y el despliegue es {HOTEL_ID}")
+
+
+def test_la_lista_trae_las_lineas_que_el_hotel_de_verdad_mueve():
+    """Una lista derivada del historico PROPIO tiene las lineas grandes de la
+    propiedad. No se fijan codigos a mano —cambian de hotel a hotel— sino que
+    se exige que lo mas pesado sea ingreso o gasto operativo, que es lo que
+    cualquier hotel mueve."""
+    lineas = obligatorias.lista()["lineas"]
+    if not lineas:
+        pytest.skip("propiedad sin historico: la lista vacia es correcta")
+    top = max(lineas, key=lambda L: abs(L["referencia_usd"]))
+    assert top["line_code"].startswith(("REV_", "OPEX_", "OH_", "COS_")), top
 
 
 def test_innoceana_no_obliga():
@@ -63,7 +131,7 @@ def test_solo_lineas_donde_entra_dato():
 
 def test_cada_linea_trae_su_magnitud_y_donde_cargarla():
     """La pregunta del owner es «que cargo y en que orden»: sin monto no hay orden."""
-    for L in obligatorias.lista()["lineas"]:
+    for L in obligatorias.lista()["lineas"]:   # vacia en una propiedad sin historico
         assert L["referencia_usd"], f"{L['line_code']} sin monto de referencia"
         assert L["historico"], f"{L['line_code']} sin historico"
         assert L["donde_se_carga"], f"{L['line_code']} no dice donde se carga"
@@ -78,8 +146,8 @@ def test_el_archivo_es_json_valido_y_no_se_lee_dos_veces():
 
 # ── El aviso ──────────────────────────────────────────────────────────────────
 
-def test_avisa_de_la_linea_en_cero():
-    todas = [L["line_code"] for L in obligatorias.lista()["lineas"]]
+def test_avisa_de_la_linea_en_cero(lab):
+    todas = [L["line_code"] for L in lab["lineas"]]
     rep = obligatorias.revisar(_pl([c for c in todas if c != "OH_UTILITIES"]),
                                "BUDGET", 0)
     assert not rep["vacio"]
@@ -87,21 +155,21 @@ def test_avisa_de_la_linea_en_cero():
     assert rep["magnitud_historica_usd"] > 0
 
 
-def test_no_avisa_cuando_estan_todas():
-    todas = [L["line_code"] for L in obligatorias.lista()["lineas"]]
+def test_no_avisa_cuando_estan_todas(lab):
+    todas = [L["line_code"] for L in lab["lineas"]]
     rep = obligatorias.revisar(_pl(todas), "BUDGET", 0)
     assert rep["faltan"] == []
     assert "tienen dato" in obligatorias.resumen_texto(rep)
 
 
-def test_las_faltantes_salen_de_mayor_a_menor():
+def test_las_faltantes_salen_de_mayor_a_menor(lab):
     """El orden ES la respuesta: primero lo que mas plata mueve."""
     rep = obligatorias.revisar({}, "BUDGET", 0)
     montos = [abs(f["referencia_usd"]) for f in rep["faltan"]]
     assert montos == sorted(montos, reverse=True)
 
 
-def test_un_escenario_entero_vacio_se_dice_una_sola_vez():
+def test_un_escenario_entero_vacio_se_dice_una_sola_vez(lab):
     """Los Working 2028-2035 no tienen agujeros: no estan empezados."""
     rep = obligatorias.revisar({m: {} for m in TODOS}, "BUDGET", 0)
     assert rep["vacio"] is True
@@ -122,13 +190,13 @@ def test_el_aviso_nunca_bloquea():
 
 # ── El corte del rolling forecast ─────────────────────────────────────────────
 
-def test_el_forecast_solo_se_revisa_en_los_meses_que_aporta():
+def test_el_forecast_solo_se_revisa_en_los_meses_que_aporta(lab):
     """Corte en 6: enero-junio salen del Actual enlazado, no de este escenario.
 
     Con dato SOLO en enero-junio, el forecast no aporta nada — y el aviso tiene
     que decirlo, no darlo por bueno.
     """
-    todas = [L["line_code"] for L in obligatorias.lista()["lineas"]]
+    todas = [L["line_code"] for L in lab["lineas"]]
     rep = obligatorias.revisar(_pl(todas, meses=list(range(1, 7))), "FORECAST", 6)
     assert rep["meses_revisados"] == list(range(7, 13))
     assert rep["meses_no_revisados"] == list(range(1, 7))
@@ -168,7 +236,12 @@ def test_no_toca_nada():
 
 
 @pytest.mark.parametrize("tipo", ["ACTUAL", "BUDGET", "FORECAST"])
-def test_no_revienta_con_entrada_vacia(tipo):
+def test_no_revienta_con_entrada_vacia(tipo, lab):
+    """Con la lista de laboratorio: lo que se prueba es el MOTOR, no el repo.
+
+    ⚠️ Ojochal todavia no tiene historico y su lista esta vacia a
+    proposito. Colgar esta prueba de la lista del repo la hacia fallar ahi por
+    una razon que no tiene nada que ver con lo que defiende."""
     rep = obligatorias.revisar({}, tipo, None)
     assert rep["hay_lista"] is True
     assert isinstance(obligatorias.resumen_texto(rep), str)

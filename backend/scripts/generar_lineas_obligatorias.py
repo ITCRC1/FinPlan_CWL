@@ -149,12 +149,24 @@ async def main(escribir: bool) -> None:
         raise SystemExit("No hay escenarios ACTUAL: sin historico no hay lista.")
     ultimo = anos[-1]
 
+    #: Cuantos anos tienen que superar el umbral para que la linea obligue.
+    #:
+    #: ⚠️ **Dos cuando hay dos o mas; uno cuando hay uno.** La regla original
+    #: pedia dos siempre, y eso esta bien para CWL —tres anos cargados— pero
+    #: deja la lista VACIA en una propiedad que abrio este ano. Un aviso que
+    #: nunca avisa es peor que no tenerlo: ocupa lugar y entrena a ignorarlo.
+    #:
+    #: Con un solo ano la lista es mas floja —un gasto de una vez entra como si
+    #: fuera recurrente— y por eso se dice en `criterio`: quien la lea sabe con
+    #: cuanta historia se produjo.
+    anos_requeridos = min(2, len(anos))
+
     lineas = []
     for code, cfg in rlc.items():
         if cfg["line_type"] not in ("MAPPED", "MAPPED_REVIEW"):
             continue                                        # (1) donde entra dato
         hist = {a: round(por_ano[a].get(code, 0.0), 2) for a in anos}
-        if sum(1 for v in hist.values() if abs(v) >= UMBRAL) < 2:
+        if sum(1 for v in hist.values() if abs(v) >= UMBRAL) < anos_requeridos:
             continue                                        # (2) recurrente
         if abs(hist[ultimo]) < 0.005:
             continue                                        # (3) sigue viva
@@ -199,6 +211,8 @@ async def main(escribir: bool) -> None:
             "historico, para saber que cargar y en que orden.",
             "",
             "`referencia_usd` es el ultimo ano ACTUAL COMPLETO — no un promedio.",
+            "Si ningun ano esta completo, es el ano con el monto mas grande, y",
+            "entonces el numero SUBESTIMA: es una parte del ano, no el ano.",
             "Se regenera con `python -m scripts.generar_lineas_obligatorias`.",
         ],
         "generado": datetime.date.today().isoformat(),
@@ -208,7 +222,8 @@ async def main(escribir: bool) -> None:
             "meses_con_dato": {str(a): meses_con_dato[a] for a in anos},
             "regla": [
                 "1. line_type MAPPED o MAPPED_REVIEW (donde ENTRA el dato).",
-                f"2. >= {UMBRAL:,.0f} USD/anio en 2 o mas anios ACTUAL.",
+                f"2. >= {UMBRAL:,.0f} USD/anio en {anos_requeridos} o mas "
+                f"anios ACTUAL (de {len(anos)} cargado(s)).",
                 f"3. distinta de cero en el ACTUAL mas reciente ({ultimo}).",
             ],
         },
