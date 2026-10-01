@@ -774,14 +774,31 @@ export function cuadroPosiciones(
 
 /* ═══════ 6 · El reparto de Cafetería y Lavandería, y con qué se hizo ═════ */
 
+/**
+ * Los repartos que este sistema conoce por su nombre. Los que no están acá
+ * salen igual, con el código crudo: es mejor mostrarlos sin rótulo bonito que
+ * esconder un reparto que movió plata.
+ */
 export const REPARTOS = [
-  { id: "CAFETERIA", rotulo: "Cafetería", base: "FTE",
-    fuente: "0220 · se reparte por el FTE de los departamentos que comen en la propiedad" },
-  { id: "LAUNDRY", rotulo: "Lavandería", base: "Kilos",
-    fuente: "0161 · se reparte por los kilos lavados de cada departamento" },
+  { id: "CAFETERIA", rotulo: "Cafetería",
+    fuente: "0220 · se reparte entre los departamentos que comen en la propiedad" },
+  { id: "LAUNDRY", rotulo: "Lavandería",
+    fuente: "0161 · la lencería por kilos y los uniformes por FTE" },
+  { id: "ROOMS", rotulo: "Habitaciones",
+    fuente: "se reparte por posición" },
+  { id: "SALARY", rotulo: "Salarios",
+    fuente: "porciones de una plaza repartidas entre varios departamentos" },
 ] as const;
 
-export type TipoReparto = (typeof REPARTOS)[number]["id"];
+/** Cómo se lee cada base, y con qué formato.
+ *
+ *  ⚠️ Ninguna es dinero: son personas, kilos o plazas. Con el formato de dólares
+ *  «700,00» al lado de «$6.461,04» invita a leer la base como un monto. */
+const BASES: Record<string, { rotulo: string; formato: FormatoCol }> = {
+  FTE:      { rotulo: "FTE", formato: "num1" },
+  KILOS:    { rotulo: "Kilos", formato: "num1" },
+  POSITION: { rotulo: "Posiciones", formato: "num1" },
+};
 
 export interface RepartoPlanning {
   versiones: VersionPlanning[];
@@ -790,14 +807,30 @@ export interface RepartoPlanning {
   deptos?: Record<string, string>;
 }
 
+/** Los tipos de reparto que ALGUNA versión tiene, en el orden conocido primero.
+ *
+ *  ⚠️ Salen de los datos. Una lista fija de dos dejaba fuera los repartos de
+ *  Habitaciones y de salarios que CWL sí tiene — y un reparto que no se ve es
+ *  plata que se movió sin que el reporte lo diga. */
+export function tiposDeReparto(resumen: (AllocationSummary | null)[]): string[] {
+  const vistos = new Set<string>();
+  for (const r of resumen) {
+    for (const [k, v] of Object.entries(r ?? {})) {
+      if (k !== "BASES" && v && Object.keys(v).length) vistos.add(k);
+    }
+  }
+  const conocidos = REPARTOS.map(x => x.id as string).filter(x => vistos.has(x));
+  return [...conocidos, ...Array.from(vistos).filter(x => !conocidos.includes(x)).sort()];
+}
+
 /**
  * Cuánto recibió cada departamento del reparto, y CON QUÉ peso.
  *
  * Owner, 2026-10-01: *«el tab de allocation de laundry y cafetería, con todos
  * los parámetros y distribución, kilos FTE para distribuir»*.
  *
- * Dos bloques: lo repartido en dólares y el peso con el que se repartió —el FTE
- * en cafetería, los kilos en lavandería—. Con el reparto solo, «Habitaciones
+ * Un bloque con lo repartido en dólares y uno por cada BASE que ese reparto usó
+ * —el FTE, los kilos, las posiciones—. Con el reparto solo, «Habitaciones
  * $7.023» no se puede discutir; con el peso al lado, sí.
  *
  * ⚠️ **El peso es `basis_value`: el número que el motor USÓ.** Volver a sumar
@@ -805,13 +838,16 @@ export interface RepartoPlanning {
  * definición del mismo reparto — coincidiría casi siempre, y el día que no, el
  * cuadro explicaría un reparto que no ocurrió.
  *
- * ⚠️ **El departamento que reparte queda en CERO y por eso no está.** Cafetería
- * y Lavandería se vacían contra los que las consumen; lo que se ve acá es el
- * lado que recibe. Si alguna quedara con saldo, sale en overhead — que es la
- * regla del 2026-08-28 y no un hueco de este cuadro.
+ * ⚠️ **Cada base en su propio bloque.** La lavandería de CWL reparte la
+ * lencería por kilos y los uniformes por FTE: en una sola fila serían kilos
+ * sumados con personas.
+ *
+ * ⚠️ **El departamento que reparte entra en NEGATIVO y por eso el total da
+ * cero.** Cafetería y Lavandería se vacían contra los que las consumen; que la
+ * suma cierre en cero ES la regla, no un reparto vacío.
  */
 export function cuadroReparto(
-  tipo: TipoReparto, datos: RepartoPlanning, escenarios: Scenario[],
+  tipo: string, datos: RepartoPlanning, escenarios: Scenario[],
   opciones: OpcionesPlanning,
 ): Cuadro {
   const { compacto = false } = opciones;
@@ -819,16 +855,21 @@ export function cuadroReparto(
   const par = parPorDefecto(datos.versiones.length, opciones.par);
   const mv = Math.min(opciones.mesesDe ?? 0,
                       Math.max(0, datos.versiones.length - 1));
-  const meta = REPARTOS.find(r => r.id === tipo)!;
+  const meta = REPARTOS.find(r => r.id === tipo);
+  const rotuloTipo = meta?.rotulo ?? tipo;
   const deptos = datos.deptos ?? {};
 
-  const plata = (vi: number, k: string) => datos.resumen[vi]?.[tipo]?.[k] ?? null;
-  const peso = (vi: number, k: string) =>
-    datos.resumen[vi]?.BASES?.[tipo]?.[k] ?? null;
+  const plata = (vi: number, k: string): number[] | null =>
+    (datos.resumen[vi]?.[tipo] as Record<string, number[]> | undefined)?.[k] ?? null;
+  const basesDe = (vi: number) =>
+    (datos.resumen[vi]?.BASES as
+      Record<string, Record<string, Record<string, number[]>>> | undefined)?.[tipo] ?? {};
+  const peso = (vi: number, base: string, k: string): number[] | null =>
+    basesDe(vi)[base]?.[k] ?? null;
   const total12 = (s: number[] | null) => (s ? suma(s, DOCE) : null);
 
   const claves = Array.from(new Set(datos.resumen.flatMap(r =>
-    Object.keys(r?.[tipo] ?? {}))))
+    Object.keys((r?.[tipo] as Record<string, number[]> | undefined) ?? {}))))
     .filter(k => !compacto
                  || datos.resumen.some((_r, vi) =>
                       Math.abs(total12(plata(vi, k)) ?? 0) >= CENTAVO))
@@ -843,20 +884,20 @@ export function cuadroReparto(
   // —falta correrlo— y no un hueco del reporte.
   if (!claves.length) {
     return armarCuadro({
-      titulo: `Planning · Reparto de ${meta.rotulo} · sin calcular`,
+      titulo: `Planning · Reparto de ${rotuloTipo} · sin calcular`,
       subtitulo: `${nombre(0)} — este escenario no tiene reparto de `
-        + `${meta.rotulo} calculado. Se corre desde Planning → Allocation `
-        + `Cafetería y Laundry; hasta entonces su gasto queda donde está.`,
-      hoja: `Reparto ${meta.rotulo}`,
-      anchoRotulo: 40,
+        + `${rotuloTipo} calculado. Se corre desde Planning → Allocation; hasta `
+        + `entonces su gasto queda donde está.`,
+      hoja: `Reparto ${rotuloTipo}`,
+      anchoRotulo: 40, mesesDe: mv,
     }, datos.versiones.length, nombre, par, [{
-      label: `Sin reparto de ${meta.rotulo} calculado en este escenario`,
+      label: `Sin reparto de ${rotuloTipo} calculado en este escenario`,
       es_seccion: true, meses: null,
     }]);
   }
 
   // ── Bloque 1: lo repartido, en dólares ────────────────────────────────
-  filas.push({ label: `Reparto de ${meta.rotulo} (USD)`, es_seccion: true,
+  filas.push({ label: `Reparto de ${rotuloTipo} (USD)`, es_seccion: true,
                meses: null });
   const desde = filas.length;
   for (const k of claves) {
@@ -866,12 +907,6 @@ export function cuadroReparto(
       anios: datos.versiones.map((_v, vi) => total12(plata(vi, k))),
     });
   }
-  // ⚠️ Este total tiene que dar CERO, y por eso lo dice el rótulo.
-  //
-  // El departamento que reparte entra con el crédito en negativo —0161
-  // Lavandería, −9.838,52— y los que consumen, en positivo. Que la suma dé cero
-  // ES la regla: «Cafetería y Lavandería siempre neto $0». Un rótulo que dijera
-  // «TOTAL REPARTIDO» sobre un cero se leería como que no se repartió nada.
   filas.push({
     label: "TOTAL (el reparto tiene que dar cero)", es_total: true,
     suma_de: claves.map((_k, i) => desde + i),
@@ -880,40 +915,47 @@ export function cuadroReparto(
       claves.reduce((t, k) => t + (total12(plata(vi, k)) ?? 0), 0)),
   });
 
-  // ── Bloque 2: con qué se repartió ─────────────────────────────────────
-  //
-  // ⚠️ Es el PESO, no plata: su formato es otro y su total es la base del
-  // reparto, no un monto. Mezclarlos en una sola columna de dólares haría una
-  // suma de kilos con dinero.
-  const conPeso = claves.filter(k => datos.resumen.some((_r, vi) => peso(vi, k)));
-  if (conPeso.length) {
-    filas.push({ label: `Base del reparto · ${meta.base}`, es_seccion: true,
+  // ── Un bloque por BASE ────────────────────────────────────────────────
+  const usadas = Array.from(new Set(
+    datos.versiones.flatMap((_v, vi) => Object.keys(basesDe(vi))))).sort();
+  for (const base of usadas) {
+    const info = BASES[base] ?? { rotulo: base, formato: "num1" as FormatoCol };
+    const conPeso = Array.from(new Set(datos.versiones.flatMap((_v, vi) =>
+      Object.keys(basesDe(vi)[base] ?? {}))))
+      .sort((a, b) => Math.abs(total12(peso(mv, base, b)) ?? 0)
+                      - Math.abs(total12(peso(mv, base, a)) ?? 0)
+                      || a.localeCompare(b));
+    if (!conPeso.length) continue;
+    filas.push({ label: `Base del reparto · ${info.rotulo}`, es_seccion: true,
                  meses: null });
     const d2 = filas.length;
     for (const k of conPeso) {
       filas.push({
-        label: rotulo(k), nivel: 1, formato: "num1",
-        meses: DOCE.map(i => peso(mv, k)?.[i] ?? null),
-        anios: datos.versiones.map((_v, vi) => total12(peso(vi, k))),
+        label: rotulo(k), nivel: 1, formato: info.formato,
+        meses: DOCE.map(i => peso(mv, base, k)?.[i] ?? null),
+        anios: datos.versiones.map((_v, vi) => total12(peso(vi, base, k))),
       });
     }
     filas.push({
-      label: `TOTAL ${meta.base.toUpperCase()}`, es_total: true, formato: "num1",
+      label: `TOTAL ${info.rotulo.toUpperCase()}`, es_total: true,
+      formato: info.formato,
       suma_de: conPeso.map((_k, i) => d2 + i),
-      meses: DOCE.map(i => conPeso.reduce((t, k) => t + (peso(mv, k)?.[i] ?? 0), 0)),
+      meses: DOCE.map(i =>
+        conPeso.reduce((t, k) => t + (peso(mv, base, k)?.[i] ?? 0), 0)),
       anios: datos.versiones.map((_v, vi) =>
-        conPeso.reduce((t, k) => t + (total12(peso(vi, k)) ?? 0), 0)),
+        conPeso.reduce((t, k) => t + (total12(peso(vi, base, k)) ?? 0), 0)),
     });
   }
 
   return armarCuadro({
-    titulo: `Planning · Reparto de ${meta.rotulo} · ${meta.fuente}`,
+    titulo: `Planning · Reparto de ${rotuloTipo}`
+            + (meta ? ` · ${meta.fuente}` : ""),
     subtitulo: `Los doce meses son de ${nombre(mv)} — cuánto recibió cada `
-      + `departamento y con qué peso `
-      + `se repartió. La fila en NEGATIVO es el departamento que reparte: su `
-      + `crédito contra los que consumen, y por eso el total da cero. El peso `
-      + `es el que usó el motor, no uno recalculado acá.`,
-    hoja: `Reparto ${meta.rotulo}${mv ? ` m${mv}` : ""}`,
+      + `departamento y con qué peso se repartió. La fila en NEGATIVO es el `
+      + `departamento que reparte: su crédito contra los que consumen, y por `
+      + `eso el total da cero. El peso es el que usó el motor, no uno `
+      + `recalculado acá.`,
+    hoja: `Reparto ${rotuloTipo}`,
     anchoRotulo: 40, mesesDe: mv,
   }, datos.versiones.length, nombre, par, filas);
 }

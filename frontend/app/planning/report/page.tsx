@@ -53,7 +53,7 @@ import { HOTEL_ID } from "@/lib/hotel";
 import {
   APERTURAS, cuadroApertura, cuadroCheckbook, cuadroEstadisticas, cuadroPlanning,
   cuadroPosiciones, cuadroReparto, METRICAS_POSICION, REPARTOS, seAbre,
-  type ClaseApertura, type MetricaPosicion,
+  tiposDeReparto, type ClaseApertura, type MetricaPosicion,
 } from "@/lib/planningReport";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
@@ -200,6 +200,14 @@ export default function PlanningReportPage() {
     if (mesesDe >= ids.length) setMesesDe(0);
   }, [ids.length, mesesDe]);
 
+  // Ni el reparto elegido puede ser uno que esta propiedad no tiene: la hoja
+  // saldría «sin calcular» cuando lo que pasa es que ese reparto no existe acá.
+  useEffect(() => {
+    if (!reparto) return;
+    const hay = tiposDeReparto(reparto.resumen);
+    if (hay.length && !hay.includes(tipoReparto)) setTipoReparto(hay[0]);
+  }, [reparto, tipoReparto]);
+
   const statsACuadro = useCallback(
     (s: { meses: (EstadisticasCierre | null)[]; anios: (EstadisticasCierre | null)[] },
      op: { ambito: string; compacto: boolean }) =>
@@ -227,8 +235,8 @@ export default function PlanningReportPage() {
       }
       if (vista === "reparto") {
         return reparto
-          ? cuadroReparto(tipoReparto as "CAFETERIA" | "LAUNDRY",
-              { versiones: reparto.resumen.map((r, i) => ({
+          ? cuadroReparto(tipoReparto,
+              { versiones: reparto.resumen.map((_r, i) => ({
                   scenario_id: ids[i] })), ...reparto }, escenarios, op)
           : null;
       }
@@ -279,8 +287,11 @@ export default function PlanningReportPage() {
       }
     } else if (v === "reparto") {
       const r = reparto ?? await cargarReparto();
-      for (const t of REPARTOS) {
-        out.push(cuadroReparto(t.id,
+      // ⚠️ Los tipos salen de los DATOS. Con la lista fija de dos, CWL bajaba
+      // el paquete sin su reparto de Habitaciones ni el de salarios — plata que
+      // se movió y que el libro no mencionaba.
+      for (const t of tiposDeReparto(r.resumen)) {
+        out.push(cuadroReparto(t,
           { versiones: r.resumen.map((_x, i) => ({ scenario_id: ids[i] })), ...r },
           escenarios, op));
       }
@@ -484,15 +495,18 @@ export default function PlanningReportPage() {
           ))}
         </nav>
       )}
-      {vista === "reparto" && (
+      {vista === "reparto" && reparto && (
         <nav aria-label="Reparto" style={{ ...grupo, marginBottom: 12 }}>
-          {REPARTOS.map((r, i) => (
-            <button key={r.id} onClick={() => setTipoReparto(r.id)} title={r.fuente}
-              style={{ ...btn(r.id === tipoReparto),
-                       borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
-              {r.rotulo}
-            </button>
-          ))}
+          {tiposDeReparto(reparto.resumen).map((t, i) => {
+            const m = REPARTOS.find(r => r.id === t);
+            return (
+              <button key={t} onClick={() => setTipoReparto(t)} title={m?.fuente}
+                style={{ ...btn(t === tipoReparto),
+                         borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+                {m?.rotulo ?? t}
+              </button>
+            );
+          })}
         </nav>
       )}
 

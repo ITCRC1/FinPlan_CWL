@@ -600,6 +600,12 @@ async def get_allocations_summary(scenario_id: str):
         )
         entries = res.scalars().all()
 
+    # ⚠️ **Los tipos salen de los datos, no de una lista escrita acá.**
+    #
+    # Estaban fijos en CAFETERIA y LAUNDRY, y CWL tiene cuatro —el reparto de
+    # Habitaciones por posición y el de salarios—: `summary[atype]` reventaba
+    # con `KeyError: 'ROOMS'` y el endpoint devolvía 500 para cualquier
+    # escenario que los tuviera. Medido el 2026-10-01 en producción.
     summary: dict[str, dict[str, list[float]]] = {
         "CAFETERIA": {},
         "LAUNDRY": {},
@@ -612,18 +618,25 @@ async def get_allocations_summary(scenario_id: str):
     # sumar el FTE de la plantilla o los kilos de la configuración daría una
     # segunda definición del mismo reparto: coincidiría casi siempre y el día
     # que no, el cuadro explicaría un reparto que no ocurrió.
-    bases: dict[str, dict[str, list[float]]] = {"CAFETERIA": {}, "LAUNDRY": {}}
+    # ⚠️ **El peso va separado POR BASE**, no sumado en un número.
+    #
+    # La lavandería de CWL reparte la lencería por kilos y los uniformes por
+    # FTE: sumarlos daría «1.123,2» mezclando kilos con personas, que no es
+    # ninguna cifra. `{tipo: {base: {depto: meses}}}`.
+    bases: dict[str, dict[str, dict[str, list[float]]]] = {}
     for e in entries:
         atype = e.allocation_type
         dept = e.target_dept
-        if dept not in summary[atype]:
+        if dept not in summary.setdefault(atype, {}):
             summary[atype][dept] = [0.0] * 12
         summary[atype][dept][e.month - 1] += float(e.amount_usd)
         # El crédito de la fuente no lleva peso (`basis_type = "CREDIT"`): es el
         # contra-asiento que vacía el departamento, no un destino del reparto.
-        if str(getattr(e, "basis_type", "") or "") in ("FTE", "KILOS"):
-            bases[atype].setdefault(dept, [0.0] * 12)[e.month - 1] += float(
-                e.basis_value or 0)
+        base = str(getattr(e, "basis_type", "") or "")
+        if base and base != "CREDIT":
+            (bases.setdefault(atype, {}).setdefault(base, {})
+                 .setdefault(dept, [0.0] * 12))[e.month - 1] += float(
+                     e.basis_value or 0)
 
     return {**summary, "BASES": bases}
 

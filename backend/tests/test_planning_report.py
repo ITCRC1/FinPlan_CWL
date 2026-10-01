@@ -262,8 +262,9 @@ def test_el_excel_trae_TODO_lo_que_la_vista_abre():
         "los checkbooks —con y sin detalle— y las aperturas bajan las CINCO clases")
     assert "for (const m of METRICAS_POSICION)" in bloque, (
         "la plantilla tiene que bajar el FTE Y el sueldo")
-    assert "for (const t of REPARTOS)" in bloque, (
-        "el reparto tiene que bajar cafeteria Y lavanderia")
+    assert "for (const t of tiposDeReparto(r.resumen))" in bloque, (
+        "el reparto tiene que bajar TODOS los que esta propiedad tenga, no una "
+        "lista fija de dos")
 
 
 def test_abre_en_un_BUDGET_con_la_regla_COMPARTIDA():
@@ -366,14 +367,49 @@ def test_el_reparto_muestra_CON_QUE_se_repartio():
     """
     lib = _lib()
     assert "export function cuadroReparto(" in lib
-    assert "datos.resumen[vi]?.BASES?.[tipo]?.[k]" in lib
+    assert "basesDe(vi)[base]?.[k]" in lib
     assert 'formato: "num1"' in lib, (
-        "la base se esta mirando como dolares: son FTE y kilos")
+        "la base se esta mirando como dolares: son FTE, kilos o plazas")
     api = (pathlib.Path(__file__).resolve().parents[1]
            / "app/api/allocation_api.py").read_text(encoding="utf-8")
     assert "e.basis_value or 0" in api
-    assert 'in ("FTE", "KILOS")' in api, (
+    assert 'base != "CREDIT"' in api, (
         "el credito de la fuente esta entrando como peso: no es un destino")
+
+
+def test_los_TIPOS_de_reparto_salen_de_los_DATOS():
+    """⚠️ Estaban fijos en CAFETERIA y LAUNDRY.
+
+    CWL tiene cuatro —reparte tambien Habitaciones por posicion y porciones de
+    salario—, y con la lista fija pasaban dos cosas: el endpoint `/summary/`
+    reventaba con `KeyError: 'ROOMS'` y devolvia 500, y el paquete bajaba sin
+    esos repartos. Un reparto que no se ve es plata que se movio sin que el
+    reporte lo diga. Medido el 2026-10-01 contra produccion.
+    """
+    lib = _lib()
+    assert "export function tiposDeReparto(" in lib
+    pagina = _pagina()
+    assert "tiposDeReparto(r.resumen)" in pagina, (
+        "el paquete vuelve a bajar una lista fija de repartos")
+    api = (pathlib.Path(__file__).resolve().parents[1]
+           / "app/api/allocation_api.py").read_text(encoding="utf-8")
+    assert "summary.setdefault(atype, {})" in api, (
+        "el resumen vuelve a indexar por una lista fija de tipos: revienta con "
+        "el primer reparto que no este en ella")
+
+
+def test_cada_BASE_del_reparto_va_en_su_propio_bloque():
+    """⚠️ La lavanderia reparte la lenceria por KILOS y los uniformes por FTE.
+
+    Sumadas en un solo numero serian kilos con personas, que no es ninguna
+    cifra — y quedaria al lado de una columna de dolares invitando a leerla
+    como un monto.
+    """
+    lib = _lib()
+    assert "for (const base of usadas)" in lib
+    api = (pathlib.Path(__file__).resolve().parents[1]
+           / "app/api/allocation_api.py").read_text(encoding="utf-8")
+    assert ".setdefault(base, {})" in api
 
 
 def test_el_BUDGET_PACKAGE_arma_con_el_MISMO_armador():

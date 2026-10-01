@@ -456,10 +456,15 @@ const REP = {
   resumen: [
     { CAFETERIA: { "0110": serie(91), "0260": serie(92) },
       LAUNDRY: { "0110": serie(93) },
-      BASES: { CAFETERIA: { "0110": Array(12).fill(10), "0260": Array(12).fill(5) },
-               LAUNDRY: { "0110": Array(12).fill(200) } } },
+      BASES: { CAFETERIA: { FTE: { "0110": Array(12).fill(10),
+                                   "0260": Array(12).fill(5) } },
+               // ⚠️ DOS bases en el mismo reparto: la lavanderia de CWL manda
+               // la lenceria por kilos y los uniformes por FTE. Sumarlas daria
+               // kilos con personas.
+               LAUNDRY: { KILOS: { "0110": Array(12).fill(200) },
+                          FTE:   { "0110": Array(12).fill(3) } } } },
     { CAFETERIA: { "0110": serie(94), "0260": serie(95) },
-      LAUNDRY: { "0110": serie(96) }, BASES: { CAFETERIA: {}, LAUNDRY: {} } },
+      LAUNDRY: { "0110": serie(96) }, BASES: {} },
   ],
 };
 const caf = P.cuadroReparto("CAFETERIA", REP, ESCENARIOS, { ambito: "", compacto: true });
@@ -475,6 +480,22 @@ ok(baseFte.formato === "num1", "⚠️ la base NO se mira como dólares: son FTE
 const lav = P.cuadroReparto("LAUNDRY", REP, ESCENARIOS, { ambito: "", compacto: true });
 auditar(lav, "reparto lavandería");
 ok(lav.filas.some(f => f.label === "TOTAL KILOS"), "en lavandería la base son kilos");
+// ⚠️ Y las DOS bases, cada una en su bloque: la lencería por kilos y los
+// uniformes por FTE. En una sola fila serían kilos sumados con personas.
+ok(lav.filas.some(f => f.label === "TOTAL FTE"),
+   "la segunda base del mismo reparto también sale, en su propio bloque");
+ok(lav.filas.filter(f => f.label.startsWith("Base del reparto")).length === 2,
+   "un bloque por base: "
+   + lav.filas.filter(f => f.label.startsWith("Base del reparto"))
+       .map(f => f.label).join(" | "));
+// Y un tipo que esta propiedad no conoce por nombre sale igual, con su código:
+// un reparto escondido es plata que se movió sin que el reporte lo diga.
+const RAROS = { versiones: [{ scenario_id: "s0" }], deptos: {},
+                resumen: [{ ROOMS: { "0110": serie(97) }, BASES: {} }] };
+ok(P.tiposDeReparto(RAROS.resumen).includes("ROOMS"),
+   "⚠️ un reparto que no está en la lista conocida se descubre igual");
+const raro = P.cuadroReparto("ROOMS", RAROS, ESCENARIOS, { ambito: "", compacto: true });
+auditar(raro, "reparto no catalogado");
 
 /* ── Cierre ─────────────────────────────────────────────────────────────── */
 

@@ -2433,15 +2433,23 @@ export interface LaundryBreakdown {
 export interface AllocationSummary {
   CAFETERIA: Record<string, number[]>; // dept → [m1..m12]
   LAUNDRY: Record<string, number[]>;
-  /** CON QUÉ se repartió: el FTE de cafetería y los kilos de lavandería, mes a
-   *  mes y por departamento destino.
+  /** ⚠️ Puede traer MÁS tipos. CWL reparte también Habitaciones (por posición)
+   *  y salarios: el endpoint devuelve los que el escenario tenga, no una lista
+   *  fija —estaba fija y devolvía 500 para cualquier escenario con otro tipo—. */
+  [tipo: string]: Record<string, number[]>
+                | Record<string, Record<string, Record<string, number[]>>>
+                | undefined;
+  /** CON QUÉ se repartió: `{tipo: {base: {departamento: doce meses}}}`.
    *
    *  ⚠️ Es `basis_value`, el peso que el motor USÓ — no el FTE de la plantilla
    *  ni los kilos de la configuración vueltos a sumar. Una segunda definición
    *  del mismo reparto coincide casi siempre, y el día que no, el cuadro
-   *  explica un reparto que no ocurrió. */
-  BASES?: { CAFETERIA: Record<string, number[]>;
-            LAUNDRY: Record<string, number[]> };
+   *  explica un reparto que no ocurrió.
+   *
+   *  ⚠️ Separado POR BASE. La lavandería de CWL reparte la lencería por kilos y
+   *  los uniformes por FTE: en un solo número serían kilos sumados con
+   *  personas, que no es ninguna cifra. */
+  BASES?: Record<string, Record<string, Record<string, number[]>>>;
 }
 
 export interface CalculateResult {
