@@ -1708,3 +1708,75 @@ async def payroll_por_cuenta(
                     for _campo, c, r in CONCEPTOS],
         "escenarios": salida,
     }
+
+
+@router.get("/payroll/posiciones/")
+async def get_posiciones_de_varias_versiones(
+    scenarios: str = Query(..., description="ids separados por coma"),
+    db: AsyncSession = Depends(get_db),
+):
+    """La plantilla completa: cada posición con su salario y sus doce FTE.
+
+    Owner, 2026-10-01, armando el Budget Package: *«quisiera también bajar las
+    posiciones por departamento con salario y FTE»*.
+
+    Existe porque los dos endpoints que ya había no contestan esto. El de FTE
+    (`/fte-report/`) agrega por departamento y pierde la posición; el del
+    checkbook (`/dept/{dept}/`) la trae pero de un departamento y de una versión
+    por vez — veintidós departamentos por tres versiones son sesenta y seis
+    viajes para armar una hoja.
+
+    ⚠️ **El salario es el CONTRATADO, no lo que cuesta el mes.** El salario sale
+    de la posición y está en su moneda; lo que el mes cuesta en dólares es
+    `salario × FTE ÷ TC`, lo calcula el motor y vive en el checkbook de planilla
+    (`c6000_sw`). Son dos cifras distintas y mezclarlas haría que la plantilla
+    diga una cosa y el P&L otra: por eso acá viaja el salario con su moneda al
+    lado, para que quien lea sepa cuál está mirando.
+    """
+    ids = [x.strip() for x in (scenarios or "").split(",") if x.strip()]
+    if not ids:
+        raise ErrorApi(422, "escenarios.requerido")
+
+    MESES_FTE = ["jan", "feb", "mar", "apr", "may", "jun",
+                 "jul", "aug", "sep", "oct", "nov", "dec"]
+    salida = []
+    for sid in ids:
+        esc = await db.get(Scenario, sid)
+        if esc is None:
+            continue   # un id que ya no existe no tumba la comparación
+        posiciones = (await db.execute(
+            select(PayrollPosition).where(PayrollPosition.scenario_id == sid)
+        )).scalars().all()
+        # ⚠️ El sueldo en dólares de cada mes se LEE, no se vuelve a calcular.
+        # Es `salario × FTE ÷ TC del mes`, y el motor ya lo dejó en `c6000_sw`:
+        # rehacer esa cuenta acá daría una plantilla que no cuadra con el
+        # checkbook de planilla ni con la línea 6000 del P&L.
+        sw: dict[str, list[float]] = {}
+        for e in (await db.execute(
+                select(PayrollConceptEntry).where(
+                    PayrollConceptEntry.scenario_id == sid))).scalars():
+            m = int(getattr(e, "month", 0) or 0)
+            if 1 <= m <= 12:
+                sw.setdefault(str(e.position_id), [0.0] * 12)[m - 1] += float(
+                    getattr(e, "c6000_sw", 0) or 0)
+        salida.append({
+            "scenario_id": sid,
+            "escenario": f"{esc.type} {esc.version} {esc.year}",
+            "year": esc.year,
+            "posiciones": [{
+                "id": str(p.id),
+                "dept_code": str(p.dept_code or ""),
+                "dept_name": str(p.dept_name or ""),
+                "position_code": str(p.position_code or ""),
+                "position_name": str(p.position_name or ""),
+                "employee_name": str(p.employee_name or ""),
+                "employee_type": str(p.employee_type or ""),
+                "salary_amount": float(p.salary_amount or 0),
+                "salary_currency": str(p.salary_currency or ""),
+                "fte": [float(getattr(p, f"fte_{m}", 0) or 0) for m in MESES_FTE],
+                #: El sueldo del mes en USD, del motor. Vacío = esa posición no
+                #: tiene conceptos calculados todavía.
+                "sw": sw.get(str(p.id), [0.0] * 12),
+            } for p in posiciones],
+        })
+    return {"escenarios": salida}

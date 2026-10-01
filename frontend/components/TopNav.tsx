@@ -74,6 +74,7 @@ export const NAV: NavGroup[] = [
       { key: "control", href: "/admin/control" },
       { key: "budget", header: true },
       { key: "bigPicture", href: "/planning/big-picture" },
+      { key: "planningReport", href: "/planning/report" },
       { key: "yearSetup", header: true },
       { key: "yearMasterData", href: "/revenue/master" },
       { key: "revenue", header: true },

@@ -21,6 +21,62 @@ C = {
     "navy_mid":    "2D5A9E",
     "blue_light":  "EBF3FB",
     "blue_header": "F0F4F8",
+    # ── La paleta de junta (owner, 2026-09-30) ───────────────────────────
+    #
+    # *«debe verse profesional para una junta. colores pasteles y bien
+    # profesional»*.
+    #
+    # ⚠️ **Pastel no es claro a secas: es poco saturado.** Un azul clarito pero
+    # vivo compite con los números; estos tonos se apoyan en el papel y dejan que
+    # la cifra sea lo primero que se lee. Y todos pasan el contraste con texto
+    # oscuro, que es lo que hace que sigan leyéndose impresos en blanco y negro.
+    "banda_seccion": "E7EDF2",   #: encabezado de sección — azul pizarra pálido
+    "banda_total":   "D8E4EE",   #: fila de total — un punto más de color
+    "raya":          "C7D2DD",   #: la rejilla fina
+    "marco":         "000000",   #: el recuadro de los totales
+    "tinta":         "1A1A2E",   #: el texto de los totales
+    #: La fila alterna. ⚠️ Tiene que verse IMPRESA: con `F7F9FB` se adivinaba en
+    #: pantalla y en papel desaparecía, que es justo donde un checkbook de trece
+    #: columnas necesita que el ojo no se salte de renglón. Y tiene que quedar
+    #: claramente por debajo de `banda_seccion`, o una fila normal se confunde
+    #: con un encabezado de bloque.
+    "cebra":         "F2F6FA",
+    #: ── Los dos tonos de encabezado de los cuadros que se bajan ──────────
+    #:
+    #: ⚠️ Son PROPIOS y no `navy` / `navy_mid`: esos dos los usan una docena de
+    #: exportadores viejos, y bajarles la saturación acá les cambiaría el
+    #: formato a todos de rebote. El azul de `navy_mid` (2D5A9E) es el azul
+    #: vivo de una plantilla de oficina; al lado de una banda pastel canta.
+    "cab_titulo":  "2E4A62",     #: la banda del título, pizarra profunda
+    #: ── La cabecera de columnas ──────────────────────────────────────────
+    #:
+    #: Owner, 2026-09-30, con una captura de cómo la quiere: *«no sé si ese azul
+    #: funciona, podrías quizás bajarle el tono un poco para que se vea más
+    #: nítido»*.
+    #:
+    #: ⚠️ **Se invirtió: fondo claro y letra oscura.** Era un azul medio con la
+    #: letra en blanco, y a 10 pt el blanco sobre color pierde definición —es
+    #: justo lo que el owner llama «no se ve nítido»—. La referencia que mandó
+    #: es cabecera clara con el rótulo en azul y el período en negro.
+    "cab_tabla":   "EDF1F6",     #: el relleno de la cabecera, casi papel
+    "cab_texto":   "1F3D5C",     #: el rótulo de la versión, azul de tinta
+    "cab_sub":     "2B2B2B",     #: el período, debajo, en negro
+    #: El relleno de las filas de TOTAL en los cuadros que se bajan.
+    #:
+    #: Owner, 2026-09-30: *«quiero que todos los que son totales bajen con el
+    #: relleno bien claro»*. `blue_header` (F0F4F8) es tan pálido que sobre el
+    #: blanco de Excel no se distingue: en pantalla se adivina y al imprimir en
+    #: blanco y negro desaparece, y entonces un total se lee como una fila más.
+    #:
+    #: ⚠️ Claro pero VISIBLE. Un total oscuro obligaría a poner el texto en
+    #: blanco y el cuadro pasaría a tener tantas bandas como bloques.
+    #:
+    #: ⚠️ **Es el mismo valor que `banda_total`, y tiene que seguir siéndolo.**
+    #: Son dos nombres del mismo relleno —uno viejo, uno de la paleta de junta—.
+    #: Cuando se retocó la paleta sólo se movió `banda_total` y quedaron dos
+    #: azules casi iguales conviviendo en la misma hoja. Se define abajo, fuera
+    #: del literal, para que no se puedan separar otra vez.
+    "total_fill":  "",
     "white":       "FFFFFF",
     "text_dark":   "1A1A2E",
     "text_mid":    "4A5568",
@@ -34,15 +90,42 @@ C = {
 }
 
 
+#: Un solo relleno para los totales, con sus dos nombres. Ver `total_fill`.
+C["total_fill"] = C["banda_total"]
+
+
 def fill(hex_color: str) -> PatternFill:
     return PatternFill("solid", fgColor=hex_color)
 
 
-def font(bold=False, color="1A1A2E", size=10, italic=False) -> Font:
-    return Font(name="Calibri", bold=bold, color=color, size=size, italic=italic)
+def font(bold=False, color="1A1A2E", size=10, italic=False,
+         underline=None) -> Font:
+    return Font(name="Calibri", bold=bold, color=color, size=size,
+                italic=italic, underline=underline)
 
 
-def border(color="CBD5E0", sides="all") -> Border:
+def marco_total(izq: bool, der: bool, color_marco=None,
+                color_raya=None) -> Border:
+    """El borde de una celda de fila TOTAL.
+
+    Owner, 2026-09-30, mostrando el tab que arregló a mano: recuadro exterior
+    NEGRO medio arriba, abajo y en los extremos; las verticales internas finas y
+    grises, como el resto.
+
+    ⚠️ Es por celda y no por fila: sólo la primera lleva el negro a la izquierda
+    y sólo la última a la derecha. Poniéndolo en todas, el total sale con la
+    rejilla negra y parece otra tabla.
+    """
+    # ⚠️ Los colores salen de la PALETA, no de un literal en la firma. Estaban
+    # escritos a mano —«000000», «CBD5E0»— y al retocar la paleta quedaron dos
+    # grises casi iguales conviviendo en la misma hoja sin que nada fallara.
+    n = Side(style="medium", color=color_marco or C["marco"])
+    f = Side(style="thin", color=color_raya or C["raya"])
+    return Border(top=n, bottom=n, left=n if izq else f, right=n if der else f)
+
+
+def border(color=None, sides="all") -> Border:
+    color = color or C["raya"]      # la misma raya de la paleta, no un literal
     s = Side(style="thin", color=color)
     m = Side(style="medium", color=color)
     n = Side(style=None)
@@ -54,6 +137,11 @@ def border(color="CBD5E0", sides="all") -> Border:
         return Border(top=m)
     if sides == "top_bottom":
         return Border(top=s, bottom=s)
+    # La rejilla completa, con la raya de arriba MARCADA: es como se cierra un
+    # bloque en un estado de resultados impreso. Con el relleno solo, dos
+    # totales seguidos se leen como una sola banda.
+    if sides == "all_top":
+        return Border(left=s, right=s, top=m, bottom=s)
     return Border()
 
 

@@ -63,6 +63,7 @@ from app.models.mapping import AccountMapping
 from app.models.nonop_entry import NonOpEntry
 from app.models.opex_entry import OpexEntry
 from app.models.payroll_concept_entry import PayrollConceptEntry
+from app.models.payroll_position import PayrollPosition
 from app.models.revenue_account_entry import RevenueAccountEntry
 from app.models.scenario import Scenario
 from app.nombres_cuenta import limpiar_nombre, nombre_de_cuenta
@@ -306,11 +307,145 @@ async def _del_auxiliar(session, escenario, clase: str, clave: str) -> dict:
     return {"series": out, "nombres": nombres}
 
 
+async def _subs_del_auxiliar(
+    session, escenario, clase: str, clave: str,
+) -> dict[tuple[str, str], dict[tuple[str, str], list[Decimal]]]:
+    """Las SUB-LÍNEAS de cada celda, con sus doce meses.
+
+    Owner, 2026-10-01, mirando el checkbook de OPEX al lado del reporte: *«por
+    qué los checkbooks no tienen los detalles. todos deben tener detalle»*. La
+    celda del reporte decía «7105 Contract Services $1.447,83» y el checkbook de
+    la pantalla ya mostraba de qué está hecha: Coral $600, Fumigación $847,83,
+    Reservation Fee $0.
+
+    Devuelve `{(depto, cuenta): {(código, nombre): [doce meses]}}`.
+
+    ## ⚠️ Cada clase tiene su propio nivel de abajo, y no son el mismo
+
+    | clase | qué hay debajo de la cuenta |
+    |---|---|
+    | `opex` | la sub-línea del checkbook: `800 · Coral` |
+    | `property` | la sub-línea del mini-checkbook de below-GOP |
+    | `payroll` | la POSICIÓN: `ROOM ATTENDANT x4`, `Property Manager` |
+    | `cost` | **nada**: lo que explica la celda es el DRIVER, que viaja aparte |
+    | `revenue` | **nada**: la cuenta —o la línea— ya es el nivel de abajo |
+
+    Donde no hay, no se inventa. Partir el costo de ventas en sub-líneas que la
+    base no guarda daría un reporte que abre más de lo que el presupuesto
+    decidió, y eso se lee como si alguien hubiera presupuestado ese desglose.
+
+    ## ⚠️ Sale del AUXILIAR, así que el mayor no tiene esto
+
+    El mayor trae la cuenta y se acabó. Quien llama no le pide las sub-líneas a
+    una versión donde manda el mayor, y en el forecast mezclado los meses
+    cerrados se quedan sin abrir: la suma de las sub-líneas no da la celda, el
+    exportador descarta la fórmula y queda el número del motor — que es el lado
+    correcto en el que equivocarse.
+    """
+    subs: dict[tuple[str, str], dict[tuple[str, str], list[Decimal]]] = {}
+
+    def sumar(dept: str, cuenta: str, code: str, nombre: str, fila) -> None:
+        serie = subs.setdefault((dept, cuenta), {}).setdefault(
+            (code, nombre), [CERO] * 12)
+        for i, col in enumerate(MESES):
+            serie[i] += Decimal(str(getattr(fila, col, None) or 0))
+
+    if clase == "opex":
+        for r in (await session.execute(select(OpexEntry).where(
+                OpexEntry.scenario_id == escenario.id))).scalars():
+            dept = _padre(str(r.dept_code or ""))
+            if clave and dept != clave:
+                continue
+            sumar(dept, str(r.account_code or ""), str(r.detail_code or ""),
+                  str(getattr(r, "detail_desc", "") or "").strip(), r)
+
+    elif clase == "property":
+        for r in (await session.execute(select(NonOpEntry).where(
+                NonOpEntry.scenario_id == escenario.id))).scalars():
+            cuenta = str(r.account_code or "")
+            if clave and cuenta != clave:
+                continue
+            # La misma llave que arma `_del_auxiliar` para el below-GOP: el
+            # 0250 es donde viven sus reglas de mapeo.
+            sumar("0250", cuenta, str(r.detail_code or ""),
+                  str(getattr(r, "detail_desc", "") or "").strip(), r)
+
+    elif clase == "payroll":
+        # ⚠️ Por POSICIÓN y por mes: `PayrollConceptEntry` tiene una fila por
+        # mes y los 17 conceptos como columnas, así que no se puede usar
+        # `sumar`, que lee doce columnas de una fila.
+        from app.api.consulta_api import CONCEPTOS
+        puestos = {
+            str(p.id): (str(p.dept_code or ""), str(p.position_name or "").strip())
+            for p in (await session.execute(select(PayrollPosition).where(
+                PayrollPosition.scenario_id == escenario.id))).scalars()
+        }
+        #: (dept, cuenta, puesto) -> (doce meses, ids de posición)
+        acum: dict[tuple[str, str, str], tuple[list[Decimal], set]] = {}
+        for r in (await session.execute(select(PayrollConceptEntry).where(
+                PayrollConceptEntry.scenario_id == escenario.id))).scalars():
+            propio, puesto = puestos.get(str(r.position_id), ("", ""))
+            # El departamento sale del ASIENTO, igual que en `_del_auxiliar`:
+            # si subiera por otro lado, la sub-línea quedaría colgada de una
+            # fila que el cuadro no dibuja.
+            dept = _padre(str(r.dept_code or "") or propio)
+            if clave and dept != clave:
+                continue
+            m = int(getattr(r, "month", 0) or 0)
+            if not 1 <= m <= 12:
+                continue
+            for campo, cuenta, _rotulo in CONCEPTOS:
+                v = Decimal(str(getattr(r, campo, None) or 0))
+                if v == CERO:
+                    continue
+                serie, ids = acum.setdefault(
+                    (dept, cuenta, puesto or "(posición sin nombre)"),
+                    ([CERO] * 12, set()))
+                serie[m - 1] += v
+                ids.add(str(r.position_id))
+        # Dos «ROOM ATTENDANT» son dos plazas, no una fila repetida: se juntan
+        # con el conteo delante, que es como se lee una planilla.
+        for (dept, cuenta, puesto), (serie, ids) in acum.items():
+            etiqueta = puesto if len(ids) == 1 else f"{puesto} x{len(ids)}"
+            subs.setdefault((dept, cuenta), {})[("", etiqueta)] = serie
+
+    return subs
+
+
+def _subs_de_la_fila(subs_de: dict, dept: str, cuenta: str,
+                     series: dict) -> list[dict]:
+    """Las sub-líneas de una fila, con la serie de cada versión que las abrió.
+
+    ⚠️ **La versión que no abrió NO va en cero: no va.** Un cero diría «esta
+    sub-línea existe y vale nada», y lo que pasa es otra cosa —esa versión lee
+    del mayor, que no tiene sub-líneas—. La pantalla deja la celda vacía, el
+    total de la cuenta sigue siendo el del motor y el exportador no escribe una
+    fórmula que no cuadra.
+    """
+    llaves = sorted({k for s in subs_de.values() for k in s.get((dept, cuenta), {})},
+                    key=lambda k: (k[0], k[1]))
+    out = []
+    for code, nombre in llaves:
+        out.append({
+            "code": code,
+            "nombre": nombre,
+            "series": {
+                sid: [_f(v) for v in
+                      subs_de[sid].get((dept, cuenta), {}).get(
+                          (code, nombre), [CERO] * 12)]
+                for sid in series if sid in subs_de
+            },
+        })
+    return out
+
+
 @router.get("/gasto-por-clase/detalle-de-celda/")
 async def detalle_de_celda(
     scenarios: str = Query(..., description="ids separados por coma"),
     clase: str = Query(..., description="revenue | cost | payroll | opex | property"),
     clave: str = Query("", description="departamento, cuenta o línea; vacío = toda la clase"),
+    abrir: bool = Query(False,
+                        description="agrega las sub-líneas de cada cuenta"),
 ):
     """Las cuentas que suman una celda del cuadro, por versión."""
     ids = [s for s in (scenarios or "").split(",") if s.strip()]
@@ -331,6 +466,8 @@ async def detalle_de_celda(
         versiones = []
         series: dict[str, dict[str, list[Decimal]]] = {}
         nombres: dict[str, str] = {}
+        #: Con `abrir`: {version: {(depto, cuenta): {(código, nombre): meses}}}
+        subs_de: dict[str, dict] = {}
 
         for sid in ids:
             escenario = await session.get(Scenario, sid)
@@ -385,6 +522,14 @@ async def detalle_de_celda(
                          "agregado": r.get("agregado")}
 
             series[sid] = r["series"]
+            # ⚠️ Las sub-líneas SÓLO salen del auxiliar: el mayor trae la cuenta
+            # y se acabó. Donde manda el mayor la cuenta no se abre, y en el
+            # forecast mezclado los meses cerrados tampoco: la suma de las
+            # sub-líneas no da la celda, el exportador descarta la fórmula y
+            # queda el número del motor.
+            if abrir and not manda_el_mayor:
+                subs_de[sid] = await _subs_del_auxiliar(
+                    session, escenario, clase, clave)
             for cuenta, nombre in r["nombres"].items():
                 if nombre and cuenta not in nombres:
                     nombres[cuenta] = nombre
@@ -417,6 +562,8 @@ async def detalle_de_celda(
                 "series": {sid: [_f(v) for v in
                                  series[sid].get((dept, cuenta), [CERO] * 12)]
                            for sid in series},
+                **({"subs": _subs_de_la_fila(subs_de, dept, cuenta, series)}
+                   if abrir else {}),
             })
 
         rotulo = clave or "Todos los departamentos"

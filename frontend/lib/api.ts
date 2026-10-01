@@ -2433,6 +2433,15 @@ export interface LaundryBreakdown {
 export interface AllocationSummary {
   CAFETERIA: Record<string, number[]>; // dept → [m1..m12]
   LAUNDRY: Record<string, number[]>;
+  /** CON QUÉ se repartió: el FTE de cafetería y los kilos de lavandería, mes a
+   *  mes y por departamento destino.
+   *
+   *  ⚠️ Es `basis_value`, el peso que el motor USÓ — no el FTE de la plantilla
+   *  ni los kilos de la configuración vueltos a sumar. Una segunda definición
+   *  del mismo reparto coincide casi siempre, y el día que no, el cuadro
+   *  explica un reparto que no ocurrió. */
+  BASES?: { CAFETERIA: Record<string, number[]>;
+            LAUNDRY: Record<string, number[]> };
 }
 
 export interface CalculateResult {
@@ -5319,6 +5328,26 @@ export interface DetalleCeldaFila {
   nombre: string;
   /** Los doce meses, por escenario. */
   series: Record<string, number[]>;
+  /** Las SUB-LÍNEAS de esta cuenta, cuando se pidió `abrir`. Ausente si no se
+   *  pidió; vacío si esa clase no tiene nivel de abajo —el costo de ventas lo
+   *  explica su driver y el ingreso ya está en su nivel más fino—. */
+  subs?: DetalleCeldaSub[];
+}
+/** Una SUB-LÍNEA de una cuenta: de qué está hecha la celda, un nivel más abajo.
+ *
+ *  Owner, 2026-10-01: *«por qué los checkbooks no tienen los detalles. todos
+ *  deben tener detalle»*. La 7105 de Habitaciones dice $1.447,83 y esto dice que
+ *  son Coral, Fumigación Hotel y Reservation Fee.
+ *
+ *  ⚠️ **Sólo las versiones que ABRIERON están en `series`.** La que lee del
+ *  mayor no tiene sub-líneas —el mayor trae la cuenta y se acabó—, así que no
+ *  aparece. Su celda queda VACÍA, que no es lo mismo que en cero. */
+export interface DetalleCeldaSub {
+  /** El código de la sub-línea del checkbook: `800`, `801`. Vacío en planilla,
+   *  donde el nivel de abajo es la posición y no tiene código. */
+  code: string;
+  nombre: string;
+  series: Record<string, number[]>;
 }
 export interface DetalleCelda {
   clase: string; clave: string; rotulo: string;
@@ -5327,11 +5356,24 @@ export interface DetalleCelda {
 }
 export async function getDetalleDeCelda(
   scenarioIds: string[], clase: string, clave: string,
+  /** El mes que se cierra, para la nota de «qué había en el presupuesto».
+   *
+   *  ⚠️ **Este backend todavía no la arma**, y el parámetro viaja igual: la
+   *  firma es la MISMA en las cuatro propiedades, así que la pantalla del
+   *  Budget Package se copia sin tocar. FastAPI descarta el parámetro que no
+   *  conoce; el día que esta propiedad traiga la nota, empieza a usarse sin
+   *  cambiar a quien la llama. */
+  mes = 0,
+  /** Agrega las SUB-LÍNEAS de cada cuenta (`filas[].subs`). Cuesta una pasada
+   *  más por el auxiliar de cada versión, así que se pide cuando se van a
+   *  mostrar y no «por las dudas». */
+  abrir = false,
 ): Promise<DetalleCelda> {
   const ids = scenarioIds.filter(Boolean).join(",");
   return api.get<DetalleCelda>(
     `/gasto-por-clase/detalle-de-celda/?scenarios=${encodeURIComponent(ids)}`
-    + `&clase=${encodeURIComponent(clase)}&clave=${encodeURIComponent(clave)}`);
+    + `&clase=${encodeURIComponent(clase)}&clave=${encodeURIComponent(clave)}`
+    + `&mes=${mes}&abrir=${abrir}`);
 }
 
 
@@ -5768,3 +5810,37 @@ export const getPacingMes = (year: number, month: number, meta?: { rn?: number; 
   if (meta?.total) q.set("meta_total", String(meta.total));
   return api.get<PacingMes>("/pacing/mes?" + q.toString());
 };
+
+// ── La plantilla: posiciones por departamento, con salario y FTE ─────────────
+//
+// Owner, 2026-10-01, armando el Budget Package: *«quisiera también bajar las
+// posiciones por departamento con salario y FTE»* · *«este fte report también
+// en el tab»*.
+//
+// ⚠️ **Dos cifras distintas por posición, y no son la misma.** `salary_amount`
+// es el salario CONTRATADO, en su moneda; `sw` es lo que cada mes cuesta en
+// dólares —salario × FTE ÷ TC del mes—, y lo calcula el motor. Mostrar una
+// donde va la otra hace que la plantilla y el P&L digan cosas distintas.
+export interface PosicionPlanilla {
+  id: string;
+  dept_code: string; dept_name: string;
+  position_code: string; position_name: string;
+  employee_name: string; employee_type: string;
+  /** El salario contratado, en `salary_currency`. */
+  salary_amount: number;
+  salary_currency: string;
+  /** Los doce FTE, de 0.00 a 1.00. */
+  fte: number[];
+  /** El sueldo del mes en USD, del motor (`c6000_sw`). */
+  sw: number[];
+}
+export interface PosicionesVersion {
+  scenario_id: string; escenario: string; year: number;
+  posiciones: PosicionPlanilla[];
+}
+export async function getPosiciones(
+  scenarioIds: string[],
+): Promise<{ escenarios: PosicionesVersion[] }> {
+  const ids = scenarioIds.filter(Boolean).join(",");
+  return api.get(`/payroll/posiciones/?scenarios=${encodeURIComponent(ids)}`);
+}

@@ -20,10 +20,50 @@ import { BASE, getToken } from "@/lib/api";
 export type FormatoCol = "usd" | "usd2" | "pct" | "num" | "num1" | "texto";
 
 export interface ColumnaCuadro {
+  /** La primera línea de la cabecera: la versión —«Actual», «Budget»,
+   *  «Variance», «Forecast»—. */
   label: string;
+  /**
+   * La SEGUNDA línea: el período —«Agosto», «YTD Agosto», «Full Year»—.
+   *
+   * Owner, 2026-09-30, con una captura de cómo la quiere: *«esta vista se ve
+   * muy cargada y está en la misma celda… podrás ver que se usan 2 celdas»*.
+   * Antes iba todo junto —«Agosto · ACTUAL Final»— envuelto dentro de una
+   * celda, partido en dos renglones que por separado no significan nada.
+   */
+  sub?: string;
+  /** Esta columna ABRE un bloque: lleva la raya gruesa a su izquierda, de la
+   *  cabecera al pie. Owner: *«se identifica con una línea gruesa lo que es
+   *  Agosto, YTD Agosto y Full Year»*. */
+  abre_grupo?: boolean;
   /** Ancho en caracteres. Sin esto, 38 para la primera columna y 14 para el resto. */
   ancho?: number;
   formato?: FormatoCol;
+  /**
+   * Esta columna es la RESTA de otras dos: `[a, b]`, índices base 0 sobre
+   * `columnas`. En el Excel la celda sale como `=Ca-Cb`, no como el número.
+   *
+   * Owner, 2026-09-30, auditando el archivo: *«los subtotales, totales y
+   * variaciones deben ser fórmulas reales»*.
+   *
+   * ⚠️ Un Excel de junta se toca: alguien corrige un actual en una celda y
+   * espera que la variación se mueva con él. Con el número puesto no se mueve,
+   * y la hoja queda diciendo dos cosas distintas sin que nada avise.
+   */
+  resta?: [number, number];
+  /**
+   * Esta columna es la SUMA de otras: índices base 0 sobre `columnas`.
+   *
+   * Es la columna «Año» de un cuadro de doce meses, o el «Total» de uno por
+   * canal. `suma_de` suma FILAS; esto suma COLUMNAS, y son dos cosas
+   * distintas: el cuadro de doce meses necesita las dos a la vez —la fila
+   * TOTAL suma sus renglones y la columna Año suma sus meses— y la celda de la
+   * esquina tiene que seguir cuadrando por los dos lados.
+   *
+   * ⚠️ Vale la MISMA regla que `suma_de`: se escribe sólo si da lo mismo que
+   * el número que ya venía. Si el motor dice otra cosa, manda el motor.
+   */
+  suma_cols?: number[];
 }
 
 export interface FilaCuadro {
@@ -32,8 +72,41 @@ export interface FilaCuadro {
   nivel?: number;
   /** Negrita + fondo. Para subtotales y totales. También sirve de banda de sección. */
   es_total?: boolean;
+  /** Encabezado de sección —«REVENUES», «Operating Expenses»—.
+   *
+   *  ⚠️ NO es un total y no lleva su recuadro negro: es el rótulo del bloque
+   *  que empieza. Antes compartía marcador con `es_total`, así que «REVENUES»
+   *  salía con el mismo peso visual que «NET PROFIT» y el ojo no encontraba
+   *  dónde cierra cada bloque (owner, 2026-09-30). */
+  es_seccion?: boolean;
   /** Pisa el formato de la columna: para cuadros que mezclan unidades por fila. */
   formato?: FormatoCol;
+  /**
+   * Esta fila es la SUMA de otras: los ordinales (base 0) dentro de `filas`.
+   *
+   * ⚠️ La fórmula se escribe **sólo si da lo mismo que el número**. El total
+   * del P&L lo calcula el motor, no la pantalla: si el cuadro no muestra todos
+   * sus componentes —o los muestra netos de un reparto— `=SUMA(...)` daría otra
+   * cifra y el archivo diría algo que el sistema no dice. Cuando no cuadra se
+   * deja el número y se pierde la fórmula, que es el lado correcto en el que
+   * equivocarse.
+   */
+  suma_de?: number[];
+  /**
+   * Esta fila es una COMBINACIÓN con signo de otras: `[[ordinal, signo], …]`.
+   * Excel: `=X45-X53`.
+   *
+   * ⚠️ **Es lo único que alcanza para la cascada.** GOP es Operating Profit
+   * MENOS Overhead; el EBITDA le resta los no operativos; el EBT, lo
+   * financiero y la depreciación; el Net Profit, el impuesto. Son las cinco
+   * líneas que todo el mundo mira, y con `suma_de` —que sólo suma— quedaban
+   * como número pegado mientras el detalle de arriba ya llevaba fórmula.
+   *
+   * ⚠️ Mismo resguardo que `suma_de`: se escribe sólo si da lo mismo que el
+   * número que vino. Si el cuadro no muestra todos los operandos, manda el
+   * motor.
+   */
+  combina_filas?: [number, number][];
   /**
    * `null` deja la celda vacía — no es lo mismo que un cero.
    *
@@ -48,6 +121,10 @@ export interface FilaCuadro {
 export interface Cuadro {
   titulo: string;
   subtitulo?: string;
+  /** La descripción de UNA línea para el Índice del libro. El título y el
+   *  subtítulo largos pasan a ser la NOTA de esa celda: siguen estando sin
+   *  volver el índice una pared de texto. */
+  descripcion?: string;
   /** Nombre de la hoja. Sin esto se usa el título recortado. */
   hoja?: string;
   columnas: ColumnaCuadro[];

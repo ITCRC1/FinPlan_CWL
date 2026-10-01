@@ -604,14 +604,28 @@ async def get_allocations_summary(scenario_id: str):
         "CAFETERIA": {},
         "LAUNDRY": {},
     }
+    # ⚠️ **Con qué se repartió**, no sólo cuánto. Owner, 2026-10-01, armando el
+    # Budget Package: *«el tab de allocation de laundry y cafetería, con todos
+    # los parámetros y distribución, kilos FTE para distribuir»*.
+    #
+    # El peso sale de `basis_value`, que es el número que el motor USÓ. Volver a
+    # sumar el FTE de la plantilla o los kilos de la configuración daría una
+    # segunda definición del mismo reparto: coincidiría casi siempre y el día
+    # que no, el cuadro explicaría un reparto que no ocurrió.
+    bases: dict[str, dict[str, list[float]]] = {"CAFETERIA": {}, "LAUNDRY": {}}
     for e in entries:
         atype = e.allocation_type
         dept = e.target_dept
         if dept not in summary[atype]:
             summary[atype][dept] = [0.0] * 12
         summary[atype][dept][e.month - 1] += float(e.amount_usd)
+        # El crédito de la fuente no lleva peso (`basis_type = "CREDIT"`): es el
+        # contra-asiento que vacía el departamento, no un destino del reparto.
+        if str(getattr(e, "basis_type", "") or "") in ("FTE", "KILOS"):
+            bases[atype].setdefault(dept, [0.0] * 12)[e.month - 1] += float(
+                e.basis_value or 0)
 
-    return summary
+    return {**summary, "BASES": bases}
 
 
 @router.get("/allocations/{scenario_id}/laundry-breakdown/")
