@@ -441,3 +441,49 @@ async def get_analisis_mes(year: int = Query(..., ge=2000, le=2100), month: int 
     await db.commit()
     manual = {"rn": meta_rn, "total": meta_total} if (meta_rn or meta_total) else None
     return motor.limpiar(analisis_mes(snaps, reservas, config, year, month, manual))
+
+
+# ───────────────────────────── análisis técnico (y su Excel para la Junta) ─────────────────────────────
+async def _tecnico(db: AsyncSession, year, kind, escenario, fuente, lang) -> dict:
+    from app.engine.pacing_tecnico import analisis_tecnico
+    if kind not in KINDS:
+        raise ErrorApi(422, "pacing.kind_invalido", kind=kind)
+    snaps = [{"id": s.id, "kind": s.kind, "as_of": s.as_of, "date_from": s.date_from,
+              "date_to": s.date_to, "has_forecast": s.has_forecast, "days": s.days or {}}
+             for s in (await db.execute(select(PacingSnapshot).where(
+                 PacingSnapshot.hotel_id == HOTEL_ID))).scalars()]
+    reservas = [{"id": r.resv_id, "ins": r.ins, "arr": r.arr, "nts": r.nts, "rms": r.rms,
+                 "amt": float(r.amt or 0), "st": r.st, "fl": r.fl, "ch": r.ch, "blk": r.blk}
+                for r in (await db.execute(select(PacingReservation).where(
+                    PacingReservation.hotel_id == HOTEL_ID))).scalars()]
+    config = _config_dict(await _config(db))
+    await db.commit()
+    return motor.limpiar(analisis_tecnico(snaps, reservas, config, year=year, kind=kind,
+                                          escenario=escenario, fuente=fuente, lang=lang))
+
+
+@router.get("/pacing/tecnico")
+async def get_tecnico(year: int | None = Query(None), kind: str = Query("total"),
+                      escenario: str = Query("avail"), fuente: str = Query("auto"),
+                      lang: str = Query("es"), db: AsyncSession = Depends(get_db)):
+    """Análisis técnico del año bajo «Posición mensual»: por mes, general y por qué confiar."""
+    return await _tecnico(db, year, kind, escenario, fuente, lang)
+
+
+@router.get("/pacing/tecnico/excel")
+async def get_tecnico_excel(year: int | None = Query(None), kind: str = Query("total"),
+                            escenario: str = Query("avail"), fuente: str = Query("auto"),
+                            lang: str = Query("es"), db: AsyncSession = Depends(get_db)):
+    """El mismo análisis en un Excel listo para la Junta (seis hojas)."""
+    from fastapi.responses import Response
+    from app.export.pacing_tecnico_xlsx import construir_excel
+    from app.hotel_actual import HOTEL_NAME, hotel_slug
+    A = await _tecnico(db, year, kind, escenario, fuente, lang)
+    if A.get("vacio"):
+        raise ErrorApi(404, "pacing.sin_datos")
+    nombre = (f"{hotel_slug()}_Pacing_{A['anio']}_Analisis_tecnico.xlsx" if lang != "en"
+              else f"{hotel_slug()}_Pacing_{A['anio']}_Technical_analysis.xlsx").replace(" ", "-")
+    return Response(construir_excel(A, HOTEL_NAME),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+

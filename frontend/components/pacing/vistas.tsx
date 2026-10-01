@@ -11,6 +11,7 @@ import {
   Aviso, Estado, Kpi, Tabla, card, colorDe, filaTotal, n0, pct, select, signo, td, tdL, th, tooltipStyle, usd0,
   useMeses, usePacing,
 } from "./comun";
+import { AnalisisTecnico } from "./tecnico";
 
 const eje = { fontSize: 11, fill: "var(--text-secondary)" };
 const kfmt = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)));
@@ -139,6 +140,7 @@ export function Posicion() {
         </tbody>
       </Tabla>
       <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("posicion.leyenda")}</div>
+      <AnalisisTecnico />
     </div>
   );
 }

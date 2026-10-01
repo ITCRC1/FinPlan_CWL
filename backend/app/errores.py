@@ -782,6 +782,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "pacing.onsite_pct": {
         "es": "El porcentaje de consumo en sitio tiene que estar entre 0 y 100.",
         "en": "The on-site spend percentage must be between 0 and 100."},
+    "pacing.sin_datos": {
+        "es": "Todavía no hay fotos de Opera cargadas para armar el análisis.",
+        "en": "There are no Opera snapshots loaded yet to build the analysis."},
     "pacing.pl_incompleto": {
         "es": "El P&L de ese escenario no trae los 12 meses; no se puede tomar como meta.",
         "en": "That scenario's P&L does not have all 12 months; it cannot be used as the target."},

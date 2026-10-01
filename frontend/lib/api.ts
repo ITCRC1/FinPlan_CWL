@@ -5686,6 +5686,50 @@ export const getPacingAnalisis = (p: { year?: number; kind?: PacingKind; escenar
   api.get<PacingAnalisis>(`/pacing/analisis?${new URLSearchParams(
     Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])))}`);
 
+// Análisis técnico del año (debajo de «Posición mensual») y su Excel para la Junta.
+// Los textos vienen redactados del backend en el idioma pedido: así la pantalla y
+// el Excel dicen exactamente lo mismo.
+export type PacingConfianza = "alta" | "media" | "baja" | "sin_operacion";
+export interface PacingTecnicoMes {
+  i: number; cerrado: boolean; sin_operacion: boolean; cap: number; otb: number; otb_rev: number; occ_otb: number | null;
+  stly: number | null; pace: number | null; ly: number; ly_rev: number; ly_base: "real" | "alcance" | "reservas" | "sin";
+  proj: number; proj_rev: number; proj_occ: number | null; proj_vs_ly: number | null; rev_vs_ly: number | null;
+  falta: number; asegurado: number | null; ly_pick: number | null; esfuerzo: number | null; tasa: number | null;
+  por_semana: number | null; ritmo_semana: number | null; otb_adr: number | null; st_adr: number | null;
+  tarifa_vs_stly: number | null; proj_adr: number | null; libres: number; rn_5pp: number; valor_5pp: number;
+  valor_tarifa_5: number; bloqueos: number | null; bloqueos_pct: number | null;
+  metodos: Record<"avail" | "add" | "mult", number>; metodos_rev: Record<"avail" | "add" | "mult", number>;
+  confianza: PacingConfianza; confianza_txt: string; puntos: number; razones: string[]; razones_txt: string[]; comentario: string;
+}
+export interface PacingTecnicoBaseFila {
+  i: number; cerrado: boolean; abierto: boolean; cap: number; rn: number; rev: number; occ: number | null; adr: number | null;
+  meta_rn: number | null; meta_rev: number | null; stly: number | null; pick: number | null; tasa: number | null;
+  reconcilia: number | null;
+}
+export interface PacingTecnico {
+  vacio: boolean; anio: number; corte: string; kind: PacingKind; escenario: "avail" | "add" | "mult"; lang: string;
+  stly: { src: string; as_of: string | null; gap: number | null } | null;
+  meses: PacingTecnicoMes[];
+  base: { anio: number; filas: PacingTecnicoBaseFila[];
+          tot: { cap: number; rn: number; rev: number; occ: number | null; adr: number | null; meta_rn: number | null;
+                 meta_rev: number | null; reconcilia: number | null; meses_reales: number; meses_abiertos: number };
+          ventana: { i: number; puntos: Record<string, number | null> }[] };
+  general: {
+    otb: number; otb_rev: number; occ_otb: number | null; stly: number | null; pace: number | null; proj: number;
+    proj_rev: number; proj_occ: number | null; ly: number; ly_rev: number; asegurado: number | null; falta: number;
+    ly_pick: number; esfuerzo: number | null; valor_5pp: number; valor_tarifa_5: number;
+    metodos: Record<"avail" | "add" | "mult", { rn: number; rev: number }>; orden: string[];
+    ventanas: { dias: number; rn: number; ly: number; comparable: boolean }[];
+    confianza: Record<"alta" | "media" | "baja", number>;
+    conclusiones: string[]; porque: { titulo: string; texto: string }[]; limites: string[];
+  };
+}
+export interface PacingTecnicoParams { year?: number; kind?: PacingKind; escenario?: PacingEscenario; fuente?: PacingFuente; lang: string }
+const _qsTecnico = (p: PacingTecnicoParams) => new URLSearchParams(
+  Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))).toString();
+export const getPacingTecnico = (p: PacingTecnicoParams) => api.get<PacingTecnico>(`/pacing/tecnico?${_qsTecnico(p)}`);
+export const bajarPacingTecnicoExcel = (p: PacingTecnicoParams) => bajarArchivo(`/pacing/tecnico/excel?${_qsTecnico(p)}`);
+
 // Análisis de un mes (el estudio «Pacing Diciembre 2026», para cualquier mes).
 export interface PacingMesEscenario { clave: "libros" | "ritmo30" | "ritmo90" | "ritmoLy" | "meta"; rn: number; ingreso: number; occ: number; vs_meta: number | null; por_semana?: number | null; tasa?: number }
 export interface PacingMesTarifa {
