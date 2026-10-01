@@ -415,3 +415,27 @@ async def flagged(year: int | None = Query(None), month: int | None = Query(None
     out.sort(key=lambda x: (x["arr"], x["id"]))
     return {"reservas": out, "potencial": round(sum(x["potencial"] for x in out
                                                     if x["motivo"] != "cortesia"), 2)}
+
+
+@router.get("/pacing/mes")
+async def get_analisis_mes(year: int = Query(..., ge=2000, le=2100), month: int = Query(..., ge=1, le=12),
+                           db: AsyncSession = Depends(get_db)):
+    """El estudio de un mes (el de «Pacing Diciembre 2026»), para cualquier mes.
+
+    Necesita las reservas COMPLETAS —huésped, garantía, pax, itinerario, tipo
+    de habitación y tarifa noche— para la revisión de tarifas y garantías.
+    """
+    from app.engine.pacing_mes import analisis_mes
+    snaps = [{"id": s.id, "kind": s.kind, "as_of": s.as_of, "date_from": s.date_from,
+              "date_to": s.date_to, "has_forecast": s.has_forecast, "days": s.days or {}}
+             for s in (await db.execute(select(PacingSnapshot).where(
+                 PacingSnapshot.hotel_id == HOTEL_ID))).scalars()]
+    reservas = [{"id": r.resv_id, "ins": r.ins, "arr": r.arr, "nts": r.nts, "rms": r.rms,
+                 "amt": float(r.amt or 0), "st": r.st, "fl": r.fl, "ch": r.ch, "blk": r.blk,
+                 "rate": r.rate, "room_type": r.room_type, "guest": r.guest, "grupo": r.grupo,
+                 "garantia": r.garantia, "pax": r.pax, "tarifa_noche": float(r.tarifa_noche or 0)}
+                for r in (await db.execute(select(PacingReservation).where(
+                    PacingReservation.hotel_id == HOTEL_ID))).scalars()]
+    config = _config_dict(await _config(db))
+    await db.commit()
+    return motor.limpiar(analisis_mes(snaps, reservas, config, year, month))

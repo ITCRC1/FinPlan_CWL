@@ -15,10 +15,12 @@ import {
 } from "@/lib/api";
 
 export const TABS = [
-  "resumen", "posicion", "comparativo", "meta", "presupuesto",
+  "resumen", "posicion", "comparativo", "meta", "noviembre-2026", "diciembre-2026", "presupuesto",
   "curva", "pickup", "cancelaciones", "alertas", "cargas",
 ] as const;
 export type PacingTab = typeof TABS[number];
+/** Los tabs de un mes traen su propio análisis: los filtros del módulo no les aplican. */
+const SIN_FILTROS: readonly PacingTab[] = ["noviembre-2026", "diciembre-2026"];
 
 export interface Filtros { year?: number; kind: PacingKind; escenario: PacingEscenario; fuente: PacingFuente }
 const LLAVE = "finplan_pacing_filtros";
@@ -169,7 +171,7 @@ export function PacingShell({ tab, children }: { tab: PacingTab; children: React
                 : t("subtituloVacio")}
             </div>
           </div>
-          {tab !== "cargas" && datos && !datos.vacio && (
+          {tab !== "cargas" && !SIN_FILTROS.includes(tab) && datos && !datos.vacio && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <label style={{ fontSize: 12 }}>{t("filtros.anio")}{" "}
                 <select style={select} value={datos.anio ?? ""} onChange={e => setFiltros({ year: Number(e.target.value) })}>

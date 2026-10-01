@@ -5685,3 +5685,38 @@ export const pacingMetaFromScenario = (scenarioId: string, year?: number) => {
 export const getPacingAnalisis = (p: { year?: number; kind?: PacingKind; escenario?: PacingEscenario; fuente?: PacingFuente }) =>
   api.get<PacingAnalisis>(`/pacing/analisis?${new URLSearchParams(
     Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])))}`);
+
+// Análisis de un mes (el estudio «Pacing Diciembre 2026», para cualquier mes).
+export interface PacingMesEscenario { clave: "libros" | "ritmo30" | "ritmo90" | "ritmoLy" | "meta"; rn: number; ingreso: number; occ: number; vs_meta: number | null; por_semana?: number | null; tasa?: number }
+export interface PacingMesTarifa {
+  id: string; guest: string | null; canal: string; rate: string; arr: string; nts: number; rms: number; pax: number;
+  tarifa: number; pp: number; mediana: number | null; mediana_pp: number | null; grupo: string | null; garantia: string | null;
+  bajo: number; alto: number; tope?: number; motivo: "cero" | "por_persona" | "itinerario" | "sin_garantia" | "perfil_hold";
+}
+export interface PacingMes {
+  vacio: boolean; anio: number; mes: number; corte: string; stly_fecha: string; pct_en_sitio: number; migracion: string | null;
+  semanas: number; cap: number; dias: number;
+  meta: { rn: number; total: number; rooms: number; avail: number; source: string | null } | null;
+  libros: { rn: number; rn_reservas: number; bloqueos: number; occ: number; reservas: number; estancia: number; rooms: number;
+            adr_rooms: number; total: number; en_sitio: number; ingreso: number; valor_noche: number; valor_total: number };
+  anterior: { rn: number; occ: number; stly: number; valor_noche: number; valor_total: number; pickup: number; por_semana: number;
+              cancel_rn: number; cancel_tasa: number };
+  ritmo: { ventanas: { dias: number; rn: number; por_semana: number }[]; necesario: number | null;
+           llenado_ly: { mes: string | null; rn: number; acum: number; pct: number }[];
+           lead_ly: { desde: number; hasta: number; rn: number }[];
+           creadas: { mes: string; activas: number; canceladas: number }[];
+           curva: { dias: number; anio: number | null; anterior: number | null }[] };
+  escenarios: PacingMesEscenario[]; noche_para_meta: number | null; t_adr: number;
+  hitos: { fecha: string; ritmo: number; ruta: number | null; alerta: number | null }[];
+  noches: { dia: number; rn: number; cap: number; ly: number; reservas: number; adr_rooms: number | null; bloqueo: number }[];
+  periodos: { desde: number; hasta: number; noches: number; cap: number; rn: number; ly: number }[];
+  garantias: { codigo: string; rn: number }[]; tipos: { tipo: string; rn: number }[];
+  canales: { canal: string | null; otros?: number; rn: number; valor: number; rn_ly: number; pick_ly: number; canc: number }[];
+  canc_por_canal: { canal: string; rn: number }[];
+  cancelaciones: { rn: number; tasa: number; hold_reservas: number; hold_rn: number };
+  tarifas: { filas: PacingMesTarifa[]; bajo: number; alto: number; por_motivo: Record<string, number> };
+  bloqueos: { rn: number; desde: number | null; hasta: number | null; por_noche: number };
+  riesgo: { garantia_debil: number; agencia: number; semana_max: { desde: number; hasta: number; rn: number; ly: number } | null; en_sitio_punto: number };
+}
+export const getPacingMes = (year: number, month: number) =>
+  api.get<PacingMes>(`/pacing/mes?year=${year}&month=${month}`);
