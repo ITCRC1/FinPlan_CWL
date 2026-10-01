@@ -39,7 +39,7 @@
       "pacingBudget": "Budget",
       "pacingDetail": "Detail",
       "pacingData": "Data",
-      "pacingMonths": "Month analysis"
+      "pacingMonths": "Special analysis"
     },
     "items": {
       "scenarios": "Scenarios (Budgets / Forecast)",
@@ -156,7 +156,8 @@
       "pacingAlertas": "Alerts & rates",
       "pacingCargas": "Uploads & settings",
       "pacingNov2026": "November 2026",
-      "pacingDic2026": "December 2026"
+      "pacingDic2026": "December 2026",
+      "pacingMedida": "Custom study 2027"
     },
     "groupsFull": {
       "financials": "Financial Statements",
@@ -4486,8 +4487,7 @@
       "cancelaciones": "Cancellations",
       "alertas": "Alerts & rates",
       "cargas": "Uploads & settings",
-      "noviembre-2026": "November 2026",
-      "diciembre-2026": "December 2026"
+      "especial": "Special analysis"
     },
     "estado": {
       "cerrado": "Closed",
@@ -5114,6 +5114,22 @@
       },
       "n1bSinBrecha": "running at {occ} occupancy; last year closed at {occly}.",
       "h6bConVolumen": "The booked value per night is {v}, {d} against {ly} ({vly}). Together with the volume, it supports the month's revenue."
+    },
+    "especial": {
+      "vistas": {
+        "nov": "November 2026",
+        "dic": "December 2026",
+        "medida": "Custom study 2027"
+      },
+      "mes": "Month to analyze",
+      "metaRn": "Room-night target (RN)",
+      "metaTotal": "Total revenue target (US$)",
+      "aplicar": "Apply",
+      "limpiar": "Back to loaded target",
+      "notaCargada": "Starts from the target loaded for that month ({fuente}). Change the numbers and press Apply to see the study against your own target; it is not saved.",
+      "notaSinMeta": "That month has no target loaded yet. Type the room-night and revenue targets and press Apply; meanwhile the study shows the books, pace and last year without a target comparison.",
+      "notaManual": "The study is calculated against the target you typed. It is not saved: the official target is edited in the Budget tab.",
+      "faltaAlgo": "To compare revenue, also type the revenue target (and the room-night one)."
     }
   }
 }

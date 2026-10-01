@@ -15,12 +15,12 @@ import {
 } from "@/lib/api";
 
 export const TABS = [
-  "resumen", "posicion", "comparativo", "meta", "noviembre-2026", "diciembre-2026", "presupuesto",
+  "resumen", "posicion", "comparativo", "meta", "especial", "presupuesto",
   "curva", "pickup", "cancelaciones", "alertas", "cargas",
 ] as const;
 export type PacingTab = typeof TABS[number];
-/** Los tabs de un mes traen su propio análisis: los filtros del módulo no les aplican. */
-const SIN_FILTROS: readonly PacingTab[] = ["noviembre-2026", "diciembre-2026"];
+/** El análisis especial trae su propio estudio por mes: los filtros del módulo no le aplican. */
+const SIN_FILTROS: readonly PacingTab[] = ["especial"];
 
 export interface Filtros { year?: number; kind: PacingKind; escenario: PacingEscenario; fuente: PacingFuente }
 const LLAVE = "finplan_pacing_filtros";

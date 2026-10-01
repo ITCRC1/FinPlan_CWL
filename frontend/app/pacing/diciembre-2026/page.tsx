@@ -1,7 +1,7 @@
-"use client";
-import { PacingShell } from "@/components/pacing/comun";
-import { AnalisisMes } from "@/components/pacing/mes";
+import { redirect } from "next/navigation";
 
+// Quedó dentro de «Análisis especial» (sub-pestaña). La ruta vieja sigue viva
+// para los enlaces que ya se compartieron.
 export default function PacingPage() {
-  return <PacingShell tab="diciembre-2026"><AnalisisMes year={2026} month={12} /></PacingShell>;
+  redirect("/pacing/especial?v=dic");
 }

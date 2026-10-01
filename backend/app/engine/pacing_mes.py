@@ -201,7 +201,11 @@ def _tarifas(act: list[dict]) -> dict:
                            for k in ("cero", "por_persona", "itinerario", "sin_garantia", "perfil_hold")}}
 
 
-def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: int, month: int) -> dict:
+def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: int, month: int,
+                 meta_manual: dict | None = None) -> dict:
+    """``meta_manual`` = {"rn": …, "total": …} para un estudio a medida: reemplaza
+    la meta del mes solo en esta consulta (no se guarda). Lo que falte se toma de
+    la meta cargada."""
     cfg = config or {}
     pct = float(cfg.get("onsite_pct") or 0) / 100 if (cfg.get("onsite_mode") or "pct") == "pct" else 0.12
     corte = ultimo_corte(snaps, "total") or ultimo_corte(snaps, "rooms")
@@ -227,6 +231,15 @@ def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: in
     meta_tot = meta["total"][month - 1] if meta else 0.0
     meta_rooms = meta["rooms"][month - 1] if meta else 0.0
     meta_cap = (meta["avail"][month - 1] if meta else 0) or cap
+    meta_fuente = meta.get("source") if meta else None
+    mm = {k: float(v) for k, v in (meta_manual or {}).items() if v is not None and float(v) > 0}
+    if mm:
+        # ⚠️ Una meta manual sin ingreso conserva el ingreso cargado (y viceversa);
+        # si no había meta cargada, la que falte queda en 0 y no se compara.
+        meta_rn = mm.get("rn", meta_rn)
+        meta_tot = mm.get("total", meta_tot)
+        meta_fuente = "manual"
+        meta = meta or {"source": "manual"}
 
     otb = hf["rn"]
     t_adr = hf["rev"] / otb if otb else 0.0
@@ -374,7 +387,7 @@ def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: in
         "vacio": False, "anio": year, "mes": month, "corte": corte, "stly_fecha": D, "pct_en_sitio": pct,
         "migracion": migracion, "semanas": semanas, "cap": cap, "dias": dias_mes,
         "meta": {"rn": meta_rn, "total": meta_tot, "rooms": meta_rooms, "avail": meta_cap,
-                 "source": meta.get("source") if meta else None} if meta else None,
+                 "source": meta_fuente, "manual": bool(mm)} if meta else None,
         "libros": {"rn": otb, "rn_reservas": rn_res, "bloqueos": otb - rn_res, "occ": otb / cap if cap else 0,
                    "reservas": len(act), "estancia": rn_res / len(act) if act else 0,
                    "rooms": hr["rev"], "adr_rooms": hr["rev"] / hr["rn"] if hr["rn"] else 0,

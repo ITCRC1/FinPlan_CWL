@@ -94,3 +94,18 @@ def test_canal_y_hold():
 
 def test_sin_fotos():
     assert analisis_mes([], [], {}, 2026, 12)["vacio"] is True
+
+
+def test_meta_manual_reemplaza_la_meta_solo_en_la_consulta():
+    snaps, reservas, cfg = _snaps(), _reservas(), CFG
+    base = analisis_mes(snaps, reservas, cfg, 2026, 12)
+    m = analisis_mes(snaps, reservas, cfg, 2026, 12, {"rn": 500, "total": 450000})
+    assert m["meta"]["rn"] == 500 and m["meta"]["total"] == 450000
+    assert m["meta"]["manual"] is True and m["meta"]["source"] == "manual"
+    assert m["libros"]["rn"] == base["libros"]["rn"]          # lo de libros no cambia
+    # Sólo RN: el ingreso queda el de la meta cargada.
+    solo_rn = analisis_mes(snaps, reservas, cfg, 2026, 12, {"rn": 500, "total": None})
+    assert solo_rn["meta"]["total"] == base["meta"]["total"] == 400000
+    # Un mes sin meta cargada también acepta la meta a medida.
+    sin = analisis_mes(snaps, reservas, cfg, 2027, 1, {"rn": 300, "total": 250000})
+    assert sin["meta"]["rn"] == 300 and sin["ritmo"]["necesario"] is not None

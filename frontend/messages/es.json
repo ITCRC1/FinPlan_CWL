@@ -39,7 +39,7 @@
       "pacingBudget": "Presupuesto",
       "pacingDetail": "Detalle",
       "pacingData": "Datos",
-      "pacingMonths": "Análisis por mes"
+      "pacingMonths": "Análisis especial"
     },
     "items": {
       "scenarios": "Escenarios (Budgets / Forecast)",
@@ -156,7 +156,8 @@
       "pacingAlertas": "Alertas y tarifas",
       "pacingCargas": "Cargas y configuración",
       "pacingNov2026": "Noviembre 2026",
-      "pacingDic2026": "Diciembre 2026"
+      "pacingDic2026": "Diciembre 2026",
+      "pacingMedida": "Estudio a medida 2027"
     },
     "groupsFull": {
       "financials": "Estados financieros",
@@ -4486,8 +4487,7 @@
       "cancelaciones": "Cancelaciones",
       "alertas": "Alertas y tarifas",
       "cargas": "Cargas y configuración",
-      "noviembre-2026": "Noviembre 2026",
-      "diciembre-2026": "Diciembre 2026"
+      "especial": "Análisis especial"
     },
     "estado": {
       "cerrado": "Cerrado",
@@ -5114,6 +5114,22 @@
       },
       "n1bSinBrecha": "va al {occ} de ocupación; el año pasado cerró al {occly}.",
       "h6bConVolumen": "El valor reservado por noche es {v}, {d} contra {ly} ({vly}). Junto con el volumen, sostiene el ingreso del mes."
+    },
+    "especial": {
+      "vistas": {
+        "nov": "Noviembre 2026",
+        "dic": "Diciembre 2026",
+        "medida": "Estudio a medida 2027"
+      },
+      "mes": "Mes a analizar",
+      "metaRn": "Meta de noches (RN)",
+      "metaTotal": "Meta de ingreso total (US$)",
+      "aplicar": "Aplicar",
+      "limpiar": "Volver a la meta cargada",
+      "notaCargada": "Arranca con la meta cargada para ese mes ({fuente}). Cambie los números y presione Aplicar para ver el estudio contra su propia meta; no se guarda.",
+      "notaSinMeta": "Ese mes todavía no tiene meta cargada. Escriba la meta de noches y de ingreso y presione Aplicar; mientras tanto el estudio muestra libros, ritmo y año anterior sin comparar contra meta.",
+      "notaManual": "El estudio está calculado contra la meta que usted escribió. No se guarda: la meta oficial se edita en la pestaña Presupuesto.",
+      "faltaAlgo": "Para comparar el ingreso escriba también la meta de ingreso (y la de noches)."
     }
   }
 }

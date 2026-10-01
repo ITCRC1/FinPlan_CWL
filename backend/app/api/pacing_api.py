@@ -419,6 +419,7 @@ async def flagged(year: int | None = Query(None), month: int | None = Query(None
 
 @router.get("/pacing/mes")
 async def get_analisis_mes(year: int = Query(..., ge=2000, le=2100), month: int = Query(..., ge=1, le=12),
+                           meta_rn: float | None = Query(None, ge=0), meta_total: float | None = Query(None, ge=0),
                            db: AsyncSession = Depends(get_db)):
     """El estudio de un mes (el de «Pacing Diciembre 2026»), para cualquier mes.
 
@@ -438,4 +439,5 @@ async def get_analisis_mes(year: int = Query(..., ge=2000, le=2100), month: int 
                     PacingReservation.hotel_id == HOTEL_ID))).scalars()]
     config = _config_dict(await _config(db))
     await db.commit()
-    return motor.limpiar(analisis_mes(snaps, reservas, config, year, month))
+    manual = {"rn": meta_rn, "total": meta_total} if (meta_rn or meta_total) else None
+    return motor.limpiar(analisis_mes(snaps, reservas, config, year, month, manual))

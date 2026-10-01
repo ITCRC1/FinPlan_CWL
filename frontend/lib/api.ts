@@ -5696,7 +5696,7 @@ export interface PacingMesTarifa {
 export interface PacingMes {
   vacio: boolean; anio: number; mes: number; corte: string; stly_fecha: string; pct_en_sitio: number; migracion: string | null;
   semanas: number; cap: number; dias: number;
-  meta: { rn: number; total: number; rooms: number; avail: number; source: string | null } | null;
+  meta: { rn: number; total: number; rooms: number; avail: number; source: string | null; manual?: boolean } | null;
   libros: { rn: number; rn_reservas: number; bloqueos: number; occ: number; reservas: number; estancia: number; rooms: number;
             adr_rooms: number; total: number; en_sitio: number; ingreso: number; valor_noche: number; valor_total: number };
   anterior: { rn: number; occ: number; stly: number; valor_noche: number; valor_total: number; pickup: number; por_semana: number;
@@ -5718,5 +5718,9 @@ export interface PacingMes {
   bloqueos: { rn: number; desde: number | null; hasta: number | null; por_noche: number };
   riesgo: { garantia_debil: number; agencia: number; semana_max: { desde: number; hasta: number; rn: number; ly: number } | null; en_sitio_punto: number };
 }
-export const getPacingMes = (year: number, month: number) =>
-  api.get<PacingMes>(`/pacing/mes?year=${year}&month=${month}`);
+export const getPacingMes = (year: number, month: number, meta?: { rn?: number; total?: number }) => {
+  const q = new URLSearchParams({ year: String(year), month: String(month) });
+  if (meta?.rn) q.set("meta_rn", String(meta.rn));
+  if (meta?.total) q.set("meta_total", String(meta.total));
+  return api.get<PacingMes>("/pacing/mes?" + q.toString());
+};

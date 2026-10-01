@@ -44,7 +44,14 @@ function Callout({ titulo, children, color = "var(--negative)" }: { titulo: stri
 }
 const Li = ({ children }: { children: ReactNode }) => <li style={{ margin: "4px 0", lineHeight: 1.55 }}>{children}</li>;
 
-export function AnalisisMes({ year, month }: { year: number; month: number }) {
+export interface MetaManual { rn?: number; total?: number }
+
+export function AnalisisMes({ year, month, metaManual, onCargado }: {
+  year: number; month: number;
+  /** Estudio a medida: meta que reemplaza la cargada sólo en esta vista (no se guarda). */
+  metaManual?: MetaManual;
+  onCargado?: (a: PacingMes) => void;
+}) {
   const t = useTranslations("pacing.mes");
   const M = useMeses();
   const tm = useTranslations("months");
@@ -55,9 +62,11 @@ export function AnalisisMes({ year, month }: { year: number; month: number }) {
   useEffect(() => {
     let vivo = true;
     setA(null); setErr(null);
-    getPacingMes(year, month).then(r => { if (vivo) setA(r); }).catch(e => { if (vivo) setErr(String(e?.message ?? e)); });
+    getPacingMes(year, month, metaManual).then(r => { if (vivo) { setA(r); onCargado?.(r); } })
+      .catch(e => { if (vivo) setErr(String(e?.message ?? e)); });
     return () => { vivo = false; };
-  }, [year, month]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month, metaManual?.rn, metaManual?.total]);
 
   if (err) return <Aviso tipo="error">{err}</Aviso>;
   if (!a) return <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{t("cargando")}</div>;
