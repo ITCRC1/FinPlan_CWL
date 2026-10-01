@@ -5129,7 +5129,32 @@
       "notaCargada": "Arranca con la meta cargada para ese mes ({fuente}). Cambie los números y presione Aplicar para ver el estudio contra su propia meta; no se guarda.",
       "notaSinMeta": "Ese mes todavía no tiene meta cargada. Escriba la meta de noches y de ingreso y presione Aplicar; mientras tanto el estudio muestra libros, ritmo y año anterior sin comparar contra meta.",
       "notaManual": "El estudio está calculado contra la meta que usted escribió. No se guarda: la meta oficial se edita en la pestaña Presupuesto.",
-      "faltaAlgo": "Para comparar el ingreso escriba también la meta de ingreso (y la de noches)."
+      "faltaAlgo": "Para comparar el ingreso escriba también la meta de ingreso (y la de noches).",
+      "ly": {
+        "titulo": "Mismo mes del año anterior ({mes}) y lo que hay hoy",
+        "c": {
+          "concepto": "Concepto",
+          "rn": "Room nights",
+          "occ": "Ocupación",
+          "adr": "ADR habitación",
+          "total": "Ingreso total",
+          "noche": "Ingreso por noche"
+        },
+        "stly": "En libros a la misma fecha del año anterior ({fecha})",
+        "cierre": "Cierre real {mes}",
+        "hoy": "En libros hoy ({fecha})",
+        "vsStly": "Hoy vs. misma fecha del año anterior",
+        "notaFotos": "El cierre del año anterior sale del History & Forecast de Opera (ingreso total, con consumo en sitio). La fila «a la misma fecha» sale de las reservas: el ingreso por noche es el valor de la reserva, sólo habitación.",
+        "notaReservas": "Las fotos de Opera no cubren ese mes del año anterior: el cierre sale de las reservas y su ingreso es sólo habitación.",
+        "constructor": "Armar la meta desde el año anterior",
+        "alza": "% incremento en tarifa",
+        "occ": "Ocupación objetivo (%)",
+        "resRn": "{occ}% × {cap} noches disponibles = {rn} RN",
+        "resNoche": "Ingreso por noche: {base} del año anterior + {alza}% = {noche}",
+        "resTotal": "Meta de ingreso: {total}",
+        "vsLy": "{d} vs. año anterior",
+        "usar": "Usar como meta"
+      }
     }
   }
 }

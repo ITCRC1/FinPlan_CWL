@@ -223,6 +223,10 @@ def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: in
     act, act_ly = M.activas(), L.activas()
     rn_res, rn_ly = M.rn(act), L.rn(act_ly)
     st = L.rn(L.activas(D))
+    st_val = L.val(L.activas(D))
+    # Cierre real del mismo mes del año anterior según el History & Forecast
+    # (cuando las fotos lo cubren; si no, queda en 0 y la pantalla usa reservas).
+    hf_ly, hr_ly = _hf_mes(tot, year - 1, month), _hf_mes(rooms, year - 1, month)
     val_res, val_ly = M.val(act), L.val(act_ly)
     adr_val_ly = val_ly / rn_ly if rn_ly else (val_res / rn_res if rn_res else 0)
 
@@ -393,7 +397,8 @@ def analisis_mes(snaps: list[dict], reservas: list[dict], config: dict, year: in
                    "rooms": hr["rev"], "adr_rooms": hr["rev"] / hr["rn"] if hr["rn"] else 0,
                    "total": hf["rev"], "en_sitio": pct * hr["rev"], "ingreso": ing_otb,
                    "valor_noche": val_res / rn_res if rn_res else 0, "valor_total": val_res},
-        "anterior": {"rn": rn_ly, "occ": rn_ly / cap if cap else 0, "stly": st,
+        "anterior": {"rn": rn_ly, "occ": rn_ly / cap if cap else 0, "stly": st, "stly_valor": st_val,
+                     "hf": {"rn": hf_ly["rn"], "total": hf_ly["rev"], "rooms": hr_ly["rev"], "cap": hf_ly["cap"]},
                      "valor_noche": adr_val_ly, "valor_total": val_ly, "pickup": rn_pick_ly,
                      "por_semana": rn_pick_ly / sem_ly, "cancel_rn": canc_ly, "cancel_tasa": tasa_c_ly},
         "ritmo": {"ventanas": ventanas, "necesario": necesario, "llenado_ly": llenado_ly, "lead_ly": lead_ly,

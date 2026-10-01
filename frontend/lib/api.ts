@@ -5699,7 +5699,7 @@ export interface PacingMes {
   meta: { rn: number; total: number; rooms: number; avail: number; source: string | null; manual?: boolean } | null;
   libros: { rn: number; rn_reservas: number; bloqueos: number; occ: number; reservas: number; estancia: number; rooms: number;
             adr_rooms: number; total: number; en_sitio: number; ingreso: number; valor_noche: number; valor_total: number };
-  anterior: { rn: number; occ: number; stly: number; valor_noche: number; valor_total: number; pickup: number; por_semana: number;
+  anterior: { rn: number; occ: number; stly: number; stly_valor: number; hf: { rn: number; total: number; rooms: number; cap: number }; valor_noche: number; valor_total: number; pickup: number; por_semana: number;
               cancel_rn: number; cancel_tasa: number };
   ritmo: { ventanas: { dias: number; rn: number; por_semana: number }[]; necesario: number | null;
            llenado_ly: { mes: string | null; rn: number; acum: number; pct: number }[];

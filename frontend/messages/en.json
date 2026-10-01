@@ -5129,7 +5129,32 @@
       "notaCargada": "Starts from the target loaded for that month ({fuente}). Change the numbers and press Apply to see the study against your own target; it is not saved.",
       "notaSinMeta": "That month has no target loaded yet. Type the room-night and revenue targets and press Apply; meanwhile the study shows the books, pace and last year without a target comparison.",
       "notaManual": "The study is calculated against the target you typed. It is not saved: the official target is edited in the Budget tab.",
-      "faltaAlgo": "To compare revenue, also type the revenue target (and the room-night one)."
+      "faltaAlgo": "To compare revenue, also type the revenue target (and the room-night one).",
+      "ly": {
+        "titulo": "Same month last year ({mes}) and what is on the books today",
+        "c": {
+          "concepto": "Item",
+          "rn": "Room nights",
+          "occ": "Occupancy",
+          "adr": "Room ADR",
+          "total": "Total revenue",
+          "noche": "Revenue per night"
+        },
+        "stly": "On the books at the same date last year ({fecha})",
+        "cierre": "Actual close {mes}",
+        "hoy": "On the books today ({fecha})",
+        "vsStly": "Today vs. same date last year",
+        "notaFotos": "Last year's close comes from Opera History & Forecast (total revenue, including on-site spend). The same-date row comes from reservations: revenue per night is the booking value, rooms only.",
+        "notaReservas": "Opera snapshots do not cover that month last year: the close comes from reservations and its revenue is rooms only.",
+        "constructor": "Build the target from last year",
+        "alza": "% rate increase",
+        "occ": "Target occupancy (%)",
+        "resRn": "{occ}% × {cap} available nights = {rn} RN",
+        "resNoche": "Revenue per night: {base} last year + {alza}% = {noche}",
+        "resTotal": "Revenue target: {total}",
+        "vsLy": "{d} vs. last year",
+        "usar": "Use as target"
+      }
     }
   }
 }

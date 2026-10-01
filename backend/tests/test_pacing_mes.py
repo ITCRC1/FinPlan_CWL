@@ -109,3 +109,15 @@ def test_meta_manual_reemplaza_la_meta_solo_en_la_consulta():
     # Un mes sin meta cargada también acepta la meta a medida.
     sin = analisis_mes(snaps, reservas, cfg, 2027, 1, {"rn": 300, "total": 250000})
     assert sin["meta"]["rn"] == 300 and sin["ritmo"]["necesario"] is not None
+
+
+def test_mismo_mes_del_anio_anterior():
+    a = analisis_mes(_snaps(), _reservas(), CFG, 2026, 12)
+    P = a["anterior"]
+    assert P["stly"] == 5 and P["stly_valor"] == 3000      # 1800 + 1200 en libros al 30-sep-2025
+    assert set(P["hf"]) == {"rn", "total", "rooms", "cap"}
+    # Para sep-2027 el cierre del año anterior sale de las fotos de sep-2026:
+    # 29 noches históricas × 10 RN + el día 30 (12 RN).
+    b = analisis_mes(_snaps(), _reservas(), CFG, 2027, 9)
+    assert b["anterior"]["hf"]["rn"] == 29 * 10 + 12
+    assert b["anterior"]["hf"]["total"] == 29 * 5000 + 9000
