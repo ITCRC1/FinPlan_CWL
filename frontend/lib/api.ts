@@ -5852,3 +5852,46 @@ export async function getPosiciones(
   const ids = scenarioIds.filter(Boolean).join(",");
   return api.get(`/payroll/posiciones/?scenarios=${encodeURIComponent(ids)}`);
 }
+
+// ── La grilla de pax: huéspedes por habitación ocupada, categoría × mes ──────
+//
+// Owner, 2026-10-04: *«que tome los datos por mes y por unidad, y después haga
+// la explosión por habitación»* · *«y que permita poner decimales»*.
+//
+// ⚠️ Va sobre `rate_cards.pax_per_room`, que es **el campo que el motor
+// multiplica**: de ahí salen los huéspedes y, con ellos, Food, Activities,
+// Transportation y Sustainability. El `pax_per_night` del hotel quedó como
+// SEMILLA —con eso nace una tarjeta nueva— y de ahí en adelante manda la
+// grilla.
+export interface PaxCelda {
+  month: number;
+  pax: string;
+  /** ⚠️ `false` = esa categoría NO está en el presupuesto de ese mes: no tiene
+   *  tarifa, y el motor la saltea entera —sin noches, sin ingreso, sin
+   *  huéspedes—. La celda no se escribe: inventarle una tarjeta para guardar un
+   *  pax la metería en el cálculo con tarifa cero y movería la ocupación y el
+   *  ADR sin que nadie lo pidiera. */
+  hay_tarifa: boolean;
+}
+export interface PaxFila {
+  room_type_id: string; code: string; name: string; units: number;
+  meses: PaxCelda[];
+}
+export interface PaxGrid {
+  scenario_id: string; year: number;
+  /** Con qué nace una tarjeta nueva: el pax del escenario, o el del hotel. */
+  semilla: string;
+  filas: PaxFila[];
+}
+export async function getPaxGrid(scenarioId: string): Promise<PaxGrid> {
+  return api.get<PaxGrid>(
+    `/scenarios/${encodeURIComponent(scenarioId)}/revenue/pax-grid/`);
+}
+export async function setPaxGrid(
+  scenarioId: string,
+  celdas: { room_type_id: string; month: number; pax: number }[],
+): Promise<{ guardadas: number;
+             sin_tarifa: { room_type_id: string; month: number }[] }> {
+  return api.put(
+    `/scenarios/${encodeURIComponent(scenarioId)}/revenue/pax-grid/`, { celdas });
+}

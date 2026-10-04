@@ -1,5 +1,6 @@
 "use client";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, repartirPegado } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { money2 } from "@/lib/fmt";
@@ -407,6 +408,20 @@ function LineBlock({
   onSetMonth: (key: string, mk: string, v: string) => void;
   onSetDesc: (key: string, v: string) => void;
 }) {
+  /**
+   * Un bloque de Excel pegado: a la derecha y hacia abajo desde la celda.
+   *
+   * ⚠️ Escribe en el BORRADOR, igual que teclear: esta pantalla guarda con su
+   * botón. Y no se sale de esta línea del reporte — las filas de otra están
+   * en otra tabla.
+   */
+  function pegarDesde(ri: number, mi: number, bloque: string[][]) {
+    repartirPegado(bloque, ri, mi, lineRows.length, MONTH_KEYS.length,
+      (f, c, valor) => {
+        onSetMonth(lineRows[f].key, MONTH_KEYS[c], String(numeroDeExcel(valor)));
+      });
+  }
+
   const t = useTranslations("nonop");
   const tc = useTranslations("common");
   // Driver lines: read-only reference (computed by the engine).
@@ -452,7 +467,7 @@ function LineBlock({
       </tr>
 
       {/* Detail rows */}
-      {lineRows.map(r => {
+      {lineRows.map((r, ri) => {
         const rowAnnual = MONTH_KEYS.reduce((s, mk) => s + (parseFloat(r.months[mk]) || 0), 0);
         return (
           <tr key={r.key}>
@@ -465,11 +480,12 @@ function LineBlock({
                 style={{ width: 230, fontSize: 11 }}
               />
             </td>
-            {MONTH_KEYS.map(mk => (
+            {MONTH_KEYS.map((mk, mi) => (
               <td key={mk} className="mono" style={{ textAlign: "right", padding: "2px 6px" }}>
                 <input
                   value={r.months[mk]}
                   onChange={e => onSetMonth(r.key, mk, e.target.value)}
+                  onPaste={e => manejarPegado(e, b => pegarDesde(ri, mi, b))}
                   className="fin-input"
                   style={{ width: 66, textAlign: "right" }}
                 />

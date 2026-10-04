@@ -1,5 +1,6 @@
 "use client";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -243,7 +244,12 @@ export default function ManagementFeesPage() {
                   {pct3.map((v, i) => (
                     <td key={i} style={{ textAlign: "right" }}>
                       <input type="number" value={v} style={numInp}
-                        onChange={e => setPct3(p => p.map((x, j) => j === i ? Number(e.target.value) : x))} />
+                        onChange={e => setPct3(p => p.map((x, j) => j === i ? Number(e.target.value) : x))}
+                        onPaste={e => manejarPegado(e, b => {
+                          const vals: Record<number, number> = {};
+                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDeExcel(s2); });
+                          setPct3(p => p.map((x, j) => (j in vals ? vals[j] : x)));
+                        })} />
                     </td>
                   ))}
                   <td></td>
@@ -263,7 +269,12 @@ export default function ManagementFeesPage() {
                   {pct5.map((v, i) => (
                     <td key={i} style={{ textAlign: "right" }}>
                       <input type="number" value={v} style={numInp}
-                        onChange={e => setPct5(p => p.map((x, j) => j === i ? Number(e.target.value) : x))} />
+                        onChange={e => setPct5(p => p.map((x, j) => j === i ? Number(e.target.value) : x))}
+                        onPaste={e => manejarPegado(e, b => {
+                          const vals: Record<number, number> = {};
+                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDeExcel(s2); });
+                          setPct5(p => p.map((x, j) => (j in vals ? vals[j] : x)));
+                        })} />
                     </td>
                   ))}
                   <td></td>

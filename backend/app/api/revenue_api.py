@@ -2704,6 +2704,7 @@ async def bulk_rack_rates(
         m: compute_net_factor([c for c in canales if c.month == m])
         for m in range(1, 13)}
     _exigir_mix(nf_mes, scenario_id)
+    semilla_pax = await _semilla_del_escenario(scenario, db)
 
     for r in rows:
         for i, mk in enumerate(_RR_MONTHS, start=1):
@@ -2718,7 +2719,11 @@ async def bulk_rack_rates(
                     id=str(_uuid.uuid4()), scenario_id=scenario_id,
                     hotel_id=scenario.hotel_id, room_type_id=r.room_type_id,
                     month=i, rack_rate=rack, net_rate=neto,
-                    pax_per_room=Decimal("1.8"),
+                    # ⚠️ La SEMILLA de la propiedad, no un 1,8 escrito acá.
+                    # Owner, 2026-10-04: el pax del hotel es con lo que nace una
+                    # tarjeta nueva; de ahí en adelante manda la grilla. Una
+                    # propiedad que opera con 2,1 nacía en 1,8 y nadie lo veía.
+                    pax_per_room=semilla_pax,
                 ))
     await db.commit()
     return {"saved": len(rows), "scenario_id": scenario_id,
@@ -3250,7 +3255,10 @@ async def bulk_package_components(
 class RateCardUpdate(BaseModel):
     rack_rate: Decimal
     net_rate: Decimal
-    pax_per_room: Decimal = Decimal("1.8")
+    #: ⚠️ `None` = **no tocar el pax**. Antes el default era `1.8`, así que
+    #: guardar una tarifa desde una pantalla que no manda pax PISABA el pax
+    #: cargado y lo devolvía al default, sin que nada avisara.
+    pax_per_room: Decimal | None = None
 
 
 @router.put("/scenarios/{scenario_id}/revenue/rate-cards/{room_type_id}/{month}/")
@@ -3287,13 +3295,16 @@ async def update_rate_card(
             month=month,
             rack_rate=payload.rack_rate,
             net_rate=payload.net_rate,
-            pax_per_room=payload.pax_per_room,
+            pax_per_room=(payload.pax_per_room
+                          if payload.pax_per_room is not None
+                          else await _semilla_del_escenario(scenario, db)),
         )
         db.add(rc)
     else:
         rc.rack_rate = payload.rack_rate
         rc.net_rate = payload.net_rate
-        rc.pax_per_room = payload.pax_per_room
+        if payload.pax_per_room is not None:
+            rc.pax_per_room = payload.pax_per_room
 
     await db.commit()
     return {"updated": True, "room_type_id": room_type_id, "month": month}
@@ -3822,3 +3833,153 @@ async def get_historical_data(
     q = q.order_by(HistoricalKpi.year, HistoricalKpi.month)
     rows = (await db.execute(q)).scalars().all()
     return [_historical_to_dict(h) for h in rows]
+
+
+# ── La grilla de pax: categoría × mes, con decimales ─────────────────────────
+#
+# Owner, 2026-10-04, mirando el Inventario: *«evalúa poner mejor un tab solo
+# para pax que ya existe pero que tome los datos por mes y por unidad, y después
+# haga la explosión por habitación»* · *«y que permita poner decimales»*.
+#
+# ## Por qué va sobre `rate_cards.pax_per_room` y no sobre un campo nuevo
+#
+# Porque **ése es el que el motor multiplica**. `revenue_calculator` hace
+# `total_guests += rooms_occ * rc.pax_per_room`, y de los huéspedes salen
+# además Food, Activities, Transportation y Sustainability. Ya estaba por
+# escenario × categoría × mes y ya era `Numeric(6,4)`: lo único que faltaba era
+# poder escribirlo.
+#
+# ## ⚠️ Lo que había antes decía que guardaba y no guardaba
+#
+# El tab de Pax leía el `pax_per_night` del escenario y su botón Guardar escribía
+# el del HOTEL — y nada copiaba ninguno de los dos a `rate_cards.pax_per_room`.
+# Se cambiaba 1,8 por 2,1, la grilla de la pantalla se recalculaba, y el
+# presupuesto no se movía. Medido el 2026-10-04 en producción: el Budget Working
+# 2027 tenía 1,8 en las 48 tarjetas y los escenarios de 2026, 2,0 — valores que
+# nadie pudo haber escrito desde la aplicación.
+#
+# El `pax_per_night` del hotel queda como SEMILLA (decisión del owner,
+# 2026-10-04): es con lo que nace una tarjeta nueva. De ahí en adelante manda la
+# grilla.
+
+
+def _pax_semilla(hotel, sm) -> Decimal:
+    """El pax con el que NACE una tarjeta: el del escenario si lo tiene, si no el
+    del hotel, y 1,8 sólo si no hay ni propiedad cargada.
+
+    ⚠️ Antes estaba escrito `Decimal("1.8")` en los dos lugares donde se crea una
+    tarjeta. Una propiedad que opera con 2,1 nacía en 1,8 y nadie lo notaba: el
+    número no se veía en ninguna pantalla.
+    """
+    if sm is not None and getattr(sm, "pax_per_night", None) is not None:
+        return Decimal(str(sm.pax_per_night))
+    if hotel is not None and getattr(hotel, "pax_per_night", None) is not None:
+        return Decimal(str(hotel.pax_per_night))
+    return Decimal("1.8")
+
+
+async def _semilla_del_escenario(scenario, db) -> Decimal:
+    sm = (await db.execute(
+        select(ScenarioMaster).where(ScenarioMaster.scenario_id == scenario.id)
+    )).scalar_one_or_none()
+    return _pax_semilla(await db.get(Hotel, scenario.hotel_id), sm)
+
+
+@router.get("/scenarios/{scenario_id}/revenue/pax-grid/")
+async def get_pax_grid(scenario_id: str, db: AsyncSession = Depends(get_db)):
+    """Los huéspedes por habitación ocupada, por categoría × mes.
+
+    Devuelve una celda por cada (categoría activa × mes) con:
+
+    * `pax` — lo cargado, o la semilla cuando esa celda todavía no tiene tarifa;
+    * `hay_tarifa` — si existe la tarjeta. ⚠️ **Donde no hay tarifa, esa
+      categoría no está en el presupuesto de ese mes**: el motor la saltea
+      entera (`if rt_id not in rates_by_type: continue`), así que no tiene
+      noches, ni ingreso, ni huéspedes. La celda se muestra en gris y no se
+      puede escribir — inventarle una tarjeta para guardar un pax metería la
+      categoría en el cálculo con tarifa cero y movería la ocupación y el ADR
+      sin que nadie lo pidiera.
+    """
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    semilla = await _semilla_del_escenario(scenario, db)
+
+    # ⚠️ `aplica_en(año)` y no `active` a secas: esta propiedad tiene categorías
+    # que todavía no abrieron, y un `active == True` suelto las deja pasar. El
+    # síntoma sería una fila de pax para una villa que ese año no existe.
+    tipos = (await db.execute(
+        select(RoomTypeConfig)
+        .where(RoomTypeConfig.hotel_id == scenario.hotel_id,
+               aplica_en(scenario.year))
+        .order_by(RoomTypeConfig.sort_order)
+    )).scalars().all()
+
+    cards = {(rc.room_type_id, rc.month): rc for rc in (await db.execute(
+        select(RateCard).where(RateCard.scenario_id == scenario_id)
+    )).scalars()}
+
+    filas = []
+    for rt in tipos:
+        celdas = []
+        for m in range(1, 13):
+            rc = cards.get((rt.id, m))
+            celdas.append({"month": m,
+                           "pax": str(rc.pax_per_room) if rc else str(semilla),
+                           "hay_tarifa": rc is not None})
+        filas.append({"room_type_id": rt.id, "code": rt.code or "",
+                      "name": rt.name, "units": rt.units, "meses": celdas})
+
+    return {"scenario_id": scenario_id, "year": scenario.year,
+            "semilla": str(semilla), "filas": filas}
+
+
+class PaxCelda(BaseModel):
+    room_type_id: str
+    month: int
+    pax: Decimal
+
+
+class PaxGridUpdate(BaseModel):
+    celdas: list[PaxCelda]
+
+
+@router.put("/scenarios/{scenario_id}/revenue/pax-grid/")
+async def set_pax_grid(
+    scenario_id: str, payload: PaxGridUpdate, db: AsyncSession = Depends(get_db),
+):
+    """Guarda el pax de las celdas que se tocaron.
+
+    ⚠️ **Sólo sobre tarjetas que YA existen.** Ver `get_pax_grid`: crear una para
+    alojar un pax metería esa categoría en el cálculo con tarifa cero. Las
+    celdas sin tarjeta se devuelven en `sin_tarifa` para que la pantalla lo diga
+    en vez de hacer como que guardó.
+
+    ⚠️ Y **no toca `rack_rate` ni `net_rate`**. El endpoint que ya existía para
+    la tarjeta exige las tres cosas juntas, así que guardar un pax obligaba a
+    reenviar las tarifas — y cualquier redondeo del camino de ida y vuelta se
+    quedaba escrito en el presupuesto.
+    """
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    try:
+        scenario.assert_editable()
+    except Exception as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    cards = {(rc.room_type_id, rc.month): rc for rc in (await db.execute(
+        select(RateCard).where(RateCard.scenario_id == scenario_id)
+    )).scalars()}
+
+    guardadas, sin_tarifa = 0, []
+    for c in payload.celdas:
+        if not 1 <= c.month <= 12:
+            raise ErrorApi(422, "mes.fuera_de_rango")
+        if c.pax < 0:
+            raise ErrorApi(422, "pax_por_noche.negativo")
+        rc = cards.get((c.room_type_id, c.month))
+        if rc is None:
+            sin_tarifa.append({"room_type_id": c.room_type_id, "month": c.month})
+            continue
+        rc.pax_per_room = c.pax
+        guardadas += 1
+
+    await db.commit()
+    return {"guardadas": guardadas, "sin_tarifa": sin_tarifa}

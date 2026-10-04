@@ -5,9 +5,10 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import {
-  getScenarios, getOccupancyPct, getRoomTypes, setPaxPerNight, rtLabel,
+  getScenarios, getOccupancyPct, getRoomTypes, rtLabel,
   type Scenario,
 } from "@/lib/api";
+import GrillaPax from "./GrillaPax";
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
@@ -36,9 +37,11 @@ export default function PaxPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
   const [rows, setRows] = useState<Row[]>([]);
-  const [pax, setPax] = useState("1.8");       // factor editable
-  const [savedPax, setSavedPax] = useState("1.8");
-  const [saving, setSaving] = useState(false);
+  /** El pax de CADA celda —`${room_type_id}:${mes}`—, que es como se carga y
+   *  como el motor lo multiplica. Antes acá había un solo número para todo el
+   *  hotel y todo el año (owner, 2026-10-04: «que tome los datos por mes y por
+   *  unidad»). */
+  const [paxCelda, setPaxCelda] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +71,6 @@ export default function PaxPage() {
       const unitsById = Object.fromEntries(rt.room_types.map(r => [r.id, r.units]));
       const codeById: Record<string, string> = Object.fromEntries(rt.room_types.map(r => [r.id, r.code]));
       const closed = new Set(rt.closed_months);
-      setPax(rt.pax_per_night); setSavedPax(rt.pax_per_night);
       // noches ocupadas = % ocupación × unidades × días (0 si cerrado)
       const computed: Row[] = occ.rooms.map(r => {
         const units = unitsById[r.room_type_id] ?? 0;
@@ -84,22 +86,19 @@ export default function PaxPage() {
 
   useEffect(() => { if (scenarioId) load(scenarioId); }, [scenarioId, load]);
 
-  const factor = parseFloat(pax) || 0;
-  const paxOf = (r: Row, mi: number) => r.nights[mi] * factor;
+  /** ⚠️ Noches ocupadas × el pax DE ESA celda. El factor único no servía: una
+   *  categoría de dos camas y una de king no llevan la misma gente, y en
+   *  temporada alta tampoco la lleva la misma que en septiembre. */
+  const paxOf = (r: Row, mi: number) =>
+    r.nights[mi] * (paxCelda[`${r.id}:${mi + 1}`] ?? 0);
+
+  /** ⚠️ Un escenario enllavado no se edita, y la grilla tiene que saberlo
+   *  ANTES de dejar escribir: el backend contesta 409, pero dejar teclear un
+   *  año entero para que el Guardar lo rechace es perder el trabajo dos veces. */
+  const bloqueado = scenarios.find(s2 => s2.id === scenarioId)?.is_locked ?? false;
   const monthTotals = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + paxOf(r, mi), 0));
   const grand = monthTotals.reduce((s, v) => s + v, 0);
   const fmt = fmtInt;
-
-  async function savePax() {
-    setSaving(true); setError(null);
-    try {
-      const v = parseFloat(pax) || 0;
-      await setPaxPerNight(HOTEL_ID, v);
-      setSavedPax(String(v));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("errorSaving"));
-    } finally { setSaving(false); }
-  }
 
   // ── Excel: la misma grilla, con el pax como número ────────────────────────
   async function bajarExcel() {
@@ -114,7 +113,8 @@ export default function PaxPage() {
     try {
       await bajarCuadros("Pax", [{
         titulo: t("title"),
-        subtitulo: `${esc} · ${t("xlsSubtitle", { factor })}`,
+        subtitulo: `${esc} · noches ocupadas × los huéspedes por habitación `
+          + `de cada categoría y mes`,
         hoja: "Pax",
         columnas: [
           { label: "Room Type", ancho: 34, formato: "texto" },
@@ -138,21 +138,19 @@ export default function PaxPage() {
         </select>
         <PushRevenueButton scenarioId={scenarioId} />
         <button onClick={bajarExcel} title={t("excelHint")} style={excelBtn}>⬇ Excel</button>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{t("paxPerNight")}</span>
-        <input className="fin-input mono" value={pax} onChange={e => setPax(e.target.value)}
-          onFocus={e => e.target.select()} style={{ width: 70, textAlign: "right" }} />
-        <button onClick={savePax} disabled={saving || pax === savedPax}
-          style={{ padding: "7px 16px", fontSize: 13, borderRadius: 5, fontWeight: 600, border: "none",
-            cursor: (saving || pax === savedPax) ? "not-allowed" : "pointer",
-            background: (saving || pax === savedPax) ? "var(--bg-surface)" : "var(--brand)",
-            color: (saving || pax === savedPax) ? "var(--text-disabled)" : "#fff" }}>
-          {saving ? tc("saving") : pax === savedPax ? t("saved") : tc("save")}
-        </button>
       </div>
       <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6, marginBottom: 12 }}>
-        {t.rich("intro", { b: (c: React.ReactNode) => <b>{c}</b>, factor })}
+        Arriba se digita cuánta gente lleva cada categoría por habitación
+        ocupada, mes a mes. Abajo, la explosión: <b>noches ocupadas × ese
+        número</b> = huéspedes. Es el mismo campo que multiplica el motor, así
+        que de acá salen los huéspedes del P&amp;L y, con ellos, Food,
+        Activities, Transportation y Sustainability.
       </p>
+
+      {/* ⚠️ La grilla va ARRIBA de su explosión, que es como el owner la
+          dibujó: se digita y se ve el efecto en el mismo scroll. */}
+      <GrillaPax scenarioId={scenarioId} bloqueado={bloqueado}
+                 onCambio={setPaxCelda} />
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 

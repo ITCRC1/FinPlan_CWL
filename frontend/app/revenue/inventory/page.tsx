@@ -110,14 +110,13 @@ export default function InventoryPage() {
   // Live total reflects edits in flight too.
   const liveTotal = rows.reduce((s, r) => s + (Number(r.units) || 0), 0) || total;
 
-  // ── Excel: la misma tabla, con units y pax como número ────────────────────
+  // ── Excel: la misma tabla ─────────────────────────────────────────────────
   async function bajarExcel() {
     const filas: FilaCuadro[] = rows.map(r => ({
       label: rtLabel(r.code, r.name), nivel: 1,
-      valores: [Number(r.pax_min) || 0, Number(r.pax_max) || 0, Number(r.units) || 0],
+      valores: [Number(r.units) || 0],
     }));
-    // Pax min/max no se suman: el total solo aplica a unidades.
-    filas.push({ label: tc("total"), es_total: true, valores: [null, null, liveTotal] });
+    filas.push({ label: tc("total"), es_total: true, valores: [liveTotal] });
     try {
       await bajarCuadros("Inventario", [{
         titulo: t("title"),
@@ -125,8 +124,6 @@ export default function InventoryPage() {
         hoja: t("sheet"),
         columnas: [
           { label: tc("category"), ancho: 40, formato: "texto" },
-          { label: "Pax min", ancho: 12, formato: "num" },
-          { label: "Pax max", ancho: 12, formato: "num" },
           { label: t("units"), ancho: 12, formato: "num" },
         ],
         filas,
@@ -149,6 +146,17 @@ export default function InventoryPage() {
       <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6, marginBottom: 16 }}>
         {t("intro", { hotel: hotel.nombre })} {busy && `· ${tc("saving")}`}
       </p>
+      {/* ⚠️ Decir a dónde se fue el pax. Estaba acá como «Pax min / Pax max»,
+          no alimentaba nada —ni el motor ni un reporte lo leía— y era entero,
+          así que un 2,1 no se podía ni escribir: el campo tomaba el dato y
+          volvía solo. Owner, 2026-10-04: «no puedo guardar». Quien venga a
+          buscarlo tiene que encontrar la puerta, no un hueco. */}
+      <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginTop: -8,
+                  marginBottom: 16 }}>
+        Los <b>huéspedes por habitación ocupada</b> se cargan en{" "}
+        <a href="/revenue/pax" style={{ color: "var(--brand)" }}>Pax</a>, por
+        categoría y por mes, con decimales — es lo que el motor multiplica.
+      </p>
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
@@ -161,8 +169,6 @@ export default function InventoryPage() {
               <tr>
                 <th style={{ textAlign: "left", width: 40 }}>#</th>
                 <th style={{ textAlign: "left" }}>{tc("category")}</th>
-                <th style={{ textAlign: "right", width: 90 }}>Pax min</th>
-                <th style={{ textAlign: "right", width: 90 }}>Pax max</th>
                 <th style={{ textAlign: "right", width: 100 }}>{t("units")}</th>
                 <th style={{ width: 40 }}></th>
               </tr>
@@ -185,8 +191,6 @@ export default function InventoryPage() {
                     </span>
                     <EditCell value={r.name} onSave={v => save(r.id, { name: v.trim() || r.name })} />
                   </td>
-                  <td><EditCell value={r.pax_min} type="number" align="right" onSave={v => save(r.id, { pax_min: parseInt(v) || 0 })} /></td>
-                  <td><EditCell value={r.pax_max} type="number" align="right" onSave={v => save(r.id, { pax_max: parseInt(v) || 0 })} /></td>
                   <td><EditCell value={r.units} type="number" align="right" onSave={v => save(r.id, { units: parseInt(v) || 0 })} /></td>
                   <td style={{ textAlign: "center" }}>
                     <button
@@ -203,7 +207,6 @@ export default function InventoryPage() {
               <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
                 <td></td>
                 <td style={{ textAlign: "left" }}>{tc("total")}</td>
-                <td></td><td></td>
                 <td className="mono" style={{ textAlign: "right" }}>{liveTotal}</td>
                 <td></td>
               </tr>

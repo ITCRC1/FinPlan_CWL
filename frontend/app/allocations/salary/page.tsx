@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ordenarEscenarios } from "@/lib/ordenEscenarios";
+import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
@@ -337,7 +338,10 @@ export default function SalaryAllocationPage() {
                           {row.label}{row.field && <button onClick={() => fillYear(i, row.field!)} title={t("copyJanHint")} style={{ marginLeft: 6, fontSize: 10, background: "none", border: `1px solid ${GOLD}66`, borderRadius: 4, color: GOLD, cursor: "pointer", padding: "0 4px" }}>{t("toYear")}</button>}
                         </td>
                         {row.vals.map((v, mi) => row.field ? (
-                          <td key={mi} style={{ padding: "5px 3px" }}><input className="mono" value={v || ""} placeholder="0" onChange={e => setVec(i, row.field!, mi, e.target.value)} style={inp} /></td>
+                          <td key={mi} style={{ padding: "5px 3px" }}><input className="mono" value={v || ""} placeholder="0" onChange={e => setVec(i, row.field!, mi, e.target.value)}
+                            onPaste={e => manejarPegado(e, b => pegarEnFila(b, mi, 12,
+                              (j, x) => setVec(i, row.field!, j, String(numeroDeExcel(x)))))}
+                            style={inp} /></td>
                         ) : (
                           <td key={mi} className="mono" style={{ ...tdN, fontWeight: row.bold ? 800 : 500, color: row.bold ? "var(--text-primary)" : "var(--text-secondary)" }}>{m0(v)}</td>
                         ))}

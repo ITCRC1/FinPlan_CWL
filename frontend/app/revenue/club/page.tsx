@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState, CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import ClubMembershipEditor from "@/components/ClubMembershipEditor";
 import { HOTEL_ID } from "@/lib/hotel";
@@ -271,6 +272,8 @@ export default function ClubPage() {
                   <td key={m} style={{ padding: 2, borderBottom: "1px solid var(--border-subtle)" }}>
                     <input className="fin-input mono" value={precio[m]}
                       onChange={e => ponerPrecio(m, e.target.value)}
+                      onPaste={e => manejarPegado(e, b => pegarEnFila(b, m, 12,
+                        (j, v) => ponerPrecio(j, String(numeroDeExcel(v)))))}
                       style={{ width: "100%", textAlign: "right", fontSize: 12, padding: "3px 6px" }} />
                   </td>
                 ))}

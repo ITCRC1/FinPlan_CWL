@@ -1,5 +1,9 @@
 "use client";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+// ⚠️ El parser COMPARTIDO: `numeroDeExcel` mira la POSICIÓN de la coma para
+// saber si es decimal o separador de miles. El que vivía acá la borraba
+// siempre, así que un número en formato español entraba multiplicado.
+import { celdasPegadas } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -93,10 +97,9 @@ export default function OccupancyPage() {
   }
 
   function handlePaste(ri: number, mi: number, e: React.ClipboardEvent) {
-    const text = e.clipboardData.getData("text");
-    if (!text || (!text.includes("\t") && !text.includes("\n"))) return;
+    const grid = celdasPegadas(e.clipboardData.getData("text"));
+    if (!grid) return;          // una celda sola: la escribe el navegador
     e.preventDefault();
-    const grid = text.replace(/\r/g, "").split("\n").filter(l => l.length).map(l => l.split("\t"));
     setRows(prev => {
       const next = prev.map(r => ({ ...r }));
       grid.forEach((cells, dr) => {

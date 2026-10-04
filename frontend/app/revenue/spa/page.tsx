@@ -1,5 +1,6 @@
 "use client";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
+import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -257,6 +258,8 @@ export default function SpaBudgetPage() {
                   <td key={i} style={{ padding: "1px 2px" }}>
                     <input className="fin-input mono" value={c} disabled={sel?.is_locked}
                       onChange={e => setCapCell(i, e.target.value)} onFocus={e => e.target.select()}
+                      onPaste={e => manejarPegado(e, b => pegarEnFila(b, i, 12,
+                        (j, v) => setCapCell(j, String(numeroDeExcel(v)))))}
                       style={{ width: "100%", textAlign: "right", padding: "3px 4px" }} />
                   </td>
                 ))}
