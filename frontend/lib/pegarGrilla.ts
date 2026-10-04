@@ -145,3 +145,32 @@ export function pegarEnFila(
   });
   return puestas;
 }
+
+/**
+ * Un número que YA está en unidades de porcentaje: `52%` es **52**, no 0,52.
+ *
+ * Owner, 2026-10-04, pegando ocupación: *«lo que yo subo son %, digo 52%, lo
+ * que quiero es que tome el 52 y no que diga 520»*.
+ *
+ * ⚠️ **Dos errores distintos, los dos en la misma celda.**
+ *
+ * 1. El parser viejo de esa pantalla hacía `replace(/[%, ]/g, "")`, o sea
+ *    borraba la coma: un `52,0` copiado de un Excel en español entraba como
+ *    **520**. Eso es lo que el owner estaba viendo.
+ * 2. Y `numeroDeExcel` lo arregla por el otro lado y se pasa: ve el `%` y
+ *    DIVIDE entre cien, así que `52%` entra como **0,52** — correcto para una
+ *    celda que guarda la fracción, equivocado para una que guarda el número.
+ *
+ * Por eso son dos funciones y no una con un `if`: lo que decide no es el texto
+ * pegado sino **qué guarda la celda**, y eso sólo lo sabe la pantalla.
+ *
+ * ⚠️ No convierte fracciones. Un `0,52` entra como 0,52 y no como 52: adivinar
+ * que «eso seguro era 52%» es inventar, y la celda de al lado podría tener un
+ * 0,52% de verdad.
+ */
+export function numeroDePorcentaje(v: string | number | null | undefined): number {
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const s = String(v ?? "").trim();
+  // El `%` acá es la UNIDAD de la celda, no una instrucción de dividir.
+  return numeroDeExcel(s.endsWith("%") ? s.slice(0, -1) : s);
+}

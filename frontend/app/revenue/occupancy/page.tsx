@@ -3,7 +3,7 @@ import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScena
 // ⚠️ El parser COMPARTIDO: `numeroDeExcel` mira la POSICIÓN de la coma para
 // saber si es decimal o separador de miles. El que vivía acá la borraba
 // siempre, así que un número en formato español entraba multiplicado.
-import { celdasPegadas } from "@/lib/pegarGrilla";
+import { celdasPegadas, numeroDePorcentaje } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -22,10 +22,13 @@ const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","
 const MONTH_KEYS: MonthKey[] = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
 
 function fracToPct(s: string): string { return String(parseFloat((parseFloat(s) * 100 || 0).toFixed(2))); }
-function pctNum(v: string): number {
-  const n = parseFloat((v || "").toString().replace(/[%, ]/g, ""));
-  return isNaN(n) ? 0 : n;
-}
+/** La celda guarda el NÚMERO del porcentaje: `52%` es 52.
+ *
+ *  ⚠️ El que vivía acá hacía `replace(/[%, ]/g, "")` y se llevaba la coma
+ *  puesta: un `52,0` pegado desde un Excel en español entraba como **520**
+ *  (owner, 2026-10-04). Y `numeroDeExcel` a secas se pasa para el otro lado:
+ *  divide entre cien y deja 0,52. */
+const pctNum = numeroDePorcentaje;
 function daysInMonth(year: number, month1: number): number {
   return new Date(year, month1, 0).getDate();
 }

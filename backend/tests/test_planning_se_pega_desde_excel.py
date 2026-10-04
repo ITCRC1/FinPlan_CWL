@@ -155,3 +155,51 @@ def test_el_pegado_sale_de_UNA_libreria():
     assert not propios, (
         f"estas pantallas pegan con su propio parser: {propios}. "
         "Con uno por pantalla, el mismo `2,1` entra distinto en cada una.")
+
+
+#: Celdas que guardan el NUMERO del porcentaje —`52%` es 52— y por lo tanto no
+#: pueden usar `numeroDeExcel`, que ve el `%` y divide entre cien.
+POR_CIENTO = {
+    "frontend/app/revenue/occupancy/page.tsx": "% de ocupacion por tipo y mes",
+    "frontend/app/revenue/spa/page.tsx": "capture rate",
+    "frontend/app/nonop/management-fees/page.tsx": "mgmt fee % y royalties %",
+}
+
+
+def test_una_celda_de_PORCENTAJE_no_usa_el_parser_de_dinero():
+    """⚠️ Dos errores distintos en la misma celda, los dos medidos el 2026-10-04.
+
+        el parser viejo    «52,0»  → 520     (borraba la coma)
+        numeroDeExcel      «52%»   → 0,52    (divide entre cien)
+
+    Owner, pegando ocupacion: *«lo que yo subo son %, digo 52%, lo que quiero es
+    que tome el 52 y no que diga 520»*.
+
+    Lo que decide cual parser va no es el texto pegado sino **que guarda la
+    celda**, y eso solo lo sabe la pantalla. Por eso son dos funciones y no una
+    con un `if`.
+    """
+    malas = []
+    for rel, que in POR_CIENTO.items():
+        p = FRONT / rel.removeprefix("frontend/")
+        if not p.exists():
+            continue
+        src = p.read_text(encoding="utf-8")
+        # Sin los comentarios: el que explica por que NO se usa la nombra.
+        codigo = re.sub(r"/\*[\s\S]*?\*/|//.*", "", src)
+        if "numeroDeExcel" in codigo:
+            malas.append(f"{rel} ({que})")
+        if "numeroDePorcentaje" not in codigo and "onPaste" in codigo:
+            malas.append(f"{rel}: pega sin `numeroDePorcentaje` ({que})")
+    assert not malas, (
+        "estas celdas guardan el NUMERO del porcentaje y estan usando el parser "
+        f"de dinero: {malas}. `numeroDeExcel` divide entre cien cuando ve un `%`.")
+
+
+def test_la_libreria_tiene_LAS_DOS_lecturas_del_porcentaje():
+    """Una celda guarda la fraccion (0,52) y otra el numero (52). Las dos
+    existen, y cada pantalla elige la suya."""
+    lib = LIB.read_text(encoding="utf-8")
+    assert "export function numeroDePorcentaje(" in lib
+    assert "s.endsWith(\"%\") ? s.slice(0, -1) : s" in lib, (
+        "`numeroDePorcentaje` volvio a dejar que se divida entre cien")

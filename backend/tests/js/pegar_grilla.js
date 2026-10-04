@@ -71,6 +71,38 @@ es("-2,1", -2.1);
 es("75%", 0.75);
 es("(75%)", -0.75);
 
+/* ── 1b · El porcentaje, que es OTRA unidad ─────────────────────────────── */
+//
+// ⚠️ Dos errores distintos en la misma celda, los dos medidos el 2026-10-04:
+//
+//   el parser viejo       `52,0`  → 520    (borraba la coma)
+//   `numeroDeExcel`       `52%`   → 0,52   (divide entre cien)
+//
+// La celda de ocupación guarda el NUMERO del porcentaje, asi que las dos
+// respuestas estan mal. Owner: «lo que yo subo son %, digo 52%, lo que quiero
+// es que tome el 52 y no que diga 520».
+
+const pc = (entrada, esperado) => {
+  const r = P.numeroDePorcentaje(entrada);
+  ok(Math.abs(r - esperado) < 1e-9, `%: «${entrada}» → ${esperado}, dio ${r}`);
+};
+pc("52", 52);
+pc("52%", 52);            // el `%` es la UNIDAD, no una instruccion de dividir
+pc("52,0", 52);           // ⚠️ el caso del owner: 52, no 520
+pc("52.0", 52);
+pc("52,5", 52.5);
+pc("52,5%", 52.5);
+pc("100%", 100);
+pc("", 0);
+pc("0", 0);
+// ⚠️ NO convierte fracciones: `0,52` entra como 0,52. Adivinar que «eso seguro
+// era 52%» es inventar, y la celda de al lado podria tener un 0,52% de verdad.
+pc("0,52", 0.52);
+// Y la otra funcion sigue dividiendo, que es lo correcto donde la celda guarda
+// la fraccion: las dos existen porque lo que decide es QUE GUARDA la celda.
+ok(Math.abs(P.numeroDeExcel("52%") - 0.52) < 1e-9,
+   "numeroDeExcel sigue dividiendo: la celda que guarda fraccion lo necesita");
+
 /* ── 2 · El bloque: filas y columnas ────────────────────────────────────── */
 
 ok(P.celdasPegadas("2,1") === null,

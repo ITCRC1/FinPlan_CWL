@@ -1,6 +1,9 @@
 "use client";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
-import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
+// ⚠️ `numeroDePorcentaje` y no `numeroDeExcel`: la celda del capture rate guarda el NÚMERO del porcentaje: `52%` es 52.
+// `numeroDeExcel` ve el `%` y divide entre cien, que es lo correcto para
+// una celda que guarda la fracción y lo contrario de lo que esta guarda.
+import { manejarPegado, numeroDePorcentaje, pegarEnFila } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -259,7 +262,7 @@ export default function SpaBudgetPage() {
                     <input className="fin-input mono" value={c} disabled={sel?.is_locked}
                       onChange={e => setCapCell(i, e.target.value)} onFocus={e => e.target.select()}
                       onPaste={e => manejarPegado(e, b => pegarEnFila(b, i, 12,
-                        (j, v) => setCapCell(j, String(numeroDeExcel(v)))))}
+                        (j, v) => setCapCell(j, String(numeroDePorcentaje(v)))))}
                       style={{ width: "100%", textAlign: "right", padding: "3px 4px" }} />
                   </td>
                 ))}

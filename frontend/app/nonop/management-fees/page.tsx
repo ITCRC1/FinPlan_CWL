@@ -1,6 +1,10 @@
 "use client";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
-import { manejarPegado, numeroDeExcel, pegarEnFila } from "@/lib/pegarGrilla";
+// ⚠️ `numeroDePorcentaje` y no `numeroDeExcel`: `pct3` y `pct5` están en
+// 0..100, o sea `3%` es 3 y no 0,03. `numeroDeExcel` ve el `%` y divide
+// entre cien, que es lo correcto para una celda que guarda la fracción y
+// lo contrario de lo que esta guarda.
+import { manejarPegado, numeroDePorcentaje, pegarEnFila } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -247,7 +251,7 @@ export default function ManagementFeesPage() {
                         onChange={e => setPct3(p => p.map((x, j) => j === i ? Number(e.target.value) : x))}
                         onPaste={e => manejarPegado(e, b => {
                           const vals: Record<number, number> = {};
-                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDeExcel(s2); });
+                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDePorcentaje(s2); });
                           setPct3(p => p.map((x, j) => (j in vals ? vals[j] : x)));
                         })} />
                     </td>
@@ -272,7 +276,7 @@ export default function ManagementFeesPage() {
                         onChange={e => setPct5(p => p.map((x, j) => j === i ? Number(e.target.value) : x))}
                         onPaste={e => manejarPegado(e, b => {
                           const vals: Record<number, number> = {};
-                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDeExcel(s2); });
+                          pegarEnFila(b, i, 12, (j, s2) => { vals[j] = numeroDePorcentaje(s2); });
                           setPct5(p => p.map((x, j) => (j in vals ? vals[j] : x)));
                         })} />
                     </td>
