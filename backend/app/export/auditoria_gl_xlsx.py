@@ -48,6 +48,14 @@ QUE_MIRA = {
     "CUENTA_GENERICA": (
         "Gasto cargado a una cuenta de cajon (7380 Miscellaneous). No es un error "
         "por si mismo: es donde se esconde uno."),
+    "PREMIUM_EN_COMIDA_DE_EMPLEADOS": (
+        "Un producto de carta (filete, pargo, congrio, bistec, mariscos, vino) cargado "
+        "al costo de la comida del personal. Infla el comedor —que se reparte a todos "
+        "los departamentos— y abarata el margen de F&B, los dos sin dar error."),
+    "PUESTO_EN_VARIOS_DEPARTAMENTOS": (
+        "Un mismo nombre de puesto cargado a mas de un departamento. Puede ser "
+        "legitimo, pero es lo que hay que mirar: se senala el departamento con menos "
+        "plata, que es el candidato a estar de mas."),
     "ALLOCATION_NO_NETEA": (
         "La cuenta 4999 reparte gasto entre departamentos y tiene que sumar cero a "
         "nivel de hotel. Si no suma cero, el reparto quedo a medias."),
@@ -59,7 +67,7 @@ _COLS = [
     ("Monto USD", 13), ("Deberia ir en", 14), ("Por que", 96),
 ]
 _COLS_DET = [
-    ("Severidad", 10), ("Regla", 28), ("Concepto", 30), ("Cuenta", 28),
+    ("Tipo", 18), ("Severidad", 10), ("Regla", 28), ("Concepto", 30), ("Cuenta", 28),
     ("Asiento", 9), ("Linea", 7), ("Fecha", 11), ("Origen", 8),
     ("Descripcion", 40), ("Referencia", 36), ("Monto CRC", 15), ("Monto USD", 13),
 ]
@@ -74,13 +82,11 @@ def _encabezado(ws, cols) -> None:
     ws.freeze_panes = "A2"
 
 
-def construir(resumen, archivo: str = "") -> bytes:
-    wb = Workbook()
-
-    ws = wb.active
-    ws.title = "Discrepancias"
+def _hoja_de_casos(wb, titulo: str, hallazgos: list):
+    """Una hoja de trabajo con sus casos. Vacia no se crea."""
+    ws = wb.create_sheet(titulo[:31])
     _encabezado(ws, _COLS)
-    for h in resumen.hallazgos:
+    for h in hallazgos:
         ws.append(["", h.severidad.upper(), h.regla, h.cuenta, h.dept, h.concepto,
                    h.n_lineas, h.monto_crc, h.monto_usd, h.sugerencia, h.porque])
         f = ws.max_row
@@ -91,20 +97,39 @@ def construir(resumen, archivo: str = "") -> bytes:
         ws.cell(row=f, column=9).number_format = _MONEDA
         ws.cell(row=f, column=11).alignment = Alignment(wrap_text=True, vertical="top")
     ws.auto_filter.ref = "A1:K{}".format(max(ws.max_row, 1))
+    return ws
+
+
+def construir(resumen, archivo: str = "") -> bytes:
+    """El reporte, partido por tipo de cuenta.
+
+    Owner, 2026-10-05: *«a mi me gustaria tener las discrepancias por tipo de
+    cuenta. Costos empieza con 5, payroll 6, Opex 7 y property expenses 8»*.
+
+    Una hoja por tipo y NO una sola con una columna para filtrar: son revisiones
+    distintas, con gente distinta al lado. Un tipo sin hallazgos no genera hoja
+    —una pestana vacia se lee como «no reviso esto», cuando lo que dice es «esto
+    salio limpio»—; el Resumen lo deja escrito.
+    """
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    for grupo in resumen.por_grupo:
+        _hoja_de_casos(wb, grupo, [h for h in resumen.hallazgos if h.grupo == grupo])
 
     det = wb.create_sheet("Detalle")
     _encabezado(det, _COLS_DET)
     for h in resumen.hallazgos:
         for l in h.lineas:
-            det.append([h.severidad.upper(), h.regla, h.concepto, l["cuenta"],
-                        l["asiento"], l["linea"], l["fecha"], l["origen"],
-                        l["descripcion"], l["referencia"], l["monto_crc"],
-                        l["monto_usd"]])
+            det.append([h.grupo, h.severidad.upper(), h.regla, h.concepto,
+                        l["cuenta"], l["asiento"], l["linea"], l["fecha"],
+                        l["origen"], l["descripcion"], l["referencia"],
+                        l["monto_crc"], l["monto_usd"]])
             f = det.max_row
-            det.cell(row=f, column=1).fill = _SEV[h.severidad]
-            det.cell(row=f, column=11).number_format = _MONEDA
+            det.cell(row=f, column=2).fill = _SEV[h.severidad]
             det.cell(row=f, column=12).number_format = _MONEDA
-    det.auto_filter.ref = "A1:L{}".format(max(det.max_row, 1))
+            det.cell(row=f, column=13).number_format = _MONEDA
+    det.auto_filter.ref = "A1:M{}".format(max(det.max_row, 1))
 
     rg = wb.create_sheet("Reglas")
     rg.append(["Auditoria del detalle del mayor"])
@@ -120,6 +145,16 @@ def construir(resumen, archivo: str = "") -> bytes:
             ("Monto senalado (CRC)", resumen.monto_en_revision_crc)):
         rg.append([etiqueta, valor])
     rg.append([])
+    rg.append(["Tipo de cuenta", "Casos", "Severidad alta", "Lineas", "Monto CRC"])
+    for c in ("A", "B", "C", "D", "E"):
+        rg["{}{}".format(c, rg.max_row)].fill = _HDR
+        rg["{}{}".format(c, rg.max_row)].font = _HDR_F
+    for grupo, d in resumen.por_grupo.items():
+        rg.append([grupo, d["casos"], d["alta"], d["lineas"], d["monto_crc"]])
+        rg.cell(row=rg.max_row, column=5).number_format = _MONEDA
+    if not resumen.por_grupo:
+        rg.append(["Sin discrepancias", 0, 0, 0, 0])
+    rg.append([])
     rg.append(["Regla", "Casos", "Que mira"])
     for c in ("A", "B", "C"):
         rg["{}{}".format(c, rg.max_row)].fill = _HDR
@@ -131,7 +166,7 @@ def construir(resumen, archivo: str = "") -> bytes:
     rg.append([])
     rg.append(["Esto no decide si un asiento esta bien: senala los que no se parecen "
                "al resto, para que la revision empiece por ahi."])
-    for col, ancho in (("A", 38), ("B", 9), ("C", 110)):
+    for col, ancho in (("A", 38), ("B", 9), ("C", 110), ("D", 10), ("E", 15)):
         rg.column_dimensions[col].width = ancho
 
     buf = io.BytesIO()

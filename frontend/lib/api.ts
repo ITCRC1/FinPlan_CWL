@@ -5908,6 +5908,9 @@ export interface AuditoriaLinea {
   monto_crc: number; monto_usd: number;
 }
 export interface AuditoriaHallazgo {
+  /** Costos (5) · Planilla (6) · Opex (7) · Gastos de propiedad (8) ·
+   *  Ingresos (4). Sale de la cuenta SEÑALADA, no de la sugerida. */
+  grupo: string;
   regla: string;
   /** `alta` · `media` · `baja` — la tabla sale ordenada por esto y por monto. */
   severidad: string;
@@ -5926,6 +5929,9 @@ export interface AuditoriaGL {
   monto_en_revision_crc: number;
   por_regla: Record<string, number>;
   por_severidad: Record<string, number>;
+  /** Por tipo de cuenta, en el orden en que se revisa. Un tipo sin hallazgos NO
+   *  viene: una pestaña vacía se lee como «no revisé esto». */
+  por_grupo: Record<string, { casos: number; lineas: number; monto_crc: number; alta: number }>;
   que_mira: Record<string, string>;
   hallazgos: AuditoriaHallazgo[];
 }

@@ -202,3 +202,94 @@ def test_cada_hallazgo_trae_la_evidencia_para_ir_a_buscarla():
     assert len(h.lineas) == 6
     assert set(h.lineas[0]) >= {"asiento", "linea", "fecha", "cuenta", "referencia",
                                 "monto_crc", "monto_usd"}
+
+
+# ──────────────── producto de carta en la comida del personal ────────────────
+def test_un_producto_premium_en_el_comedor_de_empleados_se_senala():
+    """Owner, 2026-10-05: «errores que metan productos premium en employees food
+    y que deberian ser food cost de restaurantes». En setiembre eran filete de
+    congrio, filete de pargo y bistec de res: CRC 2.887.278."""
+    ls = [L("5420-0220-000-000-000-00-00", "FILET DE CONGRIO", monto=85_750.0)
+          for _ in range(9)]
+    r = A.revisar(ls)
+    assert reglas(r.hallazgos) == {"PREMIUM_EN_COMIDA_DE_EMPLEADOS"}
+    h, = r.hallazgos
+    assert h.severidad == A.ALTA and h.sugerencia.startswith("5101")
+    assert h.n_lineas == 9 and h.grupo == "Costos"
+
+
+def test_la_comida_normal_del_personal_no_se_senala():
+    """Arroz, huevos y repollo son exactamente lo que va ahi."""
+    ls = ([L("5420-0220-000-000-000-00-00", "ARROZ 95 GRANEL", monto=79_308.0)
+           for _ in range(9)]
+          + [L("5420-0220-000-000-000-00-00", "REPOLLO VERDE") for _ in range(24)])
+    assert A.revisar(ls).hallazgos == []
+
+
+def test_el_mismo_producto_premium_en_el_restaurante_no_dice_nada():
+    """Un filete en 5101 esta en su lugar: la regla mira SOLO el comedor."""
+    ls = [L("5101-0120-000-000-000-00-00", "FILET DE CONGRIO") for _ in range(9)]
+    assert "PREMIUM_EN_COMIDA_DE_EMPLEADOS" not in reglas(A.revisar(ls).hallazgos)
+
+
+@pytest.mark.parametrize("articulo", ["Filete pargo", "FILET DE CONGRIO",
+                                      "RES BISTEC EL ARREO", "Lomito", "Camaron jumbo"])
+def test_las_palabras_premium_que_aparecieron_en_setiembre(articulo):
+    ls = [L("5420-0220-000-000-000-00-00", articulo)]
+    assert "PREMIUM_EN_COMIDA_DE_EMPLEADOS" in reglas(A.revisar(ls).hallazgos)
+
+
+# ──────────────── un puesto en un departamento que no es el suyo ────────────────
+def test_un_puesto_cargado_a_dos_departamentos():
+    """Owner, 2026-10-05: «en las cuentas de payroll 6, posiciones que no
+    corresponden al departamento». En setiembre «COCINERO B» tenia 42 lineas en
+    Kitchen (CRC 16,2 M) y 42 en Employee Dining (CRC 6,4 M)."""
+    ls = ([L("6000-0122-500-013-015-00-00", "COCINERO B", "KITCHEN", monto=387_690.0)
+           for _ in range(42)]
+          + [L("6000-0220-500-013-015-00-00", "COCINERO B", "EMPLOYEE DINING",
+               monto=152_206.0) for _ in range(42)])
+    r = A.revisar(ls)
+    assert "PUESTO_EN_VARIOS_DEPARTAMENTOS" in reglas(r.hallazgos)
+    h = [x for x in r.hallazgos if x.regla == "PUESTO_EN_VARIOS_DEPARTAMENTOS"][0]
+    assert h.dept == "0220", "a igual cantidad de lineas se senala el de MENOS plata"
+    assert h.sugerencia == "0122" and h.grupo == "Planilla"
+
+
+def test_un_puesto_en_un_solo_departamento_no_dice_nada():
+    ls = [L("6000-0122-500-013-015-00-00", "COCINERO B", "KITCHEN") for _ in range(42)]
+    assert "PUESTO_EN_VARIOS_DEPARTAMENTOS" not in reglas(A.revisar(ls).hallazgos)
+
+
+# ─────────────────────── el corte por tipo de cuenta ───────────────────────
+def test_cada_hallazgo_sabe_a_que_tipo_de_cuenta_pertenece():
+    """Owner, 2026-10-05: «me gustaria tener las discrepancias por tipo de
+    cuenta. Costos empieza con 5, payroll 6, Opex 7 y property expenses 8»."""
+    assert A.grupo_de("5101-0120-000-000-000-00-00") == "Costos"
+    assert A.grupo_de("6000-0111-501-013-015-00-00") == "Planilla"
+    assert A.grupo_de("7380-0180-800-000-000-00-00") == "Opex"
+    assert A.grupo_de("8000-0250-000-000-000-00-00") == "Gastos de propiedad"
+    assert A.grupo_de("4999-0220-000-000-000-00-00") == "Ingresos"
+
+
+def test_el_resumen_por_tipo_cuenta_casos_lineas_y_plata():
+    ls = ([L("5420-0220-000-000-000-00-00", "FILETE PARGO", monto=100.0)
+           for _ in range(3)]
+          + [L("7380-0180-800-000-000-00-00", "varios", monto=50.0) for _ in range(4)])
+    r = A.revisar(ls)
+    assert r.por_grupo["Costos"] == {"casos": 1, "lineas": 3, "monto_crc": 300.0,
+                                     "alta": 1}
+    assert r.por_grupo["Opex"]["casos"] == 1 and r.por_grupo["Opex"]["lineas"] == 4
+
+
+def test_un_tipo_sin_hallazgos_no_aparece_en_el_resumen():
+    """Una pestana vacia se lee como «no revise esto», cuando dice «salio limpio»."""
+    r = A.revisar([L("5420-0220-000-000-000-00-00", "FILETE PARGO")])
+    assert list(r.por_grupo) == ["Costos"]
+
+
+def test_los_hallazgos_salen_agrupados_por_tipo():
+    """El Excel y la pantalla leen la misma lista: tiene que venir ordenada."""
+    ls = ([L("7380-0180-800-000-000-00-00", "varios") for _ in range(4)]
+          + [L("5420-0220-000-000-000-00-00", "FILETE PARGO") for _ in range(3)])
+    grupos = [h.grupo for h in A.revisar(ls).hallazgos]
+    assert grupos == sorted(grupos, key=lambda g: A.ORDEN_GRUPOS.index(g))

@@ -61,6 +61,7 @@ function Fila({ h }: { h: AuditoriaHallazgo }) {
   return (
     <>
       <tr onClick={() => setAbierto(a => !a)} style={{ cursor: "pointer" }}>
+        <td style={{ ...td, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{h.grupo}</td>
         <td style={td}>
           <span style={{ background: s.fondo, color: s.texto, borderRadius: 4,
                          padding: "1px 6px", fontSize: 11, fontWeight: 600 }}>
@@ -80,7 +81,7 @@ function Fila({ h }: { h: AuditoriaHallazgo }) {
       </tr>
       {abierto && (
         <tr>
-          <td colSpan={7} style={{ ...td, background: "var(--bg-base)" }}>
+          <td colSpan={8} style={{ ...td, background: "var(--bg-base)" }}>
             <table style={{ borderCollapse: "collapse", width: "100%" }}>
               <thead>
                 <tr>{["Asiento", "Línea", "Fecha", "Origen", "Descripción", "Referencia", "CRC", "USD"]
@@ -114,6 +115,10 @@ export default function AuditoriaDelMayor() {
   const [ocupado, setOcupado] = useState<"" | "revisar" | "excel">("");
   const [err, setErr] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<string>("");
+  // Owner, 2026-10-05: «me gustaría tener las discrepancias por tipo de cuenta.
+  // Costos empieza con 5, payroll 6, Opex 7 y property expenses 8». Son
+  // revisiones distintas, con gente distinta al lado.
+  const [tipo, setTipo] = useState<string>("");
 
   const correr = async (f: File) => {
     setOcupado("revisar"); setErr(null); setData(null);
@@ -138,7 +143,7 @@ export default function AuditoriaDelMayor() {
   };
 
   const visibles = (data?.hallazgos ?? [])
-    .filter(h => !filtro || h.severidad === filtro);
+    .filter(h => (!filtro || h.severidad === filtro) && (!tipo || h.grupo === tipo));
 
   return (
     <div style={{ display: "grid", gap: 18, maxWidth: 1500 }}>
@@ -207,6 +212,43 @@ export default function AuditoriaDelMayor() {
             </div>
           </div>
 
+          {/* El corte por tipo de cuenta. Los que no aparecen salieron limpios:
+              el backend no manda un tipo sin hallazgos a propósito, porque una
+              pestaña vacía se lee como «no revisé esto». */}
+          <div style={card}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", marginRight: 4 }}>
+                Tipo de cuenta
+              </span>
+              {[["", "Todas", data.hallazgos.length, 0] as const,
+                ...Object.entries(data.por_grupo).map(([g, d]) =>
+                  [g, g, d.casos, d.alta] as const)].map(([k, rot, n, alta]) => (
+                <button key={k || "todas"} onClick={() => setTipo(k)}
+                        style={{ padding: "5px 11px", borderRadius: 6, fontSize: 12,
+                                 cursor: "pointer", display: "flex", gap: 6,
+                                 border: `1px solid ${tipo === k ? "var(--brand)" : "var(--border-medium)"}`,
+                                 background: tipo === k ? "var(--brand)" : "transparent",
+                                 color: tipo === k ? "#fff" : "var(--text-primary)" }}>
+                  <span>{rot}</span>
+                  <span style={{ opacity: 0.75 }}>{n}</span>
+                  {alta > 0 && (
+                    <span style={{ background: tipo === k ? "rgba(255,255,255,.25)" : "#FFD6D6",
+                                   color: tipo === k ? "#fff" : "#8B1A1A",
+                                   borderRadius: 4, padding: "0 5px", fontSize: 11 }}>
+                      {alta} alta
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {!!tipo && data.por_grupo[tipo] && (
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 8 }}>
+                {data.por_grupo[tipo].casos} casos · {data.por_grupo[tipo].lineas} líneas
+                · CRC {crc(data.por_grupo[tipo].monto_crc)}
+              </div>
+            )}
+          </div>
+
           <div style={card}>
             {/* `fin-scroll-x` y no un `overflow-x` suelto: un div que scrollea
                 en horizontal tambien lo hace en vertical, y ahi el `thead`
@@ -216,13 +258,14 @@ export default function AuditoriaDelMayor() {
             <div className="fin-scroll-x">
               <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 1100 }}>
                 <thead>
-                  <tr>{["Severidad", "Cuenta", "Concepto", "Líneas", "Monto CRC",
-                        "Debería ir en", "Por qué"].map(c => <th key={c} style={th}>{c}</th>)}</tr>
+                  <tr>{["Tipo", "Severidad", "Cuenta", "Concepto", "Líneas",
+                        "Monto CRC", "Debería ir en", "Por qué"]
+                        .map(c => <th key={c} style={th}>{c}</th>)}</tr>
                 </thead>
                 <tbody>
                   {visibles.map((h, i) => <Fila key={`${h.regla}-${h.cuenta}-${h.concepto}-${i}`} h={h} />)}
                   {!visibles.length && (
-                    <tr><td style={td} colSpan={7}>
+                    <tr><td style={td} colSpan={8}>
                       No hay casos con ese filtro. Si el archivo está limpio, eso es
                       exactamente lo que se espera ver.
                     </td></tr>

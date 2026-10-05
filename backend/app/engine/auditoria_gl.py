@@ -64,10 +64,59 @@ SIN_COSTO_DE_VENTAS = {
 #: sabe donde poner algo. No son un error — son donde se esconde uno.
 VERTEDERO = {"7380": "MISCELLANEOUS"}
 
+#: El costo de la comida del comedor de empleados (CLAUDE.md §3.2).
+COMIDA_DE_EMPLEADOS = {"5420", "5421"}
+#: Donde deberia estar la comida del restaurante.
+COSTO_DE_RESTAURANTE = "5101"
+
+#: Palabras de producto PREMIUM. Owner, 2026-10-05: *«errores que metan
+#: productos premium en employees food y que deberian ser food cost de
+#: restaurantes»*.
+#:
+#: ⚠️ Esta es la UNICA regla con lista de palabras, y es a proposito. Las demas
+#: comparan el archivo contra si mismo porque la pregunta es «¿esto se parece al
+#: resto?». Aca la pregunta es otra —«¿esto es un producto de carta?»— y eso no
+#: esta en ningun numero del mayor: el archivo no trae cantidad, asi que por
+#: monto no se puede separar un filete de pargo de un saco de arroz a granel.
+#: Probado contra setiembre: por monto salian cafe, arroz y muslo de pollo
+#: mezclados con los filetes; por palabra salen los seis articulos que son.
+#:
+#: Es una lista para CRECER. Si aparece un producto de carta que no esta aca,
+#: se agrega la palabra y queda cubierto para siempre.
+PREMIUM = (
+    "filete", "filet", "lomito", "solomillo", "churrasco", "rib eye", "ribeye",
+    "bistec", "cordero", "pargo", "congrio", "corvina", "dorado", "atun", "atún",
+    "salmon", "salmón", "camaron", "camarón", "langosta", "pulpo", "calamar",
+    "mariscos", "vino",
+)
+
 #: Que tan desparejo tiene que ser un reparto para que sea sospechoso. Con 1/3:
 #: 15 contra 3 avisa, 24 contra 21 no. Subirlo trae mas ruido del bueno y mas
 #: del malo; bajarlo esconde casos reales. Se ajusta mirando un mes completo.
 UMBRAL_MINORIA = 1 / 3
+
+#: Como el owner lee el estado de resultados. Owner, 2026-10-05: *«a mi me
+#: gustaria tener las discrepancias por tipo de cuenta. Costos empieza con 5,
+#: payroll 6, Opex 7 y property expenses 8»*.
+#:
+#: La clase 4 va aparte y no estaba en esa lista: el ingreso tambien se revisa
+#: —ahi vive la 4999, que tiene que netear a cero— y mandarlo a un grupo de
+#: gasto lo escondería. Si un mes no trae hallazgos de ingreso, el grupo
+#: simplemente no aparece.
+GRUPOS: dict[str, str] = {
+    "4": "Ingresos",
+    "5": "Costos",
+    "6": "Planilla",
+    "7": "Opex",
+    "8": "Gastos de propiedad",
+}
+ORDEN_GRUPOS = ("Costos", "Planilla", "Opex", "Gastos de propiedad", "Ingresos")
+
+
+def grupo_de(cuenta: str) -> str:
+    """El tipo de cuenta al que pertenece un hallazgo, por su primer digito."""
+    return GRUPOS.get(cuenta[:1], "Otros")
+
 
 ALTA, MEDIA, BAJA = "alta", "media", "baja"
 _ORDEN = {ALTA: 0, MEDIA: 1, BAJA: 2}
@@ -76,6 +125,10 @@ _ORDEN = {ALTA: 0, MEDIA: 1, BAJA: 2}
 @dataclass
 class Hallazgo:
     """Un caso a revisar. `lineas` son los asientos concretos donde esta."""
+    #: Costos · Planilla · Opex · Gastos de propiedad · Ingresos. Sale de la
+    #: cuenta SENALADA, no de la sugerida: el caso se revisa donde el asiento
+    #: esta hoy, no donde deberia terminar.
+    grupo: str
     regla: str
     severidad: str
     cuenta: str
@@ -100,14 +153,26 @@ class Resumen:
     hallazgos: list[Hallazgo] = field(default_factory=list)
     por_regla: dict[str, int] = field(default_factory=dict)
     por_severidad: dict[str, int] = field(default_factory=dict)
+    por_grupo: dict[str, dict] = field(default_factory=dict)
     lineas_senaladas: int = 0
     monto_en_revision_crc: float = 0.0
 
     def cerrar(self) -> "Resumen":
-        self.hallazgos.sort(key=lambda h: (_ORDEN[h.severidad], -abs(h.monto_crc)))
+        orden_g = {g: i for i, g in enumerate(ORDEN_GRUPOS)}
+        self.hallazgos.sort(key=lambda h: (orden_g.get(h.grupo, 9),
+                                           _ORDEN[h.severidad], -abs(h.monto_crc)))
         for h in self.hallazgos:
             self.por_regla[h.regla] = self.por_regla.get(h.regla, 0) + 1
             self.por_severidad[h.severidad] = self.por_severidad.get(h.severidad, 0) + 1
+        for g in ORDEN_GRUPOS:
+            hs = [h for h in self.hallazgos if h.grupo == g]
+            if hs:
+                self.por_grupo[g] = {
+                    "casos": len(hs),
+                    "lineas": sum(h.n_lineas for h in hs),
+                    "monto_crc": round(sum(abs(h.monto_crc) for h in hs), 2),
+                    "alta": sum(1 for h in hs if h.severidad == ALTA),
+                }
         self.lineas_senaladas = sum(h.n_lineas for h in self.hallazgos)
         self.monto_en_revision_crc = round(
             sum(abs(h.monto_crc) for h in self.hallazgos), 2)
@@ -133,6 +198,7 @@ def _evidencia(ls: list) -> list[dict]:
 def _hallazgo(ls: list, regla: str, sev: str, concepto: str, porque: str,
               sugerencia: str = "") -> Hallazgo:
     return Hallazgo(
+        grupo=grupo_de(ls[0].cuenta),
         regla=regla, severidad=sev, cuenta=ls[0].cuenta, dept=ls[0].seg2,
         concepto=concepto, n_lineas=len(ls),
         monto_crc=round(sum(l.monto_crc for l in ls), 2),
@@ -333,8 +399,78 @@ def _allocation_no_netea(lineas: list) -> list[Hallazgo]:
                       .format(_crc(total), len(ls)))]
 
 
+
+def _premium_en_comida_de_empleados(lineas: list) -> list[Hallazgo]:
+    """Producto de carta cargado al costo de la comida del personal.
+
+    Owner, 2026-10-05: *«errores que metan productos premium en employees food y
+    que deberian ser food cost de restaurantes»*.
+
+    Mueve plata entre dos lineas del P&L que se leen al reves: infla el costo
+    del comedor —que despues se reparte a TODOS los departamentos via la 4999—
+    y abarata el costo del restaurante, que es donde se mide el margen de F&B.
+    Los dos indicadores quedan mal y ninguno da error.
+    """
+    por_art: dict[str, list] = defaultdict(list)
+    for l in lineas:
+        if l.seg1 in COMIDA_DE_EMPLEADOS and l.referencia:
+            t = _clave(l.referencia)
+            if any(p in t for p in PREMIUM):
+                por_art[t].append(l)
+    return [_hallazgo(
+        ls, "PREMIUM_EN_COMIDA_DE_EMPLEADOS", ALTA, ls[0].referencia,
+        "«{}» es un producto de carta y esta en {}, el costo de la comida del "
+        "personal ({} {} por {}). Si se compro para el restaurante va en {}: "
+        "cargarlo aca infla el comedor —que se reparte a todos los departamentos— "
+        "y abarata el margen de F&B."
+        .format(ls[0].referencia, ls[0].seg1, len(ls),
+                "linea" if len(ls) == 1 else "lineas",
+                _crc(sum(l.monto_crc for l in ls)), COSTO_DE_RESTAURANTE),
+        COSTO_DE_RESTAURANTE + "-0120") for ls in por_art.values()]
+
+
+def _puesto_en_varios_departamentos(lineas: list) -> list[Hallazgo]:
+    """Un puesto cargado a un departamento que no es el suyo.
+
+    Owner, 2026-10-05: *«en las cuentas de payroll 6, posiciones que no
+    corresponden al departamento»*.
+
+    No es lo mismo que `_planilla_puesto`, que mira un codigo con dos nombres.
+    Aca es al reves: el mismo NOMBRE de puesto repartido entre departamentos
+    distintos. Puede ser legitimo —un cocinero del comedor de empleados es un
+    cocinero— pero es exactamente lo que hay que mirar: en setiembre «COCINERO
+    B» tenia 42 lineas en Kitchen y 42 en Employee Dining.
+
+    Se senala el departamento con MENOS plata, que es el candidato a estar de
+    mas; si los dos estan parejos se senalan ambos.
+    """
+    por_puesto: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+    for l in lineas:
+        if l.clase == "6" and l.referencia:
+            por_puesto[_clave(l.referencia)][l.seg2].append(l)
+    out: list[Hallazgo] = []
+    for por_dept in por_puesto.values():
+        if len(por_dept) < 2:
+            continue
+        dom = _dominante(por_dept)
+        reparto = " · ".join(
+            "{} x{} ({})".format(d, len(v), _crc(sum(x.monto_crc for x in v)))
+            for d, v in sorted(por_dept.items(),
+                               key=lambda kv: -abs(sum(x.monto_crc for x in kv[1]))))
+        for dept, ls in por_dept.items():
+            if dom is not None and dept == dom:
+                continue
+            out.append(_hallazgo(
+                ls, "PUESTO_EN_VARIOS_DEPARTAMENTOS", MEDIA, ls[0].referencia,
+                "El puesto «{}» esta cargado a mas de un departamento: {}. Revisar "
+                "si la plaza de {} corresponde a ese departamento."
+                .format(ls[0].referencia, reparto, dept),
+                "" if dom is None else dom))
+    return out
+
 REGLAS = (_articulo_en_varias_cuentas, _costo_en_depto_sin_costo, _planilla_depto,
-          _planilla_puesto, _cuenta_vertedero, _allocation_no_netea)
+          _planilla_puesto, _cuenta_vertedero, _allocation_no_netea,
+          _premium_en_comida_de_empleados, _puesto_en_varios_departamentos)
 
 
 def revisar(lineas: Iterable, desde_clase: int = 4, periodo: str = "") -> Resumen:
