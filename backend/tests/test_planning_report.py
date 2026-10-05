@@ -116,16 +116,19 @@ def test_la_columna_del_ANO_baja_como_formula():
     """`=SUM(B5:M5)`: sus doce sumandos estan en la misma fila, asi que es la
     unica columna del cuadro que se puede escribir sin inventar nada.
 
-    ⚠️ **Y es la de la version que puso los meses, no siempre la primera.** Las
-    otras columnas de ano NO la llevan, y es correcto: sus doce meses no estan
-    en la hoja y la formula no tendria a que apuntar — el exportador la tiraria
-    igual, en silencio.
+    ⚠️ **La lleva CADA version cuyos doce meses esten en la hoja**, y ninguna
+    otra. Desde que el cuadro abre varias versiones a la derecha (2026-10-05) ya
+    no es una sola: la que no tiene sus meses dibujados se queda como numero,
+    porque la formula no tendria a que apuntar y el exportador la tiraria igual,
+    en silencio.
     """
     lib = _lib()
-    assert "suma_cols: DOCE.map((_m, i) => 1 + i)" in lib
-    assert "...(vi === mv ? { suma_cols:" in lib, (
-        "la formula quedo clavada en la primera columna de ano: con los meses "
-        "de otra version apunta a sumandos que no estan en la hoja")
+    assert "const desde = vi === mv ? 1 : (e >= 0 ? inicioExtra(e) : -1);" in lib, (
+        "la formula dejo de seguir a los meses: una version sin su bloque "
+        "dibujado no puede sumar doce celdas que no existen")
+    assert "...(desde > 0 ? { suma_cols: docePartiendoDe(desde) } : {})" in lib, (
+        "la formula quedo clavada en una columna de ano: con los meses de otra "
+        "version apunta a sumandos que no estan en la hoja")
 
 
 def test_los_doce_meses_pueden_ser_de_CUALQUIER_version():
@@ -147,9 +150,13 @@ def test_los_doce_meses_pueden_ser_de_CUALQUIER_version():
             f"{constructor} sigue abriendo siempre la primera version")
     pagina = _pagina()
     assert "setMesesDe(" in pagina
-    assert "ids[Math.min(mesesDe, ids.length - 1)]" in pagina, (
-        "las estadisticas siguen pidiendo los doce meses de la primera version: "
-        "abririan un ano distinto que las otras seis hojas")
+    # ⚠️ Las estadisticas son el unico cuadro cuyos meses NO vienen con el ano:
+    # se piden mes por mes. Por eso es el unico que podia quedarse mostrando una
+    # sola version mientras los otros seis abren tres, y el unico cuya consulta
+    # hay que mirar aparte.
+    assert "ids.map(id => Promise.all(DOCE.map(m => unoNulo(id, m, m))))" in pagina, (
+        "las estadisticas piden los doce meses de UNA sola version: las columnas "
+        "de las demas quedarian en blanco justo en la hoja de estacionalidad")
     assert "if (mesesDe >= ids.length) setMesesDe(0);" in pagina, (
         "sacar una version de la comparacion deja la eleccion colgada")
 
@@ -522,3 +529,52 @@ def test_la_cascada_usa_EL_ROTULO_DE_ESTE_REPO():
     assert not huerfanos, (
         f"la cascada cita rotulos que la plantilla de esta propiedad no tiene: "
         f"{huerfanos}")
+
+
+def test_los_doce_meses_de_VARIAS_versiones_en_los_SIETE_tabs():
+    """Owner, 2026-10-05, con una raya roja al borde del cuadro: *«despues de la
+    linea roja … el Forecast 2027 Working, doce meses, y despues con una columna
+    de espacio viene 12 meses budget 2026 Final»* · *«eso en todos los tabs, uno
+    a uno»*.
+
+    ## Por que se vigila constructor por constructor
+
+    Son SIETE cuadros y el pedido fue explicito: todos. Uno que se quede sin
+    `extras` no falla — dibuja el cuadro de siempre, y la unica senal es que a
+    esa hoja le faltan columnas que las otras seis si tienen. En un libro de
+    treinta hojas eso no se nota.
+
+    ## Y por que los bloques van AL FINAL
+
+    `resta` y `suma_cols` son indices de columna. Un bloque de doce metido entre
+    los anos y la variacion corre cada indice doce lugares: la variacion
+    seguiria restando dos celdas —seguiria dando un numero, y cuadrando— pero de
+    dos versiones distintas. Por eso el orden es parte del contrato y no un
+    gusto de presentacion.
+    """
+    lib = _lib()
+    for constructor in ("cuadroPlanning", "cuadroApertura", "cuadroCheckbook",
+                        "cuadroPosiciones", "cuadroReparto", "cuadroEstadisticas"):
+        cuerpo = lib[lib.index(f"export function {constructor}("):]
+        cuerpo = cuerpo.split("export function ")[1]
+        assert "extras: opciones.extras" in cuerpo, (
+            f"{constructor} no abre los doce meses de las demas versiones: su "
+            f"hoja sale con menos columnas que las otras y nada lo avisa")
+
+    # Los bloques se agregan DESPUES de la variacion, no en medio.
+    i_var = lib.index('label: "Variación"')
+    i_ext = lib.index("...extras.flatMap(vi => [")
+    assert i_var < i_ext, (
+        "los bloques extra quedaron antes de la variacion: los indices de "
+        "`resta` apuntan ahora a otras columnas y la variacion resta dos "
+        "versiones que no son")
+
+    # Una version no puede abrir sus meses dos veces.
+    assert "filter(vi => vi !== mv && vi < cuantas)" in lib, (
+        "la version principal se repite a la derecha, o entra un indice que no "
+        "existe")
+
+    # Y la pantalla manda todas las elegidas menos la que ya los abre.
+    pagina = _pagina()
+    assert "ids.map((_id, i) => i).filter(i => i !== mesesDe)" in pagina, (
+        "la pantalla dejo de pedir los doce meses de las demas versiones")

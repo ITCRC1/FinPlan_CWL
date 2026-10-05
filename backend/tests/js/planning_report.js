@@ -286,7 +286,7 @@ const mes = (m) => ({
   revpar_bruto: 12, club_pagando: 100, club_revenue: 500, club_cuota_promedio: 5,
 });
 const EST = {
-  meses: Array.from({ length: 12 }, (_, i) => mes(i + 1)),
+  mesesPorVersion: [Array.from({ length: 12 }, (_, i) => mes(i + 1))],
   anios: [{ ...mes(1), desde: 1, hasta: 12, rooms_available: 1200,
             rooms_occupied: 600, guests: 960,
             rooms_revenue: Array.from({ length: 12 }, (_, i) => 1000 + i + 1)
@@ -498,6 +498,71 @@ const raro = P.cuadroReparto("ROOMS", RAROS, ESCENARIOS, { ambito: "", compacto:
 auditar(raro, "reparto no catalogado");
 
 /* ── Cierre ─────────────────────────────────────────────────────────────── */
+
+
+/* ── 9 · Los doce meses de VARIAS versiones, a la derecha ────────────────── */
+//
+// Owner, 2026-10-05, con la captura y una raya roja al borde del cuadro:
+// *«después de la línea roja … el Forecast 2027 Working, doce meses, y después
+// con una columna de espacio viene 12 meses budget 2026 Final»* · *«eso en
+// todos los tabs, uno a uno»*.
+//
+// ⚠️ Lo que se vigila acá no es que aparezcan columnas: es que los doce meses
+// de la derecha sean los de ESA versión. Repetir los de la izquierda bajo otro
+// rótulo da una hoja que cuadra en todos sus totales y dice una mentira — el
+// modo de falla caro de este archivo.
+
+const SIN = P.cuadroPlanning(PL, ESCENARIOS, { ambito: "hotel", compacto: false });
+const CON = P.cuadroPlanning(PL, ESCENARIOS,
+                             { ambito: "hotel", compacto: false, extras: [1] });
+
+ok(SIN.columnas.length === 16, `sin extras nada se mueve: ${SIN.columnas.length}`);
+// 1 rótulo + 12 meses + 2 años + 1 variación + 1 hueco + 12 meses
+ok(CON.columnas.length === 29, `con un extra son 29: ${CON.columnas.length}`);
+
+ok(CON.columnas[15].label === "Variación", "la variación sigue donde estaba");
+ok(JSON.stringify(CON.columnas[15].resta) === "[13,14]",
+   "⚠️ y sigue restando los MISMOS dos años: los bloques van al final, no en medio");
+
+ok(CON.columnas[16].label === "" && CON.columnas[16].formato === "texto",
+   "entre un bloque y el otro va una columna en blanco, sin número");
+ok(/Final 2026/.test(CON.columnas[17].sub || ""),
+   `el mes de la derecha dice de qué versión es: «${CON.columnas[17].sub}»`);
+
+const rooms = CON.filas.find(f => f.label === "Rooms");
+// ⚠️ `valores` no incluye la columna del rótulo: valores[i] es columnas[i+1].
+ok(rooms.valores[15] === null, "el hueco no lleva valor");
+ok(JSON.stringify(rooms.valores.slice(0, 12)) === JSON.stringify(serie(1)),
+   "la izquierda sigue siendo la versión principal");
+ok(JSON.stringify(rooms.valores.slice(16, 28)) === JSON.stringify(serie(2)),
+   "⚠️ y la derecha es la OTRA versión, no una copia de la izquierda");
+
+// El año de la versión abierta a la derecha ya puede ser fórmula: sus meses
+// están en la hoja. Antes se quedaba como número porque no tenían dónde apuntar.
+ok(JSON.stringify(CON.columnas[14].suma_cols)
+   === JSON.stringify(Array.from({ length: 12 }, (_, i) => 17 + i)),
+   `el Full Year de la derecha suma SUS doce: ${JSON.stringify(CON.columnas[14].suma_cols)}`);
+ok(Math.abs(rooms.valores[13] - serie(2).reduce((a, b) => a + b, 0)) < CENT,
+   "y el número que lleva es exactamente esa suma, así que la fórmula se escribe");
+
+const sec = CON.filas.find(f => f.label === "REVENUES");
+ok(sec.valores.slice(15).every(v => v === null),
+   "una sección sigue sin números también en el bloque nuevo");
+
+// Una versión no abre sus meses dos veces.
+const DOS = P.cuadroPlanning(PL, ESCENARIOS,
+                             { ambito: "hotel", compacto: false, extras: [0, 1] });
+ok(DOS.columnas.length === 29, `la principal no se repite a la derecha: ${DOS.columnas.length}`);
+
+// ⚠️ Una fila que entrega sus meses como ARREGLO —y no como función de la
+// versión— sólo sabe de la principal. Copiar ese arreglo al bloque de la otra
+// versión es la mentira que esto impide: va en blanco.
+const nom = (vi) => SID[vi];
+const suelto = P.armarCuadro(
+  { titulo: "t", subtitulo: "s", hoja: "h", extras: [1] }, 2, nom, undefined,
+  [{ label: "fila", meses: serie(7), anios: [1, 2] }]);
+ok(suelto.filas[0].valores.slice(14).every(v => v === null),
+   "sin meses propios, el bloque de la derecha va VACÍO y no repite los de al lado");
 
 console.log(`${checks} comprobaciones · ${fallos} fallos`);
 process.exit(fallos ? 1 : 0);

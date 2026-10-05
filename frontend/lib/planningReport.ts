@@ -113,7 +113,17 @@ export function columnasPlanning(
   /** De QUÉ versión son los doce meses. Owner, 2026-10-01: *«quiero que metas
    *  la opción de generar un 12 meses de Forecast y Budget 2026»*. */
   mv = 0,
+  /** Qué OTRAS versiones abren sus doce meses, a la derecha del cuadro y cada
+   *  una detrás de una columna en blanco. Owner, 2026-10-05: *«después de la
+   *  línea roja … el Forecast 2027 Working, doce meses, y después con una
+   *  columna de espacio viene 12 meses budget 2026 Final»*. */
+  extras: number[] = [],
 ): ColumnaCuadro[] {
+  /** Dónde empiezan los meses del bloque `e`: el hueco va primero. */
+  const inicioExtra = (e: number) =>
+    BASE_ANIO + cuantas + (par ? 1 : 0) + e * 13 + 1;
+  /** Los doce meses de una versión, por su posición de arranque. */
+  const docePartiendoDe = (desde: number) => DOCE.map((_m, i) => desde + i);
   return [
     { label: "Line Item", ancho: anchoRotulo, formato: "texto" },
     ...MESES.map((m, i) => ({
@@ -128,16 +138,37 @@ export function columnasPlanning(
     // meses no están en la hoja, así que la fórmula no tendría a qué apuntar y
     // el exportador la tiraría igual, en silencio. Por eso la fórmula sigue a
     // `mv` y no se queda clavada en la primera columna de año.
-    ...Array.from({ length: cuantas }, (_, vi) => ({
-      label: "Full Year", sub: nombre(vi), ancho: 16, formato: "usd2" as const,
-      ...(vi === 0 ? { abre_grupo: true } : {}),
-      ...(vi === mv ? { suma_cols: DOCE.map((_m, i) => 1 + i) } : {}),
-    })),
+    ...Array.from({ length: cuantas }, (_, vi) => {
+      // ⚠️ La fórmula sigue a los MESES, no a la versión principal: una versión
+      // cuyos doce meses ahora están en la hoja puede sumarlos de verdad, y la
+      // que no los tiene se queda como número porque no tendría a qué apuntar.
+      const e = extras.indexOf(vi);
+      const desde = vi === mv ? 1 : (e >= 0 ? inicioExtra(e) : -1);
+      return {
+        label: "Full Year", sub: nombre(vi), ancho: 16, formato: "usd2" as const,
+        ...(vi === 0 ? { abre_grupo: true } : {}),
+        ...(desde > 0 ? { suma_cols: docePartiendoDe(desde) } : {}),
+      };
+    }),
     ...(par
       ? [{ label: "Variación", sub: `${nombre(par[0])} − ${nombre(par[1])}`,
            ancho: 16, formato: "usd2" as const,
            resta: [BASE_ANIO + par[0], BASE_ANIO + par[1]] as [number, number] }]
       : []),
+    // ⚠️ Los bloques extra van al FINAL, después de la variación: así los
+    // índices de `resta` y de `suma_cols` del bloque principal no se mueven.
+    // Agregarlos en medio correría la columna de cada año y la variación
+    // restaría dos versiones distintas sin que nada fallara.
+    ...extras.flatMap(vi => [
+      // La columna en blanco que pidió el owner: separa un bloque del otro y no
+      // lleva número, para que nadie la lea como un mes en cero.
+      { label: "", sub: "", ancho: 2, formato: "texto" as const },
+      ...MESES.map((m, i) => ({
+        label: m, sub: `${MES_LARGO[i]} · ${nombre(vi)}`, ancho: 13,
+        formato: "usd2" as const,
+        ...(i === 0 ? { abre_grupo: true } : {}),
+      })),
+    ]),
   ];
 }
 
@@ -146,9 +177,20 @@ export function columnasPlanning(
  *  maneras de restar. */
 export interface FilaPlanning {
   label: string;
-  /** Los doce de la versión principal. `null` = esta fila no lleva números
-   *  (encabezado de sección): un cero ahí se leería como «sin movimiento». */
-  meses?: (number | null)[] | null;
+  /**
+   * Los doce meses. `null` = esta fila no lleva números (encabezado de
+   * sección): un cero ahí se leería como «sin movimiento».
+   *
+   * ⚠️ Es una FUNCIÓN de la versión, no un arreglo. Con un arreglo, abrir los
+   * doce meses de una segunda versión obligaba a que cada constructor eligiera
+   * por su cuenta de cuál versión eran — y siete constructores eligiendo por
+   * separado es exactamente cómo una hoja termina mostrando el Forecast bajo el
+   * rótulo del Budget sin que ningún total deje de cuadrar.
+   *
+   * Un arreglo suelto se sigue aceptando y vale sólo para el bloque principal:
+   * las estadísticas lo usan porque sus meses se piden uno por uno.
+   */
+  meses?: ((vi: number) => (number | null)[] | null) | (number | null)[] | null;
   /** Uno por versión, en el orden en que vienen. */
   anios?: (number | null)[];
   es_total?: boolean;
@@ -166,6 +208,8 @@ export interface OpcionesCuadro {
   anchoRotulo?: number;
   /** De qué versión son los doce meses. 0 = la principal. */
   mesesDe?: number;
+  /** Qué otras versiones abren además sus doce meses, a la derecha. */
+  extras?: number[];
 }
 
 /**
@@ -179,8 +223,11 @@ export function armarCuadro(
   opciones: OpcionesCuadro, cuantas: number, nombre: (vi: number) => string,
   par: [number, number] | undefined, filas: FilaPlanning[],
 ): Cuadro {
+  const mv = opciones.mesesDe ?? 0;
+  // Una versión no puede abrir sus meses dos veces: la principal ya los tiene.
+  const extras = (opciones.extras ?? []).filter(vi => vi !== mv && vi < cuantas);
   const columnas = columnasPlanning(cuantas, nombre, par, opciones.anchoRotulo,
-                                    opciones.mesesDe ?? 0);
+                                    mv, extras);
   return {
     titulo: opciones.titulo,
     subtitulo: opciones.subtitulo,
@@ -199,15 +246,27 @@ export function armarCuadro(
       const anios = Array.from({ length: cuantas }, (_, vi) => f.anios?.[vi] ?? null);
       const d = par && anios[par[0]] !== null && anios[par[1]] !== null
         ? anios[par[0]]! - anios[par[1]]! : null;
+      // ⚠️ El arreglo suelto vale SÓLO para el bloque principal. Repetirlo en
+      // los extra pondría los mismos doce números bajo el rótulo de otra
+      // versión: una hoja que se lee bien y miente. Sin dato, van en blanco.
+      const doceDe = (vi: number, principal: boolean) =>
+        typeof f.meses === "function" ? f.meses(vi)
+          : (principal ? (f.meses ?? null) : null);
+      const bloque = (vi: number, principal: boolean) => {
+        const m = doceDe(vi, principal);
+        return DOCE.map(i => (m ? m[i] ?? 0 : null));
+      };
       return {
         label: f.label,
         es_total: f.es_total, es_seccion: f.es_seccion, nivel: f.nivel,
         formato: f.formato ?? "usd2",
         suma_de: f.suma_de, combina_filas: f.combina_filas,
         valores: [
-          ...DOCE.map(i => (f.meses ? f.meses[i] ?? 0 : null)),
+          ...bloque(mv, true),
           ...anios,
           ...(par ? [d] : []),
+          // Cada extra: la columna en blanco y sus doce meses.
+          ...extras.flatMap(vi => [null, ...bloque(vi, false)]),
         ],
       };
     }),
@@ -248,6 +307,9 @@ export interface OpcionesPlanning {
    * que nada avise.
    */
   mesesDe?: number;
+  /** Qué OTRAS versiones abren además sus doce meses, a la derecha del cuadro.
+   *  Owner, 2026-10-05: *«eso en todos los tabs, uno a uno»*. */
+  extras?: number[];
 }
 
 /** Cómo se rotula de quién son los doce meses, para el título y la hoja. */
@@ -289,7 +351,7 @@ export function cuadroPlanning(
     return {
       label: f.rotulo,
       es_total: f.tipo === "tot" || f.tipo === "sub",
-      meses: mesesDe(f, mv),
+      meses: vi => mesesDe(f, vi),
       anios: versiones.map((_v, vi) => anioDe(f, vi)),
     };
   });
@@ -310,7 +372,7 @@ export function cuadroPlanning(
     subtitulo: `Los doce meses son de ${nombre(mv)}; el año, de todas. Su `
       + `columna Full Year es la suma de sus meses.`,
     hoja: `Planning ${datos.year} ${rotuloAmbito(ambito)}${mv ? ` m${mv}` : ""}`,
-    mesesDe: mv,
+    mesesDe: mv, extras: opciones.extras,
   }, versiones.length, nombre, par, filas);
 }
 
@@ -389,14 +451,14 @@ export function cuadroApertura(
 
   const filas: FilaPlanning[] = claves.map(k => ({
     label: rotulo(k),
-    meses: DOCE.map(i => serie(mv, k)[i] ?? 0),
+    meses: vi => DOCE.map(i => serie(vi, k)[i] ?? 0),
     anios: gastos.map((_g, vi) => anio(vi, k)),
   }));
   filas.push({
     label: `TOTAL ${meta.rotulo.toUpperCase()}`,
     es_total: true,
     suma_de: claves.map((_k, i) => i),
-    meses: DOCE.map(i => claves.reduce((t, k) => t + (serie(mv, k)[i] ?? 0), 0)),
+    meses: vi => DOCE.map(i => claves.reduce((t, k) => t + (serie(vi, k)[i] ?? 0), 0)),
     anios: gastos.map((_g, vi) => claves.reduce((t, k) => t + anio(vi, k), 0)),
   });
 
@@ -407,7 +469,7 @@ export function cuadroApertura(
     subtitulo: `Los doce meses son de ${nombre(mv)}; el año, de todas. El total `
       + `es la suma de las filas que se ven.`,
     hoja: `Apertura ${meta.rotulo}${mv ? ` m${mv}` : ""}`,
-    anchoRotulo: 40, mesesDe: mv,
+    anchoRotulo: 40, mesesDe: mv, extras: opciones.extras,
   }, gastos.length, nombre, par, filas);
 }
 
@@ -481,7 +543,7 @@ export function cuadroCheckbook(
         es_total: subs.length > 0,
         suma_de: subs.length
           ? subs.map((_x, k) => filas.length + 1 + k) : undefined,
-        meses: DOCE.map(i => serie(f, mv)[i] ?? 0),
+        meses: vi => DOCE.map(i => serie(f, vi)[i] ?? 0),
         anios: versiones.map((_v, vi) => anio(f, vi)),
       });
       for (const x of subs) {
@@ -490,7 +552,7 @@ export function cuadroCheckbook(
           nivel: 2,
           // ⚠️ La versión que NO abrió no va en cero: va vacía. Un cero diría
           // «esta sub-línea existe y vale nada», y lo que pasa es otra cosa.
-          meses: DOCE.map(i => x.series[versiones[mv]?.scenario_id ?? ""]?.[i] ?? null),
+          meses: vi => DOCE.map(i => x.series[versiones[vi]?.scenario_id ?? ""]?.[i] ?? null),
           anios: versiones.map(v => {
             const sr = x.series[v.scenario_id ?? ""];
             return sr ? suma(sr, DOCE) : null;
@@ -503,7 +565,7 @@ export function cuadroCheckbook(
       label: `Total ${code}`,
       es_total: true,
       suma_de: deCuenta,
-      meses: DOCE.map(i => cuentas.reduce((t, f) => t + (serie(f, mv)[i] ?? 0), 0)),
+      meses: vi => DOCE.map(i => cuentas.reduce((t, f) => t + (serie(f, vi)[i] ?? 0), 0)),
       anios: versiones.map((_v, vi) => cuentas.reduce((t, f) => t + anio(f, vi), 0)),
     });
   }
@@ -514,7 +576,7 @@ export function cuadroCheckbook(
     // ⚠️ Suma los SUBTOTALES, no las cuentas: sumar las dos cosas contaría cada
     // peso dos veces, y el exportador tiraría la fórmula por no cuadrar.
     suma_de: subtotales,
-    meses: DOCE.map(i => visibles.reduce((t, f) => t + (serie(f, mv)[i] ?? 0), 0)),
+    meses: vi => DOCE.map(i => visibles.reduce((t, f) => t + (serie(f, vi)[i] ?? 0), 0)),
     anios: versiones.map((_v, vi) => visibles.reduce((t, f) => t + anio(f, vi), 0)),
   });
 
@@ -531,7 +593,7 @@ export function cuadroCheckbook(
       + (abierto ? " Debajo de cada cuenta, de qué está hecha." : ""),
     hoja: `${abierto ? "Detalle" : "Checkbook"} ${meta?.rotulo ?? det.clase}`
           + (mv ? ` m${mv}` : ""),
-    anchoRotulo: abierto ? 52 : 46, mesesDe: mv,
+    anchoRotulo: abierto ? 52 : 46, mesesDe: mv, extras: opciones.extras,
   }, versiones.length, nombre, par, filas);
 }
 
@@ -564,8 +626,13 @@ export const ESTADISTICAS = [
 ] as const;
 
 export interface EstadisticasPlanning {
-  /** Los doce meses de la versión principal: uno por mes, en orden. */
-  meses: (EstadisticasCierre | null)[];
+  /** Los doce meses de CADA versión: `mesesPorVersion[vi][mes]`.
+   *
+   * ⚠️ Uno por versión y no uno solo. Es el único de los siete cuadros cuyos
+   * meses no vienen en la misma respuesta que el año —se piden mes por mes—,
+   * así que es el único que podía quedarse mostrando una sola versión mientras
+   * los otros seis abrían tres. */
+  mesesPorVersion: (EstadisticasCierre | null)[][];
   /** El año completo de cada versión, pedido con el período entero. */
   anios: (EstadisticasCierre | null)[];
   versiones: VersionPlanning[];
@@ -599,18 +666,19 @@ export function cuadroEstadisticas(
     .map(s => ({
       label: s.rotulo,
       formato: s.formato as FormatoCol,
-      meses: datos.meses.map(m => val(m, s.campo)),
+      meses: vi => (datos.mesesPorVersion[vi] ?? []).map(m => val(m, s.campo)),
       anios: datos.anios.map(a => val(a, s.campo)),
     }));
 
-  const anio0 = datos.anios[0]?.year ?? datos.meses.find(Boolean)?.year ?? "";
+  const anio0 = datos.anios[0]?.year
+    ?? datos.mesesPorVersion.flat().find(Boolean)?.year ?? "";
   return armarCuadro({
     titulo: `Planning ${anio0} · Estadísticas · doce meses y año`,
     subtitulo: `${nombre(0)} — los doce meses son de esta versión; el año, de `
       + `todas. ⚠️ La ocupación, el ADR, el RevPAR y los socios del año NO son `
       + `la suma de los meses: se piden con el período completo.`,
     hoja: `Estadísticas`,
-    anchoRotulo: 30,
+    anchoRotulo: 30, mesesDe: opciones.mesesDe ?? 0, extras: opciones.extras,
   }, datos.versiones.length, nombre, par, filas);
 }
 
@@ -739,7 +807,7 @@ export function cuadroPosiciones(
                + salarioEnRotulo(p.salary_amount, p.salary_currency),
         nivel: 1,
         formato: meta.formato,
-        meses: DOCE.map(i => serie(mv, k)?.[i] ?? null),
+        meses: vi => DOCE.map(i => serie(vi, k)?.[i] ?? null),
         anios: versiones.map((_v, vi) => anioPos(vi, k)),
       });
     }
@@ -748,7 +816,7 @@ export function cuadroPosiciones(
       label: `Total ${code}`,
       es_total: true, formato: meta.formato,
       suma_de: ks.map((_k, i) => desde + i),
-      meses: DOCE.map(i => ks.reduce((t, k) => t + (serie(mv, k)?.[i] ?? 0), 0)),
+      meses: vi => DOCE.map(i => ks.reduce((t, k) => t + (serie(vi, k)?.[i] ?? 0), 0)),
       anios: versiones.map((_v, vi) =>
         ks.reduce((t, k) => t + (anioPos(vi, k) ?? 0), 0)),
     });
@@ -757,7 +825,7 @@ export function cuadroPosiciones(
     label: `TOTAL ${meta.rotulo.toUpperCase()}`,
     es_total: true, formato: meta.formato,
     suma_de: subtotales,
-    meses: DOCE.map(i => llaves.reduce((t, k) => t + (serie(mv, k)?.[i] ?? 0), 0)),
+    meses: vi => DOCE.map(i => llaves.reduce((t, k) => t + (serie(vi, k)?.[i] ?? 0), 0)),
     anios: versiones.map((_v, vi) =>
       llaves.reduce((t, k) => t + (anioPos(vi, k) ?? 0), 0)),
   });
@@ -768,7 +836,7 @@ export function cuadroPosiciones(
       + `salario contratado va al lado del nombre, en su moneda: sumarlo `
       + `mezclaría colones con dólares.`,
     hoja: `Plantilla ${meta.rotulo}${mv ? ` m${mv}` : ""}`,
-    anchoRotulo: 52, mesesDe: mv,
+    anchoRotulo: 52, mesesDe: mv, extras: opciones.extras,
   }, versiones.length, nombre, par, filas);
 }
 
@@ -889,7 +957,7 @@ export function cuadroReparto(
         + `${rotuloTipo} calculado. Se corre desde Planning → Allocation; hasta `
         + `entonces su gasto queda donde está.`,
       hoja: `Reparto ${rotuloTipo}`,
-      anchoRotulo: 40, mesesDe: mv,
+      anchoRotulo: 40, mesesDe: mv, extras: opciones.extras,
     }, datos.versiones.length, nombre, par, [{
       label: `Sin reparto de ${rotuloTipo} calculado en este escenario`,
       es_seccion: true, meses: null,
@@ -903,14 +971,14 @@ export function cuadroReparto(
   for (const k of claves) {
     filas.push({
       label: rotulo(k), nivel: 1,
-      meses: DOCE.map(i => plata(mv, k)?.[i] ?? null),
+      meses: vi => DOCE.map(i => plata(vi, k)?.[i] ?? null),
       anios: datos.versiones.map((_v, vi) => total12(plata(vi, k))),
     });
   }
   filas.push({
     label: "TOTAL (el reparto tiene que dar cero)", es_total: true,
     suma_de: claves.map((_k, i) => desde + i),
-    meses: DOCE.map(i => claves.reduce((t, k) => t + (plata(mv, k)?.[i] ?? 0), 0)),
+    meses: vi => DOCE.map(i => claves.reduce((t, k) => t + (plata(vi, k)?.[i] ?? 0), 0)),
     anios: datos.versiones.map((_v, vi) =>
       claves.reduce((t, k) => t + (total12(plata(vi, k)) ?? 0), 0)),
   });
@@ -932,7 +1000,7 @@ export function cuadroReparto(
     for (const k of conPeso) {
       filas.push({
         label: rotulo(k), nivel: 1, formato: info.formato,
-        meses: DOCE.map(i => peso(mv, base, k)?.[i] ?? null),
+        meses: vi => DOCE.map(i => peso(vi, base, k)?.[i] ?? null),
         anios: datos.versiones.map((_v, vi) => total12(peso(vi, base, k))),
       });
     }
@@ -940,8 +1008,8 @@ export function cuadroReparto(
       label: `TOTAL ${info.rotulo.toUpperCase()}`, es_total: true,
       formato: info.formato,
       suma_de: conPeso.map((_k, i) => d2 + i),
-      meses: DOCE.map(i =>
-        conPeso.reduce((t, k) => t + (peso(mv, base, k)?.[i] ?? 0), 0)),
+      meses: vi => DOCE.map(i =>
+        conPeso.reduce((t, k) => t + (peso(vi, base, k)?.[i] ?? 0), 0)),
       anios: datos.versiones.map((_v, vi) =>
         conPeso.reduce((t, k) => t + (total12(peso(vi, base, k)) ?? 0), 0)),
     });
@@ -956,6 +1024,6 @@ export function cuadroReparto(
       + `eso el total da cero. El peso es el que usó el motor, no uno `
       + `recalculado acá.`,
     hoja: `Reparto ${rotuloTipo}`,
-    anchoRotulo: 40, mesesDe: mv,
+    anchoRotulo: 40, mesesDe: mv, extras: opciones.extras,
   }, datos.versiones.length, nombre, par, filas);
 }

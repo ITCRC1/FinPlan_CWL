@@ -114,7 +114,8 @@ export default function PlanningReportPage() {
   const [reparto, setReparto] = useState<
     { resumen: (AllocationSummary | null)[]; deptos: Record<string, string> } | null>(null);
   const [stats, setStats] = useState<
-    { meses: (EstadisticasCierre | null)[]; anios: (EstadisticasCierre | null)[] } | null>(null);
+    { mesesPorVersion: (EstadisticasCierre | null)[][];
+      anios: (EstadisticasCierre | null)[] } | null>(null);
 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,15 +146,15 @@ export default function PlanningReportPage() {
   const cargarStats = useCallback(async () => {
     const unoNulo = async (id: string, d: number, h: number) =>
       getEstadisticasCierre(id, d, h).catch(() => null);
-    const [meses, anios] = await Promise.all([
-      // ⚠️ Los doce meses son de la versión elegida, no siempre de la primera:
-      // si no, la hoja de estadísticas abriría un año distinto que las otras
-      // seis y nadie lo notaría — los totales de año seguirían estando bien.
-      Promise.all(DOCE.map(m => unoNulo(ids[Math.min(mesesDe, ids.length - 1)], m, m))),
+    const [mesesPorVersion, anios] = await Promise.all([
+      // ⚠️ Los doce meses de CADA versión, no sólo de la elegida: desde que el
+      // cuadro abre varias a la derecha, pedir una sola dejaba esas columnas en
+      // blanco justo en la hoja donde el owner mira la estacionalidad.
+      Promise.all(ids.map(id => Promise.all(DOCE.map(m => unoNulo(id, m, m))))),
       Promise.all(ids.map(id => unoNulo(id, 1, 12))),
     ]);
-    return { meses, anios };
-  }, [ids, mesesDe]);
+    return { mesesPorVersion, anios };
+  }, [ids]);
 
   /** El reparto de las dos: el resumen del motor por versión, más los nombres de
    *  departamento, que viven en el endpoint de gasto. */
@@ -209,14 +210,21 @@ export default function PlanningReportPage() {
   }, [reparto, tipoReparto]);
 
   const statsACuadro = useCallback(
-    (s: { meses: (EstadisticasCierre | null)[]; anios: (EstadisticasCierre | null)[] },
-     op: { ambito: string; compacto: boolean }) =>
+    (s: { mesesPorVersion: (EstadisticasCierre | null)[][];
+          anios: (EstadisticasCierre | null)[] },
+     op: { ambito: string; compacto: boolean; mesesDe?: number; extras?: number[] }) =>
       cuadroEstadisticas({ ...s, versiones: s.anios.map((a, i) => ({
         scenario_id: ids[i], escenario: a?.escenario })) }, escenarios, op),
     [ids, escenarios]);
 
+  /** Las versiones que abren sus doce meses a la DERECHA: todas las elegidas
+   *  menos la que ya los abre a la izquierda. Owner, 2026-10-05: *«después de
+   *  la línea roja … doce meses, y con una columna de espacio, otros doce»*. */
+  const extras = useMemo(
+    () => ids.map((_id, i) => i).filter(i => i !== mesesDe), [ids, mesesDe]);
+
   const cuadro: Cuadro | null = useMemo(() => {
-    const op = { ambito, compacto, mesesDe };
+    const op = { ambito, compacto, mesesDe, extras };
     try {
       if (vista === "pl") return pl ? cuadroPlanning(pl, escenarios, op) : null;
       if (vista === "aperturas") {
@@ -245,12 +253,12 @@ export default function PlanningReportPage() {
       return null;
     }
   }, [vista, pl, gastos, libro, plantilla, reparto, stats, clase, metrica,
-      tipoReparto, escenarios, ambito, compacto, mesesDe, ids, statsACuadro]);
+      tipoReparto, escenarios, ambito, compacto, mesesDe, extras, ids, statsACuadro]);
 
   /** Todas las hojas de una vista. Las usa tanto el botón de la vista como el
    *  del paquete completo, para que las dos bajen exactamente lo mismo. */
   const hojasDe = useCallback(async (v: string): Promise<Cuadro[]> => {
-    const op = { compacto, ambito, mesesDe };
+    const op = { compacto, ambito, mesesDe, extras };
     const out: Cuadro[] = [];
     if (v === "pl") {
       for (const a of AMBITOS) {
@@ -299,7 +307,7 @@ export default function PlanningReportPage() {
       out.push(statsACuadro(stats ?? await cargarStats(), op));
     }
     return out;
-  }, [compacto, ambito, mesesDe, pl, gastos, libro, plantilla, reparto, stats,
+  }, [compacto, ambito, mesesDe, extras, pl, gastos, libro, plantilla, reparto, stats,
       principal, otros, ids, escenarios, cargarReparto, cargarStats, statsACuadro]);
 
   const nombreDelArchivo = (sufijo: string) => {
