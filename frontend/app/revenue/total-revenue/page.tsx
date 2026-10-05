@@ -7,10 +7,11 @@ import {
   getScenarios, getRackRates, getChannelsConfig, getOccupancyPct, getRoomTypes, rtLabel, pushRevenueToCheckbook,
   type Scenario,
 } from "@/lib/api";
-import { fmtUsd, fmtInt } from "@/lib/fmt";
+import { fmtUsd } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import BloqueRevenue from "./BloqueRevenue";
 
 // Mismo estilo que el "⬇ Excel" de Planning · Big Picture.
 const excelBtn: React.CSSProperties = {
@@ -21,7 +22,14 @@ const excelBtn: React.CSSProperties = {
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MONTH_KEYS = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"] as const;
 
-interface Row { id: string; code: string; name: string; revenue: number[]; nights: number[]; available: number[]; }
+interface Row {
+  id: string; code: string; name: string;
+  /** Lo que se cobra: rack × noches. Antes de lo que se lleva el canal. */
+  rack: number[];
+  /** Lo que queda: rack × factor neto × noches. Es lo que va al P&L. */
+  revenue: number[];
+  nights: number[]; available: number[];
+}
 
 function daysInMonth(year: number, month1: number): number {
   return new Date(year, month1, 0).getDate();
@@ -77,8 +85,15 @@ export default function TotalRevenuePage() {
         const available = MONTHS.map((_m, mi) =>
           closed.has(mi + 1) ? 0 : units * daysInMonth(year, mi + 1));
         const nights = MONTHS.map((_m, mi) => occPct[mi] * available[mi]);
-        const revenue = MONTHS.map((_m, mi) => nights[mi] * (rack12[mi] * (nf[mi] || 0)));
-        return { id: r.room_type_id, code: codeById[r.room_type_id] ?? "", name: r.name, revenue, nights, available };
+        // ⚠️ Dos ingresos, no uno con un ajuste al final. El de RACK es lo que
+        // se le cobra al huésped; el NETO, lo que queda después de la comisión
+        // del canal, y es el que mueve el P&L. Owner, 2026-10-04: *«necesito
+        // poder ver total revenue tarifa rack, y después total revenue por tipo
+        // de habitación net rate»*.
+        const rack = MONTHS.map((_m, mi) => nights[mi] * rack12[mi]);
+        const revenue = MONTHS.map((_m, mi) => rack[mi] * (nf[mi] || 0));
+        return { id: r.room_type_id, code: codeById[r.room_type_id] ?? "", name: r.name,
+                 rack, revenue, nights, available };
       });
       setRows(computed);
     } catch (e: unknown) {
@@ -88,15 +103,14 @@ export default function TotalRevenuePage() {
 
   useEffect(() => { if (scenarioId) load(scenarioId); }, [scenarioId, load]);
 
+  const monthRack = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + r.rack[mi], 0));
   const monthTotals = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + r.revenue[mi], 0));
   const monthNights = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + r.nights[mi], 0));
   const monthAvail = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + r.available[mi], 0));
+  const grandRack = monthRack.reduce((s, v) => s + v, 0);
   const grand = monthTotals.reduce((s, v) => s + v, 0);
   const totalNights = monthNights.reduce((s, v) => s + v, 0);
   const totalAvail = monthAvail.reduce((s, v) => s + v, 0);
-  const rate = (rev: number, base: number) => (base ? rev / base : 0);
-  const fmt = fmtUsd;
-  const fmt2 = fmtUsd;
 
   const [pushing, setPushing] = useState(false);
   const [pushMsg, setPushMsg] = useState<string | null>(null);
@@ -122,36 +136,70 @@ export default function TotalRevenuePage() {
     } finally { setPushing(false); }
   }
 
-  // ── Excel: el mismo cuadro que se ve, con los números como NÚMERO ──────────
+  // ── Excel: los MISMOS dos bloques que se ven ──────────────────────────────
+  //
+  // ⚠️ Los dos, y en el mismo orden. El owner compara rack contra neto mirando
+  // una tabla debajo de la otra; un Excel que trajera sólo el neto le pediría
+  // rehacer la resta a mano, que es justo lo que la pantalla le ahorra.
   async function bajarExcel() {
     const sel = scenarios.find(s => s.id === scenarioId);
     const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
-    const filas: FilaCuadro[] = rows.map(r => ({
-      label: rtLabel(r.code, r.name),
-      nivel: 1,
-      valores: [...r.revenue, r.revenue.reduce((s, v) => s + v, 0)],
-    }));
-    filas.push({ label: "Total Revenue", es_total: true, valores: [...monthTotals, grand] });
-    filas.push({ label: t("nightsOccupied"), formato: "num", valores: [...monthNights, totalNights] });
-    filas.push({ label: t("nightsAvailable"), formato: "num", valores: [...monthAvail, totalAvail] });
+    const nocheFila = (rotulo: string, serie: number[], total: number): FilaCuadro => ({
+      label: rotulo, formato: "num", valores: [...serie, total],
+    });
     // Sin base (0 noches) la tarifa no es cero: no aplica → celda vacía.
-    filas.push({
-      label: t("adrLabel"),
-      valores: [...monthTotals.map((v, mi) => (monthNights[mi] ? v / monthNights[mi] : null)),
-                totalNights ? grand / totalNights : null],
+    const tarifaFila = (rotulo: string, tot: number[], base: number[],
+                        anual: number, baseAnual: number): FilaCuadro => ({
+      label: rotulo,
+      valores: [...tot.map((v, mi) => (base[mi] ? v / base[mi] : null)),
+                baseAnual ? anual / baseAnual : null],
     });
-    filas.push({
-      label: t("revparLabel"),
-      valores: [...monthTotals.map((v, mi) => (monthAvail[mi] ? v / monthAvail[mi] : null)),
-                totalAvail ? grand / totalAvail : null],
-    });
+
+    const bloque = (
+      titulo: string, valores: (r: typeof rows[number]) => number[],
+      tot: number[], anual: number, rotTotal: string,
+      rotAdr: string, rotRevpar: string, conNoches: boolean,
+    ): FilaCuadro[] => {
+      const out: FilaCuadro[] = [{ label: titulo, es_seccion: true,
+                                   valores: Array(13).fill(null) }];
+      const desde = out.length;
+      rows.forEach(r => out.push({
+        label: rtLabel(r.code, r.name), nivel: 1,
+        valores: [...valores(r), valores(r).reduce((s2, v) => s2 + v, 0)],
+      }));
+      out.push({ label: rotTotal, es_total: true,
+                 suma_de: rows.map((_r, i) => desde + i),
+                 valores: [...tot, anual] });
+      if (conNoches) {
+        out.push(nocheFila(t("nightsOccupied"), monthNights, totalNights));
+        out.push(nocheFila(t("nightsAvailable"), monthAvail, totalAvail));
+        // ⚠️ `pct` y no `num`: en el Excel es un porcentaje de verdad, así que
+        // va como fracción con formato de porcentaje — no como «40.5» suelto,
+        // que al multiplicarlo por algo da cien veces lo que debería.
+        out.push({ label: t("occupancyLabel"), formato: "pct",
+          valores: [...monthNights.map((n, mi) =>
+                      (monthAvail[mi] ? n / monthAvail[mi] : null)),
+                    totalAvail ? totalNights / totalAvail : null] });
+      }
+      out.push(tarifaFila(rotAdr, tot, monthNights, anual, totalNights));
+      out.push(tarifaFila(rotRevpar, tot, monthAvail, anual, totalAvail));
+      return out;
+    };
+
+    const filas: FilaCuadro[] = [
+      ...bloque(t("rackTitle"), r => r.rack, monthRack, grandRack,
+                t("rackTotal"), t("adrRack"), t("revparRack"), false),
+      { label: "", valores: Array(13).fill(null) },
+      ...bloque(t("netTitle"), r => r.revenue, monthTotals, grand,
+                t("netTotal"), t("adrLabel"), t("revparLabel"), true),
+    ];
     try {
       await bajarCuadros("Total_Revenue", [{
         titulo: t("title"),
         subtitulo: `${esc} · ${t("xlsSubtitle")}`,
         hoja: "Total Revenue",
         columnas: [
-          { label: "Room Type", ancho: 34, formato: "texto" },
+          { label: "Room Type", ancho: 38, formato: "texto" },
           ...MONTHS.map(m => ({ label: m, formato: "usd2" as const })),
           { label: tc("year"), ancho: 16, formato: "usd2" as const },
         ],
@@ -196,58 +244,45 @@ export default function TotalRevenuePage() {
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>
       ) : (
-        <div className="fin-sticky" style={{ overflowX: "auto" }}>
-          <table className="fin-table" style={{ minWidth: 1200 }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", minWidth: 220 }}>Room Type</th>
-                {MONTHS.map(m => <th key={m} style={{ textAlign: "right", minWidth: 86 }}>{m}</th>)}
-                <th style={{ textAlign: "right", minWidth: 110, borderLeft: "1px solid var(--border)" }}>{tc("year")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => {
-                const annual = r.revenue.reduce((s, v) => s + v, 0);
-                return (
-                  <tr key={r.id}>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>{rtLabel(r.code, r.name)}</td>
-                    {r.revenue.map((v, mi) => (
-                      <td key={mi} className="mono" style={{ textAlign: "right", color: v ? "var(--text-primary)" : "var(--text-disabled)" }}>{fmt(v)}</td>
-                    ))}
-                    <td className="mono" style={{ textAlign: "right", fontWeight: 600, borderLeft: "1px solid var(--border)" }}>{fmt(annual)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
-                <td style={{ textAlign: "left" }}>Total Revenue</td>
-                {monthTotals.map((t, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmt(t)}</td>)}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)", color: "var(--brand)" }}>{fmt(grand)}</td>
-              </tr>
-              <tr style={{ color: "var(--text-secondary)" }}>
-                <td style={{ textAlign: "left" }}>{t("nightsOccupied")}</td>
-                {monthNights.map((n, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmtInt(n)}</td>)}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>{fmtInt(totalNights)}</td>
-              </tr>
-              <tr style={{ color: "var(--text-secondary)" }}>
-                <td style={{ textAlign: "left" }}>{t("nightsAvailable")}</td>
-                {monthAvail.map((n, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmtInt(n)}</td>)}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>{fmtInt(totalAvail)}</td>
-              </tr>
-              <tr style={{ fontWeight: 600, color: "var(--brand)" }}>
-                <td style={{ textAlign: "left" }}>{t("adrLabel")}</td>
-                {monthTotals.map((t, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmt2(rate(t, monthNights[mi]))}</td>)}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>{fmt2(rate(grand, totalNights))}</td>
-              </tr>
-              <tr style={{ fontWeight: 600, color: "var(--brand)" }}>
-                <td style={{ textAlign: "left" }}>{t("revparLabel")}</td>
-                {monthTotals.map((t, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{fmt2(rate(t, monthAvail[mi]))}</td>)}
-                <td className="mono" style={{ textAlign: "right", borderLeft: "1px solid var(--border)" }}>{fmt2(rate(grand, totalAvail))}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <>
+          {/* ⚠️ El de RACK primero, que es lo que se le cobra al huésped, y el
+              NETO debajo, que es lo que queda y lo que mueve el P&L. En ese
+              orden se lee la comisión del canal sin tener que calcularla. */}
+          <BloqueRevenue
+            meses={MONTHS}
+            filas={rows.map(r => ({ id: r.id, code: r.code, name: r.name, valores: r.rack }))}
+            totales={monthRack} anual={grandRack}
+            noches={monthNights} disponibles={monthAvail}
+            totalNoches={totalNights} totalDisp={totalAvail}
+            titulo={t("rackTitle")} nota={t("rackNote")}
+            acento="var(--text-primary)" mostrarNoches={false}
+            rotulos={{ anio: tc("year"), total: t("rackTotal"),
+                       ocupadas: t("nightsOccupied"), disponibles: t("nightsAvailable"),
+                       ocupacion: t("occupancyLabel"),
+                       adr: t("adrRack"), revpar: t("revparRack") }} />
+
+          {/* Lo que se lleva el canal, dicho una vez y no dejado a la resta. */}
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)",
+                        margin: "-14px 0 20px", paddingLeft: 2 }}>
+            {t("commissionLine", {
+              monto: fmtUsd(grandRack - grand),
+              pct: grandRack ? ((1 - grand / grandRack) * 100).toFixed(1) : "0.0",
+            })}
+          </div>
+
+          <BloqueRevenue
+            meses={MONTHS}
+            filas={rows.map(r => ({ id: r.id, code: r.code, name: r.name, valores: r.revenue }))}
+            totales={monthTotals} anual={grand}
+            noches={monthNights} disponibles={monthAvail}
+            totalNoches={totalNights} totalDisp={totalAvail}
+            titulo={t("netTitle")} nota={t("netNote")}
+            acento="var(--brand)"
+            rotulos={{ anio: tc("year"), total: t("netTotal"),
+                       ocupadas: t("nightsOccupied"), disponibles: t("nightsAvailable"),
+                       ocupacion: t("occupancyLabel"),
+                       adr: t("adrLabel"), revpar: t("revparLabel") }} />
+        </>
       )}
     </div>
   );

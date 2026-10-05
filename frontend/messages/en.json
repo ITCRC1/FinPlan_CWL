@@ -1889,7 +1889,17 @@
     "excelHint": "Downloads this table to Excel, with the figures as numbers",
     "intro": "Calculated: <b>Revenue = Net Rate × Occupied nights</b> = (Rack × Net Factor) × (Occupancy % × units × days). It adjusts itself when rates, channels or occupancy change.",
     "revparLabel": "RevPAR (Rev ÷ available)",
-    "xlsSubtitle": "USD · Revenue = (Rack × Net Factor) × (Occupancy % × units × days)"
+    "xlsSubtitle": "USD · Revenue = (Rack × Net Factor) × (Occupancy % × units × days)",
+    "rackTitle": "Total Revenue at RACK rate",
+    "rackNote": "What the guest is charged: rack × room-nights sold, before channel commission.",
+    "rackTotal": "Total Revenue (rack)",
+    "adrRack": "Rack ADR (Rev ÷ sold)",
+    "revparRack": "Rack RevPAR (Rev ÷ available)",
+    "netTitle": "Total Revenue by Room Type — NET RATE",
+    "netNote": "What is left and what moves the P&L: rack × net factor × room-nights sold.",
+    "netTotal": "Total Revenue (net)",
+    "commissionLine": "Channel commission for the year: {monto} — {pct}% of rack.",
+    "occupancyLabel": "Occupancy % (sold ÷ available)"
   },
   "command": {
     "compareAgainst": "Compare against:",
