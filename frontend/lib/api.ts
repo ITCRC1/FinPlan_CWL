@@ -4102,6 +4102,24 @@ export async function getMixer(scenarioId: string, month = 0): Promise<MixerVist
   return api.get<MixerVista>(`/canales/mixer/?${q}`);
 }
 
+/** Los doce meses del mix de un escenario, resueltos con la misma cascada que
+ *  la vista de un mes. Es lo que come la grilla donde se pega el Excel. */
+export interface MixerDoce {
+  scenario_id: string;
+  subcanales: { code: string; nombre: string; destino: string }[];
+  canales: { code: string; nombre: string }[];
+  meses: {
+    month: number;
+    filas: Record<string, { mix_pct: number; comision_pct: number; origen: string }>;
+    derivados: CanalDerivado[];
+    mix_suma: number; mix_cierra: boolean; net_factor: number;
+  }[];
+}
+
+export async function getMixerDoce(scenarioId: string): Promise<MixerDoce> {
+  return api.get<MixerDoce>(`/canales/mixer/${scenarioId}/doce/`);
+}
+
 export async function guardarMixer(
   scenarioId: string,
   filas: { code: string; month: number; mix_pct: number; comision_pct: number }[],

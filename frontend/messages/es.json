@@ -1790,7 +1790,16 @@
       "xlsSubSheet": "Sub-canales",
       "xlsSubTitle": "Sub-canales — acá se planifica",
       "rollupTitle": "Resumen · canal principal",
-      "rollupFrom": "de {n} sub-canales"
+      "rollupFrom": "de {n} sub-canales",
+      "twelveTitle": "Los doce meses",
+      "twelveHelp": "Pegá acá el bloque del Excel: cada celda cae en su canal y su mes. Las celdas llevan el número del porcentaje — 55 es 55%.",
+      "twelveMix": "Mix % — cuánto de la venta entra por cada sub-canal",
+      "twelveCommission": "Comisión % — cuánto cobra cada sub-canal",
+      "twelveSave": "Guardar los doce meses",
+      "twelveSaved": "Guardado: {n} filas.",
+      "rollupHelp": "Mix / comisión. El cubo es la suma del mix de sus sub-canales y el promedio de su comisión ponderado por ese mix — no el promedio simple.",
+      "advancedShow": "Más opciones",
+      "advancedHide": "Ocultar opciones"
     },
     "derivedIntro": "<b>Esta grilla no se edita: es el resultado.</b> Sale de los sub-canales del sub-tab <b>Mix</b>, agrupados por a dónde rueda cada uno. Para cambiar algo, cambialo ahí y aplicalo — así el número que ves acá es siempre el mismo que el motor usa. Net Rate = Rack Rate × Net Factor.",
     "excelFailed": "No se pudo bajar el Excel",

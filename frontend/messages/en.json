@@ -1790,7 +1790,16 @@
       "xlsSubSheet": "Sub-channels",
       "xlsSubTitle": "Sub-channels — this is where planning happens",
       "rollupTitle": "Summary · main channel",
-      "rollupFrom": "from {n} sub-channels"
+      "rollupFrom": "from {n} sub-channels",
+      "twelveTitle": "The twelve months",
+      "twelveHelp": "Paste the Excel block here: each cell lands on its channel and its month. Cells hold the percentage number — 55 means 55%.",
+      "twelveMix": "Mix % — how much of the sales come through each sub-channel",
+      "twelveCommission": "Commission % — what each sub-channel charges",
+      "twelveSave": "Save the twelve months",
+      "twelveSaved": "Saved: {n} rows.",
+      "rollupHelp": "Mix / commission. The bucket is the sum of its sub-channels' mix and the average of their commission weighted by that mix — not the plain average.",
+      "advancedShow": "More options",
+      "advancedHide": "Hide options"
     },
     "derivedIntro": "<b>This grid is not edited: it is the result.</b> It comes from the sub-channels in the <b>Mix</b> sub-tab, grouped by where each one rolls into. To change something, change it there and apply it — that way the number you see here is always the one the engine uses. Net Rate = Rack Rate × Net Factor.",
     "excelFailed": "The Excel file could not be downloaded",

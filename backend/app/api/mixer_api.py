@@ -223,6 +223,56 @@ class FilaMix(BaseModel):
     rueda_a: str | None = None
 
 
+@router.get("/canales/mixer/{scenario_id}/doce/")
+async def ver_doce_meses(scenario_id: str, _=Depends(get_current_user)):
+    """Los doce meses de una vez, para la grilla donde se pega el Excel.
+
+    Owner, 2026-10-05, con la captura del mix: *«me gustaría que esto esté
+    lineal por mes para hacer un copy paste desde el Excel»* · *«que sea más
+    sencillo de lo que hoy es»*.
+
+    ## Por qué un endpoint y no doce llamadas
+
+    La pantalla editaba **un mes a la vez** con un desplegable. Para cargar el
+    año había que entrar trece veces, y el Excel del que sale el dato ya viene
+    con los doce al lado. Pedir doce veces `/canales/mixer/` traía doce veces el
+    panorama, el impacto en plata y las bases del escenario —todo lo que no
+    cambia entre meses— para quedarse con dos números de cada una.
+
+    ⚠️ **Resuelve con la MISMA cascada** (`mixer.resolver` y `mixer.derivar`)
+    que la vista de un mes. Un segundo camino para los mismos números es cómo la
+    grilla y el Net Factor terminan discrepando sin que nada falle.
+    """
+    async with get_session() as s:
+        base = await _canales_base(s)
+        overs = await _overrides(s, scenario_id)
+        destinos = await _canales_comision(s)
+        codes = [d.code for d in destinos]
+        meses = []
+        for m in range(1, 13):
+            res = mixer.resolver(base, overs, m)
+            der = mixer.derivar(res, codes)
+            meses.append({
+                "month": m,
+                "filas": {c.code: {"mix_pct": float(c.mix_pct),
+                                   "comision_pct": float(c.comision_pct),
+                                   "origen": c.origen} for c in res},
+                "derivados": [{"channel": d.channel, "mix_pct": float(d.mix_pct),
+                               "commission_pct": float(d.commission_pct)}
+                              for d in der],
+                "mix_suma": float(mixer.suma_del_mix(res)),
+                "mix_cierra": mixer.mix_cierra(res),
+                "net_factor": float(mixer.net_factor(der)),
+            })
+    return {
+        "scenario_id": scenario_id,
+        "subcanales": [{"code": c.code, "nombre": c.nombre,
+                        "destino": mixer.destino_de(c)} for c in base],
+        "canales": [{"code": d.code, "nombre": d.nombre} for d in destinos],
+        "meses": meses,
+    }
+
+
 @router.put("/canales/mixer/{scenario_id}/")
 async def guardar_mixer(scenario_id: str, filas: list[FilaMix],
                         _=Depends(get_current_user)):

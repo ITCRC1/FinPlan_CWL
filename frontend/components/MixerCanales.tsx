@@ -12,6 +12,8 @@
  * muestra el antes, el después y la diferencia en plata; escribir es aparte.
  */
 import { useTranslations } from "next-intl";
+
+import GrillaMixDoce from "@/components/GrillaMixDoce";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -118,6 +120,9 @@ export default function MixerCanales() {
   const [desdeElAno, setDesdeElAno] = useState(2027);
   const [escId, setEscId] = useState("");
   const [mes, setMes] = useState(0);
+  //: Todo lo que NO es «pegar los doce meses y guardar» vive plegado.
+  //: Owner, 2026-10-05: *«haz todo más sencillo»*.
+  const [avanzado, setAvanzado] = useState(false);
   const [vista, setVista] = useState<MixerVista | null>(null);
   const [panorama, setPanorama] = useState<PanoramaCanales | null>(null);
   const [edit, setEdit] = useState<Record<string, { mix: number; com: number }>>({});
@@ -452,6 +457,39 @@ export default function MixerCanales() {
         </div>
       )}
 
+      {/* ── Lo simple primero: los doce meses, y guardar ───────────────────
+          Owner, 2026-10-05: *«me gustaría que esto esté lineal por mes para
+          hacer un copy paste desde el Excel»* · *«haz todo más sencillo»*.
+
+          ⚠️ Lo de abajo NO se borró, se plegó. Crear y borrar sub-canales,
+          cambiar el «rueda a», guardar como base, aplicar a otros escenarios y
+          el simulador en plata siguen estando — pero eran nueve bloques
+          compitiendo por la atención con la única tarea que se hace todas las
+          semanas. */}
+      <div style={CAJA}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+          marginBottom: 12 }}>
+          <select value={escId} onChange={e => setEscId(e.target.value)}
+                  style={{ ...BTN, fontWeight: 500, minWidth: 240 }}>
+            {escenarios.map(e => (
+              <option key={e.id} value={e.id}>{e.nombre}</option>
+            ))}
+          </select>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{t("mixer.twelveTitle")}</h2>
+        </div>
+        <GrillaMixDoce
+          scenarioId={escId}
+          puedeEditar={!!escActual?.aplica}
+          onGuardado={() => { void cargarVista(escId, mes); }} />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={() => setAvanzado(v => !v)} style={{ ...BTN, padding: "5px 12px" }}>
+          {avanzado ? t("mixer.advancedHide") : t("mixer.advancedShow")}
+        </button>
+      </div>
+
+      {avanzado && (<>
       {/* ── El mixer ───────────────────────────────────────────────────── */}
       <div style={CAJA}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
@@ -1078,6 +1116,7 @@ export default function MixerCanales() {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }
