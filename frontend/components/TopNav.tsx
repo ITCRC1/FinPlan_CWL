@@ -63,6 +63,9 @@ export const NAV: NavGroup[] = [
       // Pre-Cierre va ANTES de la carga porque es el paso que la precede: el
       // mes se revisa y recién después se declara final.
       { key: "preCierre", href: "/pre-cierre" },
+      // La auditoría del mayor va pegada al Pre-Cierre porque es el paso de
+      // antes: se revisa el detalle y recién después se arma el mes.
+      { key: "auditoriaGl", href: "/pre-cierre/auditoria" },
       { key: "importActuals", href: "/admin/import-actuals" },
     ],
   },

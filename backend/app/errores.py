@@ -100,6 +100,18 @@ MENSAJES: dict[str, dict[str, str]] = {
     #
     # ⚠️ Esta sola clave reemplaza TRES redacciones que convivían en el código
     # («month debe estar entre 1 y 12», «month must be 1–12», «month 1..12»).
+    "auditoria.archivo_vacio": {
+        "es": "El archivo llegó vacío",
+        "en": "The file came through empty"},
+    "auditoria.archivo_muy_grande": {
+        "es": "El archivo pesa más de 25 MB: no parece el detalle del mayor de un mes",
+        "en": "The file is over 25 MB: that does not look like one month of GL detail"},
+    "auditoria.no_se_pudo_leer": {
+        "es": "No se pudo leer el archivo como Excel: {detalle}",
+        "en": "The file could not be read as Excel: {detalle}"},
+    "auditoria.sin_lineas": {
+        "es": "El archivo no trae ninguna línea de asiento con cuenta de siete segmentos. ¿Es el Full Detail P&L de Integrity?",
+        "en": "The file has no journal lines with a seven-segment account. Is it the Integrity Full Detail P&L?"},
     "rango.invalido": {
         "es": "El rango de meses no es válido: ambos entre 1 y 12, y el mes inicial no puede ser mayor que el final",
         "en": "Invalid month range: both between 1 and 12, and the first month cannot be later than the last"},

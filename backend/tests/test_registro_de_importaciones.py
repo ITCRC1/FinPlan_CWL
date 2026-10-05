@@ -210,6 +210,12 @@ NO_REGISTRAN = {
     "pacing_api.py:preview",
     # No es una ruta — es el helper que ambas usan para leer los XML.
     "pacing_api.py:_leer",
+    # La auditoria del mayor NO guarda nada: lee el archivo, lo revisa y
+    # devuelve. El registro existe para saber que archivo dejo que numero
+    # adentro, y aca no entra ningun numero.
+    "auditoria_gl_api.py:revisar",
+    "auditoria_gl_api.py:excel",
+    "auditoria_gl_api.py:_revisar",
 }
 
 

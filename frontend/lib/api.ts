@@ -5895,3 +5895,67 @@ export async function setPaxGrid(
   return api.put(
     `/scenarios/${encodeURIComponent(scenarioId)}/revenue/pax-grid/`, { celdas });
 }
+
+// ── Auditoría del detalle del mayor ──────────────────────────────────────────
+//
+// Owner, 2026-10-05: «que herramienta puedes hacerme para yo solo subir el
+// archivo en este detalle y me salgan automáticamente la auditoría con las
+// discrepancias». Se sube el Full Detail P&L de Integrity y vuelven los casos a
+// revisar. NO guarda nada: es una lupa sobre un archivo, no una carga.
+export interface AuditoriaLinea {
+  asiento: string; linea: string; fecha: string; cuenta: string;
+  descripcion: string; referencia: string; origen: string;
+  monto_crc: number; monto_usd: number;
+}
+export interface AuditoriaHallazgo {
+  regla: string;
+  /** `alta` · `media` · `baja` — la tabla sale ordenada por esto y por monto. */
+  severidad: string;
+  cuenta: string; dept: string; concepto: string;
+  n_lineas: number; monto_crc: number; monto_usd: number;
+  porque: string;
+  /** La cuenta donde parece ir. Vacía cuando el reparto quedó partido al medio
+   *  y no hay un lado dominante: ahí hay que decidir, no mover. */
+  sugerencia: string;
+  lineas: AuditoriaLinea[];
+}
+export interface AuditoriaGL {
+  archivo: string; titulo: string; periodo: string; moneda: string;
+  hojas: string[];
+  lineas_del_archivo: number; lineas_revisadas: number; lineas_senaladas: number;
+  monto_en_revision_crc: number;
+  por_regla: Record<string, number>;
+  por_severidad: Record<string, number>;
+  que_mira: Record<string, string>;
+  hallazgos: AuditoriaHallazgo[];
+}
+
+export async function auditarMayor(file: File): Promise<AuditoriaGL> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/auditoria-gl/revisar/`,
+    { method: "POST", body: fd, headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  return res.json();
+}
+
+/** El mismo análisis como hoja de trabajo. Va por POST porque lleva el archivo,
+ *  así que no puede usar `bajarArchivo`, que es GET. */
+export async function auditarMayorExcel(file: File): Promise<void> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/auditoria-gl/excel/`,
+    { method: "POST", body: fd, headers: authHeaders() });
+  if (!res.ok) throw await errorLegible(res);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const cd = res.headers.get("content-disposition") || "";
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  a.download = m ? decodeURIComponent(m[1]) : "auditoria.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

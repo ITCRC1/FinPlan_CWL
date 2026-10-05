@@ -1,0 +1,262 @@
+"use client";
+/**
+ * Auditoría del detalle del mayor.
+ *
+ * Owner, 2026-10-05: *«este es el máximo detalle que tira el sistema de
+ * contabilidad. Yo debo revisar línea por línea… necesito una herramienta de
+ * revisión para asegurarme que la descripción de los gastos sea correctamente
+ * con la cuenta contable, el departamento»*.
+ *
+ * Se sube el Full Detail P&L de Integrity y salen los casos a revisar. **No
+ * guarda nada**: no hay escenario, no toca el P&L. Es una lupa sobre un
+ * archivo.
+ *
+ * ⚠️ La pantalla no esconde cuánto NO revisó. Arriba van las líneas del
+ * archivo, las revisadas y las señaladas, los tres juntos: una herramienta que
+ * muestra 29 casos sin decir que miró 6.617 líneas se lee como «hay 29
+ * problemas», cuando lo que dice es «empezá por estos 29».
+ */
+import { useState } from "react";
+import { auditarMayor, auditarMayorExcel, type AuditoriaGL, type AuditoriaHallazgo } from "@/lib/api";
+
+const SEV: Record<string, { fondo: string; texto: string; rotulo: string }> = {
+  alta: { fondo: "#FFD6D6", texto: "#8B1A1A", rotulo: "Alta" },
+  media: { fondo: "#FFF0CC", texto: "#7A5200", rotulo: "Media" },
+  baja: { fondo: "#EDEDED", texto: "#4C505E", rotulo: "Baja" },
+};
+
+const card: React.CSSProperties = {
+  background: "var(--bg-surface)", border: "1px solid var(--border-medium)",
+  borderRadius: 8, padding: 16,
+};
+const th: React.CSSProperties = {
+  padding: "6px 8px", fontSize: 11, textAlign: "left", whiteSpace: "nowrap",
+  borderBottom: "1px solid var(--border-medium)", color: "var(--text-secondary)",
+};
+const td: React.CSSProperties = {
+  padding: "6px 8px", fontSize: 12, borderBottom: "1px solid var(--border-subtle)",
+  verticalAlign: "top",
+};
+const num: React.CSSProperties = {
+  ...td, textAlign: "right", whiteSpace: "nowrap",
+  fontFamily: "var(--font-mono, monospace)",
+};
+
+const crc = (v: number) =>
+  v.toLocaleString("es-CR", { maximumFractionDigits: 0 });
+
+function Dato({ rotulo, valor, tono }: { rotulo: string; valor: string; tono?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{rotulo}</div>
+      <div style={{ fontSize: 20, fontWeight: 600, fontFamily: "var(--font-mono, monospace)",
+                    color: tono || "var(--text-primary)" }}>{valor}</div>
+    </div>
+  );
+}
+
+function Fila({ h }: { h: AuditoriaHallazgo }) {
+  const [abierto, setAbierto] = useState(false);
+  const s = SEV[h.severidad] ?? SEV.baja;
+  return (
+    <>
+      <tr onClick={() => setAbierto(a => !a)} style={{ cursor: "pointer" }}>
+        <td style={td}>
+          <span style={{ background: s.fondo, color: s.texto, borderRadius: 4,
+                         padding: "1px 6px", fontSize: 11, fontWeight: 600 }}>
+            {s.rotulo}
+          </span>
+        </td>
+        <td style={{ ...td, fontFamily: "var(--font-mono, monospace)", fontSize: 11 }}>
+          {h.cuenta}
+        </td>
+        <td style={td}>{h.concepto}</td>
+        <td style={num}>{h.n_lineas}</td>
+        <td style={num}>{crc(h.monto_crc)}</td>
+        <td style={{ ...td, fontFamily: "var(--font-mono, monospace)", fontSize: 11 }}>
+          {h.sugerencia || <span style={{ color: "var(--text-secondary)" }}>—</span>}
+        </td>
+        <td style={{ ...td, color: "var(--text-secondary)", maxWidth: 520 }}>{h.porque}</td>
+      </tr>
+      {abierto && (
+        <tr>
+          <td colSpan={7} style={{ ...td, background: "var(--bg-base)" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%" }}>
+              <thead>
+                <tr>{["Asiento", "Línea", "Fecha", "Origen", "Descripción", "Referencia", "CRC", "USD"]
+                  .map(c => <th key={c} style={th}>{c}</th>)}</tr>
+              </thead>
+              <tbody>
+                {h.lineas.map((l, i) => (
+                  <tr key={`${l.asiento}-${l.linea}-${i}`}>
+                    <td style={{ ...td, fontFamily: "var(--font-mono, monospace)" }}>{l.asiento}</td>
+                    <td style={td}>{l.linea}</td>
+                    <td style={td}>{l.fecha}</td>
+                    <td style={td}>{l.origen}</td>
+                    <td style={td}>{l.descripcion}</td>
+                    <td style={td}>{l.referencia}</td>
+                    <td style={num}>{crc(l.monto_crc)}</td>
+                    <td style={num}>{l.monto_usd.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+export default function AuditoriaDelMayor() {
+  const [file, setFile] = useState<File | null>(null);
+  const [data, setData] = useState<AuditoriaGL | null>(null);
+  const [ocupado, setOcupado] = useState<"" | "revisar" | "excel">("");
+  const [err, setErr] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<string>("");
+
+  const correr = async (f: File) => {
+    setOcupado("revisar"); setErr(null); setData(null);
+    try { setData(await auditarMayor(f)); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setOcupado(""); }
+  };
+
+  const elegir = (l: FileList | null) => {
+    const f = l?.[0];
+    if (!f) return;
+    setFile(f);
+    void correr(f);
+  };
+
+  const bajar = async () => {
+    if (!file) return;
+    setOcupado("excel"); setErr(null);
+    try { await auditarMayorExcel(file); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setOcupado(""); }
+  };
+
+  const visibles = (data?.hallazgos ?? [])
+    .filter(h => !filtro || h.severidad === filtro);
+
+  return (
+    <div style={{ display: "grid", gap: 18, maxWidth: 1500 }}>
+      <div style={card}>
+        <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+          Auditoría del detalle del mayor
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+          Subí el <b>Full Detail P&amp;L</b> de Integrity —el Balance de Comprobación con
+          el detalle de asientos— y se revisan las cuentas de la clase 4 en adelante:
+          que la descripción corresponda a la cuenta y al departamento. No se guarda
+          nada y no toca el P&amp;L.
+        </div>
+        <label style={{ display: "block", border: "2px dashed var(--border-medium)",
+                        borderRadius: 8, padding: 22, textAlign: "center",
+                        cursor: "pointer", fontSize: 13 }}
+               onDragOver={e => e.preventDefault()}
+               onDrop={e => { e.preventDefault(); elegir(e.dataTransfer.files); }}>
+          {file ? file.name : "Arrastrá el Excel acá o hacé clic para elegirlo"}
+          <input type="file" accept=".xlsx,.xlsm" style={{ display: "none" }}
+                 onChange={e => elegir(e.target.files)} />
+        </label>
+        {ocupado === "revisar" && (
+          <div style={{ fontSize: 12, marginTop: 8 }}>Revisando el archivo…</div>
+        )}
+        {err && (
+          <div style={{ marginTop: 10, padding: "8px 10px", borderRadius: 6, fontSize: 12,
+                        background: "#FFD6D6", color: "#8B1A1A" }}>{err}</div>
+        )}
+      </div>
+
+      {data && (
+        <>
+          <div style={card}>
+            <div style={{ display: "flex", gap: 34, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <Dato rotulo="Período" valor={data.periodo || "—"} />
+              <Dato rotulo="Líneas del archivo" valor={data.lineas_del_archivo.toLocaleString("es-CR")} />
+              <Dato rotulo="Revisadas (clase 4+)" valor={data.lineas_revisadas.toLocaleString("es-CR")} />
+              <Dato rotulo="Casos a revisar" valor={String(data.hallazgos.length)}
+                    tono="var(--brand)" />
+              <Dato rotulo="Líneas señaladas" valor={data.lineas_senaladas.toLocaleString("es-CR")} />
+              <Dato rotulo="Monto señalado (CRC)" valor={crc(data.monto_en_revision_crc)} />
+              <button onClick={bajar} disabled={ocupado !== ""}
+                      style={{ padding: "7px 14px", borderRadius: 6, fontSize: 12,
+                               border: "1px solid var(--border-medium)",
+                               background: "var(--brand)", color: "#fff", cursor: "pointer" }}>
+                {ocupado === "excel" ? "Generando…" : "Bajar hoja de trabajo"}
+              </button>
+            </div>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[["", "Todas"], ["alta", "Alta"], ["media", "Media"], ["baja", "Baja"]]
+                .map(([k, r]) => {
+                  const n = k ? (data.por_severidad[k] ?? 0) : data.hallazgos.length;
+                  if (k && !n) return null;
+                  return (
+                    <button key={k || "todas"} onClick={() => setFiltro(k)}
+                            style={{ padding: "4px 10px", borderRadius: 5, fontSize: 12,
+                                     cursor: "pointer",
+                                     border: `1px solid ${filtro === k ? "var(--brand)" : "var(--border-medium)"}`,
+                                     background: filtro === k ? "var(--brand)" : "transparent",
+                                     color: filtro === k ? "#fff" : "var(--text-primary)" }}>
+                      {r} ({n})
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
+          <div style={card}>
+            {/* `fin-scroll-x` y no un `overflow-x` suelto: un div que scrollea
+                en horizontal tambien lo hace en vertical, y ahi el `thead`
+                sticky de la app resuelve contra la caja —no contra el nav— y
+                se come la primera fila. Ver
+                `test_encabezado_no_tapa_la_primera_fila`. */}
+            <div className="fin-scroll-x">
+              <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 1100 }}>
+                <thead>
+                  <tr>{["Severidad", "Cuenta", "Concepto", "Líneas", "Monto CRC",
+                        "Debería ir en", "Por qué"].map(c => <th key={c} style={th}>{c}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {visibles.map((h, i) => <Fila key={`${h.regla}-${h.cuenta}-${h.concepto}-${i}`} h={h} />)}
+                  {!visibles.length && (
+                    <tr><td style={td} colSpan={7}>
+                      No hay casos con ese filtro. Si el archivo está limpio, eso es
+                      exactamente lo que se espera ver.
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 8 }}>
+              Hacé clic en un renglón para ver los asientos y poder buscarlos en Integrity.
+            </div>
+          </div>
+
+          {!!Object.keys(data.que_mira).length && (
+            <div style={card}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                Qué mira cada regla
+              </div>
+              {Object.entries(data.que_mira).map(([regla, texto]) => (
+                <div key={regla} style={{ marginBottom: 8, fontSize: 12 }}>
+                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 11 }}>
+                    {regla}
+                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}> · {data.por_regla[regla]} casos</span>
+                  <div style={{ color: "var(--text-secondary)" }}>{texto}</div>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 10 }}>
+                Esto no decide si un asiento está bien: señala los que no se parecen al
+                resto, para que la revisión empiece por ahí.
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

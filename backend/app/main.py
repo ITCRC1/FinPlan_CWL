@@ -39,6 +39,7 @@ from app.api.estadisticas_api import router as estadisticas_router
 from app.api.checkbook_api import router as checkbook_router
 from app.api.canales_api import router as canales_router
 from app.api.precierre_api import router as precierre_router
+from app.api.auditoria_gl_api import router as auditoria_gl_router
 from app.api.auditoria_api import router as auditoria_router
 from app.api.detalle_celda_api import router as detalle_celda_router
 from app.api.comentario_pl_api import router as comentario_pl_router
@@ -179,6 +180,7 @@ app.include_router(estadisticas_router, prefix="/api", dependencies=_guard)
 app.include_router(checkbook_router, prefix="/api", dependencies=_guard)
 app.include_router(canales_router, prefix="/api", dependencies=_guard)
 app.include_router(precierre_router, prefix="/api", dependencies=_guard)
+app.include_router(auditoria_gl_router, prefix="/api", dependencies=_guard)
 app.include_router(auditoria_router, prefix="/api", dependencies=_guard)
 app.include_router(detalle_celda_router, prefix="/api", dependencies=_guard)
 app.include_router(comentario_pl_router, prefix="/api", dependencies=_guard)
