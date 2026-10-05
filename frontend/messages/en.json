@@ -4769,7 +4769,12 @@
         "pi": "PI discarded",
         "rango": "Created",
         "subido": "Uploaded"
-      }
+      },
+      "notaTitulo": "What to upload each week (all from Opera)",
+      "notaEstadia": "stay dates",
+      "notaCreacion": "creation dates",
+      "notaDesdeMigracion": "since migration",
+      "notaCorte": "You don't pick the cut-off: it comes from the file, the first Forecast day. Ask for the FULL year — a short export raises no error, it just leaves STLY missing. Upload the three on the same weekday."
     },
     "config": {
       "titulo": "Settings",

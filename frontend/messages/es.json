@@ -4769,7 +4769,12 @@
         "pi": "PI descartadas",
         "rango": "Creadas",
         "subido": "Subido"
-      }
+      },
+      "notaTitulo": "Qué subir cada semana (todo sale de Opera)",
+      "notaEstadia": "fechas de estadía",
+      "notaCreacion": "fechas de creación",
+      "notaDesdeMigracion": "desde la migración",
+      "notaCorte": "El corte no se elige: sale del archivo, es el primer día Forecast. Pedí el año COMPLETO —un export corto no da error, deja el STLY sin aparecer—. Subí los tres el mismo día de la semana."
     },
     "config": {
       "titulo": "Configuración",

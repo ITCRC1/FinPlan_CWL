@@ -24,6 +24,64 @@ const inp = {
   borderRadius: 4, background: "var(--bg-input)", color: "var(--text-primary)",
 };
 
+/**
+ * Qué subir cada semana y con qué rango de fechas pedirlo en Opera.
+ *
+ * Owner, 2026-10-05: *«qué fecha de archivo debo subir… para no perderme cada
+ * semana, de qué fecha a qué fecha y qué archivo»*.
+ *
+ * Las fechas se calculan con el día de hoy en vez de escribirse a mano: una
+ * nota con fechas fijas es correcta una semana y mentira la siguiente, y el
+ * costo de equivocarse acá no es visible —un export corto no da error, da un
+ * STLY que no aparece y un pacing que parece vacío—.
+ *
+ * ⚠️ El rango de History & Forecast va del año PASADO al que VIENE porque el
+ * motor compara cada año contra el anterior (`pacing.construir` arma T y T−1):
+ * con el presupuesto 2027 abierto hacen falta 2026 y 2027, y el pacing del año
+ * en curso además necesita 2025. Y tiene que ser el AÑO COMPLETO: `stly_foto`
+ * descarta una foto con menos de 300 días del año que compara.
+ *
+ * ⚠️ El de Reservations va por fecha de CREACIÓN, no de llegada, y arranca en
+ * la migración: para saber qué había en libros a una fecha pasada hay que
+ * tener las reservas creadas ANTES de esa fecha (`reservas_cubren` exige
+ * `min_ins <= corte − 1 año`).
+ */
+function NotaSemanal({ migracion }: { migracion?: string | null }) {
+  const t = useTranslations("pacing.cargas");
+  const M = useMeses();
+  const hoy = new Date();
+  const Y = hoy.getFullYear();
+  const dia = (d: Date) => `${d.getDate()} ${M[d.getMonth()]} ${d.getFullYear()}`;
+  const rangoHF = `${dia(new Date(Y - 1, 0, 1))} → ${dia(new Date(Y + 1, 11, 31))}`;
+  const rangoResv = `${migracion || t("notaDesdeMigracion")} → ${dia(hoy)}`;
+  const filas: [string, string, string][] = [
+    [t("hfTotal"), t("notaEstadia"), rangoHF],
+    [t("hfRooms"), t("notaEstadia"), rangoHF],
+    [t("tipoResv"), t("notaCreacion"), rangoResv],
+  ];
+  return (
+    <div style={{ border: "1px solid var(--border-medium)", borderRadius: 6,
+                  padding: "8px 10px", marginBottom: 10, fontSize: 12 }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>{t("notaTitulo")}</div>
+      <table style={{ borderCollapse: "collapse", width: "100%" }}>
+        <tbody>
+          {filas.map(([archivo, campo, rango]) => (
+            <tr key={archivo}>
+              <td style={{ padding: "2px 10px 2px 0", whiteSpace: "nowrap" }}>{archivo}</td>
+              <td style={{ padding: "2px 10px 2px 0", color: "var(--text-secondary)",
+                           whiteSpace: "nowrap" }}>{campo}</td>
+              <td style={{ padding: "2px 0", fontFamily: "var(--font-mono, monospace)",
+                           whiteSpace: "nowrap" }}>{rango}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ color: "var(--text-secondary)", marginTop: 6 }}>{t("notaCorte")}</div>
+    </div>
+  );
+}
+
+
 export function Cargas() {
   const t = useTranslations("pacing.cargas");
   const { recargar } = usePacing();
@@ -75,6 +133,7 @@ export function Cargas() {
       <div style={card}>
         <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{t("titulo")}</div>
         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>{t("instrucciones")}</div>
+        <NotaSemanal migracion={resv?.desde} />
         <label style={{ display: "block", border: "2px dashed var(--border-medium)", borderRadius: 8, padding: 24,
                         textAlign: "center", cursor: "pointer", fontSize: 13 }}
                onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); elegir(e.dataTransfer.files); }}>
