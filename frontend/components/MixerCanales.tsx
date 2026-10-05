@@ -585,6 +585,50 @@ export default function MixerCanales() {
                   )}
                 </td>
               </tr>
+              {/* ── El canal principal, acá mismo ──────────────────────────
+                  Owner, 2026-10-05: *«quiero que los subchannels sean los que
+                  se le asignan % de ventas y comisión, y el channel principal
+                  haga sumatoria y quede por ahí en la vista también como un
+                  summary»*.
+
+                  El resumen ya existía, pero en un panel aparte: para ver a
+                  dónde iba a parar lo que acababa de escribir había que bajar
+                  la vista y perder de vista la fila que se estaba tocando.
+                  Acá se lee en el mismo movimiento.
+
+                  ⚠️ Sale de `derivadosVivos`, el MISMO cálculo que alimenta el
+                  Net Factor y el panel de abajo — no una suma propia de esta
+                  tabla. Dos sumas del mismo número es cómo dos partes de una
+                  pantalla terminan diciendo cosas distintas.
+
+                  ⚠️ Y la comisión del cubo es el promedio PONDERADO por mix,
+                  no el simple: lo que se paga depende de cuánto volumen pasa
+                  por cada sub-canal. */}
+              <tr>
+                <td colSpan={7} style={{ ...TD, paddingTop: 14, border: "none",
+                  fontSize: 11, textTransform: "uppercase", letterSpacing: .4,
+                  color: "var(--text-secondary)" }}>
+                  {t("mixer.rollupTitle")}
+                </td>
+              </tr>
+              {derivadosVivos.map(d => {
+                const nombre = (vista?.canales ?? []).find(x => x.code === d.channel)?.nombre;
+                const cuantos = subcanales.filter(
+                  c => (destinos[c.code] ?? c.destino) === d.channel).length;
+                return (
+                  <tr key={`rollup-${d.channel}`} style={{ background: "var(--bg-elevated)" }}>
+                    <td style={{ ...TD, fontWeight: 600 }} colSpan={3}>
+                      {nombre || d.channel}
+                      <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
+                        {" "}· {t("mixer.rollupFrom", { n: cuantos })}
+                      </span>
+                    </td>
+                    <td style={{ ...NUM, fontWeight: 600 }}>{pct(d.mix_pct, 1)}</td>
+                    <td style={{ ...NUM, fontWeight: 600 }}>{pct(d.commission_pct)}</td>
+                    <td style={TD} colSpan={2} />
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

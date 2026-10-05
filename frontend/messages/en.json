@@ -1788,7 +1788,9 @@
       "xlsNfChange": "Net Factor today {hoy} → {nuevo}",
       "xlsNoChannels": "The scenario has no channels saved",
       "xlsSubSheet": "Sub-channels",
-      "xlsSubTitle": "Sub-channels — this is where planning happens"
+      "xlsSubTitle": "Sub-channels — this is where planning happens",
+      "rollupTitle": "Summary · main channel",
+      "rollupFrom": "from {n} sub-channels"
     },
     "derivedIntro": "<b>This grid is not edited: it is the result.</b> It comes from the sub-channels in the <b>Mix</b> sub-tab, grouped by where each one rolls into. To change something, change it there and apply it — that way the number you see here is always the one the engine uses. Net Rate = Rack Rate × Net Factor.",
     "excelFailed": "The Excel file could not be downloaded",
