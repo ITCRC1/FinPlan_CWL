@@ -2515,9 +2515,20 @@ async def get_occupancy_pct(scenario_id: str, db: AsyncSession = Depends(get_db)
     noches absolutas), deriva el % desde rooms_occupied / noches disponibles.
     """
     scenario = await _get_scenario_or_404(scenario_id, db)
+    # ⚠️ **Sólo las que están a la vista.** Era la ÚNICA consulta de pantalla
+    # que listaba todos los tipos sin filtrar, y por eso las categorías ocultas
+    # —«Categoría 5» a «Categoría 8», con cero unidades y cero todo— salían en
+    # Ocupación, en Pax y en Total Revenue mientras el Inventario y las Rack
+    # Rates ya no las mostraban (owner, 2026-10-04: «hay que quitar esos room
+    # types incorrectos de todas las vistas»).
+    #
+    # Es la misma regla que el resto del archivo: ocultar una categoría propaga
+    # a todo el revenue. Medido antes de tocar nada: las cuatro no tienen
+    # ocupación, ni tarifa, ni estadística — esconderlas no mueve un número.
     rts = (await db.execute(
         select(RoomTypeConfig)
-        .where(RoomTypeConfig.hotel_id == scenario.hotel_id)
+        .where(RoomTypeConfig.hotel_id == scenario.hotel_id,
+               aplica_en(scenario.year))
         .order_by(RoomTypeConfig.sort_order)
     )).scalars().all()
     occ = (await db.execute(
