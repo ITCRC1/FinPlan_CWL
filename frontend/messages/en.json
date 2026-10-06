@@ -1799,7 +1799,11 @@
       "twelveSaved": "Saved: {n} rows.",
       "rollupHelp": "Mix / commission. The bucket is the sum of its sub-channels' mix and the average of their commission weighted by that mix — not the plain average.",
       "advancedShow": "More options",
-      "advancedHide": "Hide options"
+      "advancedHide": "Hide options",
+      "baseOnlyTitle": "This is the BASE mix, not this scenario's",
+      "baseOnlyBody": "The twelve columns above hold the real month-by-month mix for <b>{esc}</b>. This table is on <b>Annual</b> and none of its rows has an exception, so it shows the <b>base</b>: what a new scenario inherits. That is why the numbers do not match.",
+      "baseOnlyFactor": "Base Net Factor <b>{base}</b> · scenario <b>{esc}</b>.",
+      "baseOnlyHint": "To see or change this scenario's, use the twelve-month grid."
     },
     "derivedIntro": "<b>This grid is not edited: it is the result.</b> It comes from the sub-channels in the <b>Mix</b> sub-tab, grouped by where each one rolls into. To change something, change it there and apply it — that way the number you see here is always the one the engine uses. Net Rate = Rack Rate × Net Factor.",
     "excelFailed": "The Excel file could not be downloaded",

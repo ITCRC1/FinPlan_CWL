@@ -54,7 +54,7 @@ export interface EscenarioMin {
 }
 
 /** Los papeles que una pantalla puede necesitar. */
-export type Rol = "budget" | "forecast" | "actual" | "actualAnterior";
+export type Rol = "budget" | "budgetPlan" | "forecast" | "actual" | "actualAnterior";
 
 /**
  * La regla del owner (2026-08-14): «quiero que la base sea Budget Working 2027,
@@ -78,6 +78,11 @@ export const PREFERENCIA: Record<Rol, { type: string; year: number; version?: st
   // CERO —son andamiaje de `ensure-working`—, así que abrir ahí mostraba un
   // reporte real y perfectamente vacío.
   budget:         { type: "BUDGET",   year: 2027, version: "Working" },
+  // ⚠️ **Donde se EDITA el presupuesto, no donde se compara.** Una pantalla
+  // de planificación que abre en un escenario enllavado obliga a cambiar el
+  // selector en cada visita. Owner, 2026-10-06: *«que quede fijo 2027 y
+  // editable... siempre me aparece 2026»*.
+  budgetPlan:     { type: "BUDGET",   year: 2027, version: "Working" },
   forecast:       { type: "FORECAST", year: 2026, version: "Working" },
   // 2026-08-19, owner: «quiero que esté siempre Budget 2027, Forecast 2026,
   // Actual 2025, Actual 2024». Los dos ACTUAL RETROCEDEN un año respecto del
