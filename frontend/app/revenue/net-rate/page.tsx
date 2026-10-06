@@ -76,10 +76,16 @@ export default function NetRatePage() {
     const sel = scenarios.find(s => s.id === scenarioId);
     const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
     // El net factor es una fracción (0.75) → va como % para no perder decimales.
-    const filas: FilaCuadro[] = [{
-      label: "Net Factor", es_total: true, formato: "pct",
-      valores: netFactor.map(nf => nf),
-    }];
+    const filas: FilaCuadro[] = [];
+    filas.push({ label: t("blockRack"), es_total: true, valores: Array(12).fill(null) });
+    for (const r of rows) {
+      filas.push({ label: r.name, nivel: 1, valores: r.rack });
+    }
+    filas.push({ label: t("blockDiscount"), es_total: true, valores: Array(12).fill(null) });
+    filas.push({ label: t("discountPct"), nivel: 1, formato: "pct",
+                 valores: netFactor.map(nf => 1 - nf) });
+    filas.push({ label: "Net Factor", nivel: 1, formato: "pct", valores: netFactor.map(nf => nf) });
+    filas.push({ label: t("blockNet"), es_total: true, valores: Array(12).fill(null) });
     for (const r of rows) {
       filas.push({
         label: r.name, nivel: 1,
@@ -131,15 +137,63 @@ export default function NetRatePage() {
               </tr>
             </thead>
             <tbody>
-              <tr style={{ color: "var(--brand)" }}>
-                <td style={{ textAlign: "left", fontWeight: 600 }}>Net Factor</td>
-                {netFactor.map((nf, mi) => <td key={mi} className="mono" style={{ textAlign: "right" }}>{nf.toFixed(4)}</td>)}
+              {/* Owner, 2026-10-06: *«pon acá la tarifa rack también para poder
+                  comparar... primero tarifa rack, después el rate de descuento y
+                  siguiente las tarifas net rate»*.
+                  La página ya traía el rack — lo usaba para calcular y no lo
+                  mostraba, así que para ver de dónde salía cada neta había que
+                  abrir otra pantalla. */}
+              <tr>
+                <td colSpan={13} style={{ textAlign: "left", fontWeight: 700,
+                  background: "var(--bg-surface)", padding: "6px 8px" }}>
+                  {t("blockRack")}
+                </td>
               </tr>
               {rows.map(r => (
-                <tr key={r.room_type_id}>
+                <tr key={`rack-${r.room_type_id}`}>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{r.name}</td>
                   {r.rack.map((rk, mi) => (
-                    <td key={mi} className="mono" style={{ textAlign: "right", color: rk ? "var(--text-primary)" : "var(--text-disabled)" }}>
+                    <td key={mi} className="mono" style={{ textAlign: "right",
+                      color: rk ? "var(--text-primary)" : "var(--text-disabled)" }}>
+                      {fmt(rk)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
+              <tr>
+                <td colSpan={13} style={{ textAlign: "left", fontWeight: 700,
+                  background: "var(--bg-surface)", padding: "6px 8px" }}>
+                  {t("blockDiscount")}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ textAlign: "left", fontWeight: 500 }}>{t("discountPct")}</td>
+                {netFactor.map((nf, mi) => (
+                  <td key={mi} className="mono" style={{ textAlign: "right" }}>
+                    {((1 - nf) * 100).toFixed(2)}%
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ color: "var(--brand)" }}>
+                <td style={{ textAlign: "left", fontWeight: 600 }}>Net Factor</td>
+                {netFactor.map((nf, mi) => (
+                  <td key={mi} className="mono" style={{ textAlign: "right" }}>{nf.toFixed(4)}</td>
+                ))}
+              </tr>
+
+              <tr>
+                <td colSpan={13} style={{ textAlign: "left", fontWeight: 700,
+                  background: "var(--bg-surface)", padding: "6px 8px" }}>
+                  {t("blockNet")}
+                </td>
+              </tr>
+              {rows.map(r => (
+                <tr key={`net-${r.room_type_id}`}>
+                  <td style={{ textAlign: "left", fontWeight: 500 }}>{r.name}</td>
+                  {r.rack.map((rk, mi) => (
+                    <td key={mi} className="mono" style={{ textAlign: "right", fontWeight: 600,
+                      color: rk ? "var(--text-primary)" : "var(--text-disabled)" }}>
                       {fmt(rk * (netFactor[mi] || 0))}
                     </td>
                   ))}

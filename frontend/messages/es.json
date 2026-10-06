@@ -3412,7 +3412,11 @@
     "excelFailed": "No se pudo generar el Excel",
     "excelHint": "Baja este cuadro a Excel, con las cifras como número",
     "intro": "<b>Net Rate = Rack Rate × Net Factor del mes</b> (de Canales de Venta). Calculado — se ajusta solo al cambiar tarifas o canales.",
-    "xlsSubtitle": "USD · Net Rate = Rack Rate × Net Factor del mes (el factor va en %)"
+    "xlsSubtitle": "USD · Net Rate = Rack Rate × Net Factor del mes (el factor va en %)",
+    "blockRack": "1 · TARIFA RACK  (lo publicado)",
+    "blockDiscount": "2 · DESCUENTO POR CANAL  (de Canales de Venta)",
+    "blockNet": "3 · TARIFA NETA  =  rack × net factor",
+    "discountPct": "Comisión ponderada del mes"
   },
   "rackRates": {
     "errorSaving": "Error al guardar",

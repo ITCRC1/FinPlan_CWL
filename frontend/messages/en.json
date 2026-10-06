@@ -3412,7 +3412,11 @@
     "excelFailed": "The Excel file could not be generated",
     "excelHint": "Downloads this table to Excel, with the figures as numbers",
     "intro": "<b>Net Rate = Rack Rate × the month's Net Factor</b> (from Sales Channels). Calculated — it adjusts itself when rates or channels change.",
-    "xlsSubtitle": "USD · Net Rate = Rack Rate × the month's Net Factor (the factor goes as %)"
+    "xlsSubtitle": "USD · Net Rate = Rack Rate × the month's Net Factor (the factor goes as %)",
+    "blockRack": "1 · RACK RATE  (published)",
+    "blockDiscount": "2 · CHANNEL DISCOUNT  (from Sales Channels)",
+    "blockNet": "3 · NET RATE  =  rack × net factor",
+    "discountPct": "Weighted commission for the month"
   },
   "rackRates": {
     "errorSaving": "Error while saving",
