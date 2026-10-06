@@ -91,6 +91,38 @@ ALLOC_EXCL_PAYROLL = {d for d, cs in ALLOCATION_EXCLUDE.items() if "6" in cs}  #
 ALLOC_EXCL_OPEX = {d for d, cs in ALLOCATION_EXCLUDE.items() if "7" in cs}     # {0220, 0161}
 
 
+def excluida_del_archivo(dept_code: str, account_code: str,
+                         en_overhead: bool = False) -> bool:
+    """¿Esta cuenta, en este departamento, la DEJA FUERA el parser?
+
+    Es `ALLOCATION_EXCLUDE` dicho desde el otro lado: no «qué se excluye del
+    P&L», sino **«qué no puede venir en el archivo»**. Y esa es la pregunta que
+    tiene que hacerse el ESCRITOR antes de poner una fila en cero.
+
+    ⚠️ **El archivo no puede borrar lo que el archivo no puede traer.** Es la
+    misma regla que ya protege las contrapartidas de reparto
+    (`es_contrapartida_de_allocation`), y se escapaba por este otro agujero.
+
+    Owner, 2026-10-06, subiendo el Forecast de setiembre con la plantilla recién
+    bajada: *«API 409 … cambiar OpexEntry.jun: 30.0000 → 0 · 7400 en 0220»*. La
+    plantilla **ofrece** el 7400 de Cafetería —está en su propia lista de orden,
+    `orden_plantilla.json`— y la trae con su monto; al volver a subirla el parser
+    la salta por ALLOCATION_EXCLUDE y el escritor dejaba la fila en cero. Bajar y
+    subir sin tocar nada borraba el gasto de Cafetería y Lavandería.
+
+    En un mes abierto eso pasaba **en silencio**: esas clases no entran a los
+    totales operativos, así que ningún número cambiaba y el P&L seguía cuadrando
+    consigo mismo. Apareció sólo porque en un mes cerrado el candado lo frena.
+
+    `en_overhead` (el espejo del Pre-Cierre) no excluye nada, así que ahí no hay
+    nada que proteger: el archivo sí las trae y manda el archivo.
+    """
+    if en_overhead:
+        return False
+    clase = str(account_code or "")[:1]
+    return clase in ALLOCATION_EXCLUDE.get(str(dept_code or ""), set())
+
+
 def allocation_en_overhead(sc) -> bool:
     """¿Este escenario ENSEÑA el gasto de allocation como overhead en vez de esconderlo?
 

@@ -134,7 +134,12 @@ def test_el_modo_overhead_no_se_puede_pedir_desde_afuera():
     escenario y por eso este test mira el código fuente.
     """
     src = Path("app/api/scenarios_api.py").read_text(encoding="utf-8")
-    assert "parse_gl_detail(data, en_overhead=allocation_en_overhead(forced))" in src
+    # El modo sale del destino UNA sola vez, y de ahi lo toman el parser y el
+    # escritor. Es una variable y no la llamada en linea porque el ESCRITOR
+    # tambien la necesita: lo que el parser excluye es exactamente lo que el
+    # escritor no debe poner en cero (ver `excluida_del_archivo`).
+    assert "en_overhead = allocation_en_overhead(forced)" in src
+    assert "parse_gl_detail(data, en_overhead=en_overhead)" in src
     assert "en_overhead: bool = Query" not in src
     assert "en_overhead=True" not in src   # nadie lo fija a mano
 
