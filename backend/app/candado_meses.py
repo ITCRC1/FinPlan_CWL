@@ -139,16 +139,31 @@ def _numero(v) -> Decimal:
 def _revisar(session: Session) -> None:
     mapa = columnas_de_mes()
 
-    def frenar(obj, mes: int, col: str, verbo: str) -> None:
+    def frenar(obj, mes: int, col: str, verbo: str,
+               antes: Decimal | None = None, ahora: Decimal | None = None) -> None:
         from app.models.scenario import Scenario
 
         with session.no_autoflush:
             sc = session.get(Scenario, getattr(obj, "scenario_id", None))
+        # ⚠️ El mensaje lleva LOS NUMEROS. Sin ellos decia «enero esta cerrado» y
+        # no habia forma de saber si el archivo cambiaba medio centimo o doce mil
+        # dolares — se discutia a ciegas y la unica salida que el texto ofrecia
+        # era reabrir el periodo. Owner, 2026-10-06: «SIGUE SALIENDO».
+        detalle = f"{verbo} {type(obj).__name__}.{col}"
+        if antes is not None and ahora is not None:
+            detalle += (f": {antes} → {ahora}"
+                        f" (diferencia {abs(ahora - antes)})")
+        cuenta = getattr(obj, "account_code", None) or getattr(obj, "line", None)
+        if cuenta:
+            detalle += f" · {cuenta}"
+            dept = getattr(obj, "dept_code", None)
+            if dept:
+                detalle += f" en {dept}"
         raise ErrorApi(
             409, "escenario.mes_cerrado",
             mes=MESES[mes - 1].capitalize(),
             escenario=(f"{sc.type} {sc.version} {sc.year}" if sc else "?"),
-            detalle=f"{verbo} {type(obj).__name__}.{col}")
+            detalle=detalle)
 
     for obj in list(session.dirty):
         cols = mapa.get(type(obj))
@@ -170,7 +185,7 @@ def _revisar(session: Session) -> None:
             antes = _numero(hist.deleted[0]) if hist.deleted else Decimal("0")
             ahora = _numero(hist.added[0]) if hist.added else Decimal("0")
             if es_edicion(antes, ahora):
-                frenar(obj, mes, col, "cambiar")
+                frenar(obj, mes, col, "cambiar", antes, ahora)
             elif antes != ahora:
                 # Menos de medio centimo: es el redondeo de la plantilla, no una
                 # edicion. Se DEVUELVE el valor guardado en vez de dejarlo pasar:

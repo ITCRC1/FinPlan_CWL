@@ -158,3 +158,16 @@ def test_la_tolerancia_es_la_del_redondeo_de_la_plantilla():
     """Media parte del ultimo decimal que la plantilla sabe escribir. Si el
     exportador pasara a cuatro decimales, esto deberia bajar con el."""
     assert cm.TOLERANCIA == D("0.005")
+
+
+def test_el_error_dice_CUANTO_cambio_y_en_que_cuenta():
+    """Sin los numeros, «enero esta cerrado» no distingue medio centimo de doce
+    mil dolares — y la unica salida que el texto ofrecia era reabrir el periodo.
+
+    Owner, 2026-10-06, tras tres intentos: «SIGUE SALIENDO». La diferencia real
+    era de medio centimo por el redondeo de la plantilla; el mensaje no permitia
+    saberlo ni a el ni a mi."""
+    fuente = inspect.getsource(cm._revisar)
+    assert "diferencia" in fuente, "el detalle tiene que traer la diferencia"
+    assert 'frenar(obj, mes, col, "cambiar", antes, ahora)' in fuente
+    assert "account_code" in fuente, "y en que cuenta fue"
