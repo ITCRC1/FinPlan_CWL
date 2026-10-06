@@ -2558,13 +2558,42 @@ def filas_de_la_clase(derivadas: list, gl_rows: list, clase: str) -> list:
 
     Las contrapartidas de allocation quedan fuera del respaldo, igual que las
     excluye el parser: las genera el sistema y no se digitan.
+
+    ## Y las que la tabla derivada NO cubre
+
+    ⚠️ **«Si la derivada trae algo, manda ella ENTERA» dejaba filas invisibles.**
+
+    Owner, 2026-10-06, quinto intento de subir el Forecast de setiembre:
+    *«API 409 … cambiar ActualEntry.jun: 583.3333 → 0 · 7625 en 0230»*. El 7625
+    de Sistemas vive en el mayor y no en `opex_entries`; como `opex_entries`
+    traía otras filas, mandaba ella entera y el 7625 **no salía en la
+    plantilla**. Al subir, el archivo no lo traía y la carga lo ponía en cero.
+
+    Es el mismo daño que las contrapartidas y por el mismo mecanismo: la
+    plantilla no enseña algo que la subida sí pisa. En los meses abiertos pasaba
+    **en silencio** —esto sí entra al P&L, así que el GOP cambiaba solo— y en un
+    mes cerrado lo frena el candado, que es como apareció.
+
+    Así que manda la derivada, **y además** entran las filas del mayor cuya
+    llave la derivada no tiene. La llave se compara con el departamento ya
+    consolidado, que es exactamente lo que evita el doble conteo que esta
+    función venía cuidando: el Spa vive en `0130` en el mayor y en `0140` en
+    `opex_entries`, y las dos caen en la llave `(0140, 4201)`, así que la del
+    mayor se descarta. Sumarlas metía la misma plata dos veces con dos
+    departamentos distintos; compararlas por llave consolidada no.
     """
-    if derivadas:
-        return list(derivadas)
     from app.importers.gl_detail_importer import es_contrapartida_de_allocation
-    return [e for e in gl_rows
-            if str(e.account_code or "").startswith(clase)
-            and not es_contrapartida_de_allocation(e.account_code, e.account_name)]
+    from app.engine.pl_engine import consolidate_dept
+
+    del_mayor = [e for e in gl_rows
+                 if str(e.account_code or "").startswith(clase)
+                 and not es_contrapartida_de_allocation(e.account_code, e.account_name)]
+    if not derivadas:
+        return del_mayor
+    ya = {(consolidate_dept(e.dept_code), str(e.account_code)) for e in derivadas}
+    return list(derivadas) + [
+        e for e in del_mayor
+        if (consolidate_dept(e.dept_code), str(e.account_code)) not in ya]
 
 
 def _donde_ya_vive(by_key: dict, dept: str, code: str):
@@ -2779,14 +2808,6 @@ async def export_scenario_detail(
     conceptos = (await db.execute(select(PayrollConceptEntry).where(
         PayrollConceptEntry.scenario_id == scenario_id,
         PayrollConceptEntry.month.in_(months)))).scalars().all()
-    if not conceptos:
-        # Mismo respaldo: la planilla del GL vive en posiciones sintéticas que
-        # también escribe solo `import-gl-detail`. Sin ellas la sección PLANILLA
-        # salía en cero teniendo el mayor sus cuentas 6xxx.
-        for e in filas_de_la_clase([], gl_rows, "6"):
-            _add(e.dept_code, e.account_code,
-                 _PAYROLL_NAMES.get(str(e.account_code), e.account_name or ""),
-                 e.get_month)
     for e in conceptos:
         for col in PAYROLL_ALL_COLS:
             amt = getattr(e, col, None) or Decimal("0")
@@ -2803,6 +2824,21 @@ async def export_scenario_detail(
                              "linea_pl": _linea_pl(e.dept_code, code)}
                         accts[key] = a
                     a["vals"][(label, e.month)] = a["vals"].get((label, e.month), 0.0) + float(amt)
+    # Y la planilla del MAYOR que los conceptos no cubren — misma regla que
+    # `filas_de_la_clase`, aplicada a la clase 6, que tiene su propio camino.
+    # Sin esto, un depto cuya planilla vive solo en el mayor no sale en la
+    # plantilla y la subida se lo lleva.
+    # ⚠️ La llave se arma consolidando los DOS lados. El bucle de conceptos de
+    # arriba guarda el depto crudo (`0184`) y `_add` guarda el consolidado
+    # (`0180`); comparando sin consolidar, la planilla de Admin entraba dos veces.
+    ya_en_planilla = {(consolidate_dept(a["dept_code"]), str(a["cuenta"]))
+                      for a in accts.values()}
+    for e in filas_de_la_clase([], gl_rows, "6"):
+        if (consolidate_dept(e.dept_code), str(e.account_code)) in ya_en_planilla:
+            continue
+        _add(e.dept_code, e.account_code,
+             _PAYROLL_NAMES.get(str(e.account_code), e.account_name or ""),
+             e.get_month)
     stats: dict[tuple, dict] = {}
     for s in (await db.execute(select(ScenarioStat).where(ScenarioStat.scenario_id == scenario_id))).scalars().all():
         if s.month in months:

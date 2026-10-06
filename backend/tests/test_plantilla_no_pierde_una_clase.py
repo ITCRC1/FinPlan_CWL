@@ -75,31 +75,42 @@ def test_las_contrapartidas_no_entran_al_respaldo():
     assert {f.account_code for f in filas} == {"4000", "4201"}
 
 
-def test_si_hay_derivadas_manda_la_derivada_y_NO_se_mezcla():
-    """Nunca las dos fuentes a la vez: duplicaría la plata.
+def test_la_misma_plata_no_entra_dos_veces():
+    """El Spa vive en el `0130` en el mayor y en el `0140` en `opex_entries`.
 
-    El Spa vive en el `0130` en el mayor y en el `0140` en `opex_entries`. Sumar
-    las dos metería la misma cuenta dos veces, con dos departamentos, y el
-    archivo devolvería el doble del gasto del Spa.
+    Sumar las dos metería la misma cuenta dos veces, con dos departamentos, y el
+    archivo devolvería el doble del gasto del Spa. Por eso la llave con la que se
+    comparan las dos fuentes lleva el departamento YA CONSOLIDADO: las dos filas
+    caen en `(0140, 7065)` y la del mayor se descarta.
     """
+    mayor = [_gl("0130", "7065", "Cleaning Supplies")]
     derivada = [OpexEntry(scenario_id="s", hotel_id="CWL", dept_code="0140",
                           account_code="7065", account_name="Cleaning Supplies")]
-    filas = filas_de_la_clase(derivada, MAYOR, "7")
+    filas = filas_de_la_clase(derivada, mayor, "7")
     assert len(filas) == 1
-    assert filas[0].dept_code == "0140"
+    assert filas[0].dept_code == "0140"          # manda la derivada
 
 
-def test_una_sola_fila_derivada_ya_manda():
-    """El respaldo es por CLASE, no por cuenta faltante.
+def test_la_cuenta_que_la_derivada_NO_tiene_sale_igual():
+    """Lo que cambió el 2026-10-06, y por qué.
 
-    Completar cuenta por cuenta parece mejor y es peor: no hay forma de saber si
-    una cuenta que está en el mayor y no en la derivada es un hueco o una fila
-    que el sistema movió de departamento a propósito.
+    Esto antes era al revés: una sola fila derivada y mandaba ella ENTERA. El
+    argumento era que no se puede distinguir un hueco de una fila que el sistema
+    movió de departamento — cierto, y por eso la llave se consolida: una fila
+    movida de 0130 a 0140 SÍ se reconoce (la prueba de arriba) y se descarta.
+
+    Lo que quedaba sin reconocer era el hueco, y costaba plata. Owner,
+    2026-10-06: *«cambiar ActualEntry.jun: 583.3333 → 0 · 7625 en 0230»*. El 7625
+    de Sistemas está en el mayor y no en `opex_entries`; la plantilla no lo
+    mostraba y la subida lo ponía en cero. En un mes abierto eso pasaba en
+    silencio y le movía el GOP.
+
+    Entre enseñar de más y borrar sin avisar, se enseña de más.
     """
     derivada = [OpexEntry(scenario_id="s", hotel_id="CWL", dept_code="0180",
                           account_code="7999", account_name="Otra")]
     filas = filas_de_la_clase(derivada, MAYOR, "7")
-    assert [f.account_code for f in filas] == ["7999"]
+    assert {f.account_code for f in filas} == {"7999", "7065"}
 
 
 def test_sin_mayor_y_sin_derivadas_no_truena():
