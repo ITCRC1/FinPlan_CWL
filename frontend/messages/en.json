@@ -1189,7 +1189,8 @@
       "onlyMonth": "{mes} only",
       "revenue": "Revenue",
       "sheet": "Consolidated"
-    }
+    },
+    "cerradoAyuda": "The 12-month load rewrites all <b>twelve</b>, and closed months come from the GL. You do not need to reopen anything: download <b>the 12-month template of THIS version</b> with the button above — it already carries the closed months — paste only the open months and upload it again. A closed month left at the same value passes the lock. Being stopped at January means your file brings a <b>different</b> January than the closed one, not that January is wrong."
   },
   "salaryAlloc": {
     "autoByFte": "automatic, by the destination's FTE",

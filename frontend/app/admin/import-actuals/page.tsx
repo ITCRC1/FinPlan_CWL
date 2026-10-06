@@ -220,6 +220,7 @@ export default function ImportActualsPage() {
     }).catch(e => setError(e instanceof Error ? e.message : t("errLoadingVersions")));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [claveError, setClaveError] = useState<string | null>(null);
   const scen = useMemo(() => scenarios.find(s => s.id === scenarioId), [scenarios, scenarioId]);
   const monthParam = camino === "mensual" ? month : 0;
 
@@ -287,7 +288,7 @@ export default function ImportActualsPage() {
       }));
       if (!ok) return;
     }
-    setBusy(true); setError(null); setResult(null); setBloqueo(null); setDivergencias([]);
+    setBusy(true); setError(null); setClaveError(null); setResult(null); setBloqueo(null); setDivergencias([]);
     try {
       const r = await importGLDetail(file, dryRun, true, scenarioId, confirmar,
                                      camino === "mensual" ? month : undefined);
@@ -304,7 +305,13 @@ export default function ImportActualsPage() {
     }
     catch (e) {
       if (e instanceof ErrorDeVerificacion) setBloqueo(e.informe);
-      else setError(e instanceof Error ? e.message : tc("error"));
+      else {
+        setError(e instanceof Error ? e.message : tc("error"));
+        // La CLAVE, no la prosa: el texto viene traducido y mirar su contenido
+        // deja de funcionar al cambiar de idioma — sin fallar, cambiando de
+        // comportamiento en silencio. Ver `test_errores_bilingues`.
+        setClaveError((e as { clave?: string })?.clave ?? null);
+      }
     }
     finally { setBusy(false); }
   };
@@ -516,6 +523,24 @@ export default function ImportActualsPage() {
           </div>
         )}
         {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginTop: 10 }}>{error}</div>}
+        {/* ⚠️ El 409 de mes cerrado nombra UN mes y se detiene ahi, porque el
+            candado salta en el primero que cambia. Leido solo, parece que hay
+            que reabrir enero — y reabrir no es lo que hace falta casi nunca.
+            Owner, 2026-10-06, subiendo el Forecast de setiembre: «como corrijo
+            esto».
+
+            Lo que pasa de verdad: la carga de 12 meses reescribe los DOCE, y
+            los cerrados vienen del GL. El candado deja pasar el MISMO valor,
+            asi que la plantilla bajada de ESTA version —que trae los cerrados
+            con su valor actual— sube sin chistar. El 409 significa que el
+            archivo trae otro enero, no que el mes este mal. */}
+        {claveError === "escenario.mes_cerrado" && camino === "historico" && (
+          <div style={{ marginTop: 10, padding: "9px 12px", borderRadius: 6, fontSize: 12.5,
+                        background: "rgba(230,168,23,0.12)",
+                        border: "1px solid rgba(230,168,23,0.4)" }}>
+            {t.rich("cerradoAyuda", { b: (c: React.ReactNode) => <b>{c}</b> })}
+          </div>
+        )}
       </div>
 
       {/* La verificación frenó la carga. No se escribió nada: el 409 sale ANTES

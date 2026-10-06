@@ -1189,7 +1189,8 @@
       "onlyMonth": "solo {mes}",
       "revenue": "Ingresos",
       "sheet": "Consolidado"
-    }
+    },
+    "cerradoAyuda": "La carga de 12 meses reescribe los <b>doce</b>, y los meses cerrados vienen del GL. No hace falta reabrir nada: bajá <b>la plantilla de 12 meses de ESTA versión</b> con el botón de arriba —viene con los meses cerrados ya cargados—, pegá solo los meses abiertos y volvé a subirla. Si un mes cerrado queda con el mismo valor, el candado lo deja pasar. Que te frene en enero quiere decir que tu archivo trae <b>otro</b> enero que el cerrado, no que enero esté mal."
   },
   "salaryAlloc": {
     "autoByFte": "automático por FTE del destino",
