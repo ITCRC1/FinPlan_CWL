@@ -114,6 +114,19 @@ def excluida_del_archivo(dept_code: str, account_code: str,
     totales operativos, así que ningún número cambiaba y el P&L seguía cuadrando
     consigo mismo. Apareció sólo porque en un mes cerrado el candado lo frena.
 
+    ⚠️ **Protege el CHECKBOOK, no el mayor.** La raya va justo ahí, y costó un
+    segundo intento encontrarla:
+
+    * `OpexEntry`, `CostEntry`, los conceptos de planilla → **se protegen.** Son
+      lo que el owner DIGITA. El archivo no los puede reponer, así que ponerlos
+      en cero los borra para siempre.
+    * `ActualEntry` (la consolidación del mayor) → **no.** Ahí el parser es la
+      autoridad de qué pertenece: por la regla permanente, las clases 5/6/7 de
+      0220 y 0161 **no van** en el mayor fuera del Pre-Cierre. Una fila así es
+      residuo —de una carga vieja o de una copia—, y dejarla viva le sumaba
+      US$62.315 de overhead al Forecast de setiembre 2026 (owner, 2026-10-06:
+      la verificación lo frenó, bien frenado). Limpiarla es el trabajo.
+
     `en_overhead` (el espejo del Pre-Cierre) no excluye nada, así que ahí no hay
     nada que proteger: el archivo sí las trae y manda el archivo.
     """

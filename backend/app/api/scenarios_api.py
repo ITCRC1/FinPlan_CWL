@@ -110,7 +110,6 @@ def _excluida_del_archivo_sql(Model, en_overhead: bool):
 async def _filas_que_sobreviven(db, target, merge: bool,
                                 meses_del_archivo: list[int],
                                 trae_contrapartida: dict[str, set[int]] | None = None,
-                                en_overhead: bool = False,
                                 ) -> dict[int, list[dict]]:
     """Las filas de `ActualEntry` que van a SEGUIR ahí después de esta carga.
 
@@ -149,8 +148,7 @@ async def _filas_que_sobreviven(db, target, merge: bool,
     una para ESE departamento y ESE mes. Los meses en que el mayor no la
     postea —enero a julio— no se mueven.
     """
-    from app.importers.gl_detail_importer import (es_contrapartida_de_allocation,
-                                                  excluida_del_archivo)
+    from app.importers.gl_detail_importer import es_contrapartida_de_allocation
     trae = trae_contrapartida or {}
     filas = (await db.execute(select(ActualEntry).where(
         ActualEntry.scenario_id == target.id))).scalars().all()
@@ -158,19 +156,6 @@ async def _filas_que_sobreviven(db, target, merge: bool,
     fuera: dict[int, list[dict]] = {}
     for e in filas:
         contrapartida = es_contrapartida_de_allocation(e.account_code, e.account_name)
-        # Las clases que el parser excluye sobreviven ENTERAS, igual que las
-        # contrapartidas y por el mismo motivo: el archivo no las puede traer. Y
-        # el reporte SÍ las cuenta —el P&L consolida `ActualEntry` por el mapeo,
-        # que manda la clase 7 de 0220 a OH_CAFETERIA—, así que dejarlas fuera de
-        # acá haría fallar la verificación sin que haya un solo error.
-        if excluida_del_archivo(e.dept_code, e.account_code, en_overhead):
-            for m in range(1, 13):
-                v = e.get_month(m)
-                if v:
-                    fuera.setdefault(m, []).append({
-                        "account_code": e.account_code, "dept_code": e.dept_code,
-                        "amount": v})
-            continue
         if not merge and not contrapartida:
             continue
         # El archivo ya trae la contrapartida de este departamento: la vieja
@@ -1879,7 +1864,7 @@ async def import_gl_detail(
                                 for r in blk.get(key, []) for mi in r["months"].keys()})
         extra = await _filas_que_sobreviven(
             db, target, merge, upload_months,
-            contrapartidas_del_archivo(blk), en_overhead=en_overhead)
+            contrapartidas_del_archivo(blk))
         con = consolidate_block(blk, mappings, report_lines, filas_extra=extra)
         consolidados[i] = con
         av = aviso_de_moneda(con["stats"])
@@ -1981,8 +1966,7 @@ async def import_gl_detail(
         if target is not None and mappings and report_lines and idx_blk not in consolidados:
             consolidados[idx_blk] = consolidate_block(
                 blk, mappings, report_lines,
-                filas_extra=await _filas_que_sobreviven(
-                    db, target, merge, upload_months, en_overhead=en_overhead))
+                filas_extra=await _filas_que_sobreviven(db, target, merge, upload_months))
         # ── Chequeo de amarre GL ↔ P&L Summary (solo en vista previa) ──────────
         # El detalle GL (costos 5xxx + planilla 6xxx + opex 7xxx, TODOS los deptos)
         # debe sumar el gasto operativo total del summary = TOTAL_OPEXP (deptos
@@ -2217,10 +2201,6 @@ async def import_gl_detail(
                 # crédito del reparto queda contado dos veces.
                 cede_ae = contrapartidas_del_archivo(blk)
                 for e in existing_ae:
-                    # Lo que el parser deja fuera por ALLOCATION_EXCLUDE tampoco
-                    # se pisa: mismo motivo que las contrapartidas.
-                    if excluida_del_archivo(e.dept_code, e.account_code, en_overhead):
-                        continue
                     es_contra = es_contrapartida_de_allocation(e.account_code,
                                                                e.account_name)
                     meses_que_ceden = cede_ae.get(e.dept_code) or set()
@@ -2265,8 +2245,7 @@ async def import_gl_detail(
             # archivo no puede quitar lo que el archivo no puede traer.
             await db.execute(sa_delete(ActualEntry).where(
                 ActualEntry.scenario_id == target.id,
-                ~ES_CONTRAPARTIDA_DE_ALLOCATION,
-                ~_excluida_del_archivo_sql(ActualEntry, en_overhead)))
+                ~ES_CONTRAPARTIDA_DE_ALLOCATION))
             await db.execute(sa_delete(ActualPLLine).where(ActualPLLine.scenario_id == target.id))
             await db.execute(sa_delete(ScenarioStat).where(ScenarioStat.scenario_id == target.id))
             for (dept_c, code_c, outlet_c), a in ae_agg.items():

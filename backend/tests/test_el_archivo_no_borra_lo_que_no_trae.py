@@ -23,6 +23,13 @@ Es el mismo patrón que las contrapartidas de reparto
 (`test_contrapartidas_sobreviven`), por otro agujero: ahí era la clase 4
 «Distribución», acá son las clases 5/6/7 de los dos departamentos de allocation.
 
+**Dónde va la raya.** Protege el CHECKBOOK —`OpexEntry`, `CostEntry`, los
+conceptos de planilla—, que es lo que el owner digita. NO protege `ActualEntry`:
+ahí el parser es la autoridad de qué pertenece al mayor, y una fila de esas
+clases es residuo. El primer intento sí la protegía, y le sumó US$62.315 de
+overhead al Forecast de setiembre — la verificación de la puerta lo frenó antes
+de escribir una sola fila, que es exactamente para lo que está.
+
 **El riesgo que vigila esta prueba:** la regla está dicha DOS VECES —en Python
 para el parser y el escritor fila por fila, y en SQL para los DELETE masivos—.
 Si se separan, el reemplazo vuelve a borrarlas y nada avisa.
@@ -112,3 +119,22 @@ def test_el_escritor_protege_las_mismas_filas_que_el_parser_salta():
             cuenta = f"{clase}400"
             assert not excluida_del_archivo(dept, cuenta), (
                 f"{cuenta} en {dept} sí entra por el parser: no hay que protegerlo")
+
+
+def test_el_mayor_no_se_protege():
+    """`ActualEntry` se limpia como siempre: ahí el parser manda.
+
+    Mira el código fuente porque es una AUSENCIA lo que hay que vigilar, y una
+    ausencia no se puede probar llamando a nadie. Si alguien vuelve a proteger el
+    mayor, el overhead del forecast sube sin que cambie un solo dato.
+    """
+    from pathlib import Path
+
+    src = Path("app/api/scenarios_api.py").read_text(encoding="utf-8")
+    borrado = src[src.index("sa_delete(ActualEntry)"):][:400]
+    assert "ES_CONTRAPARTIDA_DE_ALLOCATION" in borrado
+    assert "_excluida_del_archivo_sql" not in borrado
+    # Y `_filas_que_sobreviven` tampoco las agrega al consolidado de la puerta.
+    fn = src[src.index("async def _filas_que_sobreviven"):]
+    fn = fn[:fn.index("COPY_DATASETS")]
+    assert "excluida_del_archivo" not in fn
