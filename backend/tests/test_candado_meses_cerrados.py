@@ -6,6 +6,7 @@ checkbook, no debe dejar que se edite.»*
 """
 import inspect
 from decimal import Decimal
+from decimal import Decimal as D
 
 from app import candado_meses as cm
 # ⚠️ El mapa se deriva del registro de modelos: sin la app importada, el
@@ -56,7 +57,7 @@ def test_se_mira_si_el_valor_CAMBIA_no_si_viaja():
     diciembre."""
     fuente = inspect.getsource(cm._revisar)
     assert "hist.has_changes()" in fuente
-    assert "antes != ahora" in fuente
+    assert "es_edicion(antes, ahora)" in fuente
 
 
 def test_el_candado_es_SOLO_para_FORECAST():
@@ -106,3 +107,54 @@ def test_un_valor_reguardado_IGUAL_no_se_frena():
     y sólo debe fallar si un mes cerrado cambia de verdad."""
     fuente = inspect.getsource(cm._revisar)
     assert "if not hist.has_changes():\n                continue" in fuente
+
+
+# ─── Medio centimo no es una edicion ────────────────────────────────────────
+
+def test_una_diferencia_menor_a_un_centimo_NO_es_una_edicion():
+    """⚠️ El Excel de Detalle exporta `round(float(v), 2)` y las columnas de mes
+    son `Numeric(..., 4)`. Un ingreso en dolares sale del GL dividido por el tipo
+    de cambio, asi que casi siempre trae cuatro decimales: 176,9961 baja a la
+    plantilla como 176,99 y vuelve DISTINTO.
+
+    Comparando exacto, bajar la plantilla y subirla SIN TOCAR NADA disparaba el
+    409 — y el mensaje mandaba a reabrir el periodo, que es destruir un mes
+    cerrado y bueno para arreglar un redondeo. Owner, 2026-10-06: «VUELVE A
+    SALIR»."""
+    assert not cm.es_edicion(D("176.9961"), D("177.00"))
+    assert not cm.es_edicion(D("1234.5678"), D("1234.57"))
+    assert not cm.es_edicion(D("100"), D("100.004"))
+    # El PEOR caso del redondeo cae justo en el umbral, y es el mas probable de
+    # aparecer: con `>=` se frenaba.
+    assert not cm.es_edicion(D("1234.565"), D("1234.56"))
+
+
+def test_el_umbral_se_calcula_contra_el_redondeo_de_verdad():
+    """No se eligio a ojo: se mide contra lo que el exportador hace."""
+    from decimal import ROUND_HALF_EVEN
+    for v in ("176.9961", "1234.5678", "1234.565", "0.0049", "98765.4321"):
+        guardado = D(v)
+        en_plantilla = guardado.quantize(D("0.01"), rounding=ROUND_HALF_EVEN)
+        assert not cm.es_edicion(guardado, en_plantilla), v
+
+
+def test_un_centimo_SI_es_una_edicion():
+    """La tolerancia no puede volverse una rendija: un centavo se frena."""
+    assert cm.es_edicion(D("100.00"), D("100.01"))
+    assert cm.es_edicion(D("100.00"), D("99.99"))
+    assert cm.es_edicion(D("176.9961"), D("177.50"))
+    assert cm.es_edicion(D("0"), D("12000"))
+
+
+def test_el_redondeo_NO_se_escribe_en_el_mes_cerrado():
+    """No alcanza con dejarlo pasar: si se escribiera el valor redondeado, el mes
+    cerrado se correria medio centimo por carga y por cuenta. Se devuelve el
+    guardado — un mes cerrado no se toca ni un poquito."""
+    fuente = inspect.getsource(cm._revisar)
+    assert "setattr(obj, col, antes)" in fuente
+
+
+def test_la_tolerancia_es_la_del_redondeo_de_la_plantilla():
+    """Media parte del ultimo decimal que la plantilla sabe escribir. Si el
+    exportador pasara a cuatro decimales, esto deberia bajar con el."""
+    assert cm.TOLERANCIA == D("0.005")

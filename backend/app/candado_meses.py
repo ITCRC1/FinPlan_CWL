@@ -101,6 +101,34 @@ def _cerrados(session: Session, scenario_id: str | None) -> set[int]:
     return set(range(1, corte + 1))
 
 
+#: Medio centimo: el error MAXIMO de redondear a dos decimales. Una diferencia
+#: de hasta esto NO es una edicion, es el viaje de ida y vuelta de la plantilla.
+#:
+#: ⚠️ El Excel de Detalle exporta `round(float(v), 2)` —dos decimales— y las
+#: columnas de mes son `Numeric(..., 4)`. Un ingreso en dolares sale del GL
+#: dividido por el tipo de cambio, asi que casi siempre trae cuatro decimales:
+#: 176,9961 baja a la plantilla como 176,99 y vuelve DISTINTO. Comparando exacto,
+#: bajar la plantilla y subirla SIN TOCAR NADA disparaba el 409.
+#:
+#: Owner, 2026-10-06, con la plantilla recien bajada: «VUELVE A SALIR». Y el
+#: mensaje mandaba a reabrir el periodo, que es destruir un mes cerrado y bueno
+#: para arreglar un redondeo de medio centimo.
+TOLERANCIA = Decimal("0.005")
+
+
+def es_edicion(antes: Decimal, ahora: Decimal) -> bool:
+    """¿Esto es una edicion de verdad, o el redondeo del viaje de la plantilla?
+
+    Funcion aparte y publica a proposito: la decision que separa «te frenan el
+    cierre» de «paso sin avisar» tiene que poder probarse con numeros, no
+    leyendo el codigo de `_revisar`.
+    """
+    # `>` y no `>=`: el error MAXIMO de redondear a dos decimales es
+    # exactamente medio centimo (1234,565 → 1234,56). Con `>=` ese caso
+    # —el peor del redondeo, y el mas probable de aparecer— se frenaba.
+    return abs(antes - ahora) > TOLERANCIA
+
+
 def _numero(v) -> Decimal:
     try:
         return Decimal(str(v or 0))
@@ -141,8 +169,15 @@ def _revisar(session: Session) -> None:
                 continue
             antes = _numero(hist.deleted[0]) if hist.deleted else Decimal("0")
             ahora = _numero(hist.added[0]) if hist.added else Decimal("0")
-            if antes != ahora:
+            if es_edicion(antes, ahora):
                 frenar(obj, mes, col, "cambiar")
+            elif antes != ahora:
+                # Menos de medio centimo: es el redondeo de la plantilla, no una
+                # edicion. Se DEVUELVE el valor guardado en vez de dejarlo pasar:
+                # dejarlo pasar escribiria el redondeo en un mes cerrado y, carga
+                # tras carga, el mes se iria moviendo solo. Un mes cerrado no se
+                # toca — ni siquiera un poquito.
+                setattr(obj, col, antes)
 
     for obj in list(session.new):
         cols = mapa.get(type(obj))
