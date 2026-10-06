@@ -2826,6 +2826,11 @@ export interface PLDoceMeses {
   scenario_id: string;
   escenario: string;
   year: number;
+  /** Meses que el forecast da por CERRADOS y que el Actual enlazado no tiene
+   *  cargados. Esos meses salen en CERO —un mes cerrado se lee del Actual, no
+   *  del checkbook— y tapan la proyección que el forecast sí tenía, sin error y
+   *  sin aviso. Vacío en Budget y en Actual. */
+  meses_cerrados_sin_dato?: number[];
   meses: { month: number; kpis: PLKpis; lines: PLLine[] }[];
 }
 export async function getPLDoceMeses(scenarioId: string): Promise<PLDoceMeses> {

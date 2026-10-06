@@ -42,6 +42,7 @@ from app.engine.cashflow_budget import (
 from app.models.cashflow_version import CashFlowVersion
 from app.models.belowgop_account_entry import BelowGopAccountEntry
 from app.models.actual_entry import ActualEntry
+from app.models.actual_pl_line import ActualPLLine
 from app.models.nonop_entry import NonOpEntry
 from app.models.cashflow_budget_input import CashFlowBudgetInput
 from app.models.cashflow_budget_driver import CashFlowBudgetDriver
@@ -476,6 +477,51 @@ def _scenario_label(s: Scenario) -> str:
     return " ".join(str(x) for x in (s.type, s.version, s.year) if x)
 
 
+#: Las columnas de mes de `ActualEntry`, en orden.
+_MESES_AE = ("jan", "feb", "mar", "apr", "may", "jun",
+             "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+async def meses_cerrados_sin_dato(session, scenario) -> list[int]:
+    """Meses que el forecast da por CERRADOS y que el ACTUAL no tiene cargados.
+
+    ⚠️ **Este es el cero mas caro del sistema.** Un mes dentro del corte no se
+    calcula con el checkbook del forecast: se lee del ACTUAL enlazado
+    (`recalculate._compute_pl_month_core`). Si ese mes todavia no se subio, el
+    ACTUAL devuelve un P&L vacio y la columna sale en CERO — sin error, sin
+    aviso, y pisando la proyeccion que el forecast SI tenia.
+
+    Owner, 2026-10-06: *«por que no hay ingresos forecast en setiembre»*. El
+    corte estaba en setiembre y setiembre no se habia subido: el forecast
+    mostraba $0.00 donde su propia proyeccion decia ~$86.000.
+
+    Peor todavia, el cuadro queda incoherente consigo mismo: los KPIs del mes SI
+    caen de vuelta al forecast cuando el actual no tiene estadisticas (ver
+    `_monthly_results`), asi que la pantalla muestra noches vendidas y cero
+    ingreso. Dos fuentes para la misma columna.
+
+    Se avisa, no se arregla solo: cual de las dos cosas esta mal —falta subir el
+    mes, o el corte se adelanto— lo decide quien cierra.
+    """
+    if scenario.type != "FORECAST":
+        return []
+    corte = int(scenario.actuals_through or 0)
+    if corte <= 0:
+        return []
+    actual = await recalc.linked_actual_scenario(session, scenario)
+    if actual is None:
+        return []
+    con_lineas = {m for (m,) in (await session.execute(
+        select(ActualPLLine.month).where(ActualPLLine.scenario_id == actual.id)
+        .distinct())).all()}
+    sumas = (await session.execute(
+        select(*[func.sum(getattr(ActualEntry, c)) for c in _MESES_AE])
+        .where(ActualEntry.scenario_id == actual.id))).one()
+    con_entradas = {i + 1 for i, v in enumerate(sumas) if v}
+    con_dato = con_lineas | con_entradas
+    return [m for m in range(1, corte + 1) if m not in con_dato]
+
+
 @router.get("/pl/{scenario_id}/monthly/")
 async def get_pl_monthly(scenario_id: str):
     async with get_session() as session:
@@ -494,6 +540,9 @@ async def get_pl_monthly(scenario_id: str):
         return {
             "scenario_id": scenario_id,
             "year": scenario.year,
+            #: Meses dados por cerrados que el ACTUAL no tiene: salen en CERO y
+            #: pisan la proyeccion del forecast. Ver `meses_cerrados_sin_dato`.
+            "meses_cerrados_sin_dato": await meses_cerrados_sin_dato(session, scenario),
             "months": months,
             "annual": annual,
             "annual_kpis": full["kpis"],
@@ -526,6 +575,7 @@ async def get_pl_doce_meses(scenario_id: str):
             "scenario_id": scenario_id,
             "escenario": _scenario_label(scenario),
             "year": scenario.year,
+            "meses_cerrados_sin_dato": await meses_cerrados_sin_dato(session, scenario),
             "meses": [{
                 "month": m["month"],
                 "kpis": m["kpis"],

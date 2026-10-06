@@ -228,8 +228,34 @@ export default function DoceMeses({ escenarios, inicial, compacto = true,
       : code === "K_ROOMS_AVAIL" || code === "K_ROOMS_OCC" ? num(v)
         : usd(v);
 
+  const MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                       "agosto", "setiembre", "octubre", "noviembre", "diciembre"];
+  const sinDato = datos?.meses_cerrados_sin_dato ?? [];
+
   return (
     <div>
+      {/* ⚠️ El cero mas caro del sistema. Un mes dentro del corte del forecast no
+          se calcula con su checkbook: se lee del ACTUAL enlazado. Si ese mes no
+          se subio, la columna sale en CERO y pisa la proyeccion que el forecast
+          si tenia — sin error y sin aviso.
+
+          Owner, 2026-10-06: «por que no hay ingresos forecast en setiembre».
+          Peor: los KPIs del mes SI caen de vuelta al forecast, asi que el cuadro
+          muestra noches vendidas y cero ingreso. Dos fuentes en la misma
+          columna, y nada lo decia. */}
+      {sinDato.length > 0 && (
+        <div style={{ padding: "9px 12px", borderRadius: 6, marginBottom: 12,
+                      fontSize: 12.5, background: "rgba(230,168,23,0.12)",
+                      border: "1px solid rgba(230,168,23,0.4)" }}>
+          Este forecast da por cerrado{sinDato.length > 1 ? "s" : ""}{" "}
+          <b>{sinDato.map(m => MESES_LARGO[m - 1]).join(", ")}</b>, y
+          {sinDato.length > 1 ? " esos meses no están cargados" : " ese mes no está cargado"}{" "}
+          en el Actual: un mes cerrado se lee del Actual y no del checkbook, así que
+          sale en <b>cero</b> y tapa la proyección que el forecast sí tiene. Se
+          arregla subiendo el mes, o moviendo el corte hacia atrás en
+          Admin → Cierre de períodos.
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                     marginBottom: 12 }}>
         <nav aria-label="Panel" style={{ display: "inline-flex", borderRadius: 6,
