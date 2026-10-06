@@ -2208,10 +2208,26 @@ async def import_gl_detail(
                         if es_contra and mi_ not in meses_que_ceden:
                             continue
                         e.set_month(mi_, Decimal("0"))
-                await db.execute(sa_delete(ActualPLLine).where(
-                    ActualPLLine.scenario_id == target.id, ActualPLLine.month.in_(touched)))
-                await db.execute(sa_delete(ScenarioStat).where(
-                    ScenarioStat.scenario_id == target.id, ScenarioStat.month.in_(touched)))
+                # ⚠️ **Entre el cero y el valor de vuelta no puede haber NADA que
+                # vaya a la base.** Poner en cero y volver a escribir es un solo
+                # movimiento; lo de en medio es un estado que no existe.
+                #
+                # Acá había dos `DELETE`, y un `execute` dispara el autoflush de
+                # lo que está pendiente. El candado de meses cerrados corre en
+                # ese flush, veía el CERO —todavía sin el valor de vuelta— y
+                # frenaba la carga por una fila que el archivo sí traía igual:
+                #
+                #   owner, 2026-10-06: «cambiar ActualEntry.jun: 583.3333 → 0
+                #   (diferencia 583.3333) · 7625 en 0230»
+                #
+                # El archivo trae ese 7625 con 583,33 en junio. Sin el flush de
+                # en medio, el candado compara 583,3333 contra 583,33 —medio
+                # centavo del redondeo de la plantilla, que ya tolera— y pasa.
+                # Era la carga tropezándose con su propio paso intermedio.
+                #
+                # Los dos `DELETE` no tienen nada que ver con `ActualEntry`:
+                # borran el resumen de línea y las estadísticas de los meses
+                # subidos. Van después, y el orden no le cambia nada a ninguno.
                 for (dept_c, code_c, outlet_c), a in ae_agg.items():
                     e = ae_by.get((dept_c, code_c, outlet_c))
                     if e is None:
@@ -2224,6 +2240,11 @@ async def import_gl_detail(
                         e.account_name = a["name"]
                     for mi_, v_ in a["months"].items():
                         e.set_month(mi_, Decimal(str(v_)))
+                # Ahora sí: ya no hay ninguna fila a medio camino.
+                await db.execute(sa_delete(ActualPLLine).where(
+                    ActualPLLine.scenario_id == target.id, ActualPLLine.month.in_(touched)))
+                await db.execute(sa_delete(ScenarioStat).where(
+                    ScenarioStat.scenario_id == target.id, ScenarioStat.month.in_(touched)))
         else:
             # ⚠️ Las contrapartidas de los allocations SOBREVIVEN al reemplazo.
             #
