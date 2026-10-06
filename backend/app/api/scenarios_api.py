@@ -2019,6 +2019,8 @@ async def import_gl_detail(
             for (dept, code), a in agg.items():
                 row = by_key.get((dept, code))
                 if row is None:
+                    row = _donde_ya_vive(by_key, dept, code)
+                if row is None:
                     row = Model(scenario_id=target.id, hotel_id=target.hotel_id, dept_code=dept,
                                 account_code=code, account_name=a["account_name"], **extra_new(a),
                                 **{m: Decimal("0") for m in _GL_MONTHS})
@@ -2524,6 +2526,32 @@ def filas_de_la_clase(derivadas: list, gl_rows: list, clase: str) -> list:
     return [e for e in gl_rows
             if str(e.account_code or "").startswith(clase)
             and not es_contrapartida_de_allocation(e.account_code, e.account_name)]
+
+
+def _donde_ya_vive(by_key: dict, dept: str, code: str):
+    """La fila existente de esa cuenta en un departamento HIJO del que trae el
+    archivo, si hay exactamente una.
+
+    ⚠️ **La plantilla CONSOLIDA el departamento y el import escribia literal.**
+    El Spa se guarda en 0130 (Spa gerencia) y la plantilla lo exporta bajo 0140
+    (Spa), que es su padre —ver `pl_engine.consolidate_dept_raiz`—. Al subirla,
+    la cuenta se creaba en 0140 y la fila de 0130 se quedaba en cero.
+
+    En un mes abierto eso no da error: mueve el ingreso de un departamento al
+    otro en silencio, y como el P&L consolida los dos, el total no cambia y nadie
+    se entera. En un mes cerrado el candado lo frena, que es como aparecio:
+    owner, 2026-10-06, bajando la plantilla y subiendola sin tocarla —
+    «RevenueAccountEntry.jan: 6268.2590 → 0 · 4201 en 0130».
+
+    Si hay MAS de un hijo con esa cuenta no se adivina: se deja que la fila se
+    cree en el departamento del archivo, que es el comportamiento de siempre.
+    Elegir uno de dos moveria plata con una moneda al aire.
+    """
+    from app.engine.pl_engine import consolidate_dept_raiz
+
+    candidatos = [e for (d, c), e in by_key.items()
+                  if c == code and d != dept and consolidate_dept_raiz(d) == dept]
+    return candidatos[0] if len(candidatos) == 1 else None
 
 
 @router.get("/scenarios/{scenario_id}/export-detail/")
