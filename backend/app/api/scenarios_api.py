@@ -2038,6 +2038,13 @@ async def import_gl_detail(
             existing = (await db.execute(
                 select(Model).where(Model.scenario_id == target.id))).scalars().all()
             by_key = {(e.dept_code, e.account_code): e for e in existing}
+            # ⚠️ Lo que cada fila tenía ANTES de ponerla en cero. Es el peso con
+            # que se reparte una línea del archivo que representa a varias filas
+            # (ver `repartir_entre_destinos`), y hay que tomarlo antes del cero o
+            # todos los pesos serían cero y la repartija no significaría nada.
+            antes = {k: {mi: _num_mes(getattr(e, _GL_MONTHS[mi - 1], 0))
+                         for mi in upload_months}
+                     for k, e in by_key.items()}
             for e in existing:
                 # La misma protección que arriba, fila por fila: poner en cero lo
                 # que el archivo no puede traer es borrarlo para siempre.
@@ -2046,18 +2053,23 @@ async def import_gl_detail(
                 for mi in upload_months:
                     setattr(e, _GL_MONTHS[mi - 1], Decimal("0"))
             for (dept, code), a in agg.items():
-                row = by_key.get((dept, code))
-                if row is None:
-                    row = _donde_ya_vive(by_key, dept, code)
-                if row is None:
+                destinos = destinos_de_la_fila(by_key, dept, code)
+                if not destinos:
                     row = Model(scenario_id=target.id, hotel_id=target.hotel_id, dept_code=dept,
                                 account_code=code, account_name=a["account_name"], **extra_new(a),
                                 **{m: Decimal("0") for m in _GL_MONTHS})
                     db.add(row); by_key[(dept, code)] = row
+                    destinos = [row]
+                    antes[(dept, code)] = {mi: Decimal("0") for mi in upload_months}
                 else:
-                    row.account_name = a["account_name"]
+                    for row in destinos:
+                        row.account_name = a["account_name"]
                 for mi, v in a["months"].items():
-                    setattr(row, _GL_MONTHS[mi - 1], Decimal(str(v)))
+                    pesos = [antes.get((r.dept_code, r.account_code), {}).get(mi, Decimal("0"))
+                             for r in destinos]
+                    for row, parte in zip(destinos,
+                                          repartir_entre_destinos(destinos, pesos, Decimal(str(v)))):
+                        setattr(row, _GL_MONTHS[mi - 1], parte)
 
         await _write_accounts(RevenueAccountEntry, blk["revenue"], lambda a: {})
         await _write_accounts(BelowGopAccountEntry, blk.get("belowgop", []), lambda a: {})
@@ -2200,6 +2212,9 @@ async def import_gl_detail(
                 # mes — ahí se pone en cero como cualquier otra fila, o el
                 # crédito del reparto queda contado dos veces.
                 cede_ae = contrapartidas_del_archivo(blk)
+                # Lo que cada fila tenía antes del cero — el peso del reparto.
+                antes_ae = {k: {mi: _num_mes(e.get_month(mi)) for mi in touched}
+                            for k, e in ae_by.items()}
                 for e in existing_ae:
                     es_contra = es_contrapartida_de_allocation(e.account_code,
                                                                e.account_name)
@@ -2228,18 +2243,34 @@ async def import_gl_detail(
                 # Los dos `DELETE` no tienen nada que ver con `ActualEntry`:
                 # borran el resumen de línea y las estadísticas de los meses
                 # subidos. Van después, y el orden no le cambia nada a ninguno.
+                # ⚠️ El mayor pliega el departamento IGUAL que las tablas de
+                # cuentas, y hasta hoy no lo hacía. El Spa vive en `0130`, la
+                # plantilla lo baja en `0140`, y acá se creaba una fila nueva en
+                # `0140` dejando la de `0130` en cero — owner, 2026-10-06:
+                # «ActualEntry.jan: 6268.2590 → 0 · 4201 en 0130». El arreglo de
+                # la mañana (`destinos_de_la_fila`) solo se había cableado a las
+                # tablas derivadas; el mayor quedó con el mismo agujero.
                 for (dept_c, code_c, outlet_c), a in ae_agg.items():
-                    e = ae_by.get((dept_c, code_c, outlet_c))
-                    if e is None:
+                    destinos = destinos_de_la_fila(ae_by, dept_c, code_c, outlet_c)
+                    if not destinos:
                         e = ActualEntry(scenario_id=target.id, hotel_id=target.hotel_id,
                                         dept_code=dept_c, account_code=code_c,
                                         account_name=a["name"], outlet=outlet_c,
                                         orden_archivo=a.get("fila"))
                         db.add(e); ae_by[(dept_c, code_c, outlet_c)] = e
+                        destinos = [e]
+                        antes_ae[(dept_c, code_c, outlet_c)] = {mi: Decimal("0")
+                                                                for mi in touched}
                     elif a["name"]:
-                        e.account_name = a["name"]
+                        for e in destinos:
+                            e.account_name = a["name"]
                     for mi_, v_ in a["months"].items():
-                        e.set_month(mi_, Decimal(str(v_)))
+                        pesos = [antes_ae.get((e.dept_code, e.account_code, e.outlet or ""),
+                                              {}).get(mi_, Decimal("0")) for e in destinos]
+                        for e, parte in zip(destinos,
+                                            repartir_entre_destinos(destinos, pesos,
+                                                                    Decimal(str(v_)))):
+                            e.set_month(mi_, parte)
                 # Ahora sí: ya no hay ninguna fila a medio camino.
                 await db.execute(sa_delete(ActualPLLine).where(
                     ActualPLLine.scenario_id == target.id, ActualPLLine.month.in_(touched)))
@@ -2617,30 +2648,92 @@ def filas_de_la_clase(derivadas: list, gl_rows: list, clase: str) -> list:
         if (consolidate_dept(e.dept_code), str(e.account_code)) not in ya]
 
 
-def _donde_ya_vive(by_key: dict, dept: str, code: str):
-    """La fila existente de esa cuenta en un departamento HIJO del que trae el
-    archivo, si hay exactamente una.
+def destinos_de_la_fila(by_key: dict, dept: str, code: str, outlet: str = "") -> list:
+    """Las filas que ya existen y que ESTA fila del archivo alimenta.
 
-    ⚠️ **La plantilla CONSOLIDA el departamento y el import escribia literal.**
-    El Spa se guarda en 0130 (Spa gerencia) y la plantilla lo exporta bajo 0140
-    (Spa), que es su padre —ver `pl_engine.consolidate_dept_raiz`—. Al subirla,
-    la cuenta se creaba en 0140 y la fila de 0130 se quedaba en cero.
+    ⚠️ **La plantilla CONSOLIDA el departamento y la carga escribía literal.**
 
-    En un mes abierto eso no da error: mueve el ingreso de un departamento al
-    otro en silencio, y como el P&L consolida los dos, el total no cambia y nadie
-    se entera. En un mes cerrado el candado lo frena, que es como aparecio:
-    owner, 2026-10-06, bajando la plantilla y subiendola sin tocarla —
-    «RevenueAccountEntry.jan: 6268.2590 → 0 · 4201 en 0130».
+    El Spa se guarda en `0130` (Spa gerencia) y la plantilla lo exporta bajo
+    `0140` (Spa), su padre. Al subirla, la cuenta se creaba en `0140` y la fila
+    de `0130` se quedaba en cero.
 
-    Si hay MAS de un hijo con esa cuenta no se adivina: se deja que la fila se
-    cree en el departamento del archivo, que es el comportamiento de siempre.
-    Elegir uno de dos moveria plata con una moneda al aire.
+    En un mes abierto eso no da error: mueve la plata de un departamento al otro
+    en silencio, y como el P&L consolida los dos, el total no cambia y nadie se
+    entera. En un mes cerrado lo frena el candado, que es como apareció — owner,
+    2026-10-06, bajando la plantilla y subiéndola sin tocarla:
+
+        RevenueAccountEntry.jan: 6268.2590 → 0 · 4201 en 0130
+        ActualEntry.jan:         6268.2590 → 0 · 4201 en 0130
+
+    **El criterio es el MISMO que usa la bajada.** La plantilla pliega con
+    `consolidate_dept` —un escalón—, así que las filas que una línea del archivo
+    representa son exactamente las que ese escalón manda a ese departamento. Una
+    versión anterior comparaba con `consolidate_dept_raiz` —la cadena entera— y
+    acertaba con el Spa de casualidad: para el `0132` la bajada escribe `0130` y
+    la raíz dice `0140`, así que no se reconocían y la fila se iba a cero igual.
+
+    **Y pueden ser VARIAS.** Habitaciones tiene cuatro hijos —`0111` Recepción,
+    `0112` Reservas, `0113` Ama de llaves, `0114` Conserjería— y los cuatro
+    llevan la cuenta `6000`. La plantilla los suma en UNA línea de `0110`. La
+    versión anterior, al ver más de un candidato, no adivinaba: creaba la fila en
+    el padre y dejaba las cuatro en cero. No adivinar estaba bien; dejarlas en
+    cero no — es la misma plata borrada, por no elegir.
+
+    Lo que devuelve esta función es a quiénes alimenta la línea; cuánto le toca a
+    cada uno lo decide `repartir_entre_destinos`, que no adivina nada: reparte
+    por lo que cada fila ya tenía.
     """
-    from app.engine.pl_engine import consolidate_dept_raiz
+    from app.engine.pl_engine import consolidate_dept
 
-    candidatos = [e for (d, c), e in by_key.items()
-                  if c == code and d != dept and consolidate_dept_raiz(d) == dept]
-    return candidatos[0] if len(candidatos) == 1 else None
+    salida = []
+    for k, e in by_key.items():
+        d, c = k[0], k[1]
+        o = k[2] if len(k) > 2 else ""
+        if c != code or o != (outlet or ""):
+            continue
+        if consolidate_dept(d) == dept:
+            salida.append(e)
+    # Orden estable: el padre primero, después los hijos por código. Sin esto, el
+    # resto del redondeo caería en una fila distinta en cada carga.
+    salida.sort(key=lambda e: (e.dept_code != dept, e.dept_code))
+    return salida
+
+
+def _num_mes(v) -> Decimal:
+    """El valor de un mes como Decimal, venga como sea. Nunca revienta."""
+    try:
+        return Decimal(str(v or 0))
+    except Exception:                                   # noqa: BLE001
+        return Decimal("0")
+
+
+def repartir_entre_destinos(destinos: list, pesos: list, monto: Decimal) -> list:
+    """Cuánto le toca a cada destino: proporcional a lo que YA tenía.
+
+    ⚠️ **No es una repartija arbitraria: es lo que hace el viaje redondo nulo.**
+
+    Cuando el archivo devuelve la misma suma que las filas ya tenían —que es el
+    caso normal: bajar la plantilla y subirla sin tocar nada— cada fila recibe
+    exactamente lo suyo y **no cambia ni un centavo**. El candado no ve nada
+    porque no pasó nada. Y cuando el owner sí editó la línea, la diferencia se
+    reparte por el peso de cada fila, que es la única repartija que conserva el
+    total y no inventa una historia sobre de quién era la plata.
+
+    Sin peso en ninguna (todas en cero, o una cuenta nueva) va todo a la primera,
+    que `destinos_de_la_fila` deja siendo el departamento del archivo.
+
+    El sobrante del redondeo cae en la primera, para que la suma dé EXACTA: si se
+    redondeara cada parte por su lado, el total del archivo y el de la base se
+    separarían un centavo por fila y por mes.
+    """
+    total = sum(pesos)
+    if not destinos:
+        return []
+    if len(destinos) == 1 or total == 0:
+        return [monto] + [Decimal("0")] * (len(destinos) - 1)
+    partes = [(monto * p / total).quantize(Decimal("0.0001")) for p in pesos]
+    partes[0] += monto - sum(partes)
+    return partes
 
 
 @router.get("/scenarios/{scenario_id}/export-detail/")
