@@ -1,20 +1,5 @@
 {
-  "_nota": [
-    "Los canales comerciales y su comision, tal como el owner los mando",
-    "(2026-08-14) desde su app de Compensacion.",
-    "",
-    "`entrada` dice POR DONDE entro la reserva — lo unico que Opera puede saber.",
-    "Vacio significa que ese canal describe QUIEN la trajo, y eso el PMS no lo",
-    "registra: una reserva con market code DIR puede haber entrado por telefono,",
-    "haberla traido la ejecutiva o venir de CRC, y el codigo es el mismo.",
-    "",
-    "Por eso no se deriva del market code. Derivarlo seria adivinar quien vendio,",
-    "y eso paga comisiones equivocadas mientras el total sigue cuadrando.",
-    "",
-    "`mix_pct` es el mix BASE: el que aplica cuando nadie dijo otra cosa, y el que hace que un escenario nuevo nazca bien. La excepcion por escenario o por mes vive en `canal_mix_escenario`. La suma tiene que dar 1.",
-    "",
-    "`rueda_a` dice a que canal de COMISION rueda cada sub-canal. Es explicito a proposito: antes se deducia de `entrada` con un diccionario en el codigo que tenia DIRECT de default, asi que un canal nuevo rodaba a DIRECT en silencio — 9,27% de comision en vez del 30% de TA, o sea ingreso de MAS."
-  ],
+  "_nota": "Los siete sub-canales de Corcovado. OJO: la OTA figura con comision 0 — pendiente de confirmar con el owner, una OTA al 0% no existe.",
   "canales": [
     {
       "code": "B2B",
@@ -50,7 +35,7 @@
       "entrada": "",
       "orden": 4,
       "mix_pct": 0.07,
-      "rueda_a": "DIRECT"
+      "rueda_a": "CRC"
     },
     {
       "code": "DIR_GROUPS",
@@ -59,7 +44,7 @@
       "entrada": "",
       "orden": 5,
       "mix_pct": 0.06,
-      "rueda_a": "DIRECT"
+      "rueda_a": "GROUPS"
     },
     {
       "code": "EXEC_DIRECT",
