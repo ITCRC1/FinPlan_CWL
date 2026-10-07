@@ -96,13 +96,18 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   /** Esconde las cuentas donde el actual y las versiones coinciden. Un mes
    *  tiene ~200 cuentas y lo que se revisa son las que NO cuadran. */
   const [soloDiferencias, setSoloDiferencias] = useState(false);
-  /** El departamento que se esta revisando, o "" por todos.
+  /** Los departamentos que se estan revisando. Vacio = todos.
    *
    *  Owner, 2026-10-07: *«tengo cierto sentido de perdida... no se si se puede
-   *  hacer por departamento, droplist y escoger e ir revisando»*. Un mes son
-   *  ~195 cuentas y ~460 detalles seguidos: de a un departamento se revisa y se
-   *  cierra, y se sabe por donde se va. */
-  const [dept, setDept] = useState("");
+   *  hacer por departamento, droplist y escoger e ir revisando»* y, mirandolo
+   *  otra vez: *«prefiero que haya una celda para escoger el departamento y
+   *  revisar uno a uno si yo quiero... o seleccion multiple»*.
+   *
+   *  Las dos cosas: tocar el NOMBRE deja ese solo —el camino de «uno a uno»,
+   *  un clic— y tocar la casilla lo suma o lo quita del conjunto. Un mes son
+   *  ~285 cuentas seguidas; de a un departamento se revisa y se cierra. */
+  const [depts, setDepts] = useState<string[]>([]);
+  const [abrirDepts, setAbrirDepts] = useState(false);
   const [copiado, setCopiado] = useState("");
   /** Qué cuentas están abiertas, y sus asientos ya traídos.
    *
@@ -183,7 +188,8 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   const descuadra = (f: FilaIntegral) =>
     vers.some(v => Math.abs(f.actual - (f.versiones[v.scenario_id] ?? 0)) > 0.005);
   const visibles = (datos?.filas ?? []).filter(
-    f => (!soloDiferencias || descuadra(f)) && (!dept || f.dept_code === dept));
+    f => (!soloDiferencias || descuadra(f))
+      && (depts.length === 0 || depts.includes(f.dept_code)));
 
   /** Los departamentos del mes, con cuantas cuentas trae cada uno y si alguna
    *  descuadra — para no tener que entrar a mirar.
@@ -191,7 +197,7 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  ⚠️ Se arma sobre TODAS las filas, no sobre `visibles`: si saliera del
    *  filtrado, elegir un departamento vaciaria el droplist y no habria como
    *  volver. */
-  const depts = useMemo(() => {
+  const catalogoDepts = useMemo(() => {
     const out: { code: string; name: string; cuentas: number; ojo: number }[] = [];
     for (const f of datos?.filas ?? []) {
       let d = out.find(x => x.code === f.dept_code);
@@ -213,13 +219,22 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   const rotuloDept = (code: string, name: string) =>
     name && name !== code ? `${code} · ${name}` : code;
 
+  /** El paso `‹ ›` mueve a UN departamento — es el modo «uno a uno».
+   *
+   *  Con varios elegidos arranca desde el ultimo, que es donde esta el ojo. */
   const paso = (n: number) => {
-    if (!depts.length) return;
-    const i = depts.findIndex(x => x.code === dept);
-    const j = i < 0 ? (n > 0 ? 0 : depts.length - 1)
-                    : (i + n + depts.length) % depts.length;
-    setDept(depts[j].code);
+    const todos = catalogoDepts;
+    if (!todos.length) return;
+    const actual = depts[depts.length - 1];
+    const i = todos.findIndex(x => x.code === actual);
+    const j = i < 0 ? (n > 0 ? 0 : todos.length - 1)
+                    : (i + n + todos.length) % todos.length;
+    setDepts([todos[j].code]);
   };
+
+  const soloEste = (code: string) => { setDepts([code]); setAbrirDepts(false); };
+  const alternar = (code: string) => setDepts(
+    d => d.includes(code) ? d.filter(x => x !== code) : [...d, code]);
 
   // ⚠️ DEPARTAMENTO afuera y la categoria adentro, en orden de clase: 4
   // Ingresos, 5 Costos, 6 Payroll, 7 Opex, 8 Property Expenses. Owner,
@@ -289,26 +304,86 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
           Sólo lo que no cuadra
         </label>
 
-        {/* El departamento, para revisar de a uno. El contador de al lado dice
-            cuántas cuentas trae y, entre paréntesis, cuántas no cuadran. */}
+        {/* El departamento. Owner, 2026-10-07: *«prefiero que haya una celda
+            para escoger el departamento y revisar uno a uno si yo quiero... o
+            selección múltiple»*.
+            ⚠️ No es un `<select multiple>`: ese obliga a ctrl+clic para sumar
+            uno, y soltar el ctrl borra la selección entera sin avisar. Acá el
+            NOMBRE deja ese solo —un clic, el camino de «uno a uno»— y la
+            CASILLA lo suma o lo quita. */}
         <span style={{ fontSize: 12, color: "var(--text-secondary)",
                        marginLeft: 6 }}>Departamento</span>
-        <select value={dept} onChange={e => setDept(e.target.value)}
-                style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5,
-                         maxWidth: 260 }}>
-          <option value="">
-            Todos — {(datos?.filas ?? []).length} cuentas
-          </option>
-          {depts.map(d => (
-            <option key={d.code} value={d.code}>
-              {rotuloDept(d.code, d.name)} — {d.cuentas}
-              {d.ojo ? ` (${d.ojo} no cuadran)` : ""}
-            </option>
-          ))}
-        </select>
+        <span style={{ position: "relative" }}>
+          <button onClick={() => setAbrirDepts(v => !v)}
+                  style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5,
+                           cursor: "pointer", minWidth: 190, textAlign: "left",
+                           border: "1px solid var(--border-medium)",
+                           background: "var(--bg-input)",
+                           color: "var(--text-primary)" }}>
+            {depts.length === 0
+              ? `Todos — ${catalogoDepts.length}`
+              : depts.length === 1
+                ? rotuloDept(depts[0],
+                    catalogoDepts.find(x => x.code === depts[0])?.name ?? "")
+                : `${depts.length} departamentos`}
+            {" ▾"}
+          </button>
+          {abrirDepts && (
+            <>
+              {/* La capa que cierra el panel al tocar afuera. */}
+              <span onClick={() => setAbrirDepts(false)}
+                    style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0,
+                            zIndex: 41, minWidth: 300, maxHeight: 340,
+                            overflowY: "auto", padding: "4px 0",
+                            borderRadius: 6, border: "1px solid var(--border-medium)",
+                            background: "var(--bg-surface)",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.35)" }}>
+                <button onClick={() => { setDepts([]); setAbrirDepts(false); }}
+                        style={{ display: "block", width: "100%", textAlign: "left",
+                                 fontSize: 12, padding: "6px 12px", cursor: "pointer",
+                                 border: "none", background: "transparent",
+                                 fontWeight: depts.length === 0 ? 700 : 400,
+                                 color: "var(--text-primary)" }}>
+                  Todos los departamentos — {(datos?.filas ?? []).length} cuentas
+                </button>
+                <div style={{ height: 1, background: "var(--border-subtle)",
+                              margin: "4px 0" }} />
+                {catalogoDepts.map(d => {
+                  const puesto = depts.includes(d.code);
+                  return (
+                    <div key={d.code}
+                         style={{ display: "flex", alignItems: "center", gap: 8,
+                                  padding: "4px 12px",
+                                  background: puesto ? "var(--bg-elevated)" : "transparent" }}>
+                      <input type="checkbox" checked={puesto}
+                             onChange={() => alternar(d.code)}
+                             title="Sumar o quitar este departamento"
+                             style={{ cursor: "pointer", flex: "0 0 auto" }} />
+                      <button onClick={() => soloEste(d.code)}
+                              title="Ver sólo este departamento"
+                              style={{ flex: 1, textAlign: "left", fontSize: 12,
+                                       padding: "2px 0", cursor: "pointer",
+                                       border: "none", background: "transparent",
+                                       color: "var(--text-primary)",
+                                       fontWeight: puesto ? 700 : 400 }}>
+                        {rotuloDept(d.code, d.name)}
+                      </button>
+                      <span style={{ fontSize: 11, whiteSpace: "nowrap",
+                                     color: d.ojo ? "var(--negative)"
+                                                  : "var(--text-secondary)" }}>
+                        {d.cuentas}{d.ojo ? ` · ${d.ojo} no cuadran` : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </span>
         <span style={{ display: "inline-flex", gap: 2 }}>
           {([["‹", -1], ["›", 1]] as const).map(([txt, n]) => (
-            <button key={n} onClick={() => paso(n)} disabled={!depts.length}
+            <button key={n} onClick={() => paso(n)} disabled={!catalogoDepts.length}
                     title={n < 0 ? "Departamento anterior" : "Departamento siguiente"}
                     style={{ fontSize: 14, lineHeight: 1, padding: "3px 9px",
                              borderRadius: 5, cursor: "pointer",
@@ -317,8 +392,8 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                              color: "var(--text-primary)" }}>{txt}</button>
           ))}
         </span>
-        {dept && (
-          <button onClick={() => setDept("")}
+        {depts.length > 0 && (
+          <button onClick={() => setDepts([])}
                   style={{ fontSize: 11, padding: "3px 9px", borderRadius: 5,
                            cursor: "pointer", border: "1px solid var(--border-medium)",
                            background: "transparent", color: "var(--text-secondary)" }}>
