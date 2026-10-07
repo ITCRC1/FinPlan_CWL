@@ -118,6 +118,34 @@ def grupo_de(cuenta: str) -> str:
     return GRUPOS.get(cuenta[:1], "Otros")
 
 
+#: Como el owner lee el MAYOR COMPLETO, del 1 al 9. Owner, 2026-10-07, viendo el
+#: reporte de cambios: *«debe ir por cuenta del 1 al 8 y debe ir por categoria,
+#: Balance 01-03, Revenue 4, costos 5, payrol 6, Opex 7-8, Stats 9»*.
+#:
+#: ⚠️ **No es lo mismo que `GRUPOS` y las dos conviven a proposito.** `GRUPOS`
+#: es como se leen los HALLAZGOS —solo clases 4 a 8, con la 7 y la 8
+#: separadas («Opex» y «Gastos de propiedad»), como el owner lo pidio el
+#: 2026-10-05— y esto es como se lee el MAYOR entero, que incluye el balance y
+#: las estadisticas y junta 7 con 8. Unificarlas a mano habria cambiado en
+#: silencio un cuadro que el owner ya revisa.
+CATEGORIAS: dict[str, str] = {
+    "1": "Balance", "2": "Balance", "3": "Balance",
+    "4": "Revenue",
+    "5": "Costos",
+    "6": "Planilla",
+    "7": "Opex", "8": "Opex",
+    "9": "Stats",
+}
+#: El orden en que salen: el del numero de cuenta, 1 -> 9.
+ORDEN_CATEGORIAS = ("Balance", "Revenue", "Costos", "Planilla", "Opex", "Stats",
+                    "Otras")
+
+
+def categoria_de(cuenta: str) -> str:
+    """La categoria del mayor a la que pertenece una cuenta, por su clase."""
+    return CATEGORIAS.get(str(cuenta or "")[:1], "Otras")
+
+
 ALTA, MEDIA, BAJA = "alta", "media", "baja"
 _ORDEN = {ALTA: 0, MEDIA: 1, BAJA: 2}
 

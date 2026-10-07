@@ -311,6 +311,14 @@ async def movimientos(
     }
 
 
+def _orden_cat(nombre: str) -> int:
+    """Donde va cada categoria: el orden del numero de cuenta, 1 -> 9."""
+    try:
+        return auditoria_gl.ORDEN_CATEGORIAS.index(nombre)
+    except ValueError:
+        return len(auditoria_gl.ORDEN_CATEGORIAS)
+
+
 @router.get("/mayor/{anio}/{mes}/cambios/")
 async def cambios(
     anio: int,
@@ -379,16 +387,24 @@ async def cambios(
         va, vh = a_cta.get(cta, Decimal("0")), h_cta.get(cta, Decimal("0"))
         if abs(vh - va) <= minimo:
             continue
-        cuentas.append({"cuenta": cta, "antes": float(va), "ahora": float(vh),
+        cuentas.append({"cuenta": cta,
+                        "categoria": auditoria_gl.categoria_de(cta),
+                        "antes": float(va), "ahora": float(vh),
                         "diferencia": float(vh - va)})
-    cuentas.sort(key=lambda x: -abs(x["diferencia"]))
+    # ⚠️ Por NUMERO DE CUENTA, no por monto. Owner, 2026-10-07: *«debe ir por
+    # cuenta del 1 al 8 y debe ir por categoria»*. Ordenado por monto el cuadro
+    # se lee como una lista de sorpresas; ordenado por cuenta se lee como el
+    # mayor, que es contra lo que el owner lo compara.
+    cuentas.sort(key=lambda x: (_orden_cat(x["categoria"]), x["cuenta"]))
 
     # ── Por asiento ──────────────────────────────────────────────────────────
     llave = lambda f: (f.cuenta, f.asiento, f.linea)
     ia = {llave(f): f for f in antes}
     ih = {llave(f): f for f in hoy}
     def fila(f, que):
-        return {"que": que, "cuenta": f.cuenta, "asiento": f.asiento, "linea": f.linea,
+        return {"que": que, "cuenta": f.cuenta,
+                "categoria": auditoria_gl.categoria_de(f.cuenta),
+                "asiento": f.asiento, "linea": f.linea,
                 "fecha": f.fecha, "descripcion": f.descripcion,
                 "desc_asiento": f.desc_asiento, "origen": f.origen,
                 "neto": float(neto(f))}
@@ -405,7 +421,8 @@ async def cambios(
             movs.append({**fila(h, "cambio_de_monto"), "antes": float(neto(a)),
                          "ahora": float(neto(h)),
                          "diferencia": float(neto(h) - neto(a))})
-    movs.sort(key=lambda x: -abs(x["diferencia"]))
+    movs.sort(key=lambda x: (_orden_cat(x["categoria"]), x["cuenta"],
+                            x["asiento"], x["linea"]))
 
     def resumen(filas):
         return {"movimientos": len(filas),
@@ -415,7 +432,20 @@ async def cambios(
                 "subido_en": filas[0].subido_en.isoformat() if filas[0].subido_en else None}
 
     ra, rh = resumen(antes), resumen(hoy)
+    # El subtotal de cada categoria. Viaja calculado y no se suma en la
+    # pantalla: el listado puede venir recortado, y un subtotal que suma lo
+    # dibujado no seria el de la categoria.
+    por_cat: dict[str, dict] = {}
+    for c in cuentas:
+        d = por_cat.setdefault(c["categoria"],
+                               {"categoria": c["categoria"], "cuentas": 0,
+                                "antes": 0.0, "ahora": 0.0, "diferencia": 0.0})
+        d["cuentas"] += 1
+        for k in ("antes", "ahora", "diferencia"):
+            d[k] += c[k]
+    categorias = sorted(por_cat.values(), key=lambda x: _orden_cat(x["categoria"]))
     return {
+        "categorias": categorias,
         "anio": anio, "mes": mes, "hay": True,
         "anterior": {**ra, "reemplazado_en": (antes[0].reemplazado_en.isoformat()
                                               if antes[0].reemplazado_en else None)},

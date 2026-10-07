@@ -14,7 +14,7 @@
  * decir cosas distintas, y este proyecto ya pagó por eso una vez (owner,
  * 2026-08-27: «el excel no baja lo que está viendo»).
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 
@@ -25,13 +25,22 @@ const usd = (n: number) =>
 
 export interface Cambio {
   que: "aparecio" | "desaparecio" | "cambio_de_monto";
-  cuenta: string; asiento: string; linea: string; fecha: string;
+  cuenta: string; categoria: string; asiento: string; linea: string; fecha: string;
   descripcion: string; desc_asiento: string; origen: string;
   antes: number; ahora: number; diferencia: number;
 }
 
 export interface CuentaCambiada {
-  cuenta: string; antes: number; ahora: number; diferencia: number;
+  cuenta: string; categoria: string;
+  antes: number; ahora: number; diferencia: number;
+}
+
+/** El subtotal de una categoria del mayor. Viene CALCULADO del servidor: el
+ *  listado puede venir recortado, y un subtotal que suma lo dibujado no seria
+ *  el de la categoria. */
+export interface CategoriaCambiada {
+  categoria: string; cuentas: number;
+  antes: number; ahora: number; diferencia: number;
 }
 
 export interface Cambios {
@@ -42,6 +51,7 @@ export interface Cambios {
               debito: number; credito: number };
   diferencia?: { movimientos: number; debito: number; credito: number };
   cuentas_que_cambiaron?: number; movimientos_que_cambiaron?: number;
+  categorias?: CategoriaCambiada[];
   cuentas?: CuentaCambiada[]; movimientos?: Cambio[]; recortado?: boolean;
 }
 
@@ -157,16 +167,41 @@ export function Comparacion(
                 <th style={{ ...th, textAlign: "right" }}>Diferencia</th>
               </tr></thead>
               <tbody>
-                {datos.cuentas.map(c => (
-                  <tr key={c.cuenta}>
-                    <td style={{ ...td, whiteSpace: "nowrap" }}>{c.cuenta}</td>
-                    <td style={num}>{usd(c.antes)}</td>
-                    <td style={num}>{usd(c.ahora)}</td>
-                    <td style={{ ...num, fontWeight: 700,
-                                 color: c.diferencia < 0 ? "var(--negative)" : "var(--positive)" }}>
-                      {usd(c.diferencia)}
-                    </td>
-                  </tr>
+                {(datos.categorias ?? []).map(cat => (
+                  <Fragment key={cat.categoria}>
+                    {/* La banda de la categoria, con su subtotal. El owner lee el
+                        mayor por categoria: Balance 1-3, Revenue 4, Costos 5,
+                        Planilla 6, Opex 7-8, Stats 9. */}
+                    <tr>
+                      <td style={{ ...td, fontWeight: 700, background: "var(--bg-elevated)" }}>
+                        {cat.categoria}
+                        <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>
+                          {" "}· {cat.cuentas} {cat.cuentas === 1 ? "cuenta" : "cuentas"}
+                        </span>
+                      </td>
+                      <td style={{ ...num, background: "var(--bg-elevated)" }}>{usd(cat.antes)}</td>
+                      <td style={{ ...num, background: "var(--bg-elevated)" }}>{usd(cat.ahora)}</td>
+                      <td style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)",
+                                   color: cat.diferencia < 0 ? "var(--negative)" : "var(--positive)" }}>
+                        {usd(cat.diferencia)}
+                      </td>
+                    </tr>
+                    {(datos.cuentas ?? [])
+                      .filter(c => c.categoria === cat.categoria)
+                      .map(c => (
+                        <tr key={c.cuenta}>
+                          <td style={{ ...td, whiteSpace: "nowrap", paddingLeft: 22 }}>
+                            {c.cuenta}
+                          </td>
+                          <td style={num}>{usd(c.antes)}</td>
+                          <td style={num}>{usd(c.ahora)}</td>
+                          <td style={{ ...num, fontWeight: 700,
+                                       color: c.diferencia < 0 ? "var(--negative)" : "var(--positive)" }}>
+                            {usd(c.diferencia)}
+                          </td>
+                        </tr>
+                      ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -182,6 +217,7 @@ export function Comparacion(
           <div className="fin-scroll-x">
             <table style={{ borderCollapse: "collapse", width: "100%" }}>
               <thead><tr>
+                <th style={th}>Categoría</th>
                 <th style={th}>Qué pasó</th>
                 <th style={th}>Cuenta</th>
                 <th style={th}>Asiento</th>
@@ -195,6 +231,8 @@ export function Comparacion(
               <tbody>
                 {datos.movimientos.map((m, i) => (
                   <tr key={m.cuenta + "-" + m.asiento + "-" + m.linea + "-" + i}>
+                    <td style={{ ...td, whiteSpace: "nowrap",
+                                 color: "var(--text-secondary)" }}>{m.categoria}</td>
                     <td style={{ ...td, color: QUE[m.que]?.color, fontWeight: 600,
                                  whiteSpace: "nowrap" }}>
                       {QUE[m.que]?.rot ?? m.que}

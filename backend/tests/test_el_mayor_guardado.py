@@ -630,3 +630,106 @@ async def test_un_mes_no_subido_lo_DICE(base):
         2026, 7, desde_clase=4, db=base, _=object())
     assert r["hay"] is False
     assert r["motivo"] == "mes_no_subido"
+
+
+# ── El orden del reporte de cambios ──────────────────────────────────────────
+#
+# Owner, 2026-10-07, viendo el cuadro: «reporte se ve grande y desordenado…
+# debe ir por cuenta del 1 al 8 y debe ir por categoria, Balance 01-03,
+# Revenue 4, costos 5, payrol 6, Opex 7-8, Stats 9».
+
+
+@pytest.mark.parametrize("cuenta,categoria", [
+    ("1000-0001-001-024-001-00-00", "Balance"),
+    ("2000-0001-003-174-000-00-00", "Balance"),
+    ("3000-0001-000-000-000-00-00", "Balance"),
+    ("4500-0152-999-999-001-07-00", "Revenue"),
+    ("5420-0220-000-000-000-00-00", "Costos"),
+    ("6000-0111-501-013-015-00-00", "Planilla"),
+    ("7185-0152-800-001-000-00-00", "Opex"),
+    ("8015-0240-803-000-000-00-00", "Opex"),     # la 8 va CON la 7
+    ("9000-0110-001-001-001-01-01", "Stats"),
+])
+def test_cada_clase_cae_en_su_categoria(cuenta, categoria):
+    from app.engine.auditoria_gl import categoria_de
+
+    assert categoria_de(cuenta) == categoria
+
+
+def test_el_orden_es_el_del_numero_de_cuenta():
+    from app.engine.auditoria_gl import ORDEN_CATEGORIAS
+
+    assert ORDEN_CATEGORIAS[:6] == ("Balance", "Revenue", "Costos", "Planilla",
+                                    "Opex", "Stats")
+
+
+def test_las_dos_categorizaciones_CONVIVEN():
+    """⚠️ `GRUPOS` y `CATEGORIAS` son distintas y las dos valen.
+
+    `GRUPOS` es como se leen los HALLAZGOS —solo clases 4 a 8, con la 7 y la 8
+    separadas, como el owner lo pidio el 2026-10-05— y `CATEGORIAS` es como se
+    lee el MAYOR entero, que incluye balance y estadisticas y junta 7 con 8.
+
+    Unificarlas a mano habria cambiado en silencio un cuadro que el owner ya
+    revisa. Si alguien las junta, que sea decidiendolo.
+    """
+    from app.engine.auditoria_gl import CATEGORIAS, GRUPOS
+
+    assert GRUPOS["7"] != GRUPOS["8"], "los hallazgos separan Opex de propiedad"
+    assert CATEGORIAS["7"] == CATEGORIAS["8"] == "Opex", "el mayor los junta"
+    assert set(GRUPOS) == {"4", "5", "6", "7", "8"}
+    assert set(CATEGORIAS) == {"1", "2", "3", "4", "5", "6", "7", "8", "9"}
+
+
+@pytest.mark.asyncio
+async def test_el_cuadro_sale_por_categoria_y_por_cuenta(base):
+    """Ni por monto ni al azar: en el orden en que se lee el mayor.
+
+    Ordenado por monto el cuadro se lee como una lista de sorpresas; ordenado
+    por cuenta se lee como el mayor, que es contra lo que el owner lo compara.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+
+    def uno(cuenta, monto):
+        return Linea(cuenta=cuenta, seg1=cuenta[:4], seg2=cuenta[5:9], seg3="000",
+                     asiento="1", linea="1", fecha="30/09/26", descripcion="x",
+                     desc_asiento="y", origen="CON", referencia="", num_doc="",
+                     tc=453.0, moneda="COL", debito=monto, credito=0.0)
+
+    # A proposito con los montos AL REVES del orden de cuenta: si se ordenara
+    # por monto, saldrian justo invertidas.
+    cuentas = ["1000-0001-000-000-000-00-00", "4500-0152-000-000-000-00-00",
+               "5420-0220-000-000-000-00-00", "6000-0111-000-000-000-00-00",
+               "7185-0152-000-000-000-00-00", "8015-0240-000-000-000-00-00"]
+    v1 = Archivo(periodo="Setiembre - 2026",
+                 lineas=[uno(c, 100.0) for c in cuentas])
+    v2 = Archivo(periodo="Setiembre - 2026",
+                 lineas=[uno(c, 100.0 + (len(cuentas) - i) * 1000)
+                         for i, c in enumerate(cuentas)])
+    await auditoria_gl_api._guardar(base, v1, b"a", "v1.xlsx", "yo")
+    await auditoria_gl_api._guardar(base, v2, b"b", "v2.xlsx", "yo")
+    c = await auditoria_gl_api.cambios(2026, 9, umbral=0.005, limite=400,
+                                       db=base, _=object())
+
+    assert [x["cuenta"] for x in c["cuentas"]] == cuentas
+    assert [x["categoria"] for x in c["categorias"]] == [
+        "Balance", "Revenue", "Costos", "Planilla", "Opex"]
+    # El subtotal de Opex junta la 7 y la 8.
+    opex = next(x for x in c["categorias"] if x["categoria"] == "Opex")
+    assert opex["cuentas"] == 2
+    # Y los asientos salen en el mismo orden.
+    assert [x["cuenta"] for x in c["movimientos"]] == cuentas
+
+
+@pytest.mark.asyncio
+async def test_el_subtotal_de_la_categoria_lo_calcula_el_SERVIDOR(base):
+    """Y no la pantalla sumando lo que dibuja: el listado puede venir recortado.
+
+    Un subtotal que suma lo dibujado no es el de la categoria, y el cuadro
+    mentiria sin avisar.
+    """
+    import inspect
+
+    fuente = inspect.getsource(auditoria_gl_api.cambios)
+    assert '"categorias": categorias' in fuente
+    assert "por_cat.setdefault" in fuente
