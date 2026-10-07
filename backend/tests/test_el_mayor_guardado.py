@@ -733,3 +733,66 @@ async def test_el_subtotal_de_la_categoria_lo_calcula_el_SERVIDOR(base):
     fuente = inspect.getsource(auditoria_gl_api.cambios)
     assert '"categorias": categorias' in fuente
     assert "por_cat.setdefault" in fuente
+
+
+# ── La subida de la Auditoria NO toca el cierre ──────────────────────────────
+#
+# Owner, 2026-10-07, mirando Pre-Closing: «yo subo en el audit, pero que se
+# afecta con mi subida en esta parte de precloasing».
+#
+# Nada. Y esta es la garantia que mas caro saldria perder: dos fuentes de plata
+# para el mismo mes es el defecto mas costoso de este repo. Asi que se vigila.
+
+#: Lo que NO puede escribir el camino de la Auditoria. Son las tablas del cierre
+#: y del P&L: si la Auditoria empezara a escribir en alguna, el mes tendria dos
+#: origenes y los totales cuadrarian igual.
+PROHIBIDAS = (
+    "Precierre", "PrecierreFila", "PrecierrePosicion",
+    "ActualEntry", "ActualPLLine", "ActualRoomStat",
+    "OpexEntry", "CostEntry", "RevenueAccountEntry", "BelowGopAccountEntry",
+    "PayrollConceptEntry", "PayrollPosition",
+    "Scenario", "ScenarioStat", "AllocationEntry", "NonOpEntry",
+)
+
+
+def test_la_auditoria_solo_escribe_el_mayor():
+    """El modulo entero no menciona ni una tabla del cierre.
+
+    Se mira el MODULO y no solo la funcion de guardar: una escritura nueva en
+    otro endpoint del mismo archivo contaria igual.
+    """
+    import inspect
+    import re
+
+    from app.api import auditoria_gl_api
+
+    fuente = inspect.getsource(auditoria_gl_api)
+    # Sin comentarios ni docstrings: ahi SI se las nombra, explicando por donde
+    # entra la plata de verdad.
+    codigo = "\n".join(l for l in fuente.splitlines()
+                       if not l.strip().startswith("#"))
+    codigo = re.sub(r'""".*?"""', "", codigo, flags=re.S)
+    aparecen = [t for t in PROHIBIDAS
+                if re.search(rf"\b{t}\b", codigo)]
+    assert not aparecen, (
+        "El camino de la Auditoria menciona tablas del cierre: "
+        f"{aparecen}. Si empieza a escribirlas, el mes tiene dos origenes y los "
+        "totales cuadran igual — el defecto mas caro de este sistema.")
+
+
+def test_nadie_mas_que_la_auditoria_LEE_el_mayor_guardado():
+    """El mayor guardado es para MIRARLO, no para alimentar un reporte.
+
+    Si otro modulo lo leyera, habria que decidir que pasa cuando el mayor
+    guardado y el espejo del Pre-Cierre no dicen lo mismo — y la respuesta
+    correcta hoy es que son dos cosas distintas y ninguna manda sobre la otra.
+    """
+    import pathlib
+
+    base = pathlib.Path(__file__).resolve().parents[1] / "app"
+    lectores = sorted(
+        p.relative_to(base).as_posix()
+        for p in base.rglob("*.py")
+        if "MayorMovimiento" in p.read_text(encoding="utf-8")
+        and not p.name.startswith("mayor_movimiento"))
+    assert lectores == ["api/auditoria_gl_api.py"], lectores
