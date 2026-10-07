@@ -331,3 +331,75 @@ def test_dos_lineas_distintas_del_MISMO_asiento_se_quedan_las_dos():
     assert len(a.lineas) == 2
     assert a.repetidas == 0
     assert sum(l.debito for l in a.lineas) == pytest.approx(350.0)
+
+
+# ── El mismo balance, en colones o en dolares ────────────────────────────────
+
+def _linea(moneda_archivo: str, monto: float, tc: float = 450.0):
+    from app.importers.balance_comprobacion import Linea
+
+    return Linea(
+        cuenta="7400-0120-800-000-000-00-00", seg1="7400", seg2="0120",
+        seg3="800", asiento="900", linea="1", fecha="15/09/26",
+        descripcion="Compra", desc_asiento="Factura 55", origen="CON",
+        referencia="", num_doc="", tc=tc, moneda="COL",
+        debito=monto, credito=0.0, moneda_archivo=moneda_archivo)
+
+
+def test_el_mismo_gasto_da_lo_mismo_venga_en_la_moneda_que_venga():
+    """Owner, 2026-10-06: «¿cómo hay que subir el archivo, en colones o en USD?»
+
+    La respuesta tiene que ser «como lo tengas», y para eso el lector mira el
+    encabezado (`Moneda: DOL` / `Moneda: COL`).
+
+    ⚠️ Antes devolvía la columna cruda y la llamaba colones. Con un export en
+    dólares el monto salía rotulado CRC siendo dólares, y `monto_usd` volvía a
+    dividir por el tipo de cambio: un gasto de 1.207,84 aparecía como US$2,63.
+    La auditoría seguía dando los hallazgos correctos —las reglas comparan unos
+    contra otros, no contra una escala— y sólo los MONTOS mentían.
+    """
+    en_colones = _linea("COL", 450_000.0)
+    en_dolares = _linea("DOL", 1_000.0)
+    assert en_colones.monto_crc == pytest.approx(en_dolares.monto_crc)
+    assert en_colones.monto_usd == pytest.approx(en_dolares.monto_usd)
+    assert en_dolares.monto_usd == pytest.approx(1_000.0)
+    assert en_dolares.monto_crc == pytest.approx(450_000.0)
+
+
+def test_sin_encabezado_se_asume_colones():
+    """Lo que se asumía antes de mirar el encabezado: no se le cambia el
+    significado a nadie que construya una `Linea` a mano."""
+    from app.importers.balance_comprobacion import Linea
+
+    l = Linea(cuenta="x", seg1="7400", seg2="0120", seg3="800", asiento="1",
+              linea="1", fecha="", descripcion="", desc_asiento="", origen="",
+              referencia="", num_doc="", tc=450.0, moneda="COL",
+              debito=450_000.0, credito=0.0)
+    assert l.monto_crc == pytest.approx(450_000.0)
+    assert l.monto_usd == pytest.approx(1_000.0)
+
+
+def test_el_encabezado_viaja_a_cada_linea():
+    """El lector tiene que pasárselo: sin eso, el arreglo no hace nada."""
+    import io
+
+    from openpyxl import Workbook
+
+    from app.importers.balance_comprobacion import leer
+
+    wb = Workbook()
+    h = wb.active
+    h.title = "Detalle"
+    h.append(["Balance de Comprobación"])
+    h.append(["Setiembre - 2026"])
+    h.append(["Moneda: DOL"])
+    h.append(["7400-0120-800-000-000-00-00", "900", "1", "15/09/26", "Compra",
+              "Factura 55", "CON", "", "", "", "", 450.0, "COL", 1000.0, 0.0])
+    buf = io.BytesIO()
+    wb.save(buf)
+    a = leer(buf.getvalue())
+
+    assert a.moneda == "DOL"
+    assert a.lineas[0].moneda_archivo == "DOL"
+    assert a.lineas[0].monto_usd == pytest.approx(1000.0)
+    assert a.lineas[0].monto_crc == pytest.approx(450_000.0)

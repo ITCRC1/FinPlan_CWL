@@ -52,21 +52,54 @@ class Linea:
     referencia: str      # el ARTICULO comprado, o el puesto en planilla
     num_doc: str
     tc: float
+    #: La moneda de la TRANSACCION (`DOL` o `COL`), no la de la columna de
+    #: montos. Vienen mezcladas: el archivo de setiembre 2026 trae 1.281
+    #: renglones `DOL` y 3.497 `COL` — es en qué se pagó, no en qué está escrito.
     moneda: str
     debito: float
     credito: float
+    #: En qué moneda están los MONTOS de este archivo, del encabezado
+    #: (`Moneda: DOL` / `Moneda: COL`). Integrity exporta el mismo balance en
+    #: las dos, y la diferencia no se ve mirando una fila: son los mismos
+    #: asientos con la columna convertida.
+    #:
+    #: ⚠️ `COL` por defecto para no cambiarle el significado a nadie que
+    #: construya una `Linea` a mano — era lo que se asumía antes de mirar el
+    #: encabezado.
+    moneda_archivo: str = "COL"
 
     @property
     def clase(self) -> str:
         return self.seg1[0]
 
     @property
-    def monto_crc(self) -> float:
+    def _monto(self) -> float:
         return self.debito - self.credito
 
     @property
+    def monto_crc(self) -> float:
+        """El movimiento en COLONES, venga el archivo como venga.
+
+        ⚠️ **Antes esto devolvía la columna cruda y la llamaba colones.** Con un
+        export en dólares —que es lo que Integrity da si se le pide— el número
+        salía rotulado `CRC` siendo dólares, y `monto_usd` dividía otra vez por
+        el tipo de cambio: un gasto de 1.207,84 aparecía como US$2,63.
+
+        No fallaba nada: la auditoría corría, los hallazgos eran correctos (las
+        reglas comparan unos contra otros, no contra una escala) y sólo los
+        MONTOS mentían. Owner, 2026-10-06: *«¿cómo hay que subir el archivo
+        máximo detalle, en colones o en USD?»* — la respuesta tenía que ser
+        «como lo tengas», y para eso hay que mirar el encabezado.
+        """
+        if (self.moneda_archivo or "").upper().startswith("DOL"):
+            return self._monto * self.tc
+        return self._monto
+
+    @property
     def monto_usd(self) -> float:
-        return self.monto_crc / self.tc if self.tc else 0.0
+        if (self.moneda_archivo or "").upper().startswith("DOL"):
+            return self._monto
+        return self._monto / self.tc if self.tc else 0.0
 
 
 @dataclass
@@ -191,5 +224,6 @@ def leer(contenido: bytes) -> Archivo:
                 descripcion=_s(celdas[4]), desc_asiento=_s(celdas[5]),
                 origen=_s(celdas[6]), referencia=_s(celdas[7]),
                 num_doc=_s(celdas[9]), tc=_f(celdas[11]), moneda=_s(celdas[12]),
-                debito=_f(celdas[13]), credito=_f(celdas[14])))
+                debito=_f(celdas[13]), credito=_f(celdas[14]),
+                moneda_archivo=out.moneda or "COL"))
     return out
