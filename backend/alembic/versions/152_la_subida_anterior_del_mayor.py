@@ -38,12 +38,13 @@ depends_on = None
 #: migración es una foto congelada y no puede depender de un modelo que mañana
 #: cambie.
 #:
-#: ⚠️ Que las dos tablas no se separen lo vigila
+#: Que las dos tablas no se separen lo vigila
 #: `test_el_mayor_guardado.test_las_dos_tablas_tienen_las_MISMAS_columnas`: si
 #: alguien le agrega una columna a una y no a la otra, la copia de la anterior
 #: perdería ese dato en silencio.
-COLS = [
-    ("hotel_id", sa.String(10)), ("anio", sa.Integer), ("mes", sa.Integer),
+#: Columnas de TEXTO: su default es la cadena vacia.
+TEXTO = [
+    ("hotel_id", sa.String(10)),
     ("cuenta", sa.String(40)), ("seg1", sa.String(6)), ("seg2", sa.String(6)),
     ("seg3", sa.String(6)), ("asiento", sa.String(20)), ("linea", sa.String(10)),
     ("fecha", sa.String(20)), ("descripcion", sa.String(250)),
@@ -52,14 +53,29 @@ COLS = [
     ("moneda", sa.String(10)), ("archivo", sa.String(255)), ("checksum", sa.String(64)),
     ("subido_por", sa.String(120)),
 ]
+#: Numericas: default 0.
 NUM = [("debito", sa.Numeric(18, 4)), ("credito", sa.Numeric(18, 4)),
        ("tc", sa.Numeric(12, 4))]
+#: ⚠️ `anio` y `mes` van APARTE y SIN default.
+#:
+#: La primera version de esta migracion recorria una sola lista y les ponia
+#: `server_default=""` a todas. En SQLite eso pasa —tipado flojo— y el ensayo
+#: local quedo en verde; en PostgreSQL `DEFAULT ''` sobre un INTEGER es un error
+#: de tipos y **tumba el arranque**, porque el Procfile corre
+#: `alembic upgrade head` antes de levantar uvicorn.
+#:
+#: Owner, 2026-10-07: el backend quedo en 502. Ya habia pasado dos veces con
+#: migraciones que pasaban la suite y tumbaban el arranque; esta es la tercera, y
+#: la causa es la misma: lo que se prueba en SQLite no prueba PostgreSQL.
+ENTERO = [("anio", sa.Integer), ("mes", sa.Integer)]
 
 
 def upgrade() -> None:
     cols = [sa.Column("id", sa.String(36), primary_key=True)]
-    for nombre, tipo in COLS:
+    for nombre, tipo in TEXTO:
         cols.append(sa.Column(nombre, tipo, nullable=False, server_default=""))
+    for nombre, tipo in ENTERO:
+        cols.append(sa.Column(nombre, tipo, nullable=False))
     for nombre, tipo in NUM:
         cols.append(sa.Column(nombre, tipo, nullable=False, server_default="0"))
     cols.append(sa.Column("subido_en", sa.DateTime(timezone=True)))
