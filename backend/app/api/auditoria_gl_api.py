@@ -618,6 +618,82 @@ async def _por_cuenta_del_escenario(db, escenario, mes: int) -> dict[tuple, floa
     return fuera
 
 
+def _rotulo_de_cuenta(cuenta, dept, catalogo, crudo_del_asiento):
+    """Cómo se llama una cuenta en el Audit Integral. **Nunca vacío.**
+
+    ⚠️ El orden es al revés que en el resto del sistema, y a propósito. El
+    `nombre_de_cuenta` general prefiere «lo que trajo el asiento» porque allá
+    eso ES el nombre de la cuenta —viene del mapeo—. Acá viene del mayor, y en
+    el mayor ese campo es *«lo que escribió quien registró»*: la 4000 salía
+    «Adjusment Room Charge» y las diez cuentas de planilla, todas, «ORDINARIO».
+
+    Así que primero el catálogo (`account_mapping`), después los conceptos de
+    nómina —ese camino ya está dentro de `nombre_de_cuenta`—, y la descripción
+    del asiento sólo si no quedó nada mejor: mal rótulo es mejor que ninguno.
+    """
+    from app.nombres_cuenta import limpiar_nombre, nombre_de_cuenta
+
+    nombre = nombre_de_cuenta(cuenta, None, catalogo, dept)
+    if nombre == f"Cuenta {cuenta}":        # ni el catálogo ni los conceptos
+        return limpiar_nombre(crudo_del_asiento) or nombre
+    return nombre
+
+
+async def _nombres_del_detalle(db, scenario_ids):
+    """Devuelve `nombre(dept, cuenta, detalle)` → cómo se llama ese detalle.
+
+    El «detalle» es el tercer segmento, y qué nombra depende de la clase:
+
+    * **Clase 6** — el PUESTO. `501` es «FRONT DESK AGENT / RECEPTIONIST», y el
+      diccionario que lo dice es el mismo que usa el Pre-Cierre
+      (`posiciones_integrity.json`), para que el puesto no se llame de dos
+      formas en dos pantallas. No depende del departamento: un `501` es el
+      mismo puesto en todos.
+    * **Clase 7** — el detalle del gasto, y el que lo nombra es el CHECKBOOK:
+      `7065/801` es «Utensilios de limpieza» porque así lo escribió quien armó
+      el presupuesto. Que el nombre salga justo de donde se compara es lo que
+      se quiere: nombra la línea a la que la plata debería haber ido.
+    * **Las demás** — no hay diccionario, y devuelve `""` para que el que
+      llama use la descripción del asiento, que ahí sí sirve: en las 4 dice
+      «Accomodation», «Adjustement Extra Pax».
+
+    Se devuelve una función y no un diccionario porque las dos fuentes se
+    buscan con llaves distintas —el checkbook por departamento, el puesto
+    sin él— y armar una sola tabla obligaría a repetir los 17 conceptos de
+    planilla por cada uno de los 27 departamentos.
+    """
+    from app.api.precierre_api import _catalogo_de_posiciones
+    from app.models.opex_entry import OpexEntry
+
+    # Clase 7, del checkbook de los escenarios que se están comparando.
+    del_checkbook: dict[tuple[str, str, str], str] = {}
+    ids = [x for x in (scenario_ids or []) if x]
+    if ids:
+        filas = (await db.execute(
+            select(OpexEntry.dept_code, OpexEntry.account_code,
+                   OpexEntry.detail_code, OpexEntry.detail_desc)
+            .where(OpexEntry.scenario_id.in_(ids)))).all()
+        for dept, cta, det, desc in filas:
+            desc = (desc or "").strip()
+            if not desc:
+                continue
+            # `consolidate_dept` porque el cuadro muestra el departamento
+            # consolidado, igual que el actual.
+            del_checkbook.setdefault(
+                (pl_engine.consolidate_dept(dept or ""), cta or "", det or ""), desc)
+
+    posiciones = _catalogo_de_posiciones() or {}
+
+    def nombre(dept: str, cuenta: str, detalle: str) -> str:
+        if not detalle:
+            return ""
+        if (cuenta or "").startswith("6"):
+            return posiciones.get(str(detalle), "")
+        return del_checkbook.get((dept, cuenta, detalle), "")
+
+    return nombre
+
+
 @router.get("/mayor/{anio}/{mes}/integral/")
 async def audit_integral(
     anio: int,
@@ -663,10 +739,11 @@ async def audit_integral(
     contra 7.447,27 — las diferencias son centavos del tipo de cambio por
     asiento.
     """
+    from app.api.auditoria_api import _catalogo_gl
     from app.importers.integrity_final import signo_de
     from app.models.department_catalog import DepartmentCatalog
     from app.models.scenario import Scenario
-    from app.nombres_cuenta import nombre_de_cuenta
+    from app.nombres_cuenta import limpiar_nombre
 
     if not 1 <= mes <= 12:
         raise ErrorApi(422, "precierre.mes_invalido")
@@ -679,7 +756,17 @@ async def audit_integral(
     puente = _puente_de_departamentos()
     deptos = {d.dept_code: d.dept_name
               for d in (await db.execute(select(DepartmentCatalog))).scalars().all()}
-    catalogo = {}
+    # El catálogo de nombres del GL. Owner, 2026-10-07: *«no tengo el nombre
+    # real del GL»* — en la pantalla la 4000 salía como «Adjusment Room Charge»
+    # y las 6000 todas como «ORDINARIO».
+    #
+    # ⚠️ Eso NO es el nombre de la cuenta: es lo que escribió quien registró el
+    # asiento (`MayorMovimiento.descripcion`, «lo que escribio quien registro»).
+    # El nombre sale de `account_mapping`, que es el catálogo real y está en
+    # producción —1.098 reglas sobre 27 departamentos, y toda cuenta del ACTUAL
+    # 2026 tiene una—. `accounts` y `payroll_accounts` están VACÍOS en
+    # producción, así que no servían (medido; ver `auditoria_api._catalogo_gl`).
+    catalogo = await _catalogo_gl(db)
 
     # ── El actual, del mayor ────────────────────────────────────────────────
     # ⚠️ El grano es (departamento, cuenta, DETALLE). Owner, 2026-10-07: *«la
@@ -729,6 +816,7 @@ async def audit_integral(
     # correspondencia inventada. Lo exacto —y lo que se compara— son los totales
     # por CUENTA. Es lo mismo que ya hace `Opex by Detail`, y está escrito ahí
     # por la misma razón.
+    nombres_det = await _nombres_del_detalle(db, [v["scenario_id"] for v in versiones])
     llaves_cta = set(por_cta) | {k for v in versiones for k in v["por_cuenta"]}
     cuadro = []
     for dep, cta in llaves_cta:
@@ -738,7 +826,8 @@ async def audit_integral(
         if not r and not any(abs(x) > 0.005 for x in montos.values()):
             continue
         detalles = sorted(
-            ({"detalle": d3, "nombre": v["nombre"],
+            ({"detalle": d3,
+              "nombre": nombres_det(dep, cta, d3) or limpiar_nombre(v["nombre"]),
               "actual": round(v["monto"], 2), "lineas": v["lineas"]}
              for (dd, cc, d3), v in real.items() if dd == dep and cc == cta),
             key=lambda x: x["detalle"])
@@ -746,7 +835,7 @@ async def audit_integral(
             "grupo": auditoria_gl.grupo_de(cta),
             "dept_code": dep, "dept_name": deptos.get(dep, dep),
             "cuenta": cta,
-            "nombre": nombre_de_cuenta(cta, (r or {}).get("nombre"), catalogo, dep),
+            "nombre": _rotulo_de_cuenta(cta, dep, catalogo, (r or {}).get("nombre")),
             "actual": round((r or {}).get("monto", 0.0), 2),
             "lineas": (r or {}).get("lineas", 0),
             "versiones": {k: round(x, 2) for k, x in montos.items()},

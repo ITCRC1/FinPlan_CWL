@@ -167,12 +167,17 @@ async def base():
     """
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+    from app.models.mapping import AccountMapping
     from app.models.mayor_movimiento import MayorMovimiento, MayorMovimientoPrevio
 
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as c:
         await c.run_sync(lambda s: MayorMovimiento.__table__.create(s))
         await c.run_sync(lambda s: MayorMovimientoPrevio.__table__.create(s))
+        # El catálogo de nombres del GL. Vacía está bien —el cuadro cae al
+        # nombre del asiento—; lo que NO puede faltar es la tabla: un `no such
+        # table` acá sería el mismo que en producción, y ese tiene que gritar.
+        await c.run_sync(lambda s: AccountMapping.__table__.create(s))
     hacer = async_sessionmaker(eng, expire_on_commit=False)
     async with hacer() as db:
         yield db
@@ -1011,3 +1016,157 @@ def test_la_comparacion_NO_baja_al_detalle():
     assert '"detalles": detalles' in cuerpo or "detalles," in cuerpo
     # Y ningún detalle lleva versiones.
     assert '"detalle": d3' in cuerpo
+
+
+# ── El nombre real del GL ───────────────────────────────────────────────────
+#
+# Owner, 2026-10-07, mirando el cuadro: «no tengo el nombre real del GL». La
+# 4000 salia «Adjusment Room Charge» y las diez cuentas de planilla, todas,
+# «ORDINARIO» — porque se mostraba `MayorMovimiento.descripcion`, que es *lo que
+# escribio quien registro el asiento*, no como se llama la cuenta.
+
+
+@pytest.mark.asyncio
+async def test_el_nombre_sale_del_CATALOGO_no_del_asiento(base):
+    """Y el del asiento queda como ultimo recurso.
+
+    ⚠️ Al revés que en el resto del sistema: `nombre_de_cuenta` prefiere «lo que
+    trajo el asiento» porque allá eso viene del mapeo y SÍ es el nombre de la
+    cuenta. Acá viene del mayor, donde es texto libre de quien digitó.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.mapping import AccountMapping
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    base.add(AccountMapping(
+        id="m-4000", report_id="P&L_DETAIL_OWNERS", report_line_code="REV_ROOMS",
+        account_code="4000", dept_code="0110", source_department="Rooms",
+        source_origin="Revenue", account_name_example="Room Revenue1 | Room Revenue",
+        financial_nature="Revenue", report_line_name="Rooms", report_section="REVENUES",
+        active_status="YES"))
+    await base.commit()
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        Linea(cuenta="4000-0110-001-000-000-00-00", seg1="4000", seg2="0110",
+              seg3="001", asiento="1", linea="1", fecha="01/09/26",
+              descripcion="Adjusment Room Charge", desc_asiento="OPL",
+              origen="CON", referencia="", num_doc="", tc=453.0, moneda="DOL",
+              debito=0.0, credito=500.0, moneda_archivo="DOL")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    fila = next(f for f in cuadro["filas"] if f["cuenta"] == "4000")
+
+    # El catálogo manda, y además sin el sufijo numérico del mayor.
+    assert fila["nombre"] == "Room Revenue"
+    # El texto del asiento sigue nombrando al DETALLE, que ahí sí sirve.
+    assert fila["detalles"][0]["nombre"] == "Adjusment Room Charge"
+
+
+@pytest.mark.asyncio
+async def test_el_detalle_de_PLANILLA_dice_el_puesto(base):
+    """`501` no le dice nada a nadie; «FRONT DESK AGENT» sí.
+
+    Y sale del mismo diccionario que usa el Pre-Cierre, para que el puesto no se
+    llame de dos formas en dos pantallas.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        Linea(cuenta=f"6000-0111-{p}-013-015-00-00", seg1="6000", seg2="0111",
+              seg3=p, asiento=p, linea="1", fecha="01/09/26",
+              descripcion="ORDINARIO", desc_asiento="PLA", origen="PLA",
+              referencia="", num_doc="", tc=453.0, moneda="DOL",
+              debito=100.0, credito=0.0, moneda_archivo="DOL")
+        for p in ("501", "503")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    fila = next(f for f in cuadro["filas"] if f["cuenta"] == "6000")
+
+    # El concepto nombra la cuenta…
+    assert "ORDINARIO" not in fila["nombre"].upper()
+    assert "WAGES" in fila["nombre"].upper() or "SALAR" in fila["nombre"].upper()
+    # …y el puesto, cada detalle.
+    nombres = {d["detalle"]: d["nombre"] for d in fila["detalles"]}
+    assert "FRONT DESK" in nombres["501"].upper()
+    assert nombres["503"] != nombres["501"]
+
+
+@pytest.mark.asyncio
+async def test_el_detalle_de_OPEX_lo_nombra_el_CHECKBOOK(base):
+    """`7065/801` es «Utensilios de limpieza» porque así lo escribió quien armó
+    el presupuesto — y que el nombre salga justo de donde se compara es lo que
+    se quiere: nombra la línea a la que la plata debería haber ido."""
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+    from app.models.opex_entry import OpexEntry
+    from app.models.scenario import Scenario
+
+    # Acá se crea el esquema COMPLETO, no tabla por tabla: comparar contra un
+    # escenario recorre todos los checkbooks del presupuesto, y listarlos uno a
+    # uno haría que la prueba se rompa cada vez que se agregue uno.
+    import app.models  # noqa: F401  — registra todo en el metadata
+    from app.db import Base as _Base
+
+    async with base.bind.begin() as c:
+        await c.run_sync(_Base.metadata.create_all)
+
+    esc = Scenario(id="esc-opex", hotel_id="CWL", year=2026, type="BUDGET",
+                   version="Final", status="approved")
+    base.add(esc)
+    base.add(OpexEntry(scenario_id="esc-opex", hotel_id="CWL",
+                       dept_code="0110", account_code="7065",
+                       account_name="Cleaning Supplies", detail_code="801",
+                       detail_desc="Utensilios de limpieza"))
+    await base.commit()
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        Linea(cuenta="7065-0110-801-000-000-00-00", seg1="7065", seg2="0110",
+              seg3="801", asiento="1", linea="1", fecha="01/09/26",
+              descripcion="Factura 7788 JMF", desc_asiento="COM", origen="COM",
+              referencia="", num_doc="", tc=453.0, moneda="DOL",
+              debito=25.0, credito=0.0, moneda_archivo="DOL")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="esc-opex", db=base, _=object())
+    fila = next(f for f in cuadro["filas"] if f["cuenta"] == "7065")
+    assert fila["detalles"][0]["nombre"] == "Utensilios de limpieza"
+
+
+@pytest.mark.asyncio
+async def test_el_nombre_NUNCA_queda_vacio(base):
+    """Una cuenta que no está en ningún catálogo y cuyo asiento vino sin texto.
+
+    Sin esto la fila sale con el número pelado y una columna en blanco, que es
+    como el owner la vio antes de que hubiera catálogo.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        Linea(cuenta="4913-0199-000-000-000-00-00", seg1="4913", seg2="0199",
+              seg3="", asiento="1", linea="1", fecha="01/09/26",
+              descripcion="", desc_asiento="", origen="CON", referencia="",
+              num_doc="", tc=453.0, moneda="DOL", debito=0.0, credito=9.0,
+              moneda_archivo="DOL")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    fila = next(f for f in cuadro["filas"] if f["cuenta"] == "4913")
+    assert fila["nombre"].strip()
+    assert "4913" in fila["nombre"]

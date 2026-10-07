@@ -96,6 +96,13 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   /** Esconde las cuentas donde el actual y las versiones coinciden. Un mes
    *  tiene ~200 cuentas y lo que se revisa son las que NO cuadran. */
   const [soloDiferencias, setSoloDiferencias] = useState(false);
+  /** El departamento que se esta revisando, o "" por todos.
+   *
+   *  Owner, 2026-10-07: *«tengo cierto sentido de perdida... no se si se puede
+   *  hacer por departamento, droplist y escoger e ir revisando»*. Un mes son
+   *  ~195 cuentas y ~460 detalles seguidos: de a un departamento se revisa y se
+   *  cierra, y se sabe por donde se va. */
+  const [dept, setDept] = useState("");
   const [copiado, setCopiado] = useState("");
   /** Qué cuentas están abiertas, y sus asientos ya traídos.
    *
@@ -173,8 +180,46 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   };
 
   const vers = datos?.versiones ?? [];
-  const visibles = (datos?.filas ?? []).filter(f => !soloDiferencias
-    || vers.some(v => Math.abs(f.actual - (f.versiones[v.scenario_id] ?? 0)) > 0.005));
+  const descuadra = (f: FilaIntegral) =>
+    vers.some(v => Math.abs(f.actual - (f.versiones[v.scenario_id] ?? 0)) > 0.005);
+  const visibles = (datos?.filas ?? []).filter(
+    f => (!soloDiferencias || descuadra(f)) && (!dept || f.dept_code === dept));
+
+  /** Los departamentos del mes, con cuantas cuentas trae cada uno y si alguna
+   *  descuadra — para no tener que entrar a mirar.
+   *
+   *  ⚠️ Se arma sobre TODAS las filas, no sobre `visibles`: si saliera del
+   *  filtrado, elegir un departamento vaciaria el droplist y no habria como
+   *  volver. */
+  const depts = useMemo(() => {
+    const out: { code: string; name: string; cuentas: number; ojo: number }[] = [];
+    for (const f of datos?.filas ?? []) {
+      let d = out.find(x => x.code === f.dept_code);
+      if (!d) {
+        d = { code: f.dept_code, name: f.dept_name, cuentas: 0, ojo: 0 };
+        out.push(d);
+      }
+      d.cuentas += 1;
+      if (descuadra(f)) d.ojo += 1;
+    }
+    return out;
+  }, [datos, vers.length, soloDiferencias]);
+
+  /** El nombre del departamento, sin repetir el codigo.
+   *
+   *  `dept_name` viene del catalogo de departamentos; cuando ese catalogo no
+   *  tiene el departamento, el servidor devuelve el codigo como nombre y
+   *  «0110 · 0110» no le dice nada a nadie. */
+  const rotuloDept = (code: string, name: string) =>
+    name && name !== code ? `${code} · ${name}` : code;
+
+  const paso = (n: number) => {
+    if (!depts.length) return;
+    const i = depts.findIndex(x => x.code === dept);
+    const j = i < 0 ? (n > 0 ? 0 : depts.length - 1)
+                    : (i + n + depts.length) % depts.length;
+    setDept(depts[j].code);
+  };
 
   // ⚠️ DEPARTAMENTO afuera y la categoria adentro, en orden de clase: 4
   // Ingresos, 5 Costos, 6 Payroll, 7 Opex, 8 Property Expenses. Owner,
@@ -216,9 +261,10 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
     <div>
       <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 10px" }}>
         El mes real a máximo detalle —del mayor, clases 4 a 8— contra el Budget y
-        el Forecast, por categoría, departamento y cuenta. El botón{" "}
-        <b>copiar</b> de cada línea la deja lista para pegar en la nota de
-        reclasificación.
+        el Forecast, por <b>departamento</b> y, dentro, por categoría, cuenta y
+        detalle. Elegí un departamento abajo para revisarlo solo. El número de{" "}
+        <b>asientos</b> abre la cuenta ahí mismo, y <b>copiar</b> deja la línea
+        lista para pegar en la nota de reclasificación.
         {datos?.archivo && (
           <> Del archivo <b>{datos.archivo}</b> ({datos.moneda}).</>
         )}
@@ -242,6 +288,43 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                  onChange={e => setSoloDiferencias(e.target.checked)} />
           Sólo lo que no cuadra
         </label>
+
+        {/* El departamento, para revisar de a uno. El contador de al lado dice
+            cuántas cuentas trae y, entre paréntesis, cuántas no cuadran. */}
+        <span style={{ fontSize: 12, color: "var(--text-secondary)",
+                       marginLeft: 6 }}>Departamento</span>
+        <select value={dept} onChange={e => setDept(e.target.value)}
+                style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5,
+                         maxWidth: 260 }}>
+          <option value="">
+            Todos — {(datos?.filas ?? []).length} cuentas
+          </option>
+          {depts.map(d => (
+            <option key={d.code} value={d.code}>
+              {rotuloDept(d.code, d.name)} — {d.cuentas}
+              {d.ojo ? ` (${d.ojo} no cuadran)` : ""}
+            </option>
+          ))}
+        </select>
+        <span style={{ display: "inline-flex", gap: 2 }}>
+          {([["‹", -1], ["›", 1]] as const).map(([txt, n]) => (
+            <button key={n} onClick={() => paso(n)} disabled={!depts.length}
+                    title={n < 0 ? "Departamento anterior" : "Departamento siguiente"}
+                    style={{ fontSize: 14, lineHeight: 1, padding: "3px 9px",
+                             borderRadius: 5, cursor: "pointer",
+                             border: "1px solid var(--border-medium)",
+                             background: "transparent",
+                             color: "var(--text-primary)" }}>{txt}</button>
+          ))}
+        </span>
+        {dept && (
+          <button onClick={() => setDept("")}
+                  style={{ fontSize: 11, padding: "3px 9px", borderRadius: 5,
+                           cursor: "pointer", border: "1px solid var(--border-medium)",
+                           background: "transparent", color: "var(--text-secondary)" }}>
+            ver todos
+          </button>
+        )}
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           {visibles.length} de {(datos?.filas ?? []).length} cuentas
         </span>
@@ -269,57 +352,66 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
           <tbody>
             {bloques.map(d => (
               <Fragment key={d.code}>
-                {/* El DEPARTAMENTO, la banda fuerte. */}
+                {/* El DEPARTAMENTO, la banda fuerte.
+                    ⚠️ Sin `color: #fff`. Lo tuvo, y en el tema claro
+                    `--bg-header` es claro: la banda salia en BLANCO y el owner
+                    veia una fila vacia donde deberia decir el departamento
+                    (2026-10-07). El peso lo da el borde y la negrita, que se
+                    ven igual en los dos temas. */}
                 <tr>
-                  <td colSpan={3} style={{ ...td, fontWeight: 800, fontSize: 12.5,
-                                           background: "var(--bg-header)", color: "#fff" }}>
-                    {d.code} · {d.name}
+                  <td colSpan={3}
+                      style={{ ...td, fontWeight: 800, fontSize: 13,
+                               background: "var(--bg-elevated)",
+                               color: "var(--text-primary)",
+                               borderTop: "2px solid var(--brand)" }}>
+                    {rotuloDept(d.code, d.name)}
                   </td>
-                  <td style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
-                               color: "#fff" }}>
-                    {usd(d.grupos.reduce((a, g) => a + suma(g.filas), 0))}
-                  </td>
-                  {vers.map(v => (
-                    <td key={v.scenario_id}
-                        style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
-                                 color: "#fff" }}>
-                      {usd(d.grupos.reduce((a, g) => a + suma(g.filas, v.scenario_id), 0))}
+                  {[undefined, ...vers.map(v => v.scenario_id)].map((sid, n) => (
+                    <td key={"t" + n}
+                        style={{ ...num, fontWeight: 800,
+                                 background: "var(--bg-elevated)",
+                                 color: "var(--text-primary)",
+                                 borderTop: "2px solid var(--brand)" }}>
+                      {usd(d.grupos.reduce((a, g) => a + suma(g.filas, sid), 0))}
                     </td>
                   ))}
                   {vers.map(v => (
                     <td key={"d" + v.scenario_id}
-                        style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
-                                 color: "#fff" }}>
-                      {usd(d.grupos.reduce((a, g) => a + suma(g.filas)
-                                           - suma(g.filas, v.scenario_id), 0))}
+                        style={{ ...num, fontWeight: 800,
+                                 background: "var(--bg-elevated)",
+                                 color: "var(--text-primary)",
+                                 borderTop: "2px solid var(--brand)" }}>
+                      {usd(d.grupos.reduce(
+                        (a, g) => a + suma(g.filas) - suma(g.filas, v.scenario_id), 0))}
                     </td>
                   ))}
-                  <td style={{ ...td, background: "var(--bg-header)" }} />
+                  <td style={{ ...td, background: "var(--bg-elevated)",
+                               borderTop: "2px solid var(--brand)" }} />
                 </tr>
                 {d.grupos.map(g => (
                   <Fragment key={g.grupo}>
-                    {/* La categoria, dentro del departamento. */}
+                    {/* La categoria, dentro del departamento — un escalon
+                        mas suave, que para eso esta debajo. */}
                     <tr>
                       <td colSpan={3} style={{ ...td, fontWeight: 700,
-                                               background: "var(--bg-elevated)" }}>
+                                               background: "var(--bg-surface)" }}>
                         {g.grupo}
                       </td>
-                      <td style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
-                        {usd(suma(g.filas))}
-                      </td>
-                      {vers.map(v => (
-                        <td key={v.scenario_id}
-                            style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
-                          {usd(suma(g.filas, v.scenario_id))}
+                      {[undefined, ...vers.map(v => v.scenario_id)].map((sid, n) => (
+                        <td key={"t" + n}
+                            style={{ ...num, fontWeight: 700,
+                                     background: "var(--bg-surface)" }}>
+                          {usd(suma(g.filas, sid))}
                         </td>
                       ))}
                       {vers.map(v => (
                         <td key={"d" + v.scenario_id}
-                            style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
+                            style={{ ...num, fontWeight: 700,
+                                     background: "var(--bg-surface)" }}>
                           {usd(suma(g.filas) - suma(g.filas, v.scenario_id))}
                         </td>
                       ))}
-                      <td style={{ ...td, background: "var(--bg-elevated)" }} />
+                      <td style={{ ...td, background: "var(--bg-surface)" }} />
                     </tr>
                     {g.filas.map(f => (
                     <Fragment key={f.dept_code + f.cuenta}>
