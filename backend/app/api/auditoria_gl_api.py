@@ -68,6 +68,12 @@ async def revisar(
         "monto_en_revision_crc": r.monto_en_revision_crc,
         "por_regla": r.por_regla,
         "por_severidad": r.por_severidad,
+        # ⚠️ El corte por tipo de cuenta. Se quedo fuera de la respuesta y la
+        # pantalla lo lee sin preguntar (`Object.entries(data.por_grupo)`), asi
+        # que TODA subida exitosa terminaba en «Esta pantalla no se pudo
+        # dibujar · Cannot convert undefined or null to object» — owner,
+        # 2026-10-06. El motor siempre lo calculo; faltaba mandarlo.
+        "por_grupo": r.por_grupo,
         # Solo lo que esta regla encontro: explicar reglas que no dispararon
         # llena la pantalla de texto que no corresponde a nada en la tabla.
         "que_mira": {k: v for k, v in QUE_MIRA.items() if k in r.por_regla},
