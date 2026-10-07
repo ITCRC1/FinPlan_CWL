@@ -106,3 +106,65 @@ class MayorMovimiento(Base):
     subido_en: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True)
     subido_por: Mapped[str] = mapped_column(String(120), default="")
+
+
+class MayorMovimientoPrevio(Base):
+    """La subida ANTERIOR del mismo mes, sólo para comparar contra la nueva.
+
+    Owner, 2026-10-07: *«hicimos cambios en esta versión… cómo sé qué cambió con
+    respecto a la primera»*.
+
+    ⚠️ **Vive en su propia tabla y no como una columna «vigente».** Si
+    `mayor_movimientos` pudiera tener dos versiones del mismo mes, cualquier
+    consulta que olvide filtrar la vigente contaría todo dos veces — el modo de
+    falla más caro de este sistema, porque el total cuadra consigo mismo y no hay
+    error. Acá ese olvido es imposible: `mayor_movimientos` sigue teniendo UNA
+    versión por mes y nadie más que la comparación mira esta tabla.
+
+    **Una anterior, no un historial.** La pregunta es «¿quedaron los cambios que
+    hice?», y eso lo contesta la de antes. Guardar todas traería la pregunta de
+    cuál era la buena, que es peor que no tenerlas.
+    """
+    __tablename__ = "mayor_movimientos_previos"
+    __table_args__ = (
+        Index("ix_mayor_prev_mes", "hotel_id", "anio", "mes"),
+        Index("ix_mayor_prev_mes_cuenta", "hotel_id", "anio", "mes", "cuenta"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    hotel_id: Mapped[str] = mapped_column(String(10), default="")
+    anio: Mapped[int] = mapped_column(Integer)
+    mes: Mapped[int] = mapped_column(Integer)
+    cuenta: Mapped[str] = mapped_column(String(40), default="")
+    seg1: Mapped[str] = mapped_column(String(6), default="")
+    seg2: Mapped[str] = mapped_column(String(6), default="")
+    seg3: Mapped[str] = mapped_column(String(6), default="")
+    asiento: Mapped[str] = mapped_column(String(20), default="")
+    linea: Mapped[str] = mapped_column(String(10), default="")
+    fecha: Mapped[str] = mapped_column(String(20), default="")
+    descripcion: Mapped[str] = mapped_column(String(250), default="")
+    desc_asiento: Mapped[str] = mapped_column(String(250), default="")
+    origen: Mapped[str] = mapped_column(String(20), default="")
+    referencia: Mapped[str] = mapped_column(String(120), default="")
+    num_doc: Mapped[str] = mapped_column(String(40), default="")
+    debito: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+    credito: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+    tc: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0"))
+    moneda: Mapped[str] = mapped_column(String(10), default="")
+    archivo: Mapped[str] = mapped_column(String(255), default="")
+    checksum: Mapped[str] = mapped_column(String(64), default="")
+    subido_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    subido_por: Mapped[str] = mapped_column(String(120), default="")
+    #: Cuándo dejó de ser la vigente. Es lo único que esta tabla tiene de más:
+    #: la pantalla dice «comparado contra la subida del …».
+    reemplazado_en: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+
+
+#: Las columnas que se copian de la vigente a la anterior. Se DERIVA del modelo
+#: —no es una lista a mano— porque el día que `MayorMovimiento` crezca, la copia
+#: tiene que crecer con él o la anterior pierde ese dato en silencio.
+COLUMNAS_A_COPIAR = tuple(
+    c for c in MayorMovimiento.__table__.columns.keys() if c != "id")

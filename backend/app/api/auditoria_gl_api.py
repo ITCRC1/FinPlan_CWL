@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, insert, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -36,7 +37,8 @@ from app.errores import ErrorApi
 from app.export.auditoria_gl_xlsx import QUE_MIRA, construir
 from app.hotel_actual import HOTEL_ID
 from app.importers.balance_comprobacion import leer
-from app.models.mayor_movimiento import MayorMovimiento
+from app.models.mayor_movimiento import (COLUMNAS_A_COPIAR, MayorMovimiento,
+                                         MayorMovimientoPrevio)
 
 router = APIRouter(tags=["auditoria-gl"])
 
@@ -81,6 +83,31 @@ async def _guardar(db: AsyncSession, leido, contenido: bytes,
         return {"guardado": False, "motivo": "periodo_no_entendido",
                 "periodo": leido.periodo}
     anio, mes = am
+    # ── La vigente pasa a ser la ANTERIOR, antes de borrarla ─────────────────
+    #
+    # Owner, 2026-10-07: *«hicimos cambios en esta version… como se que cambio
+    # con respecto a la primera»*. Sin esto, corregir un posteo y volver a subir
+    # borraba el punto de comparacion y no habia forma de ver si el cambio quedo.
+    #
+    # ⚠️ Se guarda UNA anterior: la de antes de ESTA subida. La tercera subida
+    # compara contra la segunda, no contra la primera. Eso es a proposito — ver
+    # el modelo.
+    #
+    # Y la copia se hace en la base (`INSERT ... SELECT`), no trayendo 9.000
+    # filas a Python para volver a mandarlas.
+    ahora = datetime.now(timezone.utc)
+    await db.execute(sa_delete(MayorMovimientoPrevio).where(
+        MayorMovimientoPrevio.hotel_id == HOTEL_ID,
+        MayorMovimientoPrevio.anio == anio, MayorMovimientoPrevio.mes == mes))
+    cols = list(COLUMNAS_A_COPIAR)
+    # El `id` se copia tal cual: la fila de origen se borra tres lineas mas
+    # abajo, asi que no hay dos filas con el mismo id en ningun momento.
+    await db.execute(insert(MayorMovimientoPrevio).from_select(
+        ["id", *cols, "reemplazado_en"],
+        select(MayorMovimiento.id, *[getattr(MayorMovimiento, c) for c in cols],
+               literal(ahora)).where(
+            MayorMovimiento.hotel_id == HOTEL_ID,
+            MayorMovimiento.anio == anio, MayorMovimiento.mes == mes)))
     await db.execute(sa_delete(MayorMovimiento).where(
         MayorMovimiento.hotel_id == HOTEL_ID,
         MayorMovimiento.anio == anio, MayorMovimiento.mes == mes))
@@ -272,4 +299,126 @@ async def movimientos(
             "neto": float(f.debito) - float(f.credito),
             "tc": float(f.tc), "moneda": f.moneda,
         } for f in filas],
+    }
+
+
+@router.get("/mayor/{anio}/{mes}/cambios/")
+async def cambios(
+    anio: int,
+    mes: int,
+    umbral: float = Query(0.005, description="diferencia mínima para reportarla"),
+    limite: int = Query(400, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Qué cambió entre la subida vigente y la anterior del mismo mes.
+
+    Owner, 2026-10-07: *«hicimos cambios en esta versión… cómo sé qué cambió con
+    respecto a la primera. Tendrías que guardar 2 versiones para poder comparar
+    el nuevo versus el anterior y ver si los cambios quedaron»*.
+
+    Contesta en dos niveles, porque son dos preguntas distintas:
+
+    * **por cuenta** — «¿se movió la plata de donde la quería mover?». Es el
+      nivel al que se piden las correcciones y al que se verifican.
+    * **por asiento** — «¿qué movimiento entró, salió o cambió de monto?». Es el
+      nivel al que se va a Integrity a mirar.
+
+    ⚠️ **El asiento se compara por `(cuenta, asiento, línea)`**, que es lo que
+    identifica un renglón del mayor. Un renglón que cambia de CUENTA sale como
+    uno que desapareció y otro que apareció — y así debe ser: es exactamente lo
+    que pasa cuando se reclasifica, y verlo en los dos lados es la prueba de que
+    la reclasificación quedó.
+
+    Si no hay subida anterior —la primera vez que se sube el mes— se dice, en
+    vez de devolver «no cambió nada», que se leería como que el archivo es igual.
+    """
+    if not 1 <= mes <= 12:
+        raise ErrorApi(422, "precierre.mes_invalido")
+
+    # Una sola vez, fuera de los dos bucles.
+    minimo = _dec(umbral)
+
+    async def _traer(Modelo):
+        return (await db.execute(select(Modelo).where(
+            Modelo.hotel_id == HOTEL_ID, Modelo.anio == anio,
+            Modelo.mes == mes))).scalars().all()
+
+    hoy = await _traer(MayorMovimiento)
+    antes = await _traer(MayorMovimientoPrevio)
+    if not hoy:
+        return {"anio": anio, "mes": mes, "hay": False, "motivo": "mes_no_subido"}
+    if not antes:
+        return {"anio": anio, "mes": mes, "hay": False, "motivo": "sin_subida_anterior",
+                "vigente": {"archivo": hoy[0].archivo,
+                            "subido_en": hoy[0].subido_en.isoformat() if hoy[0].subido_en else None,
+                            "movimientos": len(hoy)}}
+
+    def neto(f):
+        return _dec(f.debito) - _dec(f.credito)
+
+    # ── Por cuenta ───────────────────────────────────────────────────────────
+    def por_cuenta(filas):
+        d = {}
+        for f in filas:
+            d[f.cuenta] = d.get(f.cuenta, Decimal("0")) + neto(f)
+        return d
+
+    a_cta, h_cta = por_cuenta(antes), por_cuenta(hoy)
+    cuentas = []
+    for cta in sorted(set(a_cta) | set(h_cta)):
+        va, vh = a_cta.get(cta, Decimal("0")), h_cta.get(cta, Decimal("0"))
+        if abs(vh - va) <= minimo:
+            continue
+        cuentas.append({"cuenta": cta, "antes": float(va), "ahora": float(vh),
+                        "diferencia": float(vh - va)})
+    cuentas.sort(key=lambda x: -abs(x["diferencia"]))
+
+    # ── Por asiento ──────────────────────────────────────────────────────────
+    llave = lambda f: (f.cuenta, f.asiento, f.linea)
+    ia = {llave(f): f for f in antes}
+    ih = {llave(f): f for f in hoy}
+    def fila(f, que):
+        return {"que": que, "cuenta": f.cuenta, "asiento": f.asiento, "linea": f.linea,
+                "fecha": f.fecha, "descripcion": f.descripcion,
+                "desc_asiento": f.desc_asiento, "origen": f.origen,
+                "neto": float(neto(f))}
+    movs = []
+    for k in sorted(set(ia) | set(ih)):
+        a, h = ia.get(k), ih.get(k)
+        if a is None:
+            movs.append({**fila(h, "aparecio"), "antes": 0.0,
+                         "ahora": float(neto(h)), "diferencia": float(neto(h))})
+        elif h is None:
+            movs.append({**fila(a, "desaparecio"), "antes": float(neto(a)),
+                         "ahora": 0.0, "diferencia": float(-neto(a))})
+        elif abs(neto(h) - neto(a)) > minimo:
+            movs.append({**fila(h, "cambio_de_monto"), "antes": float(neto(a)),
+                         "ahora": float(neto(h)),
+                         "diferencia": float(neto(h) - neto(a))})
+    movs.sort(key=lambda x: -abs(x["diferencia"]))
+
+    def resumen(filas):
+        return {"movimientos": len(filas),
+                "debito": float(sum(_dec(f.debito) for f in filas)),
+                "credito": float(sum(_dec(f.credito) for f in filas)),
+                "archivo": filas[0].archivo,
+                "subido_en": filas[0].subido_en.isoformat() if filas[0].subido_en else None}
+
+    ra, rh = resumen(antes), resumen(hoy)
+    return {
+        "anio": anio, "mes": mes, "hay": True,
+        "anterior": {**ra, "reemplazado_en": (antes[0].reemplazado_en.isoformat()
+                                              if antes[0].reemplazado_en else None)},
+        "vigente": rh,
+        "diferencia": {"movimientos": rh["movimientos"] - ra["movimientos"],
+                       "debito": rh["debito"] - ra["debito"],
+                       "credito": rh["credito"] - ra["credito"]},
+        # ⚠️ El conteo viaja aparte del listado recortado: si la pantalla contara
+        # lo que dibuja, un mes con 600 cambios mostraría un total que no es.
+        "cuentas_que_cambiaron": len(cuentas),
+        "movimientos_que_cambiaron": len(movs),
+        "cuentas": cuentas[:limite],
+        "movimientos": movs[:limite],
+        "recortado": len(movs) > limite or len(cuentas) > limite,
     }

@@ -160,14 +160,19 @@ pytest.importorskip("aiosqlite")
 
 @pytest_asyncio.fixture
 async def base():
-    """Una base en memoria con la tabla sola, sin PostgreSQL."""
+    """Una base en memoria con las dos tablas del mayor, sin PostgreSQL.
+
+    Las DOS, porque guardar un mes archiva la version anterior: con una sola el
+    guardado revienta, y ese es justamente el camino que se prueba.
+    """
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-    from app.models.mayor_movimiento import MayorMovimiento
+    from app.models.mayor_movimiento import MayorMovimiento, MayorMovimientoPrevio
 
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as c:
         await c.run_sync(lambda s: MayorMovimiento.__table__.create(s))
+        await c.run_sync(lambda s: MayorMovimientoPrevio.__table__.create(s))
     hacer = async_sessionmaker(eng, expire_on_commit=False)
     async with hacer() as db:
         yield db
@@ -403,3 +408,140 @@ def test_el_encabezado_viaja_a_cada_linea():
     assert a.lineas[0].moneda_archivo == "DOL"
     assert a.lineas[0].monto_usd == pytest.approx(1000.0)
     assert a.lineas[0].monto_crc == pytest.approx(450_000.0)
+
+
+# ── Dos versiones: la vigente y la anterior ──────────────────────────────────
+#
+# Owner, 2026-10-07: «hicimos cambios en esta version… como se que cambio con
+# respecto a la primera. Tendrias que guardar 2 versiones para poder comparar el
+# nuevo versus el anterior y ver si los cambios quedaron».
+
+
+def test_la_anterior_vive_en_OTRA_tabla():
+    """⚠️ La razon de que sean dos tablas y no una columna «vigente».
+
+    Si `mayor_movimientos` pudiera tener dos versiones del mismo mes, cualquier
+    consulta que olvide filtrar la vigente contaria todo dos veces — el modo de
+    falla mas caro de este sistema, porque el total cuadra consigo mismo y no hay
+    error. Con la anterior aparte, ese olvido es imposible.
+    """
+    from app.models.mayor_movimiento import MayorMovimiento, MayorMovimientoPrevio
+
+    assert MayorMovimiento.__tablename__ != MayorMovimientoPrevio.__tablename__
+    # Y la vigente NO tiene por donde distinguir versiones: no hay nada que
+    # filtrar porque no hay dos.
+    cols = set(MayorMovimiento.__table__.columns.keys())
+    assert not (cols & {"vigente", "version", "es_actual"})
+
+
+def test_las_dos_tablas_tienen_las_MISMAS_columnas():
+    """Salvo `reemplazado_en`, que es lo unico propio de la anterior.
+
+    Si alguien le agrega una columna a una y no a la otra, la copia perderia ese
+    dato en silencio.
+    """
+    from app.models.mayor_movimiento import MayorMovimiento, MayorMovimientoPrevio
+
+    a = set(MayorMovimiento.__table__.columns.keys())
+    b = set(MayorMovimientoPrevio.__table__.columns.keys())
+    assert a - b == set(), f"le falta a la anterior: {sorted(a - b)}"
+    assert b - a == {"reemplazado_en"}, f"sobra en la anterior: {sorted(b - a - {'reemplazado_en'})}"
+
+
+def test_las_columnas_a_copiar_se_DERIVAN_del_modelo():
+    """No una lista a mano: el dia que la vigente crezca, la copia crece con ella."""
+    import inspect
+
+    from app.models import mayor_movimiento as m
+
+    fuente = inspect.getsource(m)
+    assert "MayorMovimiento.__table__.columns.keys()" in fuente
+    assert "id" not in m.COLUMNAS_A_COPIAR
+    assert len(m.COLUMNAS_A_COPIAR) == len(MayorMovimientoCols := set(
+        m.MayorMovimiento.__table__.columns.keys())) - 1
+    assert "desc_asiento" in m.COLUMNAS_A_COPIAR
+
+
+def test_se_archiva_ANTES_de_borrar():
+    """El orden es lo unico que hace que la anterior exista.
+
+    Al reves, el DELETE se lleva las filas y la copia sale vacia — y el owner se
+    queda sin punto de comparacion justo cuando lo necesita.
+    """
+    import inspect
+
+    fuente = inspect.getsource(auditoria_gl_api._guardar)
+    i_copia = fuente.index("insert(MayorMovimientoPrevio)")
+    i_borra = fuente.index("sa_delete(MayorMovimiento)")
+    assert i_copia < i_borra, "se borra la vigente antes de copiarla"
+
+
+@pytest.mark.asyncio
+async def test_la_primera_subida_lo_DICE_en_vez_de_decir_que_no_cambio_nada(base):
+    """«Sin subida anterior» y «no cambio nada» son dos cosas distintas."""
+    await auditoria_gl_api._guardar(
+        base, _archivo("Setiembre - 2026", 3), b"a", "v1.xlsx", "yo")
+    c = await auditoria_gl_api.cambios(2026, 9, umbral=0.005, limite=400,
+                                       db=base, _=object())
+    assert c["hay"] is False
+    assert c["motivo"] == "sin_subida_anterior"
+
+
+@pytest.mark.asyncio
+async def test_una_reclasificacion_sale_en_las_DOS_cuentas(base):
+    """El caso que el owner quiere verificar: moví plata de cuenta, ¿quedó?
+
+    Tiene que verse en la de origen y en la de destino, con signo opuesto. Verlo
+    en los dos lados es la prueba de que la reclasificacion entro; verlo en uno
+    solo no distingue un movimiento borrado de uno movido.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+
+    def uno(cuenta, seg1, monto):
+        return Linea(cuenta=cuenta, seg1=seg1, seg2="0120", seg3="800",
+                     asiento="567", linea="5", fecha="08/09/26",
+                     descripcion="BLUETECH", desc_asiento="CXP Compras",
+                     origen="CXP", referencia="", num_doc="", tc=453.0,
+                     moneda="COL", debito=monto, credito=0.0)
+
+    v1 = Archivo(periodo="Setiembre - 2026",
+                 lineas=[uno("7140-0120-800-000-000-00-00", "7140", 88.55)])
+    v2 = Archivo(periodo="Setiembre - 2026",
+                 lineas=[uno("7065-0120-800-000-000-00-00", "7065", 88.55)])
+    await auditoria_gl_api._guardar(base, v1, b"a", "v1.xlsx", "yo")
+    await auditoria_gl_api._guardar(base, v2, b"b", "v2.xlsx", "yo")
+    c = await auditoria_gl_api.cambios(2026, 9, umbral=0.005, limite=400,
+                                       db=base, _=object())
+    assert c["hay"] is True
+    por = {x["cuenta"]: x["diferencia"] for x in c["cuentas"]}
+    assert por["7140-0120-800-000-000-00-00"] == pytest.approx(-88.55)
+    assert por["7065-0120-800-000-000-00-00"] == pytest.approx(88.55)
+    ques = {x["que"] for x in c["movimientos"]}
+    assert ques == {"aparecio", "desaparecio"}
+
+
+@pytest.mark.asyncio
+async def test_la_tercera_subida_compara_contra_la_SEGUNDA(base):
+    """Se guarda UNA anterior: la inmediata. Es a proposito — un historial
+    traeria la pregunta de cual era la buena."""
+    for v in ("v1", "v2", "v3"):
+        await auditoria_gl_api._guardar(
+            base, _archivo("Setiembre - 2026", 2), v.encode(), f"{v}.xlsx", "yo")
+    c = await auditoria_gl_api.cambios(2026, 9, umbral=0.005, limite=400,
+                                       db=base, _=object())
+    assert c["anterior"]["archivo"] == "v2.xlsx"
+    assert c["vigente"]["archivo"] == "v3.xlsx"
+
+
+@pytest.mark.asyncio
+async def test_subir_el_mismo_archivo_dos_veces_no_reporta_cambios(base):
+    """El control de que la comparacion no invente diferencias."""
+    a = _archivo("Setiembre - 2026", 4)
+    await auditoria_gl_api._guardar(base, a, b"x", "v1.xlsx", "yo")
+    await auditoria_gl_api._guardar(base, a, b"x", "v2.xlsx", "yo")
+    c = await auditoria_gl_api.cambios(2026, 9, umbral=0.005, limite=400,
+                                       db=base, _=object())
+    assert c["hay"] is True
+    assert c["cuentas_que_cambiaron"] == 0
+    assert c["movimientos_que_cambiaron"] == 0
+    assert c["diferencia"]["debito"] == pytest.approx(0.0)
