@@ -41,6 +41,19 @@ interface FilaIntegral {
   versiones: Record<string, number>;
 }
 
+interface Asiento {
+  cuenta: string; seg2: string; seg3: string;
+  asiento: string; linea: string; fecha: string;
+  descripcion: string; desc_asiento: string;
+  origen: string; referencia: string; num_doc: string;
+  monto: number; moneda: string; tc: number;
+}
+
+interface Asientos {
+  dept: string; cuenta: string; asientos: number; total: number;
+  recortado: boolean; filas: Asiento[];
+}
+
 interface Integral {
   anio: number; mes: number; hay: boolean; motivo?: string;
   archivo?: string; moneda?: string; subido_en?: string | null;
@@ -73,6 +86,32 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  tiene ~200 cuentas y lo que se revisa son las que NO cuadran. */
   const [soloDiferencias, setSoloDiferencias] = useState(false);
   const [copiado, setCopiado] = useState("");
+  /** Qué cuentas están abiertas, y sus asientos ya traídos.
+   *
+   *  Owner, 2026-10-07: *«favor dar la opción para que me abra los asientos,
+   *  expand, y ver el detalle ahí mismo»* · *«por cuenta»*.
+   *
+   *  Se piden al abrir y se guardan: cerrar y volver a abrir no vuelve a
+   *  consultar. Un mes tiene ~285 cuentas y traerlas todas por adelantado
+   *  serian miles de asientos que nadie va a mirar. */
+  const [abiertas, setAbiertas] = useState<Record<string, Asientos | "cargando">>({});
+
+  const abrir = useCallback(async (f: FilaIntegral) => {
+    const k = f.dept_code + "|" + f.cuenta;
+    if (abiertas[k]) {                      // ya está abierta: se cierra
+      setAbiertas(a => { const b = { ...a }; delete b[k]; return b; });
+      return;
+    }
+    setAbiertas(a => ({ ...a, [k]: "cargando" }));
+    try {
+      const r = await api.get<Asientos>(
+        `/mayor/${anio}/${mes}/integral/asientos/`
+        + `?dept=${encodeURIComponent(f.dept_code)}&cuenta=${encodeURIComponent(f.cuenta)}`);
+      setAbiertas(a => ({ ...a, [k]: r }));
+    } catch {
+      setAbiertas(a => { const b = { ...a }; delete b[k]; return b; });
+    }
+  }, [abiertas, anio, mes]);
 
   useEffect(() => {
     getScenarios(HOTEL_ID).then(setEscenarios).catch(() => {});
@@ -246,13 +285,29 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                       <td style={{ ...td, background: "var(--bg-elevated)" }} />
                     </tr>
                     {d.filas.map(f => (
-                      <tr key={f.dept_code + f.cuenta}>
+                    <Fragment key={f.dept_code + f.cuenta}>
+                      <tr>
                         <td style={{ ...td, paddingLeft: 22, whiteSpace: "nowrap" }}>
                           {f.cuenta}
                         </td>
                         <td style={td}>{f.nombre}</td>
-                        <td style={{ ...num, color: "var(--text-secondary)" }}>
-                          {f.lineas || "—"}
+                        <td style={num}>
+                          {f.lineas ? (
+                            // El número de asientos ES el botón: es lo que el
+                            // ojo ya estaba mirando para decidir si vale la pena
+                            // abrir la cuenta.
+                            <button onClick={() => abrir(f)}
+                                    title="Ver los asientos de esta cuenta"
+                                    style={{ fontSize: 12, padding: "1px 7px",
+                                             borderRadius: 4, cursor: "pointer",
+                                             border: "1px solid var(--border-medium)",
+                                             background: abiertas[f.dept_code + "|" + f.cuenta]
+                                               ? "var(--bg-elevated)" : "transparent",
+                                             color: "var(--text-primary)",
+                                             fontVariantNumeric: "tabular-nums" }}>
+                              {abiertas[f.dept_code + "|" + f.cuenta] ? "▾" : "▸"} {f.lineas}
+                            </button>
+                          ) : "—"}
                         </td>
                         <td style={num}>{usd(f.actual)}</td>
                         {vers.map(v => (
@@ -282,6 +337,18 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           </button>
                         </td>
                       </tr>
+                      {/* Los asientos de ESA cuenta, debajo de su fila. */}
+                      {abiertas[f.dept_code + "|" + f.cuenta] && (
+                        <tr>
+                          <td colSpan={5 + vers.length * 2}
+                              style={{ padding: "0 0 10px 34px",
+                                       background: "var(--bg-base)" }}>
+                            <Asientitos d={abiertas[f.dept_code + "|" + f.cuenta]}
+                                        actual={f.actual} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                     ))}
                   </Fragment>
                 ))}
@@ -298,6 +365,71 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
             : "No hay cuentas en este mes."}
         </p>
       )}
+    </div>
+  );
+}
+
+
+/** Los asientos de una cuenta, con su cuadre contra la fila que se abrio.
+ *
+ * ⚠️ Se muestra el total que manda el SERVIDOR y, al lado, el de la fila. Si
+ * no coincidieran se dice: un detalle que no suma su total es el defecto mas
+ * caro de un cuadro contable — se ve bien y no dice la verdad.
+ */
+function Asientitos(
+  { d, actual }: { d: Asientos | "cargando"; actual: number },
+) {
+  if (d === "cargando") {
+    return <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Cargando asientos…</span>;
+  }
+  const cuadra = Math.abs(d.total - actual) < 0.01;
+  const th: React.CSSProperties = {
+    textAlign: "left", fontSize: 10.5, fontWeight: 700, padding: "4px 6px",
+    color: "var(--text-secondary)", whiteSpace: "nowrap",
+  };
+  const td: React.CSSProperties = { fontSize: 11.5, padding: "3px 6px" };
+  const num: React.CSSProperties = {
+    ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+  };
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, color: "var(--text-secondary)", margin: "6px 0 4px" }}>
+        {d.asientos} {d.asientos === 1 ? "asiento" : "asientos"} · suman{" "}
+        <b style={{ color: cuadra ? "var(--text-primary)" : "var(--negative)" }}>
+          {usd(d.total)}
+        </b>
+        {!cuadra && <> — y la fila dice {usd(actual)}. No cuadran.</>}
+        {d.recortado && <> · se muestran los primeros {d.filas.length}.</>}
+      </div>
+      <table style={{ borderCollapse: "collapse" }}>
+        <thead><tr>
+          <th style={th}>Fecha</th>
+          <th style={th}>Asiento</th>
+          <th style={th}>Cuenta completa</th>
+          <th style={th}>Descripción</th>
+          <th style={th}>Descripción del asiento</th>
+          <th style={th}>Origen</th>
+          <th style={th}>Referencia</th>
+          <th style={{ ...th, textAlign: "right" }}>Monto</th>
+        </tr></thead>
+        <tbody>
+          {d.filas.map((x, i) => (
+            <tr key={x.asiento + "-" + x.linea + "-" + i}>
+              <td style={{ ...td, whiteSpace: "nowrap" }}>{x.fecha}</td>
+              <td style={{ ...td, whiteSpace: "nowrap" }}>
+                {x.asiento}<span style={{ color: "var(--text-secondary)" }}>·{x.linea}</span>
+              </td>
+              <td style={{ ...td, whiteSpace: "nowrap",
+                           color: "var(--text-secondary)" }}>{x.cuenta}</td>
+              <td style={td}>{x.descripcion}</td>
+              <td style={{ ...td, color: "var(--text-secondary)" }}>{x.desc_asiento}</td>
+              <td style={td}>{x.origen}</td>
+              <td style={{ ...td, color: "var(--text-secondary)" }}>{x.referencia}</td>
+              <td style={num}>{usd(x.monto)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

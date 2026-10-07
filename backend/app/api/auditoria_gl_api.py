@@ -734,3 +734,62 @@ async def audit_integral(
                       for v in versiones],
         "filas": cuadro,
     }
+
+
+@router.get("/mayor/{anio}/{mes}/integral/asientos/")
+async def asientos_de_la_cuenta(
+    anio: int,
+    mes: int,
+    dept: str = Query(..., description="departamento FinPlan, como sale en el cuadro"),
+    cuenta: str = Query(..., description="cuenta base de 4 dígitos"),
+    limite: int = Query(300, ge=1, le=3000),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Los asientos que forman UNA celda del Audit Integral.
+
+    Owner, 2026-10-07: *«favor dar la opción para que me abra los asientos,
+    expand, y ver el detalle ahí mismo»*.
+
+    ⚠️ **No sirve el filtro del visor de movimientos**, y por una razón que no
+    se ve: el cuadro muestra el departamento de **FinPlan** —`0121 Private
+    Bar`— y el mayor guarda el de **Integrity** —`0128`—. Filtrar por el que se
+    ve en pantalla no traería nada, o peor, traería lo de otro departamento.
+
+    Acá se aplica el MISMO camino que arma el cuadro —puente de departamentos y
+    después `consolidate_dept`— para que lo que se abre sume exactamente lo que
+    se ve en la fila. Y el monto lleva el signo aplicado (`signo_de`), por lo
+    mismo: sin él, las líneas de un ingreso sumarían al revés que su total.
+    """
+    from app.importers.integrity_final import signo_de
+
+    if not 1 <= mes <= 12:
+        raise ErrorApi(422, "precierre.mes_invalido")
+    puente = _puente_de_departamentos()
+    filas = (await db.execute(select(MayorMovimiento).where(
+        MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+        MayorMovimiento.mes == mes,
+        MayorMovimiento.seg1 == cuenta.strip()))).scalars().all()
+
+    objetivo = dept.strip()
+    mias = [f for f in filas
+            if pl_engine.consolidate_dept(puente.get(f.seg2, f.seg2)) == objetivo]
+    mias.sort(key=lambda f: (f.fecha, f.asiento, f.linea))
+    total = sum(signo_de(f.seg1) * _usd(f) for f in mias)
+    return {
+        "anio": anio, "mes": mes, "dept": objetivo, "cuenta": cuenta,
+        "asientos": len(mias),
+        # ⚠️ El total viaja aparte del listado recortado: si la pantalla sumara
+        # lo que dibuja, una cuenta con 300 asientos mostraría un total que no
+        # es el de la fila que se abrió.
+        "total": round(total, 2),
+        "recortado": len(mias) > limite,
+        "filas": [{
+            "cuenta": f.cuenta, "seg2": f.seg2, "seg3": f.seg3,
+            "asiento": f.asiento, "linea": f.linea, "fecha": f.fecha,
+            "descripcion": f.descripcion, "desc_asiento": f.desc_asiento,
+            "origen": f.origen, "referencia": f.referencia, "num_doc": f.num_doc,
+            "monto": round(signo_de(f.seg1) * _usd(f), 2),
+            "moneda": f.moneda, "tc": float(f.tc or 0),
+        } for f in mias[:limite]],
+    }

@@ -831,3 +831,78 @@ def test_nadie_mas_que_la_auditoria_LEE_el_mayor_guardado():
         if "MayorMovimiento" in p.read_text(encoding="utf-8")
         and not p.name.startswith("mayor_movimiento"))
     assert lectores == ["api/auditoria_gl_api.py"], lectores
+
+
+# ── Abrir una cuenta y ver sus asientos ──────────────────────────────────────
+#
+# Owner, 2026-10-07: «favor dar la opcion para que me abra los asientos, expand,
+# y ver el detalle ahi mismo» · «por cuenta».
+
+
+@pytest.mark.asyncio
+async def test_lo_que_se_abre_SUMA_lo_que_dice_la_fila(base):
+    """El invariante: el detalle tiene que sumar su total.
+
+    Sub-filas que no suman su total es el defecto mas caro de un cuadro
+    contable: se ve bien y no dice la verdad.
+
+    ⚠️ Y lo que lo hace delicado es el DEPARTAMENTO. El cuadro muestra el de
+    FinPlan y el mayor guarda el de Integrity: filtrar por el que se ve en
+    pantalla no traeria nada, o traeria lo de otro departamento. Por eso el
+    endpoint que abre aplica el mismo puente que arma el cuadro.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    def uno(seg2, asiento, monto):
+        return Linea(cuenta=f"4120-{seg2}-125-999-001-01-00", seg1="4120",
+                     seg2=seg2, seg3="125", asiento=asiento, linea="1",
+                     fecha="01/09/26", descripcion="Private Bar NA Beverage",
+                     desc_asiento="OPL", origen="CON", referencia="",
+                     num_doc="", tc=453.0, moneda="COL",
+                     debito=0.0, credito=monto, moneda_archivo="DOL")
+
+    # 0128 (Private Bar en Integrity) y 0124, que NO es el mismo departamento.
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        uno("0128", "1", 12.0), uno("0128", "2", 16.0), uno("0124", "3", 999.0)])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    fila = next(f for f in cuadro["filas"]
+                if f["cuenta"] == "4120" and f["dept_code"] == "0121")
+
+    abierto = await auditoria_gl_api.asientos_de_la_cuenta(
+        2026, 9, dept="0121", cuenta="4120", limite=300, db=base, _=object())
+
+    assert abierto["total"] == pytest.approx(fila["actual"])
+    assert abierto["asientos"] == fila["lineas"] == 2
+    # Y NO se colo la del 0124, que el puente manda a otro departamento.
+    assert {x["seg2"] for x in abierto["filas"]} == {"0128"}
+
+
+@pytest.mark.asyncio
+async def test_el_monto_que_se_abre_lleva_el_SIGNO(base):
+    """Un ingreso baja del mayor como credito; sin dar vuelta el signo, las
+    lineas sumarian al reves que su total."""
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        Linea(cuenta="4000-0110-001-001-001-01-01", seg1="4000", seg2="0110",
+              seg3="001", asiento="1", linea="1", fecha="01/09/26",
+              descripcion="Rooms", desc_asiento="OPL", origen="CON",
+              referencia="", num_doc="", tc=453.0, moneda="DOL",
+              debito=0.0, credito=500.0, moneda_archivo="DOL")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+    r = await auditoria_gl_api.asientos_de_la_cuenta(
+        2026, 9, dept="0110", cuenta="4000", limite=300, db=base, _=object())
+    # Credito de 500 en una cuenta 4 -> +500 de ingreso, no -500.
+    assert r["filas"][0]["monto"] == pytest.approx(500.0)
+    assert r["total"] == pytest.approx(500.0)
