@@ -5960,11 +5960,22 @@ export interface AuditoriaGL {
 }
 
 /** Una linea del AUDIT INTEGRAL: una cuenta del mes contra las versiones. */
+export interface DetalleIntegral {
+  detalle: string; nombre: string; actual: number; lineas: number;
+}
+
 export interface FilaIntegral {
   grupo: string; dept_code: string; dept_name: string;
   cuenta: string; nombre: string;
   actual: number; lineas: number;
   versiones: Record<string, number>;
+  /** El tercer segmento de la cuenta — en las 6 el puesto, en las 7 el detalle
+   *  del gasto. Owner, 2026-10-07: *«e internamente por Detalle»*.
+   *
+   *  ⚠️ Sin comparacion a proposito: el presupuesto numera sus detalles por su
+   *  cuenta, y apareados darian una correspondencia inventada. Lo que se compara
+   *  es el total por CUENTA. Igual que `Opex by Detail`. */
+  detalles: DetalleIntegral[];
 }
 
 export interface AuditIntegralResp {

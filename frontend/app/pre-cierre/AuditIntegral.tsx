@@ -34,11 +34,22 @@ import { api, getScenarios, type Scenario } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 
+interface Detalle {
+  detalle: string; nombre: string; actual: number; lineas: number;
+}
+
 interface FilaIntegral {
   grupo: string; dept_code: string; dept_name: string;
   cuenta: string; nombre: string;
   actual: number; lineas: number;
   versiones: Record<string, number>;
+  /** El tercer segmento de la cuenta: en las 6 el puesto, en las 7 el detalle
+   *  del gasto. Owner, 2026-10-07: *«e internamente por Detalle»*.
+   *
+   *  ⚠️ No traen comparacion a proposito: el presupuesto numera sus detalles
+   *  por su cuenta, y apareados darian una correspondencia inventada. Lo que se
+   *  compara es el total por CUENTA. Lo mismo hace `Opex by Detail`. */
+  detalles: Detalle[];
 }
 
 interface Asiento {
@@ -165,16 +176,22 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
   const visibles = (datos?.filas ?? []).filter(f => !soloDiferencias
     || vers.some(v => Math.abs(f.actual - (f.versiones[v.scenario_id] ?? 0)) > 0.005));
 
-  // Por categoría y, dentro, por departamento. El servidor ya los manda
-  // ordenados; acá sólo se arman los cortes.
+  // ⚠️ DEPARTAMENTO afuera y la categoria adentro, en orden de clase: 4
+  // Ingresos, 5 Costos, 6 Payroll, 7 Opex, 8 Property Expenses. Owner,
+  // 2026-10-07: *«la regla de orden es Departamento, si es 4-Ingresos,
+  // 5-Costos, 6-Payroll, 7-Opex, 8-Property Expenses; e internamente por
+  // Detalle»*.
+  //
+  // El servidor ya los manda en ese orden; aca solo se arman los cortes.
   const bloques = useMemo(() => {
-    const out: { grupo: string; depts: { code: string; name: string; filas: FilaIntegral[] }[] }[] = [];
+    const out: { code: string; name: string;
+                 grupos: { grupo: string; filas: FilaIntegral[] }[] }[] = [];
     for (const f of visibles) {
-      let g = out.find(x => x.grupo === f.grupo);
-      if (!g) { g = { grupo: f.grupo, depts: [] }; out.push(g); }
-      let d = g.depts.find(x => x.code === f.dept_code);
-      if (!d) { d = { code: f.dept_code, name: f.dept_name, filas: [] }; g.depts.push(d); }
-      d.filas.push(f);
+      let d = out.find(x => x.code === f.dept_code);
+      if (!d) { d = { code: f.dept_code, name: f.dept_name, grupos: [] }; out.push(d); }
+      let g = d.grupos.find(x => x.grupo === f.grupo);
+      if (!g) { g = { grupo: f.grupo, filas: [] }; d.grupos.push(g); }
+      g.filas.push(f);
     }
     return out;
   }, [visibles]);
@@ -233,7 +250,7 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
       <div className="fin-scroll-x">
         <table style={{ borderCollapse: "collapse", width: "100%" }}>
           <thead><tr>
-            <th style={th}>Cuenta</th>
+            <th style={th}>Cuenta · Detalle</th>
             <th style={th}>Nombre</th>
             <th style={{ ...th, textAlign: "right" }}>Asientos</th>
             <th style={{ ...th, textAlign: "right" }}>Actual</th>
@@ -250,52 +267,70 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
             <th style={th}></th>
           </tr></thead>
           <tbody>
-            {bloques.map(g => (
-              <Fragment key={g.grupo}>
+            {bloques.map(d => (
+              <Fragment key={d.code}>
+                {/* El DEPARTAMENTO, la banda fuerte. */}
                 <tr>
-                  <td colSpan={4 + vers.length * 2 + 1}
-                      style={{ ...td, fontWeight: 800, fontSize: 12.5,
-                               background: "var(--bg-header)", color: "#fff",
-                               textTransform: "uppercase", letterSpacing: .4 }}>
-                    {g.grupo}
+                  <td colSpan={3} style={{ ...td, fontWeight: 800, fontSize: 12.5,
+                                           background: "var(--bg-header)", color: "#fff" }}>
+                    {d.code} · {d.name}
                   </td>
+                  <td style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
+                               color: "#fff" }}>
+                    {usd(d.grupos.reduce((a, g) => a + suma(g.filas), 0))}
+                  </td>
+                  {vers.map(v => (
+                    <td key={v.scenario_id}
+                        style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
+                                 color: "#fff" }}>
+                      {usd(d.grupos.reduce((a, g) => a + suma(g.filas, v.scenario_id), 0))}
+                    </td>
+                  ))}
+                  {vers.map(v => (
+                    <td key={"d" + v.scenario_id}
+                        style={{ ...num, fontWeight: 800, background: "var(--bg-header)",
+                                 color: "#fff" }}>
+                      {usd(d.grupos.reduce((a, g) => a + suma(g.filas)
+                                           - suma(g.filas, v.scenario_id), 0))}
+                    </td>
+                  ))}
+                  <td style={{ ...td, background: "var(--bg-header)" }} />
                 </tr>
-                {g.depts.map(d => (
-                  <Fragment key={d.code}>
+                {d.grupos.map(g => (
+                  <Fragment key={g.grupo}>
+                    {/* La categoria, dentro del departamento. */}
                     <tr>
                       <td colSpan={3} style={{ ...td, fontWeight: 700,
                                                background: "var(--bg-elevated)" }}>
-                        {d.code} · {d.name}
+                        {g.grupo}
                       </td>
                       <td style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
-                        {usd(suma(d.filas))}
+                        {usd(suma(g.filas))}
                       </td>
                       {vers.map(v => (
                         <td key={v.scenario_id}
                             style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
-                          {usd(suma(d.filas, v.scenario_id))}
+                          {usd(suma(g.filas, v.scenario_id))}
                         </td>
                       ))}
                       {vers.map(v => (
                         <td key={"d" + v.scenario_id}
                             style={{ ...num, fontWeight: 700, background: "var(--bg-elevated)" }}>
-                          {usd(suma(d.filas) - suma(d.filas, v.scenario_id))}
+                          {usd(suma(g.filas) - suma(g.filas, v.scenario_id))}
                         </td>
                       ))}
                       <td style={{ ...td, background: "var(--bg-elevated)" }} />
                     </tr>
-                    {d.filas.map(f => (
+                    {g.filas.map(f => (
                     <Fragment key={f.dept_code + f.cuenta}>
                       <tr>
-                        <td style={{ ...td, paddingLeft: 22, whiteSpace: "nowrap" }}>
+                        <td style={{ ...td, paddingLeft: 22, whiteSpace: "nowrap",
+                                     fontWeight: 600 }}>
                           {f.cuenta}
                         </td>
-                        <td style={td}>{f.nombre}</td>
+                        <td style={{ ...td, fontWeight: 600 }}>{f.nombre}</td>
                         <td style={num}>
                           {f.lineas ? (
-                            // El número de asientos ES el botón: es lo que el
-                            // ojo ya estaba mirando para decidir si vale la pena
-                            // abrir la cuenta.
                             <button onClick={() => abrir(f)}
                                     title="Ver los asientos de esta cuenta"
                                     style={{ fontSize: 12, padding: "1px 7px",
@@ -305,11 +340,11 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                                                ? "var(--bg-elevated)" : "transparent",
                                              color: "var(--text-primary)",
                                              fontVariantNumeric: "tabular-nums" }}>
-                              {abiertas[f.dept_code + "|" + f.cuenta] ? "▾" : "▸"} {f.lineas}
+                              {abiertas[f.dept_code + "|" + f.cuenta] ? "\u25be" : "\u25b8"} {f.lineas}
                             </button>
-                          ) : "—"}
+                          ) : "\u2014"}
                         </td>
-                        <td style={num}>{usd(f.actual)}</td>
+                        <td style={{ ...num, fontWeight: 600 }}>{usd(f.actual)}</td>
                         {vers.map(v => (
                           <td key={v.scenario_id} style={num}>
                             {usd(f.versiones[v.scenario_id] ?? 0)}
@@ -337,12 +372,28 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           </button>
                         </td>
                       </tr>
-                      {/* Los asientos de ESA cuenta, debajo de su fila. */}
+                      {/* El DETALLE de la cuenta — el tercer segmento. Sin
+                          comparacion a proposito: ver el tipo `Detalle`. */}
+                      {f.detalles.length > 1 && f.detalles.map(x => (
+                        <tr key={f.cuenta + "d" + x.detalle}>
+                          <td style={{ ...td, paddingLeft: 46, whiteSpace: "nowrap",
+                                       color: "var(--text-secondary)" }}>
+                            {x.detalle || "\u2014"}
+                          </td>
+                          <td style={{ ...td, color: "var(--text-secondary)" }}>{x.nombre}</td>
+                          <td style={{ ...num, color: "var(--text-secondary)" }}>{x.lineas}</td>
+                          <td style={{ ...num, color: "var(--text-secondary)" }}>
+                            {usd(x.actual)}
+                          </td>
+                          {vers.map(v => <td key={v.scenario_id} style={num} />)}
+                          {vers.map(v => <td key={"d" + v.scenario_id} style={num} />)}
+                          <td style={td} />
+                        </tr>
+                      ))}
                       {abiertas[f.dept_code + "|" + f.cuenta] && (
                         <tr>
                           <td colSpan={5 + vers.length * 2}
-                              style={{ padding: "0 0 10px 34px",
-                                       background: "var(--bg-base)" }}>
+                              style={{ padding: "0 0 10px 34px", background: "var(--bg-base)" }}>
                             <Asientitos d={abiertas[f.dept_code + "|" + f.cuenta]}
                                         actual={f.actual} />
                           </td>

@@ -906,3 +906,108 @@ async def test_el_monto_que_se_abre_lleva_el_SIGNO(base):
     # Credito de 500 en una cuenta 4 -> +500 de ingreso, no -500.
     assert r["filas"][0]["monto"] == pytest.approx(500.0)
     assert r["total"] == pytest.approx(500.0)
+
+
+# ── El orden del AUDIT INTEGRAL ─────────────────────────────────────────────
+#
+# Owner, 2026-10-07: «la regla de orden es Departamento, si es 4-Ingresos,
+# 5-Costos, 6-Payroll, 7-Opex, 8-Property Expenses; e internamente por Detalle».
+#
+# El orden lo fija el SERVIDOR y la pantalla solo arma los cortes, asi que el
+# dia que se altere acá, se altera en la pantalla y en el Excel a la vez — y
+# nadie se entera. Por eso se fija en una prueba.
+
+
+@pytest.mark.asyncio
+async def test_el_integral_va_por_DEPARTAMENTO_y_dentro_por_clase(base):
+    """Departamento afuera; dentro, 4 → 5 → 6 → 7 → 8.
+
+    ⚠️ El orden es el del número de cuenta, NO el de la categoría: la categoría
+    «Opex» junta la 7 con la 8, y ordenar por su nombre pondría «Costos» antes
+    de «Ingresos» por alfabeto.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    def uno(cuenta, seg2, seg3="000", monto=100.0):
+        return Linea(cuenta=f"{cuenta}-{seg2}-{seg3}-000-000-00-00", seg1=cuenta,
+                     seg2=seg2, seg3=seg3, asiento="1", linea="1",
+                     fecha="01/09/26", descripcion=f"{cuenta} {seg3}",
+                     desc_asiento="OPL", origen="CON", referencia="", num_doc="",
+                     tc=453.0, moneda="DOL", debito=monto, credito=0.0,
+                     moneda_archivo="DOL")
+
+    # A proposito desordenado: el 0220 antes del 0110, y dentro de cada uno la
+    # 7 antes de la 6 y la 4 al final.
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        uno("7400", "0220"), uno("6000", "0220"), uno("5420", "0220"),
+        uno("8015", "0110"), uno("7065", "0110"), uno("6000", "0110"),
+        uno("4000", "0110"),
+    ])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    salida = [(f["dept_code"], f["cuenta"]) for f in cuadro["filas"]]
+
+    assert salida == [
+        ("0110", "4000"), ("0110", "6000"), ("0110", "7065"), ("0110", "8015"),
+        ("0220", "5420"), ("0220", "6000"), ("0220", "7400"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_el_detalle_SUMA_su_cuenta(base):
+    """Lo mismo que se exige al abrir los asientos, un nivel más arriba.
+
+    Si los detalles no sumaran su cuenta, el cuadro se leería bien y diría otra
+    cosa que el mayor.
+    """
+    from app.importers.balance_comprobacion import Archivo, Linea
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with base.bind.begin() as c:
+        await c.run_sync(lambda s: DepartmentCatalog.__table__.create(s))
+
+    def uno(seg3, monto, asiento):
+        return Linea(cuenta=f"7065-0110-{seg3}-000-000-00-00", seg1="7065",
+                     seg2="0110", seg3=seg3, asiento=asiento, linea="1",
+                     fecha="01/09/26", descripcion=f"Insumo {seg3}",
+                     desc_asiento="OPL", origen="CON", referencia="",
+                     num_doc="", tc=453.0, moneda="DOL", debito=monto,
+                     credito=0.0, moneda_archivo="DOL")
+
+    a = Archivo(periodo="Setiembre - 2026", lineas=[
+        uno("801", 10.0, "1"), uno("801", 15.0, "2"), uno("800", 7.5, "3")])
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+
+    cuadro = await auditoria_gl_api.audit_integral(
+        2026, 9, scenarios="", db=base, _=object())
+    fila = next(f for f in cuadro["filas"] if f["cuenta"] == "7065")
+
+    # Los detalles, ordenados por su código y sumando el total de la cuenta.
+    assert [d["detalle"] for d in fila["detalles"]] == ["800", "801"]
+    assert sum(d["actual"] for d in fila["detalles"]) == pytest.approx(fila["actual"])
+    assert sum(d["lineas"] for d in fila["detalles"]) == fila["lineas"] == 3
+    assert fila["actual"] == pytest.approx(32.5)
+
+
+def test_la_comparacion_NO_baja_al_detalle():
+    """A propósito: el presupuesto numera sus detalles por su cuenta.
+
+    Apareados darían una correspondencia inventada — el detalle 801 del mayor
+    con el 801 del checkbook, que puede ser otra cosa. Lo que se compara es el
+    total por CUENTA. El mismo precedente que `cuadroGastoDetalle`.
+    """
+    import inspect
+
+    fuente = inspect.getsource(auditoria_gl_api.audit_integral)
+    # La comparación se arma sobre el nivel de cuenta, no sobre el de detalle.
+    assert "por_cta" in fuente
+    cuerpo = _sin_comentarios(fuente)
+    assert '"detalles": detalles' in cuerpo or "detalles," in cuerpo
+    # Y ningún detalle lleva versiones.
+    assert '"detalle": d3' in cuerpo

@@ -546,6 +546,8 @@ async def auditoria_guardada(
 #: estadísticas. Acá se mira el estado de resultados, así que la 8 es su propia
 #: línea («gastos dueños») y el balance no entra. Las dos conviven a propósito;
 #: ver la nota en `auditoria_gl`.
+#: 4 Ingresos, 5 Costos, 6 Payroll, 7 Opex, 8 Property Expenses — el orden de
+#: la clase, tal cual lo dicto el owner el 2026-10-07.
 ORDEN_INTEGRAL = ("Ingresos", "Costos", "Planilla", "Opex", "Gastos de propiedad")
 
 
@@ -680,16 +682,29 @@ async def audit_integral(
     catalogo = {}
 
     # ── El actual, del mayor ────────────────────────────────────────────────
+    # ⚠️ El grano es (departamento, cuenta, DETALLE). Owner, 2026-10-07: *«la
+    # regla de orden es Departamento, si es 4-Ingresos, 5-Costos, 6-Payroll,
+    # 7-Opex, 8-Property Expenses; e internamente por Detalle»*.
+    #
+    # El «detalle» es el tercer segmento de la cuenta, que en las 6 es el puesto
+    # y en las 7 el detalle del gasto — el mismo eje que abre `Opex by Detail`.
     real: dict[tuple, dict] = {}
+    por_cta: dict[tuple, dict] = {}
     for f in filas:
         if (f.seg1 or "")[:1] not in "45678":
             continue
         dep = pl_engine.consolidate_dept(puente.get(f.seg2, f.seg2))
-        k = (dep, f.seg1)
+        monto = signo_de(f.seg1) * _usd(f)
+        k = (dep, f.seg1, f.seg3 or "")
         d = real.setdefault(k, {"monto": 0.0, "lineas": 0,
                                 "nombre": f.descripcion or ""})
-        d["monto"] += signo_de(f.seg1) * _usd(f)
+        d["monto"] += monto
         d["lineas"] += 1
+        # El total por CUENTA, que es el nivel donde SÍ se compara.
+        c = por_cta.setdefault((dep, f.seg1), {"monto": 0.0, "lineas": 0,
+                                               "nombre": f.descripcion or ""})
+        c["monto"] += monto
+        c["lineas"] += 1
 
     # ── Las versiones contra las que se compara ─────────────────────────────
     ids = [x for x in (scenarios or "").split(",") if x.strip()]
@@ -705,14 +720,28 @@ async def audit_integral(
         })
 
     # ── El cuadro ───────────────────────────────────────────────────────────
-    llaves = set(real) | {k for v in versiones for k in v["por_cuenta"]}
+    #
+    # Dos niveles de fila: la CUENTA, que es donde se compara, y su DETALLE
+    # debajo, que sólo trae el actual.
+    #
+    # ⚠️ **La comparación NO baja al detalle, y es a propósito.** El presupuesto
+    # numera sus detalles por su cuenta, así que apareados darían una
+    # correspondencia inventada. Lo exacto —y lo que se compara— son los totales
+    # por CUENTA. Es lo mismo que ya hace `Opex by Detail`, y está escrito ahí
+    # por la misma razón.
+    llaves_cta = set(por_cta) | {k for v in versiones for k in v["por_cuenta"]}
     cuadro = []
-    for dep, cta in llaves:
-        r = real.get((dep, cta))
+    for dep, cta in llaves_cta:
+        r = por_cta.get((dep, cta))
         montos = {v["scenario_id"]: v["por_cuenta"].get((dep, cta), 0.0)
                   for v in versiones}
         if not r and not any(abs(x) > 0.005 for x in montos.values()):
             continue
+        detalles = sorted(
+            ({"detalle": d3, "nombre": v["nombre"],
+              "actual": round(v["monto"], 2), "lineas": v["lineas"]}
+             for (dd, cc, d3), v in real.items() if dd == dep and cc == cta),
+            key=lambda x: x["detalle"])
         cuadro.append({
             "grupo": auditoria_gl.grupo_de(cta),
             "dept_code": dep, "dept_name": deptos.get(dep, dep),
@@ -721,9 +750,11 @@ async def audit_integral(
             "actual": round((r or {}).get("monto", 0.0), 2),
             "lineas": (r or {}).get("lineas", 0),
             "versiones": {k: round(x, 2) for k, x in montos.items()},
+            "detalles": detalles,
         })
+    # El orden del owner: DEPARTAMENTO primero, y adentro la clase 4 -> 8.
     orden = {g: i for i, g in enumerate(ORDEN_INTEGRAL)}
-    cuadro.sort(key=lambda x: (orden.get(x["grupo"], 9), x["dept_code"], x["cuenta"]))
+    cuadro.sort(key=lambda x: (x["dept_code"], orden.get(x["grupo"], 9), x["cuenta"]))
     cabeza = filas[0]
     return {
         "anio": anio, "mes": mes, "hay": True,

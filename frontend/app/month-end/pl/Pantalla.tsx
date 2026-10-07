@@ -33,6 +33,7 @@ import {
   type AuditoriaCuadre, type PLDetailFila, type EstadisticasCierre,
   type Scenario, type PLCompareVersion, type PLColumn, type GastoEscenario,
   getAuditIntegral,
+  type FilaIntegral,
 } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
 import { elegir, limpiarSiEsDeOtraGeneracion } from "@/lib/escenarioPreferido";
@@ -1973,29 +1974,50 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     if (!d.hay || !d.filas?.length) return [];
     const vers = d.versiones ?? [];
     const filas: FilaCuadro[] = [];
-    let grupo = "";
+    const suma = (xs: FilaIntegral[], sid?: string) =>
+      xs.reduce((a, x) => a + (sid ? (x.versiones[sid] ?? 0) : x.actual), 0);
+
+    // ⚠️ DEPARTAMENTO afuera y la categoria adentro, en orden de clase — el
+    // mismo que la pantalla. Si el libro agrupara al revés diria lo mismo en
+    // otro orden, y el owner tendria que volver a buscar cada numero: *«el excel
+    // no baja lo que esta viendo»* (2026-08-27). El servidor ya manda las filas
+    // ordenadas; aca solo se arman los cortes.
     let dept = "";
+    let grupo = "";
     for (const f of d.filas) {
-      if (f.grupo !== grupo) {
-        grupo = f.grupo;
-        dept = "";
-        filas.push({ label: f.grupo.toUpperCase(), es_seccion: true,
-                     valores: [null, ...vers.map(() => null)] });
-      }
       if (f.dept_code !== dept) {
         dept = f.dept_code;
-        const suyas = d.filas.filter(x => x.grupo === grupo && x.dept_code === dept);
+        grupo = "";
+        const suyas = d.filas.filter(x => x.dept_code === dept);
         filas.push({
-          label: `${f.dept_code} · ${f.dept_name}`, es_total: true,
-          valores: [suyas.reduce((a, x) => a + x.actual, 0),
-                    ...vers.map(v => suyas.reduce(
-                      (a, x) => a + (x.versiones[v.scenario_id] ?? 0), 0))],
+          label: `${f.dept_code} · ${f.dept_name}`, es_seccion: true,
+          valores: [suma(suyas), ...vers.map(v => suma(suyas, v.scenario_id))],
+        });
+      }
+      if (f.grupo !== grupo) {
+        grupo = f.grupo;
+        const suyas = d.filas.filter(x => x.dept_code === dept && x.grupo === grupo);
+        filas.push({
+          label: f.grupo, es_total: true,
+          valores: [suma(suyas), ...vers.map(v => suma(suyas, v.scenario_id))],
         });
       }
       filas.push({
         label: `${f.cuenta}  ${f.nombre}`, nivel: 1,
         valores: [f.actual, ...vers.map(v => f.versiones[v.scenario_id] ?? 0)],
       });
+      // El detalle, solo cuando parte la cuenta en más de uno: una cuenta con un
+      // único detalle repetiria su propia cifra una linea más abajo.
+      //
+      // Van sin comparacion a proposito — ver `FilaIntegral.detalles`.
+      if ((f.detalles?.length ?? 0) > 1) {
+        for (const x of f.detalles) {
+          filas.push({
+            label: `${x.detalle || "—"}  ${x.nombre}`, nivel: 2,
+            valores: [x.actual, ...vers.map(() => null)],
+          });
+        }
+      }
     }
     return [{
       titulo: t("tab_integral"),
