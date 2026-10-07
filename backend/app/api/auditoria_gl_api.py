@@ -37,6 +37,11 @@ from app.errores import ErrorApi
 from app.export.auditoria_gl_xlsx import QUE_MIRA, construir
 from app.hotel_actual import HOTEL_ID
 from app.importers.balance_comprobacion import leer
+
+#: Los meses como los escribe Integrity, para rearmar el periodo del mes
+#: guardado. El mismo nombre que el lector entiende de vuelta.
+MESES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+            "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
 from app.models.mayor_movimiento import (COLUMNAS_A_COPIAR, MayorMovimiento,
                                          MayorMovimientoPrevio)
 
@@ -125,7 +130,11 @@ async def _guardar(db: AsyncSession, leido, contenido: bytes,
             origen=l.origen[:20], referencia=l.referencia[:120],
             num_doc=l.num_doc[:40],
             debito=_dec(l.debito), credito=_dec(l.credito), tc=_dec(l.tc),
-            moneda=(l.moneda or "")[:10], **sello))
+            moneda=(l.moneda or "")[:10],
+            # La del ENCABEZADO, no la del renglon: es la que dice si los montos
+            # son colones o dolares. Sin ella el mes guardado no se vuelve a
+            # leer bien.
+            moneda_archivo=(l.moneda_archivo or "COL")[:10], **sello))
     await db.commit()
     return {"guardado": True, "anio": anio, "mes": mes,
             "movimientos": len(leido.lineas)}
@@ -421,4 +430,75 @@ async def cambios(
         "cuentas": cuentas[:limite],
         "movimientos": movs[:limite],
         "recortado": len(movs) > limite or len(cuentas) > limite,
+    }
+
+
+@router.get("/auditoria-gl/{anio}/{mes}/")
+async def auditoria_guardada(
+    anio: int,
+    mes: int,
+    desde_clase: int = Query(4, ge=1, le=9),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Los hallazgos del mes YA SUBIDO, recalculados desde el mayor guardado.
+
+    Owner, 2026-10-07: *«me gustaría que el análisis de diferencias una vez que
+    se suba no desaparezca, que quede ahí hasta subir la otra versión… que sirva
+    para validación y revisión… veo que todo desaparece una vez que uno sale y
+    entra otra vez»*.
+
+    Tenía razón: la pantalla no cargaba nada al entrar. Los hallazgos vivían en
+    la memoria del navegador desde la subida, y salir de la pantalla los borraba.
+
+    ## Se RECALCULAN, no se guardan
+
+    Podría haber guardado los hallazgos en una tabla. No: se recalculan del mayor
+    almacenado, que ya está ahí desde la migración 151. Así hay **una sola
+    fuente** — el libro — y el día que se le agregue una regla a la auditoría,
+    los meses viejos la aplican sin volver a subir nada. Guardar los hallazgos
+    los habría congelado con las reglas del día que se subió el archivo.
+
+    ⚠️ Por eso hacía falta `moneda_archivo` (migración 153): sin saber si los
+    montos guardados son colones o dólares, los montos de los hallazgos saldrían
+    multiplicados por el tipo de cambio.
+    """
+    from app.importers.balance_comprobacion import Linea
+
+    if not 1 <= mes <= 12:
+        raise ErrorApi(422, "precierre.mes_invalido")
+    filas = (await db.execute(select(MayorMovimiento).where(
+        MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+        MayorMovimiento.mes == mes))).scalars().all()
+    if not filas:
+        return {"anio": anio, "mes": mes, "hay": False, "motivo": "mes_no_subido"}
+
+    lineas = [Linea(
+        cuenta=f.cuenta, seg1=f.seg1, seg2=f.seg2, seg3=f.seg3,
+        asiento=f.asiento, linea=f.linea, fecha=f.fecha,
+        descripcion=f.descripcion, desc_asiento=f.desc_asiento,
+        origen=f.origen, referencia=f.referencia, num_doc=f.num_doc,
+        tc=float(f.tc or 0), moneda=f.moneda,
+        debito=float(f.debito or 0), credito=float(f.credito or 0),
+        moneda_archivo=f.moneda_archivo or "COL") for f in filas]
+    periodo = f"{MESES_ES[mes - 1]} - {anio}"
+    r = auditoria_gl.revisar(lineas, desde_clase, periodo)
+    cabeza = filas[0]
+    return {
+        "anio": anio, "mes": mes, "hay": True,
+        "de_lo_guardado": True,
+        "archivo": cabeza.archivo,
+        "moneda": cabeza.moneda_archivo,
+        "subido_en": cabeza.subido_en.isoformat() if cabeza.subido_en else None,
+        "subido_por": cabeza.subido_por,
+        "periodo": r.periodo,
+        "lineas_del_archivo": r.lineas_del_archivo,
+        "lineas_revisadas": r.lineas_revisadas,
+        "lineas_senaladas": r.lineas_senaladas,
+        "monto_en_revision_crc": r.monto_en_revision_crc,
+        "por_regla": r.por_regla,
+        "por_severidad": r.por_severidad,
+        "por_grupo": r.por_grupo,
+        "que_mira": {k: v for k, v in QUE_MIRA.items() if k in r.por_regla},
+        "hallazgos": [h.dict() for h in r.hallazgos],
     }

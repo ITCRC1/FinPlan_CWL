@@ -95,6 +95,15 @@ class MayorMovimiento(Base):
     #: El TC del asiento y la moneda, como vienen. El mayor de CWL trae `DOL`.
     tc: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0"))
     moneda: Mapped[str] = mapped_column(String(10), default="")
+    #: En qué moneda están los MONTOS de este archivo, del encabezado
+    #: (`Moneda: DOL` / `Moneda: COL`).
+    #:
+    #: ⚠️ **Sin esto el mayor guardado no se puede volver a leer bien.** La
+    #: columna `moneda` de arriba es la de la TRANSACCIÓN y viene mezclada; la
+    #: que dice si los montos son colones o dólares es ésta. Un mayor subido en
+    #: dólares, leído como colones, da los montos multiplicados por el TC.
+    moneda_archivo: Mapped[str] = mapped_column(String(10), default="COL",
+                                                server_default="COL")
 
     # ── De qué subida salió ──────────────────────────────────────────────────
     #: El nombre y el checksum viajan en la FILA y no en una tabla de subidas
@@ -152,6 +161,8 @@ class MayorMovimientoPrevio(Base):
     credito: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
     tc: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("0"))
     moneda: Mapped[str] = mapped_column(String(10), default="")
+    moneda_archivo: Mapped[str] = mapped_column(String(10), default="COL",
+                                                server_default="COL")
     archivo: Mapped[str] = mapped_column(String(255), default="")
     checksum: Mapped[str] = mapped_column(String(64), default="")
     subido_en: Mapped[datetime | None] = mapped_column(

@@ -545,3 +545,88 @@ async def test_subir_el_mismo_archivo_dos_veces_no_reporta_cambios(base):
     assert c["cuentas_que_cambiaron"] == 0
     assert c["movimientos_que_cambiaron"] == 0
     assert c["diferencia"]["debito"] == pytest.approx(0.0)
+
+
+# ── Los hallazgos no desaparecen al salir de la pantalla ─────────────────────
+#
+# Owner, 2026-10-07: «me gustaria que el analisis de diferencias una vez que se
+# suba no desaparezca, que quede ahi hasta subir la otra version… veo que todo
+# desaparece una vez que uno sale y entra otra vez».
+
+
+def test_los_hallazgos_se_RECALCULAN_no_se_guardan():
+    """No hay tabla de hallazgos, y es a proposito.
+
+    Se recalculan del mayor almacenado: una sola fuente —el libro— y el dia que
+    la auditoria gane una regla, los meses viejos la aplican sin volver a subir
+    nada. Guardarlos los habria congelado con las reglas del dia de la subida.
+    """
+    from app.db import Base
+    from app.main import app  # noqa: F401
+
+    tablas = set(Base.metadata.tables)
+    assert not {t for t in tablas if "hallazgo" in t}, (
+        "aparecio una tabla de hallazgos: se congelarian con las reglas viejas")
+
+
+def test_el_periodo_rearmado_se_vuelve_a_entender():
+    """El mes guardado no conserva el texto del encabezado: se rearma.
+
+    Si el rotulo que se arma no lo entendiera el lector, el periodo del mes
+    guardado saldria vacio en la pantalla.
+    """
+    from app.api.auditoria_gl_api import MESES_ES
+    from app.importers.balance_comprobacion import _anio_mes
+
+    for m in range(1, 13):
+        assert _anio_mes(f"{MESES_ES[m - 1]} - 2026") == (2026, m)
+
+
+def test_se_guarda_la_moneda_DEL_ARCHIVO():
+    """Sin ella, un mayor subido en dolares se relee como colones.
+
+    Los montos saldrian multiplicados por el tipo de cambio — y los hallazgos
+    con ellos, porque la severidad mira el monto.
+    """
+    from app.models.mayor_movimiento import MayorMovimiento
+
+    assert "moneda_archivo" in MayorMovimiento.__table__.columns.keys()
+
+
+@pytest.mark.asyncio
+async def test_al_volver_a_entrar_sale_LO_MISMO_que_al_subir(base):
+    """El invariante de todo esto: la pantalla recargada no cambia un numero."""
+    from app.engine import auditoria_gl
+
+    a = _archivo("Setiembre - 2026", 6)
+    # Que haya algo que la auditoria pueda señalar: la cuenta de comida de
+    # empleados con un articulo de carta.
+    a.lineas[0].cuenta = "5420-0220-000-000-000-00-00"
+    a.lineas[0].seg1 = "5420"
+    a.lineas[0].seg2 = "0220"
+    a.lineas[0].referencia = "FILET DE CONGRIO"
+    al_subir = auditoria_gl.revisar(a.lineas, 4, a.periodo)
+
+    await auditoria_gl_api._guardar(base, a, b"x", "sep.xlsx", "yo")
+    de_vuelta = await auditoria_gl_api.auditoria_guardada(
+        2026, 9, desde_clase=4, db=base, _=object())
+
+    assert de_vuelta["hay"] is True
+    assert de_vuelta["de_lo_guardado"] is True
+    assert de_vuelta["lineas_revisadas"] == al_subir.lineas_revisadas
+    assert len(de_vuelta["hallazgos"]) == len(al_subir.hallazgos)
+    assert de_vuelta["por_severidad"] == al_subir.por_severidad
+    assert de_vuelta["por_regla"] == al_subir.por_regla
+    assert de_vuelta["monto_en_revision_crc"] == pytest.approx(
+        al_subir.monto_en_revision_crc)
+    # Y recuerda de qué archivo salió, que es la mitad de la validación.
+    assert de_vuelta["archivo"] == "sep.xlsx"
+
+
+@pytest.mark.asyncio
+async def test_un_mes_no_subido_lo_DICE(base):
+    """«No subido» y «sin hallazgos» son dos cosas distintas."""
+    r = await auditoria_gl_api.auditoria_guardada(
+        2026, 7, desde_clase=4, db=base, _=object())
+    assert r["hay"] is False
+    assert r["motivo"] == "mes_no_subido"

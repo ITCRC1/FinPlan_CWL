@@ -5959,6 +5959,33 @@ export interface AuditoriaGL {
   hallazgos: AuditoriaHallazgo[];
 }
 
+/** Un mes del mayor que ya quedo guardado. */
+export interface MesGuardado {
+  anio: number; mes: number; movimientos: number;
+  archivo: string | null; subido_en: string | null;
+}
+
+/** Que meses del mayor estan guardados, del mas nuevo al mas viejo. */
+export async function mesesDelMayor(): Promise<{ meses: MesGuardado[] }> {
+  return api.get(`/mayor/meses/`);
+}
+
+/**
+ * Los hallazgos de un mes YA SUBIDO, recalculados del mayor guardado.
+ *
+ * Owner, 2026-10-07: *«que el analisis no desaparezca… veo que todo desaparece
+ * una vez que uno sale y entra otra vez»*.
+ *
+ * ⚠️ Devuelve `hay: false` cuando el mes no esta subido, en vez de un cuadro
+ * vacio: «no subido» y «sin hallazgos» son dos cosas distintas.
+ */
+export async function auditoriaGuardada(
+  anio: number, mes: number,
+): Promise<AuditoriaGL & { hay: boolean; motivo?: string; de_lo_guardado?: boolean;
+                           subido_en?: string | null; subido_por?: string }> {
+  return api.get(`/auditoria-gl/${anio}/${mes}/`);
+}
+
 export async function auditarMayor(file: File): Promise<AuditoriaGL> {
   const fd = new FormData();
   fd.append("file", file);

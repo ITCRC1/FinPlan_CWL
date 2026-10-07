@@ -16,8 +16,11 @@
  * muestra 29 casos sin decir que miró 6.617 líneas se lee como «hay 29
  * problemas», cuando lo que dice es «empezá por estos 29».
  */
-import { useState } from "react";
-import { auditarMayor, auditarMayorExcel, type AuditoriaGL, type AuditoriaHallazgo } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import {
+  auditarMayor, auditarMayorExcel, auditoriaGuardada, mesesDelMayor,
+  type AuditoriaGL, type AuditoriaHallazgo, type MesGuardado,
+} from "@/lib/api";
 
 const SEV: Record<string, { fondo: string; texto: string; rotulo: string }> = {
   alta: { fondo: "#FFD6D6", texto: "#8B1A1A", rotulo: "Alta" },
@@ -109,6 +112,10 @@ function Fila({ h }: { h: AuditoriaHallazgo }) {
   );
 }
 
+const MES_ROTULO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                    "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre",
+                    "Diciembre"];
+
 export default function AuditoriaDelMayor() {
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<AuditoriaGL | null>(null);
@@ -119,10 +126,62 @@ export default function AuditoriaDelMayor() {
   // Costos empieza con 5, payroll 6, Opex 7 y property expenses 8». Son
   // revisiones distintas, con gente distinta al lado.
   const [tipo, setTipo] = useState<string>("");
+  /** Los meses que ya estan guardados, para poder volver a cualquiera.
+   *
+   *  Owner, 2026-10-07: *«me gustaria que el analisis de diferencias una vez que
+   *  se suba no desaparezca, que quede ahi hasta subir la otra version… veo que
+   *  todo desaparece una vez que uno sale y entra otra vez»*.
+   *
+   *  Tenia razon: esta pantalla no cargaba NADA al entrar. Los hallazgos vivian
+   *  en la memoria del navegador desde la subida, asi que salir los borraba.
+   *
+   *  ⚠️ Los hallazgos NO se guardan: se recalculan del mayor almacenado. Asi hay
+   *  una sola fuente —el libro— y el dia que la auditoria gane una regla, los
+   *  meses viejos la aplican sin volver a subir nada. */
+  const [meses, setMeses] = useState<MesGuardado[]>([]);
+  const [elegido, setElegido] = useState<string>("");
+
+  const cargarGuardado = useCallback(async (anio: number, mes: number) => {
+    setOcupado("revisar"); setErr(null);
+    try {
+      const r = await auditoriaGuardada(anio, mes);
+      setData(r.hay ? r : null);
+      if (!r.hay) setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally { setOcupado(""); }
+  }, []);
+
+  // Al entrar: que haya guardado y, si hay, el mas reciente.
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await mesesDelMayor();
+        if (!vivo) return;
+        setMeses(r.meses);
+        if (r.meses.length) {
+          const m = r.meses[0];          // el backend los manda del mas nuevo
+          setElegido(`${m.anio}-${m.mes}`);
+          await cargarGuardado(m.anio, m.mes);
+        }
+      } catch { /* sin guardado, la pantalla queda como siempre */ }
+    })();
+    return () => { vivo = false; };
+  }, [cargarGuardado]);
 
   const correr = async (f: File) => {
     setOcupado("revisar"); setErr(null); setData(null);
-    try { setData(await auditarMayor(f)); }
+    try {
+      setData(await auditarMayor(f));
+      // El mes acaba de quedar guardado: que aparezca en el selector sin
+      // recargar la pagina.
+      try {
+        const r = await mesesDelMayor();
+        setMeses(r.meses);
+        if (r.meses.length) setElegido(`${r.meses[0].anio}-${r.meses[0].mes}`);
+      } catch { /* el selector es ayuda, no bloquea la revision */ }
+    }
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setOcupado(""); }
   };
@@ -154,9 +213,32 @@ export default function AuditoriaDelMayor() {
         <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
           Subí el <b>Full Detail P&amp;L</b> de Integrity —el Balance de Comprobación con
           el detalle de asientos— y se revisan las cuentas de la clase 4 en adelante:
-          que la descripción corresponda a la cuenta y al departamento. No se guarda
-          nada y no toca el P&amp;L.
+          que la descripción corresponda a la cuenta y al departamento.{" "}
+          <b>El mes queda guardado</b> y la revisión sigue acá al volver a entrar,
+          hasta que subas otra versión. No toca el P&amp;L.
         </div>
+        {/* Los meses que ya estan guardados. Sin esto, la unica forma de ver un
+            mes era volver a subir su archivo. */}
+        {meses.length > 0 && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center",
+                        marginBottom: 12, fontSize: 12, flexWrap: "wrap" }}>
+            <span style={{ color: "var(--text-secondary)" }}>Mes guardado</span>
+            <select value={elegido}
+                    onChange={e => {
+                      setElegido(e.target.value);
+                      const [a, m] = e.target.value.split("-").map(Number);
+                      void cargarGuardado(a, m);
+                    }}
+                    style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5 }}>
+              {meses.map(m => (
+                <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>
+                  {MES_ROTULO[m.mes - 1]} {m.anio} · {m.movimientos.toLocaleString("en-US")} mov
+                  {m.archivo ? ` · ${m.archivo}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label style={{ display: "block", border: "2px dashed var(--border-medium)",
                         borderRadius: 8, padding: 22, textAlign: "center",
                         cursor: "pointer", fontSize: 13 }}
