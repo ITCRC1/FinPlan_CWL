@@ -755,29 +755,64 @@ PROHIBIDAS = (
 )
 
 
-def test_la_auditoria_solo_escribe_el_mayor():
-    """El modulo entero no menciona ni una tabla del cierre.
+def test_la_auditoria_solo_ESCRIBE_el_mayor():
+    """La Auditoria puede LEER las tablas del cierre; escribirlas, no.
 
-    Se mira el MODULO y no solo la funcion de guardar: una escritura nueva en
-    otro endpoint del mismo archivo contaria igual.
+    ⚠️ La primera version de esta prueba decia «no las menciona», y se cayo
+    sola el 2026-10-07 cuando el Audit Integral empezo a comparar contra el
+    Budget: para eso hay que LEER el escenario y sus auxiliares. Leer esta bien
+    —es una lupa—; escribir no, porque ahi el mes tendria dos origenes y los
+    totales cuadrarian igual.
+
+    Asi que se buscan ESCRITURAS, no menciones.
     """
     import inspect
-    import re
+    import re as _re
 
     from app.api import auditoria_gl_api
 
-    fuente = inspect.getsource(auditoria_gl_api)
-    # Sin comentarios ni docstrings: ahi SI se las nombra, explicando por donde
-    # entra la plata de verdad.
-    codigo = "\n".join(l for l in fuente.splitlines()
-                       if not l.strip().startswith("#"))
-    codigo = re.sub(r'""".*?"""', "", codigo, flags=re.S)
-    aparecen = [t for t in PROHIBIDAS
-                if re.search(rf"\b{t}\b", codigo)]
-    assert not aparecen, (
-        "El camino de la Auditoria menciona tablas del cierre: "
-        f"{aparecen}. Si empieza a escribirlas, el mes tiene dos origenes y los "
-        "totales cuadran igual — el defecto mas caro de este sistema.")
+    codigo = _sin_comentarios(inspect.getsource(auditoria_gl_api))
+    escrituras = []
+    for t in PROHIBIDAS:
+        for patron in (rf"db\.add\(\s*{t}\(", rf"sa_delete\(\s*{t}\b",
+                       rf"\binsert\(\s*{t}\b", rf"\bupdate\(\s*{t}\b"):
+            if _re.search(patron, codigo):
+                escrituras.append(t)
+    assert not escrituras, (
+        "El camino de la Auditoria ESCRIBE tablas del cierre: "
+        f"{sorted(set(escrituras))}. El mes tendria dos origenes y los totales "
+        "cuadrarian igual — el defecto mas caro de este sistema.")
+
+
+def test_la_auditoria_escribe_EXACTAMENTE_dos_tablas():
+    """La contracara: las unicas dos que escribe son las del mayor.
+
+    Sin esto, la prueba de arriba pasaria tambien si alguien escribiera una
+    tabla nueva que nadie se acordo de poner en `PROHIBIDAS`.
+    """
+    import inspect
+    import re as _re
+
+    from app.api import auditoria_gl_api
+
+    codigo = _sin_comentarios(inspect.getsource(auditoria_gl_api))
+    escritas = set(_re.findall(
+        r"(?:db\.add\(\s*|sa_delete\(\s*|\binsert\(\s*)([A-Z]\w+)", codigo))
+    assert escritas == {"MayorMovimiento", "MayorMovimientoPrevio"}, escritas
+
+
+def _sin_comentarios(fuente: str) -> str:
+    import re
+
+    """El codigo, sin comentarios ni docstrings.
+
+    Hace falta porque los docstrings SI nombran las tablas del cierre — ahi se
+    explica por donde entra la plata de verdad — y un grep sobre el texto crudo
+    daria un falso positivo en cada explicacion.
+    """
+    sin = "\n".join(l for l in fuente.splitlines()
+                     if not l.strip().startswith("#"))
+    return re.sub(r'"""(?:.|\n)*?"""', "", sin)
 
 
 def test_nadie_mas_que_la_auditoria_LEE_el_mayor_guardado():

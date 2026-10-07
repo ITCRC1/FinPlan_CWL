@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import Checkbooks from "./Checkbooks";
+import AuditIntegral from "./AuditIntegral";
 import Movimientos from "./Movimientos";
 import { useTranslations } from "next-intl";
 
@@ -50,7 +51,7 @@ const FONDO: Record<string, string> = {
 const usd = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Pestana = "hallazgos" | "hoja" | "checkbooks" | "movimientos" | "cambios" | "descargas";
+type Pestana = "hallazgos" | "hoja" | "checkbooks" | "integral" | "movimientos" | "cambios" | "descargas";
 
 export default function PreCierrePage() {
   const t = useTranslations("precierre");
@@ -281,7 +282,7 @@ export default function PreCierrePage() {
           </p>
 
           <nav style={{ display: "flex", gap: 4, margin: "18px 0 12px" }}>
-            {(["hallazgos", "hoja", "checkbooks", "movimientos", "cambios", "descargas"] as Pestana[]).map(p => (
+            {(["hallazgos", "hoja", "checkbooks", "integral", "movimientos", "cambios", "descargas"] as Pestana[]).map(p => (
               <button key={p} onClick={() => setPestana(p)}
                       style={{ ...tab, ...(pestana === p ? tabActivo : {}) }}>
                 {t(`tab.${p}`)}
@@ -307,6 +308,10 @@ export default function PreCierrePage() {
           {/* El mes contra el Budget y el Forecast, cuenta por cuenta. No
               depende de `dl`: lee el espejo, no el borrador. */}
           {pestana === "checkbooks" && <Checkbooks anio={anio} mes={mes} />}
+          {/* El mes real a maximo detalle contra Budget y Forecast. Sale del
+              mayor guardado, no del borrador: el borrador llega a la cuenta y
+              lo que hace falta aca es poder bajar al asiento. */}
+          {pestana === "integral" && <AuditIntegral anio={anio} mes={mes} />}
           {/* El mayor del mes, hasta el asiento. No depende del borrador:
               sale del Balance de Comprobación que se sube en la Auditoría. */}
           {pestana === "movimientos" && <Movimientos anio={anio} mes={mes} />}

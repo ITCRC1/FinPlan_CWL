@@ -4433,7 +4433,8 @@
       "cambios": "Qué cambió",
       "descargas": "Descargas",
       "checkbooks": "Checkbooks",
-      "movimientos": "Movimientos"
+      "movimientos": "Movimientos",
+      "integral": "Audit Integral"
     },
     "cambios": {
       "primera": "Es la primera vuelta de este mes: no hay contra qué comparar.",

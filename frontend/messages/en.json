@@ -4433,7 +4433,8 @@
       "cambios": "What changed",
       "descargas": "Downloads",
       "checkbooks": "Checkbooks",
-      "movimientos": "GL entries"
+      "movimientos": "GL entries",
+      "integral": "Audit Integral"
     },
     "cambios": {
       "primera": "This is the first round for this month: nothing to compare against.",

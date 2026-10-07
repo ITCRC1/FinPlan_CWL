@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.db import get_db
 from app.engine import auditoria_gl
+from app.engine import pl_engine
 from app.errores import ErrorApi
 from app.export.auditoria_gl_xlsx import QUE_MIRA, construir
 from app.hotel_actual import HOTEL_ID
@@ -531,4 +532,205 @@ async def auditoria_guardada(
         "por_grupo": r.por_grupo,
         "que_mira": {k: v for k, v in QUE_MIRA.items() if k in r.por_regla},
         "hallazgos": [h.dict() for h in r.hallazgos],
+    }
+
+
+# ── AUDIT INTEGRAL: el mes a máximo detalle, contra Budget y Forecast ────────
+
+#: El orden en que el owner lee este cuadro. Owner, 2026-10-07: *«por
+#: departamento y categorías de cuentas, a decir ingresos, costos, planilla,
+#: opex, gastos dueños»*.
+#:
+#: ⚠️ Usa `GRUPOS` —la categorización de los HALLAZGOS, con la 7 y la 8
+#: separadas— y NO `CATEGORIAS`, que junta 7 con 8 y agrega balance y
+#: estadísticas. Acá se mira el estado de resultados, así que la 8 es su propia
+#: línea («gastos dueños») y el balance no entra. Las dos conviven a propósito;
+#: ver la nota en `auditoria_gl`.
+ORDEN_INTEGRAL = ("Ingresos", "Costos", "Planilla", "Opex", "Gastos de propiedad")
+
+
+def _usd(f) -> float:
+    """El movimiento en DOLARES, venga el archivo como venga.
+
+    La misma regla que `balance_comprobacion.Linea.monto_usd`, aplicada a la
+    fila guardada: si el archivo venia en dolares, la columna YA es dolares; si
+    venia en colones, se divide por el tipo de cambio del asiento.
+    """
+    monto = float(f.debito or 0) - float(f.credito or 0)
+    if (f.moneda_archivo or "COL").upper().startswith("DOL"):
+        return monto
+    tc = float(f.tc or 0)
+    return monto / tc if tc else 0.0
+
+
+def _puente_de_departamentos() -> dict[str, str]:
+    """`{departamento de Integrity: departamento de FinPlan}`.
+
+    ⚠️ **Sin el puente la comparacion sale mal**, y el diagnostico tambien: el
+    2026-09-11 una pasada sin puente dio una lista larga de fallbacks falsos, y
+    con el puente aplicado quedaban exactamente dos.
+
+    Se lee de la semilla, que es donde vive, y se cachea: son 34 filas que no
+    cambian entre peticiones.
+    """
+    global _PUENTE
+    if _PUENTE is None:
+        import json
+        import pathlib
+
+        ruta = (pathlib.Path(__file__).resolve().parents[1]
+                / "seed_data" / HOTEL_ID / "mapd_integrity.json")
+        try:
+            datos = json.loads(ruta.read_text(encoding="utf-8"))["departamentos"]
+            _PUENTE = {d["codigo"]: d["destino_finplan"] for d in datos}
+        except Exception:                                # noqa: BLE001
+            # Sin puente el cuadro sale igual, con los departamentos crudos de
+            # Integrity. Que falte el archivo no puede tumbar la pantalla.
+            _PUENTE = {}
+    return _PUENTE
+
+
+_PUENTE: dict[str, str] | None = None
+
+
+async def _por_cuenta_del_escenario(db, escenario, mes: int) -> dict[tuple, float]:
+    """`{(depto, cuenta): monto}` de un escenario para un mes.
+
+    Usa el MISMO camino que el motor del P&L —`actual_rows_for_month` para lo
+    importado, el checkbook para lo que se construye en la app— para que la
+    comparación sea contra lo que el sistema reporta y no contra otra lectura.
+    """
+    from app.engine import recalculate as recalc
+
+    filas = []
+    if (getattr(escenario, "source_mode", "imported") or "imported") != "checkbook":
+        filas = await recalc.actual_rows_for_month(db, escenario.id, mes)
+        filas = [f for f in filas if f.get("amount")]
+    if not filas:
+        filas = await recalc.checkbook_account_rows_for_month(db, escenario.id, mes)
+    fuera: dict[tuple, float] = {}
+    for f in filas:
+        k = (pl_engine.consolidate_dept(f.get("dept_code") or ""),
+             str(f.get("account_code") or ""))
+        fuera[k] = fuera.get(k, 0.0) + float(f.get("amount") or 0)
+    return fuera
+
+
+@router.get("/mayor/{anio}/{mes}/integral/")
+async def audit_integral(
+    anio: int,
+    mes: int,
+    scenarios: str = Query("", description="ids a comparar, separados por coma"),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """El mes real a máximo detalle, depurado, contra el Budget y el Forecast.
+
+    Owner, 2026-10-07: *«aprovechando que hay máximo detalle en las cuentas de
+    resultados por cuenta, se pueda generar un tipo de revisión versus budget o
+    forecast a máximo detalle por departamento y categorías de cuentas […] si
+    hay algo que no debería estar ahí, a máximo detalle, sólo copio y mando la
+    nota para que reclasifiquen»*.
+
+    ## Qué significa «depurado»
+
+    Del mayor guardado entran **sólo las clases 4 a 8** —el estado de
+    resultados—. El balance (1-3) y las estadísticas (9) quedan fuera: no se
+    comparan contra un presupuesto.
+
+    Y se aplican las dos reglas que el sistema ya usa para leer ese archivo, que
+    son las que hacen que los números coincidan con el cierre:
+
+    * **El signo** (`integrity_final.signo_de`): en el mayor un ingreso es un
+      crédito, o sea negativo. La `4999` es la excepción, porque son las
+      contrapartidas de reparto y ya vienen bien.
+    * **El puente de departamentos**: el mayor trae el departamento de Integrity
+      y el presupuesto el de FinPlan. Sin el puente la comparación sale mal — y
+      el diagnóstico también: medido el 2026-09-11, sin puente aparecían
+      fallbacks falsos a montones.
+
+    ## Por qué el Actual sale de acá y no del Pre-Cierre
+
+    Porque el Pre-Cierre llega a la cuenta y se acaba, y lo que el owner quiere
+    es el asiento: *«sólo copio y mando la nota para que reclasifiquen»*. El
+    mayor guardado tiene el asiento, la fecha y el concepto.
+
+    ⚠️ **Esto NO cambia de dónde sale la plata del cierre.** El P&L sigue
+    saliendo del Pre-Cierre; esto es una lupa que compara. Verificado contra la
+    pantalla de setiembre 2026: Rooms 20.259,00 contra 20.258,87, A&B 7.448,63
+    contra 7.447,27 — las diferencias son centavos del tipo de cambio por
+    asiento.
+    """
+    from app.importers.integrity_final import signo_de
+    from app.models.department_catalog import DepartmentCatalog
+    from app.models.scenario import Scenario
+    from app.nombres_cuenta import nombre_de_cuenta
+
+    if not 1 <= mes <= 12:
+        raise ErrorApi(422, "precierre.mes_invalido")
+    filas = (await db.execute(select(MayorMovimiento).where(
+        MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+        MayorMovimiento.mes == mes))).scalars().all()
+    if not filas:
+        return {"anio": anio, "mes": mes, "hay": False, "motivo": "mes_no_subido"}
+
+    puente = _puente_de_departamentos()
+    deptos = {d.dept_code: d.dept_name
+              for d in (await db.execute(select(DepartmentCatalog))).scalars().all()}
+    catalogo = {}
+
+    # ── El actual, del mayor ────────────────────────────────────────────────
+    real: dict[tuple, dict] = {}
+    for f in filas:
+        if (f.seg1 or "")[:1] not in "45678":
+            continue
+        dep = pl_engine.consolidate_dept(puente.get(f.seg2, f.seg2))
+        k = (dep, f.seg1)
+        d = real.setdefault(k, {"monto": 0.0, "lineas": 0,
+                                "nombre": f.descripcion or ""})
+        d["monto"] += signo_de(f.seg1) * _usd(f)
+        d["lineas"] += 1
+
+    # ── Las versiones contra las que se compara ─────────────────────────────
+    ids = [x for x in (scenarios or "").split(",") if x.strip()]
+    versiones = []
+    for sid in ids:
+        esc = await db.get(Scenario, sid.strip())
+        if esc is None:
+            continue
+        versiones.append({
+            "scenario_id": esc.id,
+            "escenario": f"{esc.type} {esc.version} {esc.year}",
+            "por_cuenta": await _por_cuenta_del_escenario(db, esc, mes),
+        })
+
+    # ── El cuadro ───────────────────────────────────────────────────────────
+    llaves = set(real) | {k for v in versiones for k in v["por_cuenta"]}
+    cuadro = []
+    for dep, cta in llaves:
+        r = real.get((dep, cta))
+        montos = {v["scenario_id"]: v["por_cuenta"].get((dep, cta), 0.0)
+                  for v in versiones}
+        if not r and not any(abs(x) > 0.005 for x in montos.values()):
+            continue
+        cuadro.append({
+            "grupo": auditoria_gl.grupo_de(cta),
+            "dept_code": dep, "dept_name": deptos.get(dep, dep),
+            "cuenta": cta,
+            "nombre": nombre_de_cuenta(cta, (r or {}).get("nombre"), catalogo, dep),
+            "actual": round((r or {}).get("monto", 0.0), 2),
+            "lineas": (r or {}).get("lineas", 0),
+            "versiones": {k: round(x, 2) for k, x in montos.items()},
+        })
+    orden = {g: i for i, g in enumerate(ORDEN_INTEGRAL)}
+    cuadro.sort(key=lambda x: (orden.get(x["grupo"], 9), x["dept_code"], x["cuenta"]))
+    cabeza = filas[0]
+    return {
+        "anio": anio, "mes": mes, "hay": True,
+        "archivo": cabeza.archivo, "moneda": cabeza.moneda_archivo,
+        "subido_en": cabeza.subido_en.isoformat() if cabeza.subido_en else None,
+        "orden_grupos": list(ORDEN_INTEGRAL),
+        "versiones": [{"scenario_id": v["scenario_id"], "escenario": v["escenario"]}
+                      for v in versiones],
+        "filas": cuadro,
     }
