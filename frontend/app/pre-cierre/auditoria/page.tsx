@@ -21,6 +21,7 @@ import {
   auditarMayor, auditarMayorExcel, auditoriaGuardada, mesesDelMayor,
   type AuditoriaGL, type AuditoriaHallazgo, type MesGuardado,
 } from "@/lib/api";
+import { CambiosDelMayor } from "@/components/CambiosDelMayor";
 
 const SEV: Record<string, { fondo: string; texto: string; rotulo: string }> = {
   alta: { fondo: "#FFD6D6", texto: "#8B1A1A", rotulo: "Alta" },
@@ -381,6 +382,29 @@ export default function AuditoriaDelMayor() {
             </div>
           )}
         </>
+      )}
+
+      {/* Qué cambió contra la subida anterior del mismo mes.
+
+          Owner, 2026-10-07, después de subir: *«no veo reporte de cambios entre
+          uno y otro, solo veo hallazgos»*. Estaba, pero en otra pantalla y en
+          otro menú — error mío: **se mira donde se sube**.
+
+          Sale sólo cuando hay un mes elegido; el componente se encarga de decir
+          que todavía no hay anterior cuando es la primera subida. */}
+      {elegido && (
+        <div style={card}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+            Qué cambió contra la subida anterior
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)",
+                        marginBottom: 12 }}>
+            Las dos últimas versiones de este mes, comparadas por cuenta y por
+            asiento. Es para verificar que las correcciones quedaron.
+          </div>
+          <CambiosDelMayor anio={Number(elegido.split("-")[0])}
+                           mes={Number(elegido.split("-")[1])} />
+        </div>
       )}
     </div>
   );
