@@ -2884,7 +2884,8 @@
     "xlSinVariacion": "no variance (data missing in one of the two columns)",
     "xlTitulo": "Month-End Close — {periodo} {year}",
     "xlVariacionEntre": "Variance: {escA} vs {escB}",
-    "ytdA": "YTD to {mes} {year}"
+    "ytdA": "YTD to {mes} {year}",
+    "tab_integral": "Audit Integral"
   },
   "otb": {
     "a851Nota1": "{metrica} by {unidad}:",

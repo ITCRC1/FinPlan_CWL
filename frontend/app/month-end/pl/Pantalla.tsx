@@ -32,6 +32,7 @@ import {
   type ConsultaFila, type ConsultaCatalogo, type FbDetalle, type FbMes, type IngresoDetalle,
   type AuditoriaCuadre, type PLDetailFila, type EstadisticasCierre,
   type Scenario, type PLCompareVersion, type PLColumn, type GastoEscenario,
+  getAuditIntegral,
 } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
 import { elegir, limpiarSiEsDeOtraGeneracion } from "@/lib/escenarioPreferido";
@@ -51,6 +52,7 @@ import VistasVisibles from "./VistasVisibles";
 import ResumenDoceMeses, { armar as armarResumen, filasResumen }
   from "./ResumenDoceMeses";
 import { getTabsApagados } from "@/lib/tabsVisibles";
+import AuditIntegral from "@/app/pre-cierre/AuditIntegral";
 
 /** Respaldo si el catálogo de idioma no trae la lista larga de meses. */
 const MESES_FALLBACK = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -109,6 +111,16 @@ const VISTAS = [
   // El gemelo para el gasto: el mismo tercer segmento, que en las 6 es el
   // puesto y en las 7 es el detalle (owner, 2026-09-10).
   { key: "gastoDetalle" },
+  // Owner, 2026-10-07: «aprovechando que hay maximo detalle en las cuentas de
+  // resultados por cuenta […] revision versus budget o forecast a maximo
+  // detalle por departamento y categorias de cuentas» · «este tab debe estar en
+  // Pre closing en un tab adicional llamado AUDIT INTEGRAL».
+  //
+  // A diferencia de los demas, este NO sale del espejo ni del borrador: sale
+  // del MAYOR guardado (el Balance de Comprobacion que se sube en la Auditoria
+  // del mayor). El borrador llega a la cuenta y se acaba, y lo que hace falta
+  // aca es poder bajar al asiento para mandar la nota de reclasificacion.
+  { key: "integral" },
 ] as const;
 type Vista = typeof VISTAS[number]["key"];
 
@@ -1942,7 +1954,61 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     planillaCuentas: async () => [await cuadroPlanillaCuentas()],
     planillaPosicion: async () => await cuadroPlanillaPosicion(),
     gastoDetalle: async () => await cuadroGastoDetalle(),
+    integral: async () => await cuadroIntegral(),
   };
+
+  /** AUDIT INTEGRAL para el Excel: el mes real a maximo detalle contra las
+   *  versiones de la pantalla, por categoria y departamento.
+   *
+   *  ⚠️ Sale del MAYOR guardado, no del espejo — como en pantalla. Si bajara
+   *  del espejo, el libro diria otra cosa que el cuadro que el owner acaba de
+   *  mirar, que es exactamente el defecto que este archivo lleva dos meses
+   *  evitando.
+   *
+   *  Si el mes no esta subido al mayor devuelve `[]`: una hoja vacia se lee
+   *  como «no hay nada que revisar», y lo que pasa es que falta el archivo. */
+  async function cuadroIntegral(): Promise<Cuadro[]> {
+    const ids = ranuras.slice(1).filter(Boolean);
+    const d = await getAuditIntegral(year, mes, ids);
+    if (!d.hay || !d.filas?.length) return [];
+    const vers = d.versiones ?? [];
+    const filas: FilaCuadro[] = [];
+    let grupo = "";
+    let dept = "";
+    for (const f of d.filas) {
+      if (f.grupo !== grupo) {
+        grupo = f.grupo;
+        dept = "";
+        filas.push({ label: f.grupo.toUpperCase(), es_seccion: true,
+                     valores: [null, ...vers.map(() => null)] });
+      }
+      if (f.dept_code !== dept) {
+        dept = f.dept_code;
+        const suyas = d.filas.filter(x => x.grupo === grupo && x.dept_code === dept);
+        filas.push({
+          label: `${f.dept_code} · ${f.dept_name}`, es_total: true,
+          valores: [suyas.reduce((a, x) => a + x.actual, 0),
+                    ...vers.map(v => suyas.reduce(
+                      (a, x) => a + (x.versiones[v.scenario_id] ?? 0), 0))],
+        });
+      }
+      filas.push({
+        label: `${f.cuenta}  ${f.nombre}`, nivel: 1,
+        valores: [f.actual, ...vers.map(v => f.versiones[v.scenario_id] ?? 0)],
+      });
+    }
+    return [{
+      titulo: t("tab_integral"),
+      subtitulo: `${MESES[mes - 1]} ${year} · USD · del mayor ${d.archivo ?? ""}`,
+      columnas: [
+        { label: t("detalle"), ancho: 60, formato: "texto" },
+        { label: `${MESES[mes - 1]} ${year}`, ancho: 18, formato: "usd2" },
+        ...vers.map(v => ({ label: etiqueta(v.scenario_id), ancho: 18,
+                            formato: "usd2" as const })),
+      ],
+      filas,
+    }];
+  }
 
   /** El gasto por DEPARTAMENTO · CUENTA · DETALLE, **con las versiones de la
    *  pantalla**.
@@ -3738,6 +3804,10 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
        * overhead, que es el error que ya dejó a Sistemas 937,33 corto.
        * Ver la nota `finplan-dos-vocabularios-de-linea`. */}
       {vista === "utilidad" && <PLDetailEnCierre esPre={esPre} />}
+
+      {/* AUDIT INTEGRAL — el mes real a maximo detalle contra Budget y Forecast.
+          Sale del MAYOR guardado, no del espejo: ver la nota en `VISTAS`. */}
+      {vista === "integral" && <AuditIntegral anio={year} mes={mes} />}
 
       {vista === "gastoDetalle" && (() => {
         /* El gasto del mes por DEPARTAMENTO · CUENTA · DETALLE.

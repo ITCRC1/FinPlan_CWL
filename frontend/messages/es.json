@@ -2884,7 +2884,8 @@
     "xlSinVariacion": "sin variación (falta dato en una de las dos columnas)",
     "xlTitulo": "Cierre de mes — {periodo} {year}",
     "xlVariacionEntre": "Variación: {escA} vs {escB}",
-    "ytdA": "YTD a {mes} {year}"
+    "ytdA": "YTD a {mes} {year}",
+    "tab_integral": "Audit Integral"
   },
   "otb": {
     "a851Nota1": "{metrica} por {unidad}:",

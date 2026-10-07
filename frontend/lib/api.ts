@@ -5959,6 +5959,35 @@ export interface AuditoriaGL {
   hallazgos: AuditoriaHallazgo[];
 }
 
+/** Una linea del AUDIT INTEGRAL: una cuenta del mes contra las versiones. */
+export interface FilaIntegral {
+  grupo: string; dept_code: string; dept_name: string;
+  cuenta: string; nombre: string;
+  actual: number; lineas: number;
+  versiones: Record<string, number>;
+}
+
+export interface AuditIntegralResp {
+  anio: number; mes: number; hay: boolean; motivo?: string;
+  archivo?: string; moneda?: string; subido_en?: string | null;
+  orden_grupos?: string[];
+  versiones?: { scenario_id: string; escenario: string }[];
+  filas?: FilaIntegral[];
+}
+
+/**
+ * El mes real a maximo detalle contra Budget y Forecast.
+ *
+ * Sale del MAYOR guardado, no del espejo del Pre-Cierre: el espejo llega a la
+ * cuenta y se acaba, y aca hace falta poder bajar al asiento.
+ */
+export async function getAuditIntegral(
+  anio: number, mes: number, scenarios: string[],
+): Promise<AuditIntegralResp> {
+  const q = encodeURIComponent(scenarios.filter(Boolean).join(","));
+  return api.get(`/mayor/${anio}/${mes}/integral/?scenarios=${q}`);
+}
+
 /** Un mes del mayor que ya quedo guardado. */
 export interface MesGuardado {
   anio: number; mes: number; movimientos: number;
