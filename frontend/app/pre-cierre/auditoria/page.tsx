@@ -295,6 +295,32 @@ export default function AuditoriaDelMayor() {
             </div>
           </div>
 
+          {/* Qué cambió contra la subida anterior del mismo mes.
+
+              Owner, 2026-10-07: primero *«no veo reporte de cambios entre uno y
+              otro, solo veo hallazgos»* — estaba en otro menú—; y después, ya
+              en esta pantalla, *«no veo nada»*, porque lo habia puesto al final,
+              debajo de la tabla de 86 hallazgos.
+
+              ⚠️ **Va ARRIBA de los hallazgos.** Lo primero que uno quiere saber
+              después de subir es si los cambios entraron; los hallazgos vienen
+              después. Un bloque correcto que nadie ve es un bloque que no
+              existe. */}
+          {elegido && (
+            <div style={card}>
+              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+                Qué cambió contra la subida anterior
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-secondary)",
+                            marginBottom: 12 }}>
+                Las dos últimas versiones de este mes, comparadas por cuenta y
+                por asiento. Es para verificar que las correcciones quedaron.
+              </div>
+              <CambiosDelMayor anio={Number(elegido.split("-")[0])}
+                               mes={Number(elegido.split("-")[1])} />
+            </div>
+          )}
+
           {/* El corte por tipo de cuenta. Los que no aparecen salieron limpios:
               el backend no manda un tipo sin hallazgos a propósito, porque una
               pestaña vacía se lee como «no revisé esto». */}
@@ -382,29 +408,6 @@ export default function AuditoriaDelMayor() {
             </div>
           )}
         </>
-      )}
-
-      {/* Qué cambió contra la subida anterior del mismo mes.
-
-          Owner, 2026-10-07, después de subir: *«no veo reporte de cambios entre
-          uno y otro, solo veo hallazgos»*. Estaba, pero en otra pantalla y en
-          otro menú — error mío: **se mira donde se sube**.
-
-          Sale sólo cuando hay un mes elegido; el componente se encarga de decir
-          que todavía no hay anterior cuando es la primera subida. */}
-      {elegido && (
-        <div style={card}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
-            Qué cambió contra la subida anterior
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)",
-                        marginBottom: 12 }}>
-            Las dos últimas versiones de este mes, comparadas por cuenta y por
-            asiento. Es para verificar que las correcciones quedaron.
-          </div>
-          <CambiosDelMayor anio={Number(elegido.split("-")[0])}
-                           mes={Number(elegido.split("-")[1])} />
-        </div>
       )}
     </div>
   );
