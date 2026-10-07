@@ -2333,7 +2333,9 @@
     "sinDrivers": "Este escenario no tiene drivers por tipo de habitación. Los <b>actuales por tipo</b> llegarán vía el importador de Opera (XML).",
     "subirExcelTitle": "Subir el Excel completo (todos los meses)",
     "uploading": "Subiendo…",
-    "ytdThrough": "YTD hasta"
+    "ytdThrough": "YTD hasta",
+    "bajarPorMes": "Excel por mes",
+    "bajarPorMesTitle": "Todo el detalle mes a mes, de enero al corte: una hoja por métrica"
   },
   "bsProj": {
     "lastRealBalance": "último balance real subido",

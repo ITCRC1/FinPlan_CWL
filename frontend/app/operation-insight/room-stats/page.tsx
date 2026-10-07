@@ -229,6 +229,80 @@ export default function OperationRoomStatsPage() {
     } catch (e) { setUploadMsg(`Error: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
+  // ── Bajar TODO el detalle, mes a mes ──────────────────────────────────────
+  //
+  // Owner, 2026-10-06: *«necesito que esto baje todo el detalle por mes desde
+  // enero hasta setiembre 2026. Puede ser un tab para revenue, otro pax y otro
+  // rooms occupied, pero debe bajar todo»*.
+  //
+  // La bajada de arriba da el YTD acumulado —una foto—; ésta da la película:
+  // una hoja por métrica, los tipos de habitación en las filas y los meses en
+  // las columnas, hasta el corte que esté elegido.
+  //
+  // ⚠️ **No hace falta pedirle nada al servidor.** `getRevenueByRoomType` ya
+  // devuelve `months[]` con las filas de cada mes: la pantalla las sumaba para
+  // mostrar el YTD y tiraba el detalle. Agregar un endpoint habría creado una
+  // segunda fuente del mismo número.
+  //
+  // ⚠️ **«Other Rooms Revenue» va incluido.** Es el ingreso sin tipo asociado
+  // —no-show, penalidades— y no tiene noches ni ADR, pero su plata es ingreso
+  // real. Ya desapareció callada una vez del KPI y del Excel.
+  const METRICAS = useMemo(() => ([
+    // «Revenue» y «Pax» se quedan en ingles en los dos idiomas, como el resto
+    // de los terminos hoteleros de la app. Y literales, no `t()`: una llave que
+    // no existe no la ve el typecheck y revienta la pantalla en tiempo de
+    // ejecucion — paso hoy mismo con `totalRevenue`, que no estaba.
+    { clave: "revenue" as const, hoja: "Revenue", rotulo: "Revenue", formato: "usd" as const },
+    { clave: "pax" as const, hoja: "Pax", rotulo: "Pax", formato: "num" as const },
+    { clave: "nights_occupied" as const, hoja: "Nights Occupied", rotulo: t("nochesOcup"), formato: "num1" as const },
+    { clave: "nights_available" as const, hoja: "Nights Available", rotulo: t("nochesDisp"), formato: "num" as const },
+  ]), [t]);
+
+  async function bajarExcelPorMes() {
+    setUploadMsg(null);
+    if (!rs) { setUploadMsg(`Error: ${t("noRowsExport")}`); return; }
+    const meses = Array.from({ length: month }, (_, i) => i + 1);
+    const scn = scenarios.find(s => s.id === rsId);
+    // Los tipos en el MISMO orden en todas las hojas: se comparan hoja contra
+    // hoja, y un orden por monto las desalinearía entre métricas.
+    const tipos = rs.room_types.slice().sort((a, b) => a.name.localeCompare(b.name));
+
+    const valor = (m: number, id: string, clave: string): number => {
+      const mo = rs.months.find(x => x.month === m);
+      const r = mo?.rows.find(x => x.room_type_id === id);
+      return r ? Number((r as unknown as Record<string, number>)[clave] ?? 0) : 0;
+    };
+
+    const cuadros = METRICAS.map(met => {
+      const filas: FilaCuadro[] = tipos.map(rt => ({
+        label: rtLabel(rt.code, rt.name),
+        valores: [...meses.map(m => valor(m, rt.id, met.clave)),
+                  meses.reduce((s, m) => s + valor(m, rt.id, met.clave), 0)],
+      }));
+      filas.push({
+        label: "TOTAL", es_total: true,
+        valores: [...meses.map(m => tipos.reduce((s, rt) => s + valor(m, rt.id, met.clave), 0)),
+                  meses.reduce((s, m) => s + tipos.reduce((a, rt) => a + valor(m, rt.id, met.clave), 0), 0)],
+      });
+      return {
+        titulo: `${met.rotulo} por tipo de habitación · ${MONTHS_EN[0]}–${MONTHS_EN[month - 1]} ${year}`,
+        subtitulo: t("excelSubtitulo", { scn: scn ? scnLabel(scn) : "", mes: MONTHS[month - 1] }),
+        descripcion: `${met.rotulo} · ${meses.length} ${meses.length === 1 ? "mes" : "meses"}`,
+        hoja: met.hoja,
+        columnas: [
+          { label: "Room Category", ancho: 34, formato: "texto" as const },
+          ...meses.map(m => ({ label: MONTHS[m - 1], ancho: 13, formato: met.formato })),
+          { label: "TOTAL", ancho: 15, formato: met.formato, abre_grupo: true },
+        ],
+        filas,
+      };
+    });
+
+    try {
+      await bajarCuadros(`Room_Stats_por_mes_${year}`, cuadros);
+    } catch (e) { setUploadMsg(`Error: ${e instanceof Error ? e.message : String(e)}`); }
+  }
+
   const sel: React.CSSProperties = { background: "var(--bg-input)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: 5, padding: "6px 10px", fontSize: 13, fontWeight: 600, cursor: "pointer" };
   const th: React.CSSProperties = { textAlign: "right", padding: "5px 10px", fontSize: 10.5, color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { textAlign: "right", padding: "3px 8px", fontSize: 12.5 };
@@ -257,6 +331,9 @@ export default function OperationRoomStatsPage() {
           <input ref={fileRef} type="file" accept=".xlsx" style={{ display: "none" }} onChange={handleUpload} />
           <button onClick={() => fileRef.current?.click()} disabled={uploading} title={t("subirExcelTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: uploading ? "default" : "pointer", background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", alignSelf: "flex-end" }}>{uploading ? t("uploading") : "⬆ Excel"}</button>
           <button onClick={bajarExcel} title={t("bajarExcelTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "transparent", color: "var(--positive)", border: "1px solid var(--positive)", alignSelf: "flex-end" }}>⬇ Excel</button>
+          {/* El detalle mes a mes, una hoja por métrica. El de al lado baja el
+              YTD acumulado; éste, de enero al corte. */}
+          <button onClick={bajarExcelPorMes} title={t("bajarPorMesTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "var(--positive)", color: "#fff", border: "1px solid var(--positive)", alignSelf: "flex-end" }}>⬇ {t("bajarPorMes")}</button>
           <button onClick={() => window.print()} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "var(--brand)", color: "#fff", border: "1px solid var(--brand)", alignSelf: "flex-end" }}>{tc("print")}</button>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase" }}>{tc("scenario")}</span>

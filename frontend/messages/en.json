@@ -2333,7 +2333,9 @@
     "sinDrivers": "This scenario has no drivers by room type. The <b>actuals by type</b> will arrive through the Opera importer (XML).",
     "subirExcelTitle": "Upload the complete Excel file (all months)",
     "uploading": "Uploading…",
-    "ytdThrough": "YTD through"
+    "ytdThrough": "YTD through",
+    "bajarPorMes": "Excel by month",
+    "bajarPorMesTitle": "The full month-by-month detail, January to the cut-off: one sheet per metric"
   },
   "bsProj": {
     "lastRealBalance": "last actual balance uploaded",
