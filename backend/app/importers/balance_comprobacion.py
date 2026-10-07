@@ -78,6 +78,41 @@ class Archivo:
     hojas: list[str] = field(default_factory=list)
     descartadas: int = 0
 
+    @property
+    def anio_mes(self) -> tuple[int, int] | None:
+        """`(2026, 9)` a partir de «Setiembre - 2026». `None` si no se entiende.
+
+        Vive acá y no en quien llama porque el período es un dato del ARCHIVO:
+        el día que Integrity lo escriba distinto, se arregla en un solo lugar.
+
+        ⚠️ Devuelve `None` en vez de adivinar. Guardar el mayor de setiembre
+        como si fuera otro mes es peor que no guardarlo: el mes bueno se
+        quedaría sin su libro y el malo mostraría asientos que no son suyos.
+        """
+        return _anio_mes(self.periodo)
+
+
+#: Los doce meses como los escribe Integrity, y las dos formas de setiembre:
+#: el archivo del owner dice «Setiembre» y el castellano general «Septiembre».
+#: Las dos tienen que valer o el libro de un mes entero se pierde por una letra.
+_MESES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+    "julio": 7, "agosto": 8, "setiembre": 9, "septiembre": 9, "octubre": 10,
+    "noviembre": 11, "diciembre": 12,
+    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
+    "december": 12,
+}
+
+
+def _anio_mes(periodo: str) -> tuple[int, int] | None:
+    texto = (periodo or "").lower()
+    mes = next((n for nombre, n in _MESES.items() if nombre in texto), None)
+    anio = re.search(r"(20\d{2})", texto)
+    if mes is None or not anio:
+        return None
+    return int(anio.group(1)), mes
+
 
 def _f(v) -> float:
     try:

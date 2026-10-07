@@ -20,5 +20,8 @@ python-docx>=1.1.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 httpx>=0.27.0
+# Solo para pruebas: una base en memoria donde ensayar un guardado real sin
+# PostgreSQL. Ver `test_el_mayor_guardado`.
+aiosqlite>=0.20.0
 tzdata>=2025.1
 anthropic>=0.69.0

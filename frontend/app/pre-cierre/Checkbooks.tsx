@@ -40,12 +40,9 @@ import {
   type DetalleCelda, type Scenario,
 } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
+import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { APERTURAS, cuadroCheckbook, type ClaseApertura } from "@/lib/planningReport";
 import Tabla from "@/app/planning/report/Tabla";
-
-/** Cuántas versiones se comparan contra el espejo. Dos: el Budget y el
- *  Forecast, que es la pregunta que se hace al cerrar: ¿contra qué quedé? */
-const COMPARAR = 2;
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
                "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -55,7 +52,20 @@ export default function Checkbooks(
 ) {
   const [escenarios, setEscenarios] = useState<Scenario[]>([]);
   const [espejo, setEspejo] = useState<string>("");
-  const [otros, setOtros] = useState<string[]>(Array(COMPARAR).fill(""));
+  // ⚠️ La regla COMPARTIDA, no una propia. Cada pantalla traía su «el año más
+  // nuevo» copiado a mano, y el día que nacieron los Working 2028-2035 todos
+  // los reportes se fueron a 2035 sin que nada fallara.
+  //
+  // Dos llaves distintas y SIN `?esc=`: con un solo parámetro en la dirección,
+  // los dos selectores quedarían en el mismo escenario y la comparación sería
+  // contra sí misma — variaciones de cero que se leen como «no cambió nada».
+  const [budget, setBudget] = useEscenarioDe(
+    "pre-cierre/checkbooks:budget", escenarios, "budget");
+  const [forecast, setForecast] = useEscenarioDe(
+    "pre-cierre/checkbooks:forecast", escenarios, "forecast");
+  const otros = useMemo(() => [budget, forecast], [budget, forecast]);
+  const ponerOtro = (i: number, v: string) =>
+    (i === 0 ? setBudget : setForecast)(v);
   const [clase, setClase] = useState<ClaseApertura>("opex");
   const [compacto, setCompacto] = useState(true);
   const [datos, setDatos] = useState<DetalleCelda | null>(null);
@@ -75,14 +85,8 @@ export default function Checkbooks(
         if (!vivo) return;
         setEscenarios(lista);
         setEspejo(esp.espejo?.id || "");
-        // Arranca comparando contra lo que casi siempre se quiere: el Budget
-        // del año y el Forecast vivo. Si no están, quedan vacíos y se eligen.
-        const delAnio = lista.filter(s => s.year === anio);
-        setOtros([
-          delAnio.find(s => s.type === "BUDGET")?.id || "",
-          delAnio.find(s => s.type === "FORECAST" && s.is_current_forecast)?.id
-            || delAnio.find(s => s.type === "FORECAST")?.id || "",
-        ]);
+        // Con qué arranca cada selector lo decide `useEscenarioDe`, y lo que se
+        // elija queda recordado por pantalla.
       } catch (e) {
         if (vivo) setError(e instanceof Error ? e.message : "no se pudo cargar");
       }
@@ -160,8 +164,7 @@ export default function Checkbooks(
         </span>
         {otros.map((id, i) => (
           <select key={i} value={id}
-                  onChange={e => setOtros(o =>
-                    o.map((v, j) => (j === i ? e.target.value : v)))}
+                  onChange={e => ponerOtro(i, e.target.value)}
                   style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5 }}>
             <option value="">— sin comparar —</option>
             {escenarios.filter(s => !s.es_precierre).map(s => (

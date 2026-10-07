@@ -4430,7 +4430,8 @@
       "hoja": "Month review",
       "cambios": "What changed",
       "descargas": "Downloads",
-      "checkbooks": "Checkbooks"
+      "checkbooks": "Checkbooks",
+      "movimientos": "GL entries"
     },
     "cambios": {
       "primera": "This is the first round for this month: nothing to compare against.",

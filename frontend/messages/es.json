@@ -4430,7 +4430,8 @@
       "hoja": "Revisión del mes",
       "cambios": "Qué cambió",
       "descargas": "Descargas",
-      "checkbooks": "Checkbooks"
+      "checkbooks": "Checkbooks",
+      "movimientos": "Movimientos"
     },
     "cambios": {
       "primera": "Es la primera vuelta de este mes: no hay contra qué comparar.",
