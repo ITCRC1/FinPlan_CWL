@@ -4429,7 +4429,8 @@
       "hallazgos": "Findings",
       "hoja": "Month review",
       "cambios": "What changed",
-      "descargas": "Downloads"
+      "descargas": "Downloads",
+      "checkbooks": "Checkbooks"
     },
     "cambios": {
       "primera": "This is the first round for this month: nothing to compare against.",

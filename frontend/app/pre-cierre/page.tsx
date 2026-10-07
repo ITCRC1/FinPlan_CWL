@@ -23,6 +23,8 @@
  * después de la primera carga y la pantalla dice en qué vuelta va.
  */
 import { useCallback, useEffect, useState } from "react";
+
+import Checkbooks from "./Checkbooks";
 import { useTranslations } from "next-intl";
 
 import {
@@ -47,7 +49,7 @@ const FONDO: Record<string, string> = {
 const usd = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Pestana = "hallazgos" | "hoja" | "cambios" | "descargas";
+type Pestana = "hallazgos" | "hoja" | "checkbooks" | "cambios" | "descargas";
 
 export default function PreCierrePage() {
   const t = useTranslations("precierre");
@@ -278,7 +280,7 @@ export default function PreCierrePage() {
           </p>
 
           <nav style={{ display: "flex", gap: 4, margin: "18px 0 12px" }}>
-            {(["hallazgos", "hoja", "cambios", "descargas"] as Pestana[]).map(p => (
+            {(["hallazgos", "hoja", "checkbooks", "cambios", "descargas"] as Pestana[]).map(p => (
               <button key={p} onClick={() => setPestana(p)}
                       style={{ ...tab, ...(pestana === p ? tabActivo : {}) }}>
                 {t(`tab.${p}`)}
@@ -301,6 +303,9 @@ export default function PreCierrePage() {
             <Hoja filas={hoja} hojaExcelUrl={dl.hoja} t={t}
                   moneda={moneda} setMoneda={setMoneda} hayCrc={hayCrc} />
           )}
+          {/* El mes contra el Budget y el Forecast, cuenta por cuenta. No
+              depende de `dl`: lee el espejo, no el borrador. */}
+          {pestana === "checkbooks" && <Checkbooks anio={anio} mes={mes} />}
           {pestana === "cambios" && (
             <Cambios datos={cambios} t={t} contra={contra} setContra={setContra} />
           )}
