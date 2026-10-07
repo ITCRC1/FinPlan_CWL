@@ -77,6 +77,10 @@ class Archivo:
     moneda: str = ""
     hojas: list[str] = field(default_factory=list)
     descartadas: int = 0
+    #: Lineas que ya venian en otra hoja del mismo libro y NO se volvieron a
+    #: contar. Viaja en la respuesta porque es un dato del archivo, no un
+    #: detalle del lector: el owner tiene que saber que su export repite.
+    repetidas: int = 0
 
     @property
     def anio_mes(self) -> tuple[int, int] | None:
@@ -126,9 +130,29 @@ def _s(v) -> str:
 
 
 def leer(contenido: bytes) -> Archivo:
-    """Todas las hojas del reporte, concatenadas, sin las filas de corte."""
+    """Todas las hojas del reporte, concatenadas, sin las filas de corte y **sin
+    repetir una linea que ya vino en otra hoja**.
+
+    ⚠️ **Un export de Integrity puede traer la misma linea en varias hojas.**
+    Medido sobre `Full Detail P&L September 2026.xlsx` (owner, 2026-10-06): tres
+    hojas —`Detalle`, `Detalle (2)`, `Detalle (3)`— con 4.565, 2.330 y 1.957
+    lineas. Las dos ultimas **no aportan ni una linea nueva**: estan contenidas
+    enteras en la primera. Concatenando salian 8.852 lineas donde hay 4.565, o
+    sea **4.287 de mas**, y el debito del mes daba 1.092 millones de colones en
+    vez de 815 — **277 millones contados dos y tres veces**.
+
+    No fallaba nada. El archivo se leia, la auditoria corria y daba hallazgos
+    reales; solo que sobre un libro inflado. Es el modo de falla de siempre en
+    este repo: la plata esta mal y los totales cuadran consigo mismos.
+
+    La llave es `(cuenta, asiento, linea, debito, credito)`, que es lo que
+    identifica un renglon del mayor: un asiento no tiene dos veces la misma
+    linea para la misma cuenta. Lo que se descarta se CUENTA y se informa, en
+    vez de desaparecer en silencio.
+    """
     wb = load_workbook(io.BytesIO(contenido), data_only=True, read_only=True)
     out = Archivo(hojas=list(wb.sheetnames))
+    vistas: set[tuple] = set()
     for i, nombre in enumerate(wb.sheetnames):
         ws = wb[nombre]
         for fila in ws.iter_rows(values_only=True):
@@ -153,6 +177,14 @@ def leer(contenido: bytes) -> Archivo:
                     out.descartadas += 1
                 continue
             p = cta.split("-")
+            # La llave de un renglon del mayor. Si ya vino en otra hoja, no se
+            # vuelve a contar — ver el porque en el docstring.
+            llave = (cta, _s(celdas[1]), _s(celdas[2]),
+                     _f(celdas[13]), _f(celdas[14]))
+            if llave in vistas:
+                out.repetidas += 1
+                continue
+            vistas.add(llave)
             out.lineas.append(Linea(
                 cuenta=cta, seg1=p[0], seg2=p[1], seg3=p[2],
                 asiento=_s(celdas[1]), linea=_s(celdas[2]), fecha=_s(celdas[3]),

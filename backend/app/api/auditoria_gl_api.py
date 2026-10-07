@@ -138,6 +138,10 @@ async def revisar(
         "moneda": leido.moneda,
         "hojas": leido.hojas,
         "lineas_del_archivo": r.lineas_del_archivo,
+        # Lineas que el archivo traia repetidas en otra hoja y NO se contaron.
+        # Viaja siempre: que el export repita es un dato del archivo del owner,
+        # y callarlo dejaria el numero de lineas sin explicacion.
+        "lineas_repetidas": leido.repetidas,
         "lineas_revisadas": r.lineas_revisadas,
         "lineas_senaladas": r.lineas_senaladas,
         "monto_en_revision_crc": r.monto_en_revision_crc,

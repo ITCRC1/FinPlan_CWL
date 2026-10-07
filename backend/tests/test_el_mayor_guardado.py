@@ -252,3 +252,82 @@ async def test_queda_de_que_archivo_salio(base):
     assert f.subido_en is not None
     # Y la descripcion del asiento, que es lo que el owner pidio por su nombre.
     assert f.desc_asiento == "Allocation LN Septiembre"
+
+
+# ── Un export que repite la misma linea en varias hojas ──────────────────────
+
+def test_la_linea_repetida_en_otra_hoja_no_se_cuenta_dos_veces():
+    """`Full Detail P&L September 2026.xlsx` (owner, 2026-10-06) trae TRES hojas
+    —`Detalle`, `Detalle (2)`, `Detalle (3)`— y las dos ultimas estan contenidas
+    enteras en la primera: no aportan ni una linea nueva.
+
+    Concatenandolas salian 8.852 lineas donde hay 4.565, y el debito del mes daba
+    1.092 millones de colones en vez de 815 — **277 millones contados dos y tres
+    veces**. No fallaba nada: la auditoria corria y daba hallazgos reales, solo
+    que sobre un libro inflado.
+
+    Se prueba con un libro armado a mano —dos hojas, la segunda repitiendo una
+    linea de la primera— para que la prueba no dependa de un archivo que vive en
+    la carpeta de descargas del owner.
+    """
+    import io
+
+    from openpyxl import Workbook
+
+    from app.importers.balance_comprobacion import leer
+
+    wb = Workbook()
+    h1 = wb.active
+    h1.title = "Detalle"
+    h1.append(["Balance de Comprobación"])
+    h1.append(["Setiembre - 2026"])
+    h1.append(["Moneda: DOL"])
+    fila_a = ["7310-0110-001-000-000-00-00", "1083", "8", "30/09/26",
+              "Distribución gasto Lavandería", "Allocation LN Septiembre",
+              "FIJ", "", "", "", "", 453.0, "DOL", 1207.84, 0.0]
+    fila_b = ["7310-0110-001-000-000-00-00", "1085", "8", "30/09/26",
+              "Ajuste", "Allocation LN Septiembre Ajuste",
+              "FIJ", "", "", "", "", 453.0, "DOL", 96.65, 0.0]
+    h1.append(fila_a)
+    h1.append(fila_b)
+    h2 = wb.create_sheet("Detalle (2)")
+    h2.append(fila_a)                      # la MISMA linea, otra vez
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    a = leer(buf.getvalue())
+
+    assert len(a.lineas) == 2, [l.asiento for l in a.lineas]
+    assert a.repetidas == 1
+    assert sum(l.debito for l in a.lineas) == pytest.approx(1304.49)
+
+
+def test_dos_lineas_distintas_del_MISMO_asiento_se_quedan_las_dos():
+    """La llave lleva el numero de linea: un asiento con dos renglones de la
+    misma cuenta son dos movimientos, no una repeticion.
+
+    Sin esto, el arreglo de arriba borraria plata de verdad — que seria peor que
+    el defecto que viene a arreglar.
+    """
+    import io
+
+    from openpyxl import Workbook
+
+    from app.importers.balance_comprobacion import leer
+
+    wb = Workbook()
+    h = wb.active
+    h.title = "Detalle"
+    h.append(["Balance de Comprobación"])
+    h.append(["Setiembre - 2026"])
+    for linea, monto in (("1", 100.0), ("2", 250.0)):
+        h.append(["7400-0120-800-000-000-00-00", "900", linea, "15/09/26",
+                  "Compra", "Factura 55", "CON", "", "", "", "", 453.0, "DOL",
+                  monto, 0.0])
+    buf = io.BytesIO()
+    wb.save(buf)
+    a = leer(buf.getvalue())
+
+    assert len(a.lineas) == 2
+    assert a.repetidas == 0
+    assert sum(l.debito for l in a.lineas) == pytest.approx(350.0)
