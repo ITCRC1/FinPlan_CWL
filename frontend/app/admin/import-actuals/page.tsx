@@ -199,6 +199,29 @@ export default function ImportActualsPage() {
    * abierto.
    */
   const [camino, setCamino] = useState<"historico" | "mensual" | null>(null);
+  /**
+   * Reemplazar el AÑO ENTERO, no solo los meses que trae el archivo.
+   *
+   * Es el `merge=false` del backend, que existía y **nadie pedía**: la pantalla
+   * mandaba `merge=true` fijo. Y `merge=true` limpia *sólo los meses presentes
+   * en el archivo*, así que un año cargado por partes queda mezclado.
+   *
+   * Pasó el 2026-10-08. ACTUAL 2026 tenía los doce meses de 2025 (se había
+   * elegido el año equivocado en el selector). Se subió el detalle real de
+   * 2026, que trae **enero a julio** — y agosto a diciembre **siguieron siendo
+   * 2025**: $82.588,09 de ingreso del año anterior, dentro del año en curso.
+   * El P&L cuadró consigo mismo, porque esos cinco meses son coherentes entre
+   * sí. Son un año de verdad, sólo que el año equivocado.
+   *
+   * ⚠️ **Apagado por defecto.** Prender esto hace que lo que el archivo no
+   * traiga quede VACÍO, y eso no puede ser lo que pasa si no lo pediste. El
+   * backend ya lo decía: «el reemplazo total sigue disponible, pero ahora hay
+   * que pedirlo».
+   *
+   * Sólo aparece en la carga histórica: el cierre mensual escribe un mes y
+   * borrar los otros once sería exactamente lo contrario de lo que hace.
+   */
+  const [reemplazarAnio, setReemplazarAnio] = useState(false);
   const [month, setMonth] = useState(1);
   const [estado, setEstado] = useState<MesesCerrados | null>(null);
   const [divergencias, setDivergencias] = useState<Divergencia[]>([]);
@@ -283,14 +306,21 @@ export default function ImportActualsPage() {
     // vista previa no toca nada, así que preguntar ahí sería ruido.
     if (camino === "historico" && !dryRun && estado?.tiene_datos) {
       const ms = estado.meses_cerrados.map(m => MESES[m - 1]).join(", ");
-      const ok = window.confirm(t("historicConfirm", {
+// Con «reemplazar el año» la pregunta es OTRA: no es «voy a pisar estos
+      // meses», es «lo que el archivo no traiga queda vacío». Decirlo con el
+      // mismo texto escondería justo lo que cambia.
+      const ok = window.confirm(t(reemplazarAnio ? "replaceYearConfirm" : "historicConfirm", {
         esc: estado.escenario, n: estado.meses_cerrados.length, meses: ms,
       }));
       if (!ok) return;
     }
     setBusy(true); setError(null); setClaveError(null); setResult(null); setBloqueo(null); setDivergencias([]);
     try {
-      const r = await importGLDetail(file, dryRun, true, scenarioId, confirmar,
+// `merge` es lo contrario de «reemplazar el año»: merge limpia sólo los
+      // meses que trae el archivo; sin merge se reemplaza el escenario entero.
+      // El cierre mensual nunca reemplaza: escribe un mes.
+      const merge = !(camino === "historico" && reemplazarAnio);
+      const r = await importGLDetail(file, dryRun, merge, scenarioId, confirmar,
                                      camino === "mensual" ? month : undefined);
       setResult(r);
       // Al terminar un cierre mensual, mirar los meses cerrados del forecast que
@@ -465,6 +495,25 @@ export default function ImportActualsPage() {
                 b: (c: React.ReactNode) => <b>{c}</b>,
               })}
             </div>
+            {/* El reemplazo del año entero. Apagado por defecto, y con el
+                efecto dicho entero: lo que el archivo no traiga queda VACÍO.
+                Sin esto, un año cargado en dos tandas queda mezclado y el P&L
+                cuadra igual — ver el comentario de `reemplazarAnio`. */}
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8,
+              marginTop: 12, paddingTop: 10, cursor: "pointer",
+              borderTop: "1px solid rgba(133,100,4,.3)" }}>
+              <input type="checkbox" checked={reemplazarAnio} style={{ marginTop: 3 }}
+                onChange={e => setReemplazarAnio(e.target.checked)} />
+              <span>
+                <span style={{ fontSize: 12.5, fontWeight: 700 }}>
+                  {t("replaceYearLabel")}
+                </span>
+                <span style={{ display: "block", fontSize: 12, marginTop: 2,
+                  color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  {t("replaceYearHelp")}
+                </span>
+              </span>
+            </label>
           </div>
         )}
 

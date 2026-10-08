@@ -123,26 +123,55 @@ export default function PLDetailPage() {
    * mismo peso a un mes lleno que a uno cerrado — y Amarena tiene cinco meses
    * en cero, así que el ADR del año habría salido 5/12 más bajo.
    */
-  const stats = useCallback((k: PLDetail["versiones"][number]["kpis"] | undefined) => {
-    if (!k) return null;
-    const av = corte(k.rooms_available) ?? 0;
-    const oc = corte(k.rooms_occupied) ?? 0;
-    const gu = corte(k.guests) ?? 0;
-    const rev = corte(k.rooms_revenue) ?? 0;
-    return {
-      "Total available Rooms": num(av),
-      "Total Rooms Occupied": num(oc),
-      "Total Guests": num(gu),
-      "% Occupancy": av ? pct(oc / av) : "—",
-      "Average Daily Room Only": oc ? usd(rev / oc) : "—",
-      "Total RevPAR": av ? usd(rev / av) : "—",
-    };
-  }, [corte]);
+const statsDe = useCallback(
+    (k: PLDetail["versiones"][number]["kpis"] | undefined, idxs: number[]) => {
+      if (!k) return null;
+      const sum = (s: number[] | null | undefined) =>
+        idxs.reduce((t, i) => t + (s?.[i] ?? 0), 0);
+      const av = sum(k.rooms_available);
+      const oc = sum(k.rooms_occupied);
+      const gu = sum(k.guests);
+      const rev = sum(k.rooms_revenue);
+      return {
+        "Total available Rooms": av ? num(av) : "—",
+        "Total Rooms Occupied": oc ? num(oc) : "—",
+        "Total Guests": gu ? num(gu) : "—",
+        "% Occupancy": av ? pct(oc / av) : "—",
+        "Average Daily Room Only": oc ? usd(rev / oc) : "—",
+        "Total RevPAR": av ? usd(rev / av) : "—",
+      };
+    }, []);
+
+  const stats = useCallback(
+    (k: PLDetail["versiones"][number]["kpis"] | undefined) => statsDe(k, ventana),
+    [statsDe, ventana]);
 
   /** Una columna de estadisticas por version. */
   const statsPorVersion = useMemo(
     () => (datos?.versiones ?? []).map(v => stats(v.kpis)),
     [stats, datos]);
+
+  /**
+   * Las mismas estadisticas, MES A MES, para las columnas de la ventana.
+   *
+   * Owner, 2026-10-08, mirando el Full Year del ACTUAL 2025: *«por que actual
+   * 2025 no tiene las stats»*. Las tenia —los doce meses, correctos— pero el
+   * bloque las colapsaba al total del corte mientras el P&L de abajo abria los
+   * doce meses. Dos cuadros pegados, uno abierto y el otro cerrado: parece que
+   * al de arriba le falta el dato.
+   *
+   * ⚠️ **Cada mes se rearma con SUS numeradores y denominadores.** Ocupacion,
+   * ADR y RevPAR son razones y no se reparten: el ADR de enero sale de su
+   * propio ingreso sobre sus propias noches. Por eso se llama `statsDe` con
+   * `[i]` y no se divide el total del año entre doce.
+   *
+   * Solo la version PRINCIPAL se abre por mes — las columnas de la derecha
+   * siguen siendo una por version, igual que en el P&L de abajo, donde los
+   * meses tambien son los de la principal.
+   */
+  const statsPorMes = useMemo(
+    () => ventana.map(i => statsDe(datos?.versiones?.[0]?.kpis, [i])),
+    [statsDe, ventana, datos]);
 
   /** Baja el Excel CON LA FORMA del cuadro. Antes usaba el exportador
    *  generico, que aplana los dos pisos de encabezado — el owner lo describio
@@ -276,31 +305,59 @@ export default function PLDetailPage() {
             {" · "}{act.ayuda} · USD
           </div>
 
-          {/* Las estadísticas del Excel (filas 3–9 de sus hojas), una columna
-              por versión. */}
+          {/* Las estadísticas del Excel (filas 3–9 de sus hojas).
+              Las MISMAS columnas que el P&L de abajo: los meses de la ventana,
+              y después una por versión. Que los dos cuadros se lean con la
+              misma regla es justamente lo que faltaba. */}
           {statsPorVersion[0] && (
-            <table className="fin-table" style={{ marginBottom: 16, minWidth: 520 }}>
+            <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+            <table className="fin-table"
+                   style={{ marginBottom: 16, minWidth: 300 + anchoCols * 95 }}>
               <thead>
                 <tr>
                   <th style={{ ...TDL, textAlign: "left" }}>
                     ESTADÍSTICAS · {rotuloCorte}
                   </th>
-                  {datos.versiones.map(v => (
-                    <th key={v.scenario_id} style={TD}>{v.escenario}</th>
+                  {ventana.map(i => <th key={i} style={TD}>{MESES[i]}</th>)}
+                  {datos.versiones.map((v, i) => (
+                    <th key={v.scenario_id}
+                        style={{ ...TD, fontWeight: i === 0 ? 800 : 600,
+                                 borderLeft: i === 0
+                                   ? "2px solid var(--border-medium)" : undefined }}>
+                      {i === 0 ? `${rotuloCorte} · ${v.escenario}` : v.escenario}
+                    </th>
                   ))}
+                  {hayVar && (
+                    <>
+                      <th style={TD} />
+                      <th style={TD} />
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {Object.keys(statsPorVersion[0]!).map(k => (
                   <tr key={k}>
                     <td style={{ ...TDL, fontWeight: 500 }}>{k}</td>
-                    {statsPorVersion.map((st, i) => (
-                      <td key={i} className="mono"
-                          style={{ ...TD, fontWeight: i === 0 ? 700 : 400,
-                                   color: i ? "var(--text-secondary)" : undefined }}>
+                    {statsPorMes.map((st, j) => (
+                      <td key={j} className="mono" style={TD}>
                         {st ? st[k as keyof typeof st] : "—"}
                       </td>
                     ))}
+                    {statsPorVersion.map((st, i) => (
+                      <td key={i} className="mono"
+                          style={{ ...TD, fontWeight: i === 0 ? 800 : 500,
+                                   color: i ? "var(--text-secondary)" : undefined,
+                                   borderLeft: i === 0
+                                     ? "2px solid var(--border-medium)" : undefined }}>
+                        {st ? st[k as keyof typeof st] : "—"}
+                      </td>
+                    ))}
+                    {/* Sin Var $ ni Var %: la varianza de una razon (ADR,
+                        ocupacion) no es la resta de las razones. Se dejan
+                        vacias para que las columnas sigan alineadas con el
+                        P&L de abajo. */}
+                    {hayVar && (<><td style={TD} /><td style={TD} /></>)}
                   </tr>
                 ))}
                 {datos.club && (
@@ -308,14 +365,21 @@ export default function PLDetailPage() {
                     <td style={{ ...TDL, fontWeight: 500 }}>
                       Membresías (total · pagando)
                     </td>
-                    <td className="mono" style={{ ...TD, fontWeight: 700 }}>
+                    {/* Vacías a propósito: el de socios es un SALDO, no un
+                        flujo (ver `ClubMembershipStat`), así que repartirlo por
+                        mes sería inventar. */}
+                    {ventana.map((_, j) => <td key={j} style={TD} />)}
+                    <td className="mono" style={{ ...TD, fontWeight: 800,
+                      borderLeft: "2px solid var(--border-medium)" }}>
                       {datos.club.cierre.total} · {datos.club.cierre.pagando}
                     </td>
-                    {datos.versiones.slice(1).map((v, i) => <td key={i} />)}
+                    {datos.versiones.slice(1).map((v, i) => <td key={i} style={TD} />)}
+                    {hayVar && (<><td style={TD} /><td style={TD} /></>)}
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           )}
 
           {vista === "cierre" ? <Cierre datos={datos} mes={mes} /> : (

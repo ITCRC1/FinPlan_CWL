@@ -171,8 +171,18 @@ export default function PlanningReportPage() {
     setCargando(true);
     setError(null);
     try {
-      if (vista === "pl") setPl(await getPLDetail(ambito, principal, otros));
-      else if (vista === "aperturas") {
+      if (vista === "pl") {
+        // ⚠️ Las dos a la vez, no una después de la otra: son dos endpoints
+        // distintos y encadenarlos duplicaría la espera de la vista que más se
+        // abre. Si las estadísticas fallan, el P&L igual se dibuja — por eso
+        // `cargarStats` ya devuelve `null` por versión en vez de tirar.
+        const [d, s] = await Promise.all([
+          getPLDetail(ambito, principal, otros),
+          cargarStats().catch(() => null),
+        ]);
+        setPl(d);
+        setStats(s);
+      } else if (vista === "aperturas") {
         const g = await getGastoPorClase(ids, true);
         setGastos({ escenarios: g.escenarios, departamentos: g.departamentos ?? {} });
       } else if (vista === "checkbooks" || vista === "detalle") {
@@ -222,6 +232,32 @@ export default function PlanningReportPage() {
    *  la línea roja … doce meses, y con una columna de espacio, otros doce»*. */
   const extras = useMemo(
     () => ids.map((_id, i) => i).filter(i => i !== mesesDe), [ids, mesesDe]);
+
+  /**
+   * Las estadísticas, encima del P&L.
+   *
+   * Owner, 2026-10-08, señalando el encabezado del Budget Package: *«todo ese
+   * set de stats debe aparecer acá arriba para todas las versiones… pero no
+   * aparece»*. Estaban, pero sólo en su propia pestaña.
+   *
+   * ⚠️ **Es un cuadro APARTE, no filas metidas en el del P&L.** `cuadroPlanning`
+   * cuelga `suma_de` y `combina_filas` por ÍNDICE DE FILA, y su propio
+   * comentario lo advierte: un índice que apunta a otra fila hace que el
+   * exportador descarte la fórmula **sin decir nada**. Anteponer filas habría
+   * corrido los de las seis líneas de la cascada —NET PROFIT incluido— y la
+   * hoja habría perdido sus fórmulas más miradas en silencio.
+   *
+   * Las columnas salen iguales porque las dos pasan por `armarCuadro` con las
+   * mismas `versiones`, `mesesDe` y `extras`.
+   */
+  const cuadroStats: Cuadro | null = useMemo(() => {
+    if (vista !== "pl" || !stats) return null;
+    try {
+      return statsACuadro(stats, { ambito, compacto, mesesDe, extras });
+    } catch {
+      return null;
+    }
+  }, [vista, stats, statsACuadro, ambito, compacto, mesesDe, extras]);
 
   const cuadro: Cuadro | null = useMemo(() => {
     const op = { ambito, compacto, mesesDe, extras };
@@ -548,6 +584,11 @@ export default function PlanningReportPage() {
           <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
             {cuadro.subtitulo}
           </div>
+          {cuadroStats && (
+            <div style={{ marginBottom: 18 }}>
+              <Tabla cuadro={cuadroStats} />
+            </div>
+          )}
           <Tabla cuadro={cuadro} />
         </>
       )}

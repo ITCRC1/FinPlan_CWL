@@ -1785,6 +1785,56 @@ async def import_gl_detail(
     except Exception as e:
         raise ErrorApi(400, "archivo.no_se_pudo_leer", detalle=str(e))
 
+    if forced is not None:
+        # ── El año del archivo tiene que ser el año de la versión ──────────────
+        #
+        # `forced` se salta `_match_block_target`, y con él se saltaba la única
+        # comparación de año que había (`s.year == year`, línea 1425). El
+        # selector sirve para DESEMPATAR entre versiones del mismo tipo+año
+        # —ese es el caso que lo justificó, «2 forecast 2026»—, pero sin este
+        # chequeo también servía para mandar el dato a otro año.
+        #
+        # Pasó el 2026-10-08: `..._ACTUAL_Final_2025_full.xlsx` entró con ACTUAL
+        # Final **2026** seleccionado, y los doce meses de 2025 quedaron
+        # guardados como 2026 — $153,204.61 de habitaciones, al centavo, en el
+        # año equivocado. **Nada falló**: el P&L cuadró consigo mismo y la
+        # verificación de arriba contra abajo también, porque los dos lados
+        # salen del MISMO archivo. Lo único que no cuadraba era contra la
+        # realidad, y eso el sistema no lo mira.
+        #
+        # ⚠️ **Sin salida de emergencia, a propósito.** `confirmar_diferencias`
+        # existe porque una propiedad puede tener tarifas raras y saberlo; un
+        # año equivocado no tiene versión legítima. Si de verdad hay que mover
+        # un año a otro, se cambia la etiqueta del bloque en el Excel.
+        desalineados = sorted({
+            (blk["label"], blk["year"]) for blk in blocks
+            if blk.get("year") and blk["year"] != forced.year})
+        if desalineados:
+            raise ErrorApi(
+                409, "gl.ano_no_coincide",
+                anio_archivo=", ".join(str(a) for a in sorted({a for _, a in desalineados})),
+                anio_destino=forced.year,
+                destino=f"{forced.type} {forced.version} {forced.year}",
+                bloques="; ".join(f"«{lab}» ({a})" for lab, a in desalineados),
+                extra={
+                    "error": (f"El archivo es de "
+                              f"{', '.join(str(a) for a in sorted({a for _, a in desalineados}))} "
+                              f"y la versión elegida es de {forced.year}."),
+                    "que_hacer": (f"Elegí la versión {forced.type} del año que trae el "
+                                  f"archivo y volvé a subirlo. No se cargó nada."),
+                    # Sin «bloques» a propósito: `lib/api.ts` abre el panel
+                    # rojo —con su botón «subir igual»— en cuanto el 409 trae
+                    # esa clave, y ese botón manda `confirmar_diferencias=true`,
+                    # que a este chequeo NO lo abre. Sería un botón que promete
+                    # saltarse la regla y después falla igual. (Además la tabla
+                    # se dibujaría con «no trae bloque de verificación», que no
+                    # tiene nada que ver con lo que pasó.) Sin la clave, la
+                    # pantalla muestra el texto del error, que ya lo dice todo.
+                    "texto": "\n".join(
+                        f"«{lab}» es de {a}, pero la versión elegida es de {forced.year}"
+                        for lab, a in desalineados),
+                })
+
     # ── Una fila con monto y sin numero de cuenta NO pasa ────────────────────
     #
     # El importador necesita el codigo para saber a que cuenta y a que linea del
