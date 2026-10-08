@@ -1,0 +1,5 @@
+# Los informes armados son SALIDA: se regeneran con `armar.py` desde el corte de
+# `generador/datos/` y la narrativa del mes. Lo que se versiona es lo que los
+# produce, no el producto.
+CWL_Informe_Operativo_*.docx
+~$*

@@ -1,0 +1,367 @@
+# Informe operativo de variaciones — especificación
+
+> **Qué es:** el documento de trabajo del control de costos. Un informe mensual
+> que compara el Actual del Pre-Cierre contra el Budget y el Forecast, por
+> departamento y a máximo detalle, y que termina en **preguntas concretas para
+> cada gerente**. No es el resumen ejecutivo a propietarios.
+>
+> **Para qué existe este archivo:** para que el informe salga **igual todos los
+> meses** — mismas partes, mismo orden, mismas reglas, mismos cuadros. Si se
+> pide «el informe operativo de octubre», se sigue esto y nada más.
+>
+> **Modelo de referencia:** `CWL_Informe_Operativo_Setiembre_2026.docx`, hecho
+> el 2026-10-07. Su análisis vive en
+> `generador/narrativa/n2026_09.py` y sirve de plantilla.
+
+---
+
+## 1. Cómo se produce, en tres pasos
+
+```bash
+# 1 · Extraer el mes de producción (solo lectura)
+python informes/generador/extraer.py --anio 2026 --mes 10
+
+# 2 · Escribir el análisis del mes
+#     copiar generador/narrativa/n2026_09.py a n2026_10.py y reescribir el texto
+
+# 3 · Armar el Word
+python informes/generador/armar.py --anio 2026 --mes 10
+```
+
+El paso 2 es el trabajo real. Los pasos 1 y 3 son mecánicos y no se opinan.
+
+**Si se salta el paso 2**, el informe sale igual: con los 53 cuadros completos y
+marcas `[PENDIENTE: clave]` donde falta el análisis, y `armar.py` imprime la
+lista de lo que falta. Un hueco visible es útil; una sección que desaparece sin
+avisar, no.
+
+### Requisitos antes de empezar
+
+| Requisito | Dónde se verifica | Si falta |
+|---|---|---|
+| El Pre-Cierre del mes está subido | Pre-Closing → selector de escenario | `extraer.py` se detiene y lo dice |
+| El **mayor** del mes está subido | Scenarios → Auditoría del mayor | El informe sale sin proveedores ni asientos; `extraer.py` avisa |
+| Existe un BUDGET del año | — | `extraer.py` se detiene |
+| Existe un FORECAST que nombre el mes | — | Usa el más reciente y lo avisa |
+| El escenario ACTUAL tiene estadística de habitaciones | — | El informe sale sin ocupación ni ADR; `extraer.py` avisa |
+| Las credenciales de la base están en caché | `%TEMP%\claude\pgvars.json` | `railway variables --service Postgres --json` |
+
+---
+
+## 2. Las reglas que hacen que los números aten
+
+Son cinco y **ninguna es negociable**. Cada una se violó alguna vez y cada vez
+costó un informe que no se podía discutir.
+
+### 2.1 Los totales por clase NO se recalculan
+
+Salen de `gasto_por_clase_api._por_mes`, que es la misma función que alimenta la
+pantalla *Month-End Close — P&L*. Reimplementar esa suma es la forma más fácil
+de que el informe diga un número y la pantalla otro.
+
+### 2.2 Hay que pasarle el objeto `escenario`, no solo su id
+
+```python
+sc = await db.get(Scenario, sid)
+await g._por_mes(db, sid, detalle=det, escenario=sc)   # ← con el objeto
+```
+
+De eso depende la regla de allocation. Sin el objeto el parámetro queda en
+`None`, la regla cae al caso general y los totales se van — medido: **$10.943,00
+de diferencia** en el costo de setiembre.
+
+### 2.3 El ingreso no viene en la fila de `_por_mes`
+
+Esa fila trae las cuatro clases de **gasto** (`payroll`, `cost`, `opex`,
+`property`). El ingreso se suma de su apertura, que la misma función dejó en
+`detalle`. Ya lo hace `Datos.total()`.
+
+### 2.4 Las cuentas se agrupan por `(departamento, cuenta)` — **nunca** por nombre
+
+El real escribe `UTILITIES - OIL` y el presupuesto `Oil (Boat and Equipment)`
+para la misma **7395**. Agrupar por nombre las parte en dos filas que no se ven
+como la misma cuenta, y el cuadro muestra dos variaciones donde hay una.
+
+### 2.5 El detalle del mayor pasa por el puente y después por la consolidación
+
+```python
+dept = pl_engine.consolidate_dept(puente.get(seg2, seg2))
+```
+
+El mayor guarda el departamento de **Integrity** y el cuadro muestra el de
+**FinPlan**. Sin el puente, el `0128` (Private Bar) no aparea con el `0121`.
+Es el mismo camino que usa el Audit Integral, a propósito.
+
+### 2.6 El cuadre obligatorio
+
+`armar.py` lo imprime siempre. **No se publica un informe sin verificarlo:**
+
+1. Ingreso, gasto y GOP de los tres escenarios contra la pantalla.
+2. `GOP del reporte − GOP del motor` tiene que ser **exactamente** el crédito
+   4999 descartado. Si dice `⚠ NO COINCIDE`, hay otra causa y hay que buscarla
+   antes de publicar.
+
+---
+
+## 3. Las cuatro advertencias de lectura
+
+Van en la sección 1.2 del informe **todos los meses**. No son adorno: sin ellas
+los números llevan a la conclusión equivocada.
+
+**A · El Pre-Cierre y el presupuesto no miden el mismo perímetro.**
+Cafetería (0220), Lavandería (0161) y Laundry Revenue (0162) se muestran en la
+columna del Pre-Cierre y se excluyen en Budget y Forecast. Su gasto aparece como
+variación desfavorable completa cuando en parte **sí** está presupuestado, solo
+que en otro departamento o en otra cuenta.
+
+**B · El Pre-Cierre solo contiene los últimos meses subidos.**
+No hay acumulado válido desde esa fuente. En setiembre 2026 tenía agosto y
+setiembre; un YTD calculado ahí daba −91% de ingreso y era un artefacto de la
+carga. El informe es **mensual**, con comparativo secuencial contra el mes
+anterior cargado.
+
+**C · El GOP del reporte y el del motor no coinciden.**
+El tab incluye el *gasto* de allocation y descarta el *crédito* — la cuenta
+**4999** — que es lo que hace que esos departamentos neteen a cero. La
+diferencia es exactamente ese crédito. En setiembre: $18.789,30 ($15.663,09 de
+Cafetería + $3.126,21 de Lavandería), y $35.763,30 en los dos meses, que es el
+número del aviso amarillo de la pantalla al centavo.
+→ **Los cuadros usan el GOP del reporte** para que aten con la pantalla, pero la
+conversación con la gerencia general se hace sobre el del motor.
+
+**D · El Pre-Cierre no trae estadística de habitaciones.**
+Por eso el encabezado de la pantalla muestra «—» en ocupación, ADR y RevPAR. El
+informe la toma de `actual_room_stats` del escenario ACTUAL, que sí las tiene, y
+lo dice en la nota al pie del cuadro.
+
+---
+
+## 4. Las doce secciones
+
+| # | Sección | Cuadros (automáticos) | Narrativa (se escribe) |
+|---|---|---|---|
+| 1 | Propósito y cómo leer | Fuentes · advertencias A-D | — |
+| 2 | Resumen ejecutivo operativo | El mes en una tabla | `resumen`, `hallazgos` |
+| 3 | Contexto operativo | KPI de habitaciones · por tipo de villa · secuencial | `contexto`, `contexto_kpi`, `contexto_tipos`, `contexto_secuencial`, `contexto_nota` |
+| 4 | Departamentos operativos | Resumen + uno por departamento | `dept_resumen`, `dept.<nombre>` |
+| 5 | Overhead | Resumen + uno por departamento | `dept.<nombre>` |
+| 6 | Planilla transversal | Por concepto · por departamento · conceptos sin presupuesto | `payroll_conceptos`, `payroll_nota` |
+| 7 | Costo de ventas y márgenes | Margen por departamento | `margenes`, `margen_detalle` |
+| 8 | Opex | Las 20 cuentas que lo mueven | `opex_favorables`, `opex_impactos` |
+| 9 | Gastos de propiedad | Clase 8 por cuenta | `propiedad_notas` |
+| 10 | Hallazgos de clasificación | El crédito 4999 | `clasificacion`, `sin_presupuesto`, `brechas` |
+| 11 | Agenda por responsable | — | `agenda` |
+| 12 | Anexos | A1 ingreso · A2 costo · A3 opex · A4 planilla · A5 metodología | — |
+
+### El orden de los departamentos
+
+Está en `datos.py` y es el del P&L. **No se reordena por monto**: ordenado por
+monto el informe se lee como una lista de sorpresas; ordenado como el P&L se lee
+como el estado de resultados, que es contra lo que se compara.
+
+```
+OPERATIVOS: Rooms (0110) · A&B (0120+0121) · Spa (0130+0140) · Tours (0150)
+            Gift Shop (0165) · Transportación (0152) · Lavandería (0161+0162)
+            Innoceana (0155) · Sostenibilidad (280) · Cafetería (0220)
+
+OVERHEAD:   Administración (0180) · Ventas y Mercadeo (0190)
+            Mantenimiento (0200) · Sistemas (0230) · Utilities (0210+0205)
+```
+
+Algunos son la suma de varios códigos, y eso **no** es un detalle: A&B junta el
+Private Bar (0121) y el Spa vive partido entre 0130 (donde lo carga el
+presupuesto) y 0140 (donde lo registra el real). Separados no comparan.
+
+### Cada departamento, en cuatro planos
+
+Siempre los mismos, siempre en este orden:
+
+1. **Ingreso** — contra Budget y Forecast, y contra el volumen que lo debería
+   explicar (noches, huéspedes, cobertura).
+2. **Costo de ventas** — en valor absoluto **y como % del ingreso que le
+   corresponde**. Un costo que baja menos que su ingreso es margen perdido,
+   aunque la variación absoluta parezca favorable.
+3. **Planilla** — contra Budget, abierta por concepto cuando el desvío está en
+   horas extra, vacaciones o provisiones y no en el salario base.
+4. **Opex** — contra Budget, separando **diferimiento de calendario** de **gasto
+   estructural nuevo**.
+
+Y cierra en **preguntas al gerente**: lo que el mayor no puede responder. Esas
+preguntas son el producto del informe.
+
+---
+
+## 5. Cómo se escribe el análisis
+
+### 5.1 Los hallazgos de la sección 2
+
+Entre cinco y siete, **ordenados por impacto en dólares sobre el resultado del
+mes** — no por tamaño absoluto de la cuenta. Cada uno lleva título, monto entre
+paréntesis y un párrafo que nombra la cuenta, el departamento y el proveedor o
+concepto que lo produjo.
+
+Criterio para entrar: que mueva el resultado del mes en una cifra que el dueño
+reconocería, o que revele un problema de proceso (no de monto) que se va a
+repetir.
+
+### 5.2 La regla del color
+
+```
+Ingreso y resultado:  más = verde,  menos = rojo
+Gasto:                más = ROJO,   menos = verde
+```
+
+En el código, `var()` para ingreso y resultado; `var_gasto()` para gasto. Se
+invierte porque gastar menos de lo presupuestado es favorable. Equivocarse acá
+hace que todo el informe se lea al revés.
+
+### 5.3 Favorabilidad: ahorro o diferimiento
+
+**La distinción más importante del informe**, y la única que no sale de la base.
+Por cada partida favorable hay que decidir:
+
+- **Ahorro estructural** — no vuelve. Renegociación, cierre de un servicio.
+- **Diferimiento** — vuelve, y hay que decir cuándo. Ferias, medios,
+  mantenimiento programado.
+- **Reclasificación** — no es ni lo uno ni lo otro: el gasto existe, en otra
+  cuenta.
+
+La pista más fiable es el **Forecast**: si el Forecast del mes siguiente sube esa
+cuenta, el ahorro era diferimiento. En setiembre, Trade Shows no se gastó
+($12.600) y el Forecast lo subía a $32.600 — el ahorro era una obligación
+pendiente.
+
+### 5.4 Las preguntas al gerente
+
+Una pregunta sirve si cumple las tres:
+
+1. **Nombra la cifra** y su contraparte presupuestada.
+2. **Nombra la evidencia** del mayor — proveedor, número de asientos, concepto.
+3. **No se puede contestar desde el sistema.** Si la respuesta está en la base,
+   no es una pregunta: es un dato que faltó buscar.
+
+> ✅ «SINAC $3.232,68 de entradas contra $3.150,17 de ingreso TOTAL de tours.
+> ¿Cuántos pax de parque nacional y a qué precio de venta? Si la entrada se cobra
+> al huésped, este renglón no puede exceder su propio ingreso.»
+>
+> ❌ «¿Por qué subió el costo de tours?»
+
+### 5.5 El tono
+
+Se escribe para alguien que va a sentarse con un gerente a discutir. Directo, sin
+adjetivos, y **sin acusar**: el informe muestra el número y la evidencia, y la
+explicación la da el gerente. Cuando una variación es de registro y no de
+gestión, se dice en la sección 10 y **no** se le lleva al gerente — llevarle una
+variación que es un error de cuenta destruye la credibilidad del resto.
+
+---
+
+## 6. Las claves de narrativa
+
+Todas opcionales: si falta una, sale `[PENDIENTE: clave]` y `armar.py` la lista.
+
+| Clave | Tipo | Va en |
+|---|---|---|
+| `propiedad` | texto | Portada |
+| `resumen` | lista de párrafos | 2 |
+| `hallazgos` | lista de `(título, monto, texto)` | 2.2 |
+| `contexto` | lista de párrafos | 3 |
+| `contexto_kpi` | lista de párrafos | bajo el cuadro de KPI |
+| `contexto_tipos` | lista de párrafos | bajo el cuadro por villa |
+| `contexto_secuencial` | lista de párrafos | bajo el secuencial |
+| `contexto_nota` | `(título, texto)` | recuadro gris al cierre de 3 |
+| `dept_resumen` | lista de párrafos | 4.0 |
+| `dept.<nombre>.comentario` | lista de párrafos | cada departamento |
+| `dept.<nombre>.cuentas` | lista de `(depto, cuenta, etiqueta)` | tabla del mayor |
+| `dept.<nombre>.preguntas` | lista de texto | cierre del departamento |
+| `overhead_resumen` | lista de párrafos | 5.0 |
+| `payroll_conceptos` | lista de párrafos | 6.2 |
+| `payroll_nota` | `(título, texto)` | recuadro en 6.2 |
+| `margenes` | lista de párrafos | 7.1 |
+| `margen_detalle` | `{titulo, intro, cabeceras, filas, nota, cierre}` | 7.2 |
+| `opex_favorables` | `{cabeceras, filas, nota, cierre}` | 8.2 |
+| `opex_impactos` | `{cabeceras, filas}` | 8.3 |
+| `propiedad_notas` | lista de viñetas | 9 |
+| `clasificacion` | `{intro, cabeceras, filas, nota}` | 10.2 |
+| `sin_presupuesto` | `{intro, cabeceras, filas, nota}` | 10.3 |
+| `brechas` | lista de viñetas | 10.4 |
+| `agenda` | lista de `(responsable, foco, [preguntas])` | 11 |
+
+`<nombre>` es el nombre del departamento tal como aparece en `OPERATIVOS` y
+`OVERHEAD` de `datos.py` — `"Rooms"`, `"Alimentos y Bebidas"`, `"Utilities /
+Energia"`…
+
+En las filas de tabla, una celda puede ser `texto` o `(texto, estilo)`, con
+estilo `"tot"` (negrita + fondo), `"sec"` (sección), `"sub"`, `"neg"` (rojo),
+`"pos"` (verde) o `"gris"`.
+
+---
+
+## 7. Los archivos
+
+```
+informes/
+├── INFORME_OPERATIVO.md              ← esto
+├── CWL_Informe_Operativo_<Mes>_<Año>.docx
+└── generador/
+    ├── extraer.py                    paso 1 · solo lectura de producción
+    ├── armar.py                      paso 3 · el Word
+    ├── datos.py                      la capa de datos y el orden del P&L
+    ├── formato.py                    estilos, tablas, colores
+    ├── secciones.py                  secciones 1-3 + el bloque departamental
+    ├── secciones2.py                 secciones 4-12
+    ├── datos/<año>_<mes>.json        lo extraído (no se edita a mano)
+    └── narrativa/
+        ├── n2026_09.py               el análisis de setiembre — modelo
+        └── n<año>_<mes>.py           uno por mes
+```
+
+El JSON de `datos/` es el corte del mes: una vez extraído, el informe se puede
+rearmar cuantas veces se quiera **sin volver a tocar producción**. Si hay que
+corregir un cuadro o reescribir un comentario, no se vuelve a consultar.
+
+---
+
+## 8. Lista de verificación antes de entregar
+
+- [ ] `extraer.py` corrió sin avisos, o los avisos están explicados en la sección 1.2.
+- [ ] El cuadre de `armar.py` coincide con la pantalla en los tres escenarios.
+- [ ] `GOP reporte − GOP motor` dice **coincide**.
+- [ ] `armar.py` no lista claves de narrativa pendientes.
+- [ ] Ningún `[PENDIENTE]` en el documento.
+- [ ] Los hallazgos de la sección 2 están ordenados por impacto, no por tamaño.
+- [ ] Cada favorabilidad de opex está clasificada en ahorro / diferimiento / reclasificación.
+- [ ] Cada pregunta nombra la cifra, la evidencia del mayor, y no se puede contestar desde el sistema.
+- [ ] Las variaciones que son de registro están en la sección 10 y **no** en la agenda del gerente.
+- [ ] La sección 10.2 está actualizada: los cinco casos de setiembre pueden haberse corregido.
+
+---
+
+## 9. Lo que cambia mes a mes y hay que volver a mirar
+
+Esto no es estructura: es el estado del sistema en setiembre 2026. **Verificar
+cada mes** — si ya se arreglaron, el informe lo tiene que decir.
+
+| Pendiente | Efecto si sigue |
+|---|---|
+| El reporte descarta el crédito 4999 | El GOP del informe sale peor que el real |
+| El Pre-Cierre no carga estadística de habitaciones | Ocupación y ADR vienen de otra tabla |
+| Cafetería presupuestada en 5700 y real en 5420 | Variación de $10.764,88 en vez de $3.964,88 |
+| Costo de tours presupuestado en 0152 y real en 0150 | Dos variaciones falsas donde hay un hecho |
+| Costo de internet en 5700/5702/5704 vs 5400/5401 | Cuatro variaciones donde hay una |
+| Costo del Gift Shop presupuestado en 0151 | Margen de 100% aparente en 0165 |
+| Spa presupuestado en 0130 y real en 0140 | Solo compara si se suman los dos |
+| 6001, 6002 y 6023 con presupuesto cero o simbólico | Toda variación de planilla sale desfavorable siempre |
+
+---
+
+## 10. Para otra propiedad
+
+`extraer.py` toma `--hotel` (por defecto `CWL`). Lo que habría que revisar antes
+de usarlo en otra:
+
+- `OPERATIVOS` y `OVERHEAD` en `datos.py` — los códigos de departamento y cómo
+  se agrupan son de Corcovado.
+- `EXCL` — los departamentos de allocation pueden ser otros.
+- El puente de Integrity a FinPlan vive en
+  `backend/app/seed_data/<HOTEL>/mapd_integrity.json`.
