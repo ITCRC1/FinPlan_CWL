@@ -43,7 +43,19 @@ def cargar_narrativa(anio: int, mes: int) -> dict:
     return getattr(mod, "NARRATIVA", {})
 
 
-def main(anio: int, mes: int, salida: str | None):
+def main(anio: int, mes: int, salida: str | None, extraer: bool = False):
+    corte = AQUI / "datos" / f"{anio}_{mes:02d}.json"
+    if extraer or not corte.exists():
+        # Un comando y no dos. El corte se guarda igual, asi que rearmar el
+        # informe despues de reescribir la narrativa NO vuelve a tocar
+        # produccion — para eso hay que pedirlo con --extraer.
+        print(f"Extrayendo {anio}-{mes:02d} de produccion...")
+        import subprocess
+        r = subprocess.run([sys.executable, str(AQUI / "extraer.py"),
+                            "--anio", str(anio), "--mes", str(mes)])
+        if r.returncode != 0:
+            raise SystemExit(r.returncode)
+        print()
     D = Datos(anio, mes)
     nar = cargar_narrativa(anio, mes)
     agg = D.mayor()
@@ -108,5 +120,7 @@ if __name__ == "__main__":
     ap.add_argument("--anio", type=int, required=True)
     ap.add_argument("--mes", type=int, required=True)
     ap.add_argument("--salida", default=None)
+    ap.add_argument("--extraer", action="store_true",
+                    help="vuelve a leer produccion aunque el corte ya exista")
     a = ap.parse_args()
-    main(a.anio, a.mes, a.salida)
+    main(a.anio, a.mes, a.salida, a.extraer)

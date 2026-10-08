@@ -15,20 +15,34 @@
 
 ---
 
-## 1. Cómo se produce, en tres pasos
+## 1. Cómo se activa
 
-```bash
-# 1 · Extraer el mes de producción (solo lectura)
-python informes/generador/extraer.py --anio 2026 --mes 10
+### Opción A — pedirlo en el chat (lo normal)
 
-# 2 · Escribir el análisis del mes
-#     copiar generador/narrativa/n2026_09.py a n2026_10.py y reescribir el texto
-
-# 3 · Armar el Word
-python informes/generador/armar.py --anio 2026 --mes 10
+```
+/informe octubre 2026
 ```
 
-El paso 2 es el trabajo real. Los pasos 1 y 3 son mecánicos y no se opinan.
+Claude lee esta especificación, saca los cuadros, mira el detalle del mayor,
+escribe el análisis y manda el Word. El comando vive en
+`.claude/commands/informe.md`.
+
+### Opción B — correrlo uno mismo
+
+```bash
+backend/.venv/Scripts/python.exe informes/generador/armar.py --anio 2026 --mes 10
+```
+
+Un solo comando: si falta el corte del mes lo extrae de producción solo. Sale el
+Word con los 53 cuadros completos y marcas `[PENDIENTE]` donde falta el
+análisis, más la lista de claves por escribir.
+
+Después se escribe el análisis en `generador/narrativa/n2026_10.py` —copiando
+`n2026_10.py` si está en blanco, o `n2026_09.py` como modelo— y se vuelve a
+correr el mismo comando. La segunda vez **no** toca producción: usa el corte ya
+guardado. Para forzar una lectura nueva, `--extraer`.
+
+**El análisis es el trabajo real.** Los cuadros son mecánicos y no se opinan.
 
 **Si se salta el paso 2**, el informe sale igual: con los 53 cuadros completos y
 marcas `[PENDIENTE: clave]` donde falta el análisis, y `armar.py` imprime la
