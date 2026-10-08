@@ -66,6 +66,19 @@ forma de las preguntas al gerente.
 6. **Repasar la lista de verificacion** de §8 del `.md` y **mandarle el archivo**
    con `SendUserFile`.
 
+## Si el mes ya se hizo antes
+
+Si el owner pide un mes que ya tiene narrativa escrita, por defecto sale
+identico: no se vuelve a leer produccion ni se reescribe el analisis.
+
+Si dice que **volvio a subir** el P&L del Pre-Cierre o el mayor, o que corrigio
+algo, hay que agregar `--extraer`. `extraer.py` compara contra la extraccion
+anterior e imprime que se movio: totales por clase, archivo del mayor, cuentas.
+
+⚠️ **Esa lista es la lista de parrafos a corregir.** Los cuadros se actualizan
+solos y las cifras escritas en la narrativa NO. Repasar cada mencion de lo que
+cambio y reescribirla, y decirle al owner que cambio contra la version anterior.
+
 ## Lo que hay que volver a mirar cada mes
 
 La §9 del `.md` lista el estado del sistema en setiembre 2026: el credito 4999

@@ -110,6 +110,73 @@ def forecast_del_mes(filas, mes: int):
     return (fcst[0] if fcst else None), False
 
 
+def _tot(d, esc, clase, mes):
+    f = next((x for x in d["meses"].get(esc, []) if int(x["month"]) == mes), None)
+    if f and clase in f:
+        return float(f[clase])
+    out = 0.0
+    for ser in d["detalle"].get(esc, {}).get(clase, {}).values():
+        if isinstance(ser, dict):
+            out += float(ser.get(str(mes), ser.get(mes, 0)) or 0)
+        else:
+            out += float(ser[mes - 1] or 0)
+    return out
+
+
+def _por_cuenta(d):
+    out = {}
+    for clase, filas in d.get("lineas", {}).items():
+        for x in filas:
+            if x["esc"] != "ACT":
+                continue
+            k = (clase, x["dept_code"], x["account_code"])
+            out[k] = out.get(k, 0.0) + float(x["mes"] or 0)
+    return out
+
+
+def _comparar(ant, nuevo, mes):
+    """Que se movio entre dos extracciones del mismo mes.
+
+    Se comparan los totales por escenario y clase, el mayor, los escenarios
+    elegidos y las cuentas con mas de un dolar de diferencia. No se compara
+    todo: la idea es que la lista quepa en la pantalla y diga QUE PARRAFOS del
+    analisis hay que repasar.
+    """
+    fuera = []
+    for esc in ("ACT", "BUD", "FCT"):
+        if esc not in nuevo["meses"]:
+            continue
+        for clase in ("revenue", "cost", "payroll", "opex", "property"):
+            a = _tot(ant, esc, clase, mes)
+            b = _tot(nuevo, esc, clase, mes)
+            if abs(a - b) > 0.01:
+                fuera.append(f"{esc} {clase:9s} {a:>14,.2f} -> {b:>14,.2f}"
+                             f"   ({b - a:+,.2f})")
+    na, nb = len(ant.get("mayor", [])), len(nuevo.get("mayor", []))
+    if na != nb:
+        fuera.append(f"mayor: {na:,} lineas -> {nb:,} lineas")
+    aa = (ant.get("mayor") or [{}])[0].get("archivo")
+    ab = (nuevo.get("mayor") or [{}])[0].get("archivo")
+    if aa != ab:
+        fuera.append(f"archivo del mayor: <{aa}> -> <{ab}>")
+    for k, v in nuevo["escenarios"].items():
+        prev = ant.get("escenarios", {}).get(k, {})
+        if prev.get("id") and prev["id"] != v["id"]:
+            fuera.append(f"{k}: <{prev.get('rotulo')}> -> <{v['rotulo']}>")
+    pa, pb = _por_cuenta(ant), _por_cuenta(nuevo)
+    movidas = []
+    for k in set(pa) | set(pb):
+        va, vb = pa.get(k, 0.0), pb.get(k, 0.0)
+        if abs(va - vb) > 1.0:
+            movidas.append((abs(va - vb), k, va, vb))
+    movidas.sort(reverse=True)
+    for _, k, va, vb in movidas[:12]:
+        fuera.append(f"  {k[0]:8s} {k[1]} - {k[2]}   {va:>12,.2f} -> {vb:>12,.2f}")
+    if len(movidas) > 12:
+        fuera.append(f"  ...y {len(movidas) - 12} cuentas mas")
+    return fuera
+
+
 async def main(anio: int, mes: int, hotel: str):
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -280,6 +347,38 @@ async def main(anio: int, mes: int, hotel: str):
 
     destino = AQUI / "datos" / f"{anio}_{mes:02d}.json"
     destino.parent.mkdir(parents=True, exist_ok=True)
+    # ⚠️ Lo mas importante que imprime el script. Si el owner vuelve a subir el
+    # P&L del Pre-Cierre o el mayor y se vuelve a extraer, los CUADROS se
+    # actualizan solos y el TEXTO del analisis NO: las cifras citadas en la
+    # narrativa quedan como estaban. Un cuadro que dice una cosa y el parrafo de
+    # al lado que dice otra es peor que no tener informe.
+    #
+    # Asi que antes de sobreescribir se compara, se dice que se movio, y la
+    # version anterior se guarda al lado por si hay que mirarla.
+    if destino.exists():
+        try:
+            ant = json.loads(destino.read_text(encoding="utf-8"))
+        except Exception:
+            ant = None
+        if ant:
+            cambios = _comparar(ant, out, mes)
+            copia = destino.with_suffix(".anterior.json")
+            copia.write_text(destino.read_text(encoding="utf-8"), encoding="utf-8")
+            if cambios:
+                print("\n" + "=" * 70)
+                print("CAMBIO desde la extraccion anterior - REVISAR EL TEXTO")
+                print("=" * 70)
+                for c in cambios:
+                    print("   " + c)
+                print("\n   Los cuadros ya salen con los numeros nuevos. Las cifras")
+                print(f"   escritas en narrativa/n{anio}_{mes:02d}.py NO se actualizan")
+                print("   solas: hay que repasar los parrafos que mencionen lo de "
+                      "arriba.")
+                print(f"\n   La extraccion anterior quedo en {copia.name}")
+            else:
+                print("\nSin cambios contra la extraccion anterior: el informe sale "
+                      "igual.")
+
     destino.write_text(json.dumps(out, ensure_ascii=False, default=str),
                        encoding="utf-8")
     print(f"\nguardado: {destino}")

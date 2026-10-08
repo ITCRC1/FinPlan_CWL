@@ -62,6 +62,52 @@ avisar, no.
 
 ---
 
+## 1-bis. Volver a generar un mes ya hecho
+
+### Si no cambió nada en el sistema
+
+```
+/informe setiembre 2026
+```
+
+Sale **idéntico**: el análisis está guardado en `narrativa/` y el corte de datos
+en `generador/datos/`. Por defecto **no vuelve a leer producción**, y eso es
+deliberado — un informe que ya circuló no debería cambiar de números solo porque
+se volvió a imprimir.
+
+### Si se volvió a subir el mes
+
+Si se resubió el P&L del Pre-Cierre, o el mayor en *Auditoría del mayor*, o se
+corrigió una clasificación:
+
+```bash
+backend/.venv/Scripts/python.exe informes/generador/armar.py --anio 2026 --mes 9 --extraer
+```
+
+**`extraer.py` compara contra la extracción anterior y dice qué se movió**, antes
+de sobreescribir. Imprime los totales por escenario y clase que cambiaron, si
+cambió el archivo del mayor o el número de líneas, si cambió el escenario
+elegido, y las doce cuentas con más diferencia:
+
+```
+======================================================================
+CAMBIO desde la extraccion anterior - REVISAR EL TEXTO
+======================================================================
+   ACT opex          105,051.60 ->     110,051.60   (+5,000.00)
+   mayor: 5,000 lineas -> 5,105 lineas
+   archivo del mayor: <...v1.xlsx> -> <...v2.xlsx>
+     cost     0120 - 5101       6,260.83 ->     9,460.83
+```
+
+> ⚠️ **Los cuadros se actualizan solos; el texto no.** Las cifras escritas en la
+> narrativa quedan como estaban. Un cuadro que dice una cosa y el párrafo de al
+> lado que dice otra es peor que no tener informe. Por eso la comparación existe:
+> la lista de arriba es exactamente la lista de párrafos que hay que repasar.
+
+La extracción anterior queda guardada en `datos/<año>_<mes>.anterior.json`.
+
+---
+
 ## 2. Las reglas que hacen que los números aten
 
 Son cinco y **ninguna es negociable**. Cada una se violó alguna vez y cada vez
