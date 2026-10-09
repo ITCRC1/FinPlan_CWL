@@ -6060,6 +6060,19 @@ export interface AuditoriaGL {
   hallazgos: AuditoriaHallazgo[];
 }
 
+/** Lo que el estandar aprueba como renglones del reporte de un departamento. */
+export interface UsaliSchedule {
+  schedule: string;
+  /** 1 Rooms, 2 F&B, … 14 Payroll-Related. Nulo si no es un solo schedule. */
+  numero: number | null;
+  titulo?: string;
+  /** ⚠️ Falso en el Schedule 3 —Spa, Tours, Transporte, Retail—: el libro NO da
+   *  lista para esos. Decirlo es la mitad util de la respuesta. */
+  lista_aprobada: boolean;
+  motivo: string;
+  renglones: string[];
+}
+
 /** Lo que el USALI dice de una cuenta del hotel. */
 export interface UsaliParaCuenta {
   nombre: string;
@@ -6069,6 +6082,8 @@ export interface UsaliParaCuenta {
   cuenta_usali: string | null;
   definiciones: { cuenta: string; texto: string; pagina: number }[];
   items: { item: string; schedule: string }[];
+  /** Que lleva ESE departamento segun el estandar. Nulo si no se dijo cual. */
+  schedule: UsaliSchedule | null;
 }
 
 /**
@@ -6081,10 +6096,13 @@ export interface UsaliParaCuenta {
  * porque el catalogo del hotel se armo sobre USALI.
  */
 export async function usaliParaCuenta(
-  nombre: string, schedule = "",
+  nombre: string, dept = "",
 ): Promise<UsaliParaCuenta> {
+  // Se manda el departamento de la contabilidad —«0110»— y el puente al
+  // departamento del USALI vive en el servidor: la pantalla no tiene por que
+  // saber que Rooms es el Schedule 1 y el Spa el 3.
   return api.get(`/usali/para-cuenta/?nombre=${encodeURIComponent(nombre)}`
-    + `&schedule=${encodeURIComponent(schedule)}`);
+    + `&dept=${encodeURIComponent(dept)}`);
 }
 
 /** Una linea del AUDIT INTEGRAL: una cuenta del mes contra las versiones. */

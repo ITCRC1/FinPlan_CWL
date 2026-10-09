@@ -91,6 +91,8 @@ class Lectura:
     #: El catalogo fusionado: lo que de verdad se guarda y se consulta.
     catalogo: list["ItemCatalogo"] = field(default_factory=list)
     definiciones: list[Definicion] = field(default_factory=list)
+    #: Los renglones aprobados de cada Schedule: la otra mitad del libro.
+    renglones: list["Renglon"] = field(default_factory=list)
     paginas: int = 0
     paginas_con_texto: int = 0
     #: Lo que coincidió entre los dos ordenamientos y lo que no.
@@ -330,5 +332,151 @@ def leer_pdf(datos: bytes) -> Lectura:
     definiciones = leer_definiciones(cuerpo)
     return Lectura(entradas=entradas, catalogo=fusionar(entradas),
                    definiciones=definiciones,
+                   renglones=leer_renglones(con_texto),
                    paginas=len(r.pages), paginas_con_texto=len(con_texto),
                    cruce=cruzar(entradas))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Los SCHEDULES: el formato de cada departamento
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Cada Schedule —palabras del libro— «designates the revenue and expense
+# accounts that are approved as line items in the Uniform System», y aclara que
+# «the Uniform System does not provide for the addition or substitution of other
+# revenue or expense line items».
+#
+# Es distinto del diccionario: el diccionario da EJEMPLOS de artículos; el
+# Schedule da el RENGLÓN del reporte. Se guarda como referencia del panel —qué
+# dice el estándar que lleva este departamento—, no como alarma.
+#
+# ⚠️ **Medido antes de construirlo.** Contra las 252 cuentas que usó setiembre
+# 2026 la regla «esta cuenta no es renglón aprobado de su schedule» dio UN
+# hallazgo, y dudoso: 130 cuentas (51.6%) son propias del hotel y el estándar
+# nunca las nombró, y 68 (27.0%) caen en departamentos donde el libro no da
+# lista. Como alarma no sirve en esta propiedad. Como referencia por
+# departamento, sí.
+
+#: El rótulo del cuadro, en MAYÚSCULAS: «ROOMS—SCHEDULE 1». La prosa que lo
+#: explica usa el mismo nombre en minúsculas —«Rooms—Schedule 1 reflects…»—, y
+#: por eso se distinguen sin mirar el número de página.
+_TITULO_CUADRO = re.compile(r"^([A-Z][A-Z&/'\u2019,\.\- ]{3,60})[\u2014\-]+SCHEDULE\s+(\d+)\s*$")
+
+#: Las dos frases con las que el libro declara que un schedule tiene lista
+#: cerrada. Usa una u otra según el schedule: la 1 en Rooms y F&B, la 2 en
+#: Miscellaneous Income y en Payroll-Related Expenses. El Schedule 3 —Other
+#: Operated Departments— no trae ninguna, y por eso queda sin lista: dice
+#: «only the revenues and expenses […] that exist at an individual property».
+_DECLARA_LISTA = re.compile(
+    r"approved as line items"
+    r"|does not provide for the addition or substitution", re.I)
+
+#: El nombre con que el DICCIONARIO llama a cada schedule. Es la llave de
+#: apareo: las ~1.950 entradas del diccionario traen este nombre, no el del
+#: título del cuadro.
+NOMBRE_EN_DICCIONARIO = {
+    "ROOMS": "Rooms",
+    "FOOD AND BEVERAGE": "F&B",
+    "OTHER OPERATED DEPARTMENTS": "Minor Oper. Dept",
+    "MISCELLANEOUS INCOME": "Misc. Income",
+    "ADMINISTRATIVE AND GENERAL": "A&G",
+    "INFORMATION AND TELECOMMUNICATIONS SYSTEMS": "Info & Telecom",
+    "SALES AND MARKETING": "Sales/Marketing",
+    "PROPERTY OPERATION AND MAINTENANCE": "POM",
+    "UTILITIES": "Utilities",
+    "MANAGEMENT FEES": "Management Fees",
+    "NON-OPERATING INCOME AND EXPENSES": "Non Op. I&E",
+    "HOUSE LAUNDRY": "Laundry",
+    "STAFF DINING": "Staff Dining",
+    "PAYROLL-RELATED EXPENSES": "Payroll-Rel. Exp",
+}
+
+#: Lo que aparece en el cuadro y NO es un renglón de cuenta: encabezados de
+#: columna, rótulos de periodo, totales, y los encabezados del bloque de
+#: planilla que se repiten en los catorce schedules.
+_NO_ES_RENGLON = re.compile(
+    r"^\s*(\$|%|aCtual|foreCast|Budget|Prior|Year|Period|Current|to\-date"
+    r"|SCHEDULE|Operating Statements|Uniform System|continued"
+    r"|Total|TOTAL|Net |Gross |Departmental|REVENUE|EXPENSES"
+    r"|Payroll|Cost of|Other Expenses"
+    r"|Labor Costs and Related|Salaries, Wages|Labor and Bonuses"
+    r"|Management$|Non\-Management$|Service Charges)\b", re.I)
+
+#: Un renglón de cuenta: mayúscula inicial, sin relleno de puntos y sin montos.
+_ES_RENGLON = re.compile(r"^[A-Z][A-Za-z0-9&/'\u2019\u2014\-,\. ]{2,60}$")
+
+
+@dataclass
+class Renglon:
+    """Un renglón aprobado del reporte de un departamento."""
+    numero: int            # el número del Schedule: 1..14
+    titulo: str            # como lo titula el cuadro: ROOMS, HOUSE LAUNDRY…
+    schedule: str          # como lo llama el diccionario: Rooms, Laundry…
+    renglon: str           # el nombre del renglón: Linen, Contract Services…
+    orden: int             # en qué posición lo trae el cuadro
+    pagina: int
+    lista_aprobada: bool   # ¿el libro declara lista cerrada para este schedule?
+
+
+def leer_renglones(paginas: list[tuple[int, str]]) -> list[Renglon]:
+    """Los renglones aprobados de cada Schedule, con su marca de lista cerrada.
+
+    Encuentra los cuadros por su título en MAYÚSCULAS y lee hasta el título
+    siguiente. La marca `lista_aprobada` sale de la prosa del propio libro, no
+    de una lista escrita a mano: así otra edición sigue funcionando.
+    """
+    # 1 · ¿qué schedules declara el libro con lista aprobada?
+    #
+    # La prosa viene partida a mitad de palabra —«and des-\nignates the revenue
+    # and expense accounts that are approved as line items»—, así que primero se
+    # pega la página y se deshace el guion de corte.
+    declara: dict[int, bool] = {}
+    for _n, texto in paginas:
+        plano = re.sub(r"[\u00ad\-]\s*\n\s*", "", texto)
+        plano = " ".join(plano.split())
+        for m in re.finditer(r"[\u2014\-]Schedule\s+(\d+)\b", plano):
+            num = int(m.group(1))
+            # La declaración viene en la misma oración que el nombre.
+            cerca = plano[m.end():m.end() + 400]
+            if _DECLARA_LISTA.search(cerca):
+                declara[num] = True
+            else:
+                declara.setdefault(num, False)
+
+    # 2 · los cuadros
+    salida: list[Renglon] = []
+    actual: tuple[int, str, str] | None = None
+    vistos: set[tuple[int, str]] = set()
+    for n, texto in paginas:
+        for cruda in texto.split("\n"):
+            s = _limpiar(cruda)
+            if not s:
+                continue
+            t = _TITULO_CUADRO.match(s)
+            if t:
+                titulo = " ".join(t.group(1).split())
+                dicc = NOMBRE_EN_DICCIONARIO.get(titulo)
+                actual = (int(t.group(2)), titulo, dicc) if dicc else None
+                continue
+            if actual is None or len(s) < 3:
+                continue
+            if _NO_ES_RENGLON.match(s) or _NO_ES_RENGLON.match(cruda):
+                continue
+            if "...." in s or re.search(r"\d{2,}", s):
+                continue
+            if actual[1].lower() in s.lower():
+                continue
+            if not _ES_RENGLON.match(s):
+                # Prosa: el cuadro terminó.
+                if len(s) > 70:
+                    actual = None
+                continue
+            k = (actual[0], s.lower())
+            if k in vistos:
+                continue
+            vistos.add(k)
+            salida.append(Renglon(
+                numero=actual[0], titulo=actual[1], schedule=actual[2],
+                renglon=s, orden=len(salida), pagina=n,
+                lista_aprobada=declara.get(actual[0], False)))
+    return salida

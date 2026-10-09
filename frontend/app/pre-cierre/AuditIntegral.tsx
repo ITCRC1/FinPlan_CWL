@@ -116,10 +116,10 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  que incluye esa cuenta, para que el ojo decida mas rapido. */
   const [usali, setUsali] = useState<UsaliParaCuenta | "cargando" | null>(null);
 
-  const verUsali = useCallback(async (nombre: string) => {
+  const verUsali = useCallback(async (nombre: string, dept: string) => {
     setUsali("cargando");
     try {
-      setUsali(await usaliParaCuenta(nombre));
+      setUsali(await usaliParaCuenta(nombre, dept));
     } catch {
       setUsali(null);
     }
@@ -516,7 +516,7 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           {/* El nombre abre lo que el USALI dice que va aca.
                               Es referencia, no regla: si el estandar no tiene
                               una cuenta parecida, lo dice y no inventa. */}
-                          <button onClick={() => void verUsali(f.nombre)}
+                          <button onClick={() => void verUsali(f.nombre, f.dept_code)}
                                   title="Que dice el USALI que incluye esta cuenta"
                                   style={{ font: "inherit", fontWeight: 600,
                                            padding: 0, border: "none",
@@ -693,6 +693,49 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                     )}
                   </>
                 )}
+
+                {/* Que lleva ESTE departamento segun el estandar.
+                    *
+                    * Owner, 2026-10-08: *«cada cuenta tiene la descripcion y
+                    * va por departamento»*. Es referencia: cuando el libro no
+                    * da lista —el Spa y los departamentos menores son el
+                    * Schedule 3— lo dice en vez de callarse, porque el
+                    * silencio se lee como «su cuenta esta mal». */}
+                  {usali.schedule && (
+                    <div style={{ marginTop: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700,
+                                    marginBottom: 4 }}>
+                        {usali.schedule.lista_aprobada
+                          ? `Renglones aprobados de ${usali.schedule.titulo ?? usali.schedule.schedule}`
+                            + ` — Schedule ${usali.schedule.numero}`
+                            + ` (${usali.schedule.renglones.length})`
+                          : "El estándar no da lista para este departamento"}
+                      </div>
+                      {usali.schedule.lista_aprobada ? (
+                        <div style={{ fontSize: 12, columns: 2,
+                                      columnGap: 22 }}>
+                          {usali.schedule.renglones.map((g, i) => (
+                            <div key={i} style={{ breakInside: "avoid",
+                                                  padding: "1px 0" }}>
+                              {g}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,
+                                    color: "var(--text-secondary)" }}>
+                          {usali.schedule.numero === 3
+                            ? "Es un Other Operated Department — Schedule 3. "
+                              + "El libro no aprueba una lista cerrada: «only "
+                              + "the revenues and expenses that exist at an "
+                              + "individual property». Que una cuenta no "
+                              + "aparezca en el estándar no dice nada acá."
+                            : usali.schedule.motivo}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                 <p style={{ fontSize: 11, marginTop: 16, marginBottom: 0,
                             color: "var(--text-secondary)" }}>
                   Referencia, no regla: esto no marca ni corrige nada. Uniform

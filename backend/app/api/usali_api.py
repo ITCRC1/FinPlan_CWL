@@ -33,7 +33,8 @@ from app.db import get_db
 from app.errores import ErrorApi
 from app.hotel_actual import HOTEL_ID
 from app.importers.registro_dep import registro_de_subida
-from app.models.usali import UsaliDefinicion, UsaliDocumento, UsaliItem
+from app.models.usali import (UsaliDefinicion, UsaliDocumento, UsaliItem,
+                              UsaliRenglon)
 
 router = APIRouter(tags=["usali"])
 
@@ -69,6 +70,7 @@ async def estado(db: AsyncSession = Depends(get_db), _=Depends(get_current_user)
         "items": doc.items,
         "items_confirmados": doc.items_confirmados,
         "definiciones": doc.definiciones,
+        "renglones": doc.renglones,
         "cruce": json.loads(doc.cruce or "{}"),
         "subido_en": doc.subido_en.isoformat() if doc.subido_en else None,
         "subido_por": doc.subido_por,
@@ -115,7 +117,8 @@ async def subir(
             paginas=lectura.paginas, con_texto=lectura.paginas_con_texto)
 
     # ── reemplazo, en una sola transacción ────────────────────────────────
-    for modelo in (UsaliItem, UsaliDefinicion, UsaliDocumento):
+    for modelo in (UsaliItem, UsaliDefinicion, UsaliRenglon,
+                   UsaliDocumento):
         await db.execute(sa_delete(modelo).where(modelo.hotel_id == HOTEL_ID))
 
     db.add(UsaliDocumento(
@@ -126,6 +129,7 @@ async def subir(
         items_confirmados=sum(1 for c in lectura.catalogo
                               if c.confianza == "confirmado"),
         definiciones=len(lectura.definiciones),
+        renglones=len(lectura.renglones),
         cruce=json.dumps(lectura.cruce, ensure_ascii=False),
         subido_por=getattr(user, "email", "")))
 
@@ -148,12 +152,29 @@ async def subir(
         db.add(UsaliDefinicion(hotel_id=HOTEL_ID, cuenta=d.cuenta[:200],
                                cuenta_norm=_norm(d.cuenta)[:200],
                                texto=d.texto, pagina=d.pagina))
+    # Los renglones del Schedule: la otra mitad del libro. Se guarda tambien
+    # cuando el schedule NO tiene lista aprobada —Schedule 3—, porque esa
+    # ausencia es informacion: es la que evita decirle a alguien que su cuenta
+    # del Spa esta mal cuando el estandar nunca dio lista para el Spa.
+    vistos_r: set[tuple] = set()
+    for g in lectura.renglones:
+        k = (g.numero, _norm(g.renglon))
+        if k in vistos_r:
+            continue
+        vistos_r.add(k)
+        db.add(UsaliRenglon(hotel_id=HOTEL_ID, numero=g.numero,
+                            titulo=g.titulo[:80], schedule=g.schedule[:80],
+                            renglon=g.renglon[:200],
+                            renglon_norm=_norm(g.renglon)[:200],
+                            orden=g.orden, pagina=g.pagina,
+                            lista_aprobada=g.lista_aprobada))
     await db.commit()
 
     return {
         "ok": True, "archivo": file.filename,
         "paginas": lectura.paginas, "paginas_con_texto": lectura.paginas_con_texto,
         "items": len(vistos), "definiciones": len(vistas),
+        "renglones": len(vistos_r),
         "cruce": lectura.cruce,
     }
 
@@ -223,10 +244,111 @@ def _norm_cta(s: str) -> str:
     return " ".join(s.split())
 
 
+#: Departamento de la contabilidad -> departamento del USALI. Es la parte que no
+#: se adivina: la correspondencia la miro una persona.
+#:
+#: Los del Schedule 3 —Spa, Tours, Transporte, Retail, Lavanderia, Innoceana—
+#: quedan adrede en una casilla SIN lista aprobada. No es un hueco: es lo que
+#: dice el libro, «only the revenues and expenses […] that exist at an
+#: individual property».
+DEPTO_A_SCHEDULE = {
+    "0110": "Rooms", "0111": "Rooms", "0112": "Rooms", "0113": "Rooms",
+    "0114": "Rooms",
+    "0120": "F&B", "0121": "F&B", "0122": "F&B", "0123": "F&B", "0124": "F&B",
+    "0125": "F&B", "0126": "F&B", "0127": "F&B", "0128": "F&B", "0129": "F&B",
+    "0130": "Health Club/Spa", "0131": "Health Club/Spa",
+    "0132": "Health Club/Spa", "0133": "Health Club/Spa",
+    "0140": "Health Club/Spa",
+    "0150": "Minor Oper. Dept", "0151": "Minor Oper. Dept",
+    "0152": "Minor Oper. Dept", "0155": "Minor Oper. Dept",
+    "0156": "Minor Oper. Dept", "0160": "Minor Oper. Dept",
+    "0162": "Minor Oper. Dept", "0165": "Minor Oper. Dept",
+    # La lavanderia interna SI tiene schedule propio: el 12, House Laundry.
+    "0161": "Laundry",
+    "0180": "A&G", "0181": "A&G", "0182": "A&G", "0183": "A&G",
+    "0184": "A&G", "0186": "A&G",
+    "0190": "Sales/Marketing", "0191": "Sales/Marketing",
+    "0200": "POM",
+    "0205": "Utilities", "0210": "Utilities",
+    # La cafeteria de empleados es el Schedule 13, Staff Dining — y el libro le
+    # pide lo mismo que el P&L de esta propiedad: «Net Recovery […] should
+    # always net to zero to reflect full allocation of this department».
+    "0220": "Staff Dining",
+    "0230": "Info & Telecom",
+    "0240": "Non Op. I&E", "0250": "Non Op. I&E",
+}
+
+
+#: El diccionario y los Schedules no llaman igual a todos los departamentos. El
+#: diccionario tiene casillas que NO son un schedule: «Health Club/Spa» es un
+#: Other Operated Department —Schedule 3— y «Mult. Depts» quiere decir «este
+#: renglon vive en varios schedules», que no es ninguno en particular.
+#:
+#: ⚠️ Esto importa para no afirmar de mas. Contra setiembre 2026, el 27% de las
+#: cuentas cae en una de estas casillas; tratarlas como si tuvieran lista
+#: aprobada marcaba 13 cuentas, y las 13 estaban bien puestas.
+SCHEDULE_DEL_DICCIONARIO = {
+    "Health Club/Spa": 3,
+    "Golf Pro Shop": 3,
+    "Parking": 3,
+    "Garage Parking": 3,
+    "Minor Oper. Dept": 3,
+    "Other Oper. Depts": 3,
+    "Rooms": 1, "F&B": 2, "Misc. Income": 4, "A&G": 5,
+    "Info & Telecom": 6, "Sales/Marketing": 7, "POM": 8, "Utilities": 9,
+    "Management Fees": 10, "Non Op. I&E": 11, "Laundry": 12,
+    "Staff Dining": 13, "Payroll-Rel. Exp": 14,
+}
+
+
+async def _renglones_del_schedule(db: AsyncSession, schedule: str) -> dict:
+    """Que renglones aprueba el estandar para este departamento.
+
+    Devuelve `lista_aprobada=False` cuando el libro no da lista —el Schedule 3,
+    Other Operated Departments, dice «only the revenues and expenses […] that
+    exist at an individual property»—. Decirlo es la mitad util de la respuesta:
+    evita que alguien lea el silencio como «su cuenta esta mal».
+    """
+    num = SCHEDULE_DEL_DICCIONARIO.get(schedule)
+    if num is None:
+        return {"schedule": schedule, "numero": None, "lista_aprobada": False,
+                "renglones": [],
+                "motivo": "este renglon del diccionario no es un solo "
+                          "departamento del reporte"}
+    filas = (await db.execute(
+        select(UsaliRenglon)
+        .where(UsaliRenglon.hotel_id == HOTEL_ID, UsaliRenglon.numero == num)
+        .order_by(UsaliRenglon.orden))).scalars().all()
+    if not filas:
+        return {"schedule": schedule, "numero": num, "lista_aprobada": False,
+                "renglones": [], "motivo": "no hay USALI cargado"}
+    aprobada = bool(filas[0].lista_aprobada)
+    return {
+        "schedule": schedule,
+        "numero": num,
+        "titulo": filas[0].titulo,
+        "lista_aprobada": aprobada,
+        "motivo": "" if aprobada else
+                  "el estandar no da lista cerrada para este departamento",
+        "renglones": [g.renglon for g in filas],
+    }
+
+
+@router.get("/usali/schedule/")
+async def schedule_de(
+    schedule: str = Query(..., description="el departamento del USALI"),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Los renglones aprobados del reporte de un departamento."""
+    return await _renglones_del_schedule(db, schedule)
+
+
 @router.get("/usali/para-cuenta/")
 async def para_cuenta(
     nombre: str = Query(..., description="el nombre de la cuenta del hotel"),
-    schedule: str = Query("", description="el departamento, si se sabe"),
+    schedule: str = Query("", description="el departamento del USALI, si se sabe"),
+    dept: str = Query("", description="el departamento de la contabilidad"),
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -245,6 +367,12 @@ async def para_cuenta(
     decida. La diferencia importa: una regla que afirma mal deja de mirarse; una
     referencia que se equivoca se ignora y no cuesta nada.
     """
+    # El que llama pasa el departamento de la contabilidad —«0110»— y el
+    # puente vive aca: la pantalla no tiene por que saber como se llaman los
+    # departamentos del USALI.
+    if dept and not schedule:
+        schedule = DEPTO_A_SCHEDULE.get(dept, "")
+
     filas = (await db.execute(
         select(UsaliDefinicion)
         .where(UsaliDefinicion.hotel_id == HOTEL_ID))).scalars().all()
@@ -273,7 +401,9 @@ async def para_cuenta(
         # ⚠️ Se contesta que no hay, y no el candidato malo. Mostrar
         # «Cafeteria -> Collateral Material» ensena a desconfiar de la pantalla.
         return {"nombre": nombre, "grado": "ninguno", "parecido": round(calidad, 3),
-                "cuenta_usali": None, "definiciones": [], "items": []}
+                "cuenta_usali": None, "definiciones": [], "items": [],
+                "schedule": (await _renglones_del_schedule(db, schedule)
+                             if schedule else None)}
 
     defs = [d for d in filas if _norm_cta(d.cuenta) == _norm_cta(cuenta_usali or "")]
     items = (await db.execute(
@@ -292,6 +422,11 @@ async def para_cuenta(
         "definiciones": [{"cuenta": d.cuenta, "texto": d.texto, "pagina": d.pagina}
                          for d in defs],
         "items": [{"item": i.item, "schedule": i.schedule} for i in items],
+        # Que lleva ESE departamento segun el estandar. Es lo que el owner
+        # pidio el 2026-10-08: «cada cuenta tiene la descripcion y va por
+        # departamento».
+        "schedule": (await _renglones_del_schedule(db, schedule)
+                     if schedule else None),
     }
 
 
@@ -302,7 +437,7 @@ async def excel(
     db: AsyncSession = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """El catalogo en Excel: el diccionario y las definiciones, dos hojas.
+    """El catalogo en Excel: diccionario, definiciones y renglones del reporte.
 
     No es un adorno: con las ~1.950 filas afuera se puede revisar el catalogo de
     corrido y, sobre todo, es la base para armar el PUENTE contra las cuentas de
@@ -330,6 +465,9 @@ async def excel(
     defs = (await db.execute(
         select(UsaliDefinicion).where(UsaliDefinicion.hotel_id == HOTEL_ID)
         .order_by(UsaliDefinicion.pagina))).scalars().all()
+    renglones = (await db.execute(
+        select(UsaliRenglon).where(UsaliRenglon.hotel_id == HOTEL_ID)
+        .order_by(UsaliRenglon.numero, UsaliRenglon.orden))).scalars().all()
 
     wb = Workbook()
     cab = Font(bold=True, color="FFFFFF")
@@ -359,6 +497,21 @@ async def excel(
     for fila in d.iter_rows(min_row=2, min_col=3, max_col=3):
         fila[0].alignment = Alignment(wrap_text=True, vertical="top")
     d.freeze_panes = "A2"
+
+    g = wb.create_sheet("Renglones del reporte")
+    g.append(["Sch.", "Departamento", "Orden", "Renglon aprobado",
+              "Lista cerrada", "Pagina"])
+    for c in g[1]:
+        c.font, c.fill = cab, fondo
+    for x in renglones:
+        g.append([x.numero, x.schedule, x.orden + 1, x.renglon,
+                  # Decirlo en la hoja y no solo en pantalla: el Schedule 3 no
+                  # tiene lista, y quien lea el Excel suelto tiene que saberlo.
+                  "si" if x.lista_aprobada else "NO - el estandar no da lista",
+                  x.pagina])
+    for col, ancho in zip("ABCDEF", (7, 20, 8, 46, 30, 9)):
+        g.column_dimensions[col].width = ancho
+    g.freeze_panes = "A2"
 
     buf = io.BytesIO()
     wb.save(buf)

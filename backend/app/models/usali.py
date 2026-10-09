@@ -38,7 +38,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (Boolean, DateTime, Integer, String, Text,
+                        UniqueConstraint, func)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -62,6 +63,7 @@ class UsaliDocumento(Base):
     items: Mapped[int] = mapped_column(Integer, default=0)
     items_confirmados: Mapped[int] = mapped_column(Integer, default=0)
     definiciones: Mapped[int] = mapped_column(Integer, default=0)
+    renglones: Mapped[int] = mapped_column(Integer, default=0)
     #: El cruce de los dos ordenamientos, como lo devolvió el importador.
     cruce: Mapped[str] = mapped_column(Text, default="")
     subido_en: Mapped[datetime] = mapped_column(DateTime(timezone=True),
@@ -105,3 +107,58 @@ class UsaliDefinicion(Base):
     cuenta_norm: Mapped[str] = mapped_column(String(200), index=True)
     texto: Mapped[str] = mapped_column(Text)
     pagina: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UsaliRenglon(Base):
+    """Un renglón aprobado del reporte de un departamento (un Schedule).
+
+    Es la OTRA mitad del libro. El diccionario (`usali_items`) da ejemplos de
+    artículos —«Cots → Rooms / Operating Supplies»—; el Schedule da el renglón
+    del reporte: qué líneas lleva el estado de resultados de Rooms, de F&B, de
+    A&G. Son ~400 en 14 schedules.
+
+    ## Por qué es referencia y no alarma
+
+    Se midió antes de construirlo, contra las 252 cuentas que usó setiembre
+    2026. La regla «esta cuenta no es renglón aprobado de su schedule» dio UN
+    hallazgo, y dudoso. El reparto real:
+
+    * 130 (51.6%) son cuentas propias del hotel que el estándar nunca nombró;
+    * 68 (27.0%) caen en departamentos donde el libro **no da lista** —el Spa y
+      los minor departments son Schedule 3, que es una plantilla de formato—;
+    * 52 (20.6%) sí son renglón aprobado de su schedule.
+
+    Con ese reparto no se puede alarmar. Sirve para lo que el owner pidió el
+    2026-10-08: *«cada cuenta tiene la descripción y va por departamento»* — al
+    revisar una cuenta, ver qué dice el estándar que lleva ese departamento.
+
+    ## `lista_aprobada` sale del libro, no de una lista a mano
+
+    El texto declara la lista cerrada con una de dos frases —«approved as line
+    items» o «does not provide for the addition or substitution»—. El Schedule 3
+    no trae ninguna; dice «only the revenues and expenses […] that exist at an
+    individual property». Leerlo del texto es lo que hace que otra edición del
+    libro siga funcionando.
+    """
+    __tablename__ = "usali_renglones"
+    __table_args__ = (
+        UniqueConstraint("hotel_id", "numero", "renglon_norm",
+                         name="uq_usali_renglon"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    hotel_id: Mapped[str] = mapped_column(String(10), index=True)
+    #: El número del Schedule: 1 Rooms, 2 F&B, … 14 Payroll-Related.
+    numero: Mapped[int] = mapped_column(Integer, index=True)
+    #: Como lo titula el cuadro: ROOMS, HOUSE LAUNDRY, STAFF DINING…
+    titulo: Mapped[str] = mapped_column(String(80))
+    #: Como lo llama el diccionario: Rooms, Laundry, Staff Dining. Es la llave
+    #: de apareo con `usali_items`.
+    schedule: Mapped[str] = mapped_column(String(80), index=True)
+    renglon: Mapped[str] = mapped_column(String(200))
+    renglon_norm: Mapped[str] = mapped_column(String(200), index=True)
+    #: En qué posición lo trae el cuadro: el reporte se arma en ese orden.
+    orden: Mapped[int] = mapped_column(Integer, default=0)
+    pagina: Mapped[int] = mapped_column(Integer, default=0)
+    #: ¿El libro declara lista cerrada para este schedule? False en el 3.
+    lista_aprobada: Mapped[bool] = mapped_column(Boolean, default=False)

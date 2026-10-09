@@ -281,3 +281,106 @@ def test_el_estandar_no_marca_nada():
     fuente = inspect.getsource(usali_api)
     for palabra in ("hallazgo", "Hallazgo", "severidad", "REGLAS"):
         assert palabra not in fuente
+
+
+# ── los renglones de cada Schedule ──────────────────────────────────────────
+#
+# La otra mitad del libro. El diccionario da EJEMPLOS de artículos; el Schedule
+# da el RENGLÓN del reporte. Es referencia del panel, no alarma, y estas pruebas
+# existen para que siga siéndolo.
+
+def test_los_catorce_schedules_salen_por_CONTENIDO():
+    """Encontrarlos por número de página habría durado hasta la próxima edición.
+
+    El cuadro se delata por su título en MAYÚSCULAS —«ROOMS—SCHEDULE 1»—, que es
+    distinto de la prosa que lo explica —«Rooms—Schedule 1 reflects…»—. Medido
+    sobre el libro del owner el 2026-10-09: 399 renglones en 14 schedules.
+    """
+    from app.importers.usali_pdf import leer_pdf
+
+    L = leer_pdf(LIBRO.read_bytes())
+    por_num = {}
+    for g in L.renglones:
+        por_num.setdefault(g.numero, []).append(g)
+    assert sorted(por_num) == list(range(1, 15)), (
+        f"faltan o sobran schedules: {sorted(por_num)}")
+    assert len(L.renglones) > 350
+    # Utilities es el cuadro chico y exacto: sirve de testigo.
+    assert [g.renglon for g in por_num[9]] == [
+        "Electricity", "Gas", "Oil", "Water/Sewer", "Steam", "Chilled Water",
+        "Other Fuels", "Contract Services"]
+
+
+def test_el_schedule_3_queda_SIN_lista_aprobada():
+    """⚠️ La mitad útil de la respuesta.
+
+    El Schedule 3 —Other Operated Departments— no declara lista cerrada: dice
+    «only the revenues and expenses […] that exist at an individual property».
+    Ahí viven el Spa, Tours, Transporte y Lavandería de esta propiedad: el 27%
+    de las cuentas de setiembre 2026. Tratarlo como lista cerrada producía 13
+    hallazgos y los 13 eran falsos.
+    """
+    from app.importers.usali_pdf import leer_pdf
+
+    L = leer_pdf(LIBRO.read_bytes())
+    por_num = {}
+    for g in L.renglones:
+        por_num.setdefault(g.numero, []).append(g)
+    assert not any(g.lista_aprobada for g in por_num[3])
+    # Y los que sí la declaran, la declaran: con una de las dos frases del
+    # libro —«approved as line items» o «does not provide for the addition»—.
+    for num in (1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
+        assert all(g.lista_aprobada for g in por_num[num]), (
+            f"el Schedule {num} perdió su declaración de lista cerrada")
+
+
+def test_los_encabezados_del_bloque_de_planilla_NO_son_renglones():
+    """Se repiten en los catorce schedules y no son cuentas.
+
+    «Labor Costs and Related Expenses», «Management», «Non-Management» son
+    rótulos de agrupación. Colarlos hacía que doce schedules tuvieran los mismos
+    cuatro renglones falsos y que el cuadro no se pudiera leer.
+    """
+    from app.importers.usali_pdf import leer_pdf
+
+    L = leer_pdf(LIBRO.read_bytes())
+    malos = {"management", "non-management", "labor costs and related expenses",
+             "other expenses", "payroll-related expenses"}
+    hallados = {g.renglon.lower() for g in L.renglones} & malos
+    assert not hallados, f"encabezados colados como renglones: {hallados}"
+
+
+def test_la_casilla_del_diccionario_que_no_es_un_schedule_no_afirma_nada():
+    """«Health Club/Spa» y «Mult. Depts» son casillas del DICCIONARIO.
+
+    El Spa es un Other Operated Department —Schedule 3, sin lista—; «Mult.
+    Depts» quiere decir «este renglón vive en varios», que no es ninguno. Si
+    alguna vez se mapean a un schedule con lista cerrada, vuelven los 13 falsos.
+    """
+    from app.api.usali_api import SCHEDULE_DEL_DICCIONARIO
+
+    assert SCHEDULE_DEL_DICCIONARIO["Health Club/Spa"] == 3
+    assert SCHEDULE_DEL_DICCIONARIO["Minor Oper. Dept"] == 3
+    assert "Mult. Depts" not in SCHEDULE_DEL_DICCIONARIO
+
+
+@pytest.mark.asyncio
+async def test_los_renglones_arrancan_vacios_en_un_clon(base):
+    """Como las otras tres: el texto es de AHLA/HFTP y no se siembra."""
+    from app.models.usali import UsaliRenglon
+
+    n = (await base.execute(
+        select(func.count()).select_from(UsaliRenglon))).scalar()
+    assert n == 0
+
+
+@pytest.mark.asyncio
+async def test_sin_USALI_cargado_el_panel_dice_que_no_hay(base):
+    """No puede contestar «este departamento no lleva nada» cuando lo que pasa
+    es que nadie subió el libro. Son cosas distintas y se leen distinto."""
+    from app.api.usali_api import _renglones_del_schedule
+
+    r = await _renglones_del_schedule(base, "Rooms")
+    assert r["renglones"] == []
+    assert r["lista_aprobada"] is False
+    assert "no hay USALI cargado" in r["motivo"]

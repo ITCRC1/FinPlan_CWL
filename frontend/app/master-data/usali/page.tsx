@@ -26,6 +26,10 @@ interface Estado {
   items?: number;
   items_confirmados?: number;
   definiciones?: number;
+  /** Los renglones aprobados de los 14 Schedules: la otra mitad
+   *  del libro. El diccionario da ejemplos de articulos; el
+   *  Schedule da el renglon del reporte. */
+  renglones?: number;
   subido_en?: string | null;
   subido_por?: string;
   cruce?: Record<string, number>;
@@ -170,7 +174,8 @@ export default function UsaliPage() {
               <b>{estado.items?.toLocaleString()}</b> artículos del diccionario,{" "}
               {estado.items_confirmados?.toLocaleString()} confirmados por los dos
               ordenamientos del libro ·{" "}
-              <b>{estado.definiciones}</b> definiciones de cuenta
+              <b>{estado.definiciones}</b> definiciones de cuenta ·{" "}
+              <b>{estado.renglones}</b> renglones de los 14 Schedules
               {estado.subido_en && (
                 <> · subido {new Date(estado.subido_en).toLocaleDateString()}
                   {estado.subido_por ? ` por ${estado.subido_por}` : ""}</>
@@ -228,9 +233,11 @@ export default function UsaliPage() {
             </span>
             {/* ⚠️ Baja lo que se está viendo, filtros incluidos. Y sirve de
                 verdad: con las ~1.950 filas afuera se arma el puente contra las
-                cuentas de Integrity, que es la etapa 2. */}
+                cuentas de Integrity. La tercera hoja trae los renglones
+                aprobados de cada Schedule, y dice cuáles NO tienen lista —el 3,
+                Other Operated Departments, donde viven el Spa y los tours—. */}
             <button onClick={() => void bajarExcel()}
-                    title="El diccionario y las definiciones, en dos hojas"
+                    title="Diccionario, definiciones y renglones del reporte, en tres hojas"
                     style={{ fontSize: 12, padding: "5px 11px", borderRadius: 5,
                              cursor: "pointer", fontWeight: 600,
                              border: "1px solid var(--border-medium)",
