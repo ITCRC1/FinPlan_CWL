@@ -14,8 +14,8 @@ que desaparece sin avisar.
 """
 from __future__ import annotations
 
-from datos import OPERATIVOS, OVERHEAD
-from formato import (AZUL, GRIS, NEGRO, Pt, bullet, h1, h2, h3, nota, par, pc,
+from app.informes.datos import OPERATIVOS, OVERHEAD
+from app.informes.formato import (AZUL, GRIS, NEGRO, Pt, bullet, h1, h2, h3, nota, par, pc,
                      pct_var, tabla, us, var, var_gasto)
 
 FALTANTES: list[str] = []

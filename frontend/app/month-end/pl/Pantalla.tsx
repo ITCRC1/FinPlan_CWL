@@ -27,6 +27,7 @@ import {
   getAuditoria, getPLDetail, getComentariosPL, guardarComentarioPL,
   getEstadisticasCierre, getDetalleDeCelda,
   getConsultaCatalogo, correrConsulta, bajarConsultaExcel, getPLDoceMeses,
+  bajarInformeOperativo,
   getPlanillaPorCuenta, getPlanillaPorPosicion, getGastoPorDetalle,
   espejoAlDia, type PrecierreEspejo,
   type ConsultaFila, type ConsultaCatalogo, type FbDetalle, type FbMes, type IngresoDetalle,
@@ -458,6 +459,13 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
    *  seguido abriendo en el que él mandó al final. Nada habría fallado; sólo
    *  habría abierto en el cuadro equivocado. */
   const VISTA_INICIAL: Vista = VISTAS[0].key;
+  /** Dos saltos de linea para separar avisos en un `alert`. */
+  const SALTO = String.fromCharCode(10);
+
+  /** El informe operativo: «armando» mientras el servidor lo arma, y despues el
+   *  aviso del cuadre. Tarda unos segundos porque recorre el mes entero. */
+  const [informe, setInforme] = useState<"" | "armando">("");
+
   const [vista, setVista] = useState<Vista>(VISTA_INICIAL);
   // La planilla por cuenta: se pide solo cuando se abre su tab. Son 17 filas y
   // no las mira nadie desde los otros sub-tabs; traerlas siempre seria pagar
@@ -2411,6 +2419,32 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     }
   }
 
+  async function bajarInforme() {
+    setInforme("armando");
+    try {
+      const r = await bajarInformeOperativo(year, mes);
+      const avisos: string[] = [];
+      if (!r.conAnalisis) {
+        avisos.push(
+          "El documento trae los cuadros completos. El analisis de este mes "
+          + "todavia no esta escrito: el texto sale con marcas [PENDIENTE].");
+      }
+      if (!r.cuadra) {
+        // ⚠️ No es un detalle: el GOP del reporte y el del motor difieren por el
+        // credito 4999 que el tab descarta. Si la diferencia NO es ese credito,
+        // hay otra causa y el informe no se publica hasta entenderla.
+        avisos.push(
+          `⚠️ El cuadre NO dio: GOP del reporte ${r.gopReporte} contra `
+          + `${r.gopMotor} del motor. Revisar antes de publicar.`);
+      }
+      if (avisos.length) alert(avisos.join(SALTO + SALTO));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo armar el informe");
+    } finally {
+      setInforme("");
+    }
+  }
+
   async function bajarWord() {
     // ⚠️ **Primero, que la pantalla haya cargado.**
     //
@@ -2662,6 +2696,21 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
             es lo mismo que dibuja la fila de sub-tabs. */}
         <button onClick={bajarWord} title="Reporte de cierre en Word, con espacio para comentar cada cuadro"
           style={{ ...SEL, cursor: "pointer", fontWeight: 600 }}>⬇ Word</button>
+
+        {/* El informe operativo de variaciones. Owner, 2026-10-08: «yo ocupo
+            seguir haciendolo mes a mes, escojo el mes y genero la informacion».
+
+            ⚠️ Trae los CUADROS. El analisis —que es juicio— se escribe aparte y
+            queda versionado; si el mes todavia no lo tiene, el documento sale
+            con los cuadros y marcas [PENDIENTE] en el texto, y el boton lo
+            avisa. No se llama a ningun modelo desde el servidor. */}
+        <button onClick={bajarInforme} disabled={informe === "armando"}
+          title="Informe operativo de variaciones del mes: 53 cuadros, por departamento y a maximo detalle"
+          style={{ ...SEL, cursor: informe === "armando" ? "wait" : "pointer",
+                   fontWeight: 600,
+                   opacity: informe === "armando" ? 0.6 : 1 }}>
+          {informe === "armando" ? "armando…" : "⬇ Informe operativo"}
+        </button>
 
       </div>
 

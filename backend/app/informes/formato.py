@@ -95,7 +95,8 @@ def tabla(d, cabeceras, filas, anchos=None, nota_pie=None, size=8.5):
         celdas = t.add_row().cells
         for i, v in enumerate(fila):
             est = None
-            if isinstance(v, tuple): v, est = v
+            # Desde JSON una celda con estilo llega como LISTA, no como tupla.
+            if isinstance(v, (tuple, list)) and len(v) == 2: v, est = v
             cel = celdas[i]
             cel.paragraphs[0].paragraph_format.space_after = Pt(0)
             cel.paragraphs[0].alignment = (WD_ALIGN_PARAGRAPH.LEFT if i == 0

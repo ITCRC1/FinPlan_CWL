@@ -11,43 +11,51 @@
 >
 > **Modelo de referencia:** `CWL_Informe_Operativo_Setiembre_2026.docx`, hecho
 > el 2026-10-07. Su análisis vive en
-> `generador/narrativa/n2026_09.py` y sirve de plantilla.
+> `backend/app/seed_data/CWL/informes/2026_09.json` y sirve de plantilla.
 
 ---
 
 ## 1. Cómo se activa
 
-### Opción A — pedirlo en el chat (lo normal)
+### Opción A — el botón, dentro de FinPlan
+
+*Pre-Closing → Month-End Close — P&L →* **⬇ Informe operativo**
+
+Elegís mes y año arriba, le das clic y baja el `.docx`. Corre en el servidor, así
+que funciona desde cualquier máquina y sin instalar nada.
+
+> **El botón trae los CUADROS.** El análisis sale solo si ya está escrito para
+> ese mes. Si no lo está, el documento baja con los 53 cuadros completos y marcas
+> `[PENDIENTE]` en el texto, y el botón lo avisa.
+>
+> **El servidor no llama a ningún modelo.** Sin llave de API, sin costo y sin
+> riesgo de que una cifra inventada entre a un documento que circula.
+
+El botón también verifica el cuadre y avisa si no dio.
+
+### Opción B — pedir el análisis en el chat
 
 ```
 /informe octubre 2026
 ```
 
 Claude lee esta especificación, saca los cuadros, mira el detalle del mayor,
-escribe el análisis y manda el Word. El comando vive en
-`.claude/commands/informe.md`.
+escribe el análisis, lo deja guardado en
+`backend/app/seed_data/<HOTEL>/informes/<año>_<mes>.json` y manda el Word. A
+partir de ahí **el botón de la opción A ya entrega ese mes completo**, para
+cualquiera del equipo.
 
-### Opción B — correrlo uno mismo
+### Opción C — la línea de comandos
 
 ```bash
-backend/.venv/Scripts/python.exe informes/generador/armar.py --anio 2026 --mes 10
+backend/.venv/Scripts/python.exe informes/armar.py --anio 2026 --mes 10
 ```
 
-Un solo comando: si falta el corte del mes lo extrae de producción solo. Sale el
-Word con los 53 cuadros completos y marcas `[PENDIENTE]` donde falta el
-análisis, más la lista de claves por escribir.
-
-Después se escribe el análisis en `generador/narrativa/n2026_10.py` —copiando
-`n2026_10.py` si está en blanco, o `n2026_09.py` como modelo— y se vuelve a
-correr el mismo comando. La segunda vez **no** toca producción: usa el corte ya
-guardado. Para forzar una lectura nueva, `--extraer`.
+Un solo comando: si falta el corte del mes lo extrae de producción solo. La
+segunda corrida **no** toca producción —usa el corte guardado—, que es lo que uno
+quiere al reescribir un comentario. Para forzar lectura nueva, `--extraer`.
 
 **El análisis es el trabajo real.** Los cuadros son mecánicos y no se opinan.
-
-**Si se salta el paso 2**, el informe sale igual: con los 53 cuadros completos y
-marcas `[PENDIENTE: clave]` donde falta el análisis, y `armar.py` imprime la
-lista de lo que falta. Un hueco visible es útil; una sección que desaparece sin
-avisar, no.
 
 ### Requisitos antes de empezar
 
@@ -70,8 +78,8 @@ avisar, no.
 /informe setiembre 2026
 ```
 
-Sale **idéntico**: el análisis está guardado en `narrativa/` y el corte de datos
-en `generador/datos/`. Por defecto **no vuelve a leer producción**, y eso es
+Sale **idéntico**: el análisis está guardado en `seed_data/<HOTEL>/informes/` y el corte
+en `app/informes/datos/`. Por defecto **no vuelve a leer producción**, y eso es
 deliberado — un informe que ya circuló no debería cambiar de números solo porque
 se volvió a imprimir.
 
@@ -81,7 +89,7 @@ Si se resubió el P&L del Pre-Cierre, o el mayor en *Auditoría del mayor*, o se
 corrigió una clasificación:
 
 ```bash
-backend/.venv/Scripts/python.exe informes/generador/armar.py --anio 2026 --mes 9 --extraer
+backend/.venv/Scripts/python.exe informes/armar.py --anio 2026 --mes 9 --extraer
 ```
 
 **`extraer.py` compara contra la extracción anterior y dice qué se movió**, antes
@@ -104,7 +112,7 @@ CAMBIO desde la extraccion anterior - REVISAR EL TEXTO
 > lado que dice otra es peor que no tener informe. Por eso la comparación existe:
 > la lista de arriba es exactamente la lista de párrafos que hay que repasar.
 
-La extracción anterior queda guardada en `datos/<año>_<mes>.anterior.json`.
+La extracción anterior queda guardada en `app/informes/datos/<año>_<mes>.anterior.json`.
 
 ---
 
@@ -215,7 +223,7 @@ lo dice en la nota al pie del cuadro.
 
 ### El orden de los departamentos
 
-Está en `datos.py` y es el del P&L. **No se reordena por monto**: ordenado por
+Está en `app/informes/datos.py` y es el del P&L. **No se reordena por monto**: ordenado por
 monto el informe se lee como una lista de sorpresas; ordenado como el P&L se lee
 como el estado de resultados, que es contra lo que se compara.
 
@@ -348,7 +356,7 @@ Todas opcionales: si falta una, sale `[PENDIENTE: clave]` y `armar.py` la lista.
 | `agenda` | lista de `(responsable, foco, [preguntas])` | 11 |
 
 `<nombre>` es el nombre del departamento tal como aparece en `OPERATIVOS` y
-`OVERHEAD` de `datos.py` — `"Rooms"`, `"Alimentos y Bebidas"`, `"Utilities /
+`OVERHEAD` de `app/informes/datos.py` — `"Rooms"`, `"Alimentos y Bebidas"`, `"Utilities /
 Energia"`…
 
 En las filas de tabla, una celda puede ser `texto` o `(texto, estilo)`, con
@@ -359,28 +367,38 @@ estilo `"tot"` (negrita + fondo), `"sec"` (sección), `"sub"`, `"neg"` (rojo),
 
 ## 7. Los archivos
 
+⚠️ **El generador vive dentro de `backend/`**, y no es un detalle de orden:
+Railway despliega solo esa carpeta, así que un generador fuera de ahí no existe
+para el servidor y el botón no podría armar nada.
+
 ```
 informes/
 ├── INFORME_OPERATIVO.md              ← esto
-├── CWL_Informe_Operativo_<Mes>_<Año>.docx
-└── generador/
-    ├── extraer.py                    paso 1 · solo lectura de producción
-    ├── armar.py                      paso 3 · el Word
+├── extraer.py                        guardar el corte del mes (solo lectura)
+├── armar.py                          el Word, desde la línea de comandos
+└── CWL_Informe_Operativo_<Mes>_<Año>.docx
+
+backend/app/
+├── api/informe_api.py                el endpoint del botón
+├── seed_data/<HOTEL>/informes/
+│   └── <año>_<mes>.json              EL ANÁLISIS — uno por mes
+└── informes/
+    ├── extraccion.py                 el corte, desde una sesión
+    ├── armador.py                    ensambla el documento y calcula el cuadre
     ├── datos.py                      la capa de datos y el orden del P&L
     ├── formato.py                    estilos, tablas, colores
     ├── secciones.py                  secciones 1-3 + el bloque departamental
     ├── secciones2.py                 secciones 4-12
-    ├── datos/<año>_<mes>.json        lo extraído (no se edita a mano)
-    └── narrativa/
-        ├── n2026_09.py               el análisis de setiembre — modelo
-        └── n<año>_<mes>.py           uno por mes
+    └── datos/<año>_<mes>.json        el corte (no se versiona, no se edita)
 ```
 
-El JSON de `datos/` es el corte del mes: una vez extraído, el informe se puede
-rearmar cuantas veces se quiera **sin volver a tocar producción**. Si hay que
-corregir un cuadro o reescribir un comentario, no se vuelve a consultar.
+**El análisis vive en `seed_data/<HOTEL>/` y no en `app/`.** Es contenido de una
+propiedad: un clon no puede heredar el análisis de Corcovado, y
+`tests/test_un_hotel_por_instalacion.py` no deja que su nombre viva dentro de
+`app/` como valor.
 
----
+El corte de `informes/datos/` es la foto del mes: una vez extraído, el informe se
+rearma cuantas veces haga falta **sin volver a tocar producción**.
 
 ## 8. Lista de verificación antes de entregar
 
@@ -420,7 +438,7 @@ cada mes** — si ya se arreglaron, el informe lo tiene que decir.
 `extraer.py` toma `--hotel` (por defecto `CWL`). Lo que habría que revisar antes
 de usarlo en otra:
 
-- `OPERATIVOS` y `OVERHEAD` en `datos.py` — los códigos de departamento y cómo
+- `OPERATIVOS` y `OVERHEAD` en `app/informes/datos.py` — los códigos de departamento y cómo
   se agrupan son de Corcovado.
 - `EXCL` — los departamentos de allocation pueden ser otros.
 - El puente de Integrity a FinPlan vive en

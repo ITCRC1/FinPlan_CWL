@@ -775,6 +775,48 @@ export async function correrConsulta(f: ConsultaFiltro): Promise<{
 }
 
 /** Baja el .xlsx. Va por fetch y no por <a href> porque el endpoint pide token. */
+/** El informe operativo de variaciones del mes, en Word.
+ *
+ * ⚠️ Trae los CUADROS. El analisis sale solo si ya esta escrito para ese mes
+ * —owner, 2026-10-08: *«si solo quiero que me generes los cuadros y despues lo
+ * subo aca y me lo analizas»*—. El servidor no llama a ningun modelo.
+ *
+ * Devuelve el cuadre que viene en las cabeceras, para que la pantalla pueda
+ * avisar sin volver a preguntar.
+ */
+export async function bajarInformeOperativo(
+  anio: number, mes: number,
+): Promise<{ cuadra: boolean; conAnalisis: boolean; gopReporte: string;
+             gopMotor: string }> {
+  const token = getToken();
+  const res = await fetch(`${BASE}/informes/operativo/${anio}/${mes}/`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let msg = `No se pudo armar el informe (HTTP ${res.status})`;
+    try {
+      const j = await res.json();
+      if (j?.detail) msg = typeof j.detail === "string" ? j.detail : j.detail.mensaje;
+    } catch { /* el cuerpo no era JSON */ }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = (res.headers.get("Content-Disposition") || "")
+    .split("filename=")[1]?.replace(/"/g, "")
+    || `Informe_Operativo_${anio}_${mes}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return {
+    cuadra: res.headers.get("X-Informe-Cuadra") === "si",
+    conAnalisis: res.headers.get("X-Informe-Con-Analisis") === "si",
+    gopReporte: res.headers.get("X-Informe-GOP-Reporte") || "",
+    gopMotor: res.headers.get("X-Informe-GOP-Motor") || "",
+  };
+}
+
 export async function bajarConsultaExcel(f: ConsultaFiltro): Promise<void> {
   const token = getToken();
   const res = await fetch(`${BASE}/consulta/excel/?${_qs(f)}`, {

@@ -17,7 +17,7 @@ advertencias de lectura, como se escribe el analisis y la lista de verificacion.
 **No improvises la estructura**: el owner pidio explicitamente que el informe
 salga igual todos los meses.
 
-El modelo de referencia es `informes/generador/narrativa/n2026_09.py`, que es el
+El modelo de referencia es `backend/app/seed_data/CWL/informes/2026_09.json`, que es el
 analisis de setiembre 2026. Leelo para ver el tono, el nivel de detalle y la
 forma de las preguntas al gerente.
 
@@ -26,11 +26,15 @@ forma de las preguntas al gerente.
 1. **Sacar los cuadros primero.**
 
    ```
-   python informes/generador/armar.py --anio <ano> --mes <mes>
+   python informes/armar.py --anio <ano> --mes <mes>
    ```
 
    Un solo comando: si falta el corte lo extrae de produccion. Usa el python del
    venv: `backend/.venv/Scripts/python.exe`.
+
+   Cuando el analisis quede guardado, el BOTON de la aplicacion
+   —Pre-Closing, «Informe operativo»— ya entrega ese mes completo para
+   cualquiera del equipo. Decirselo al owner al entregar.
 
    Si se queja de que falta el Pre-Cierre o el mayor, decile al owner que los
    suba y pare ahi — sin el mayor el informe no puede nombrar proveedores ni
@@ -44,11 +48,11 @@ forma de las preguntas al gerente.
 3. **Mirar los numeros de verdad.** No escribas el analisis desde los totales.
    Entra al detalle: las cuentas con mas variacion, los proveedores del mayor,
    los conceptos de planilla, los margenes por departamento. Usa consultas de
-   solo lectura sobre el corte en `informes/generador/datos/<ano>_<mes>.json`, o
+   solo lectura sobre el corte en `backend/app/informes/datos/<ano>_<mes>.json`, o
    sobre produccion si hace falta mas —con `scripts/_prodenv.py`, solo lectura—.
 
-4. **Escribir la narrativa** en `informes/generador/narrativa/n<ano>_<mes>.py`.
-   Copia la plantilla de `n2026_10.py` si no existe. Las reglas de escritura
+4. **Escribir la narrativa** en `backend/app/seed_data/<HOTEL>/informes/<ano>_<mes>.json`.
+   Copia la estructura del de setiembre si no existe. Es JSON: las tuplas van como listas. Las reglas de escritura
    estan en §5 del `.md`; las tres que mas importan:
 
    - Los hallazgos van **ordenados por impacto en dolares sobre el resultado**,

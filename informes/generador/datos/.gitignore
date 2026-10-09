@@ -1,3 +1,0 @@
-# El corte extraido de produccion: se regenera con `extraer.py` y puede traer
-# detalle de proveedores y salarios. No va al repositorio.
-*.json

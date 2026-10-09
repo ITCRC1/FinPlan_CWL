@@ -2,10 +2,10 @@
 """Secciones 4 a 12. Los cuadros son automaticos; el texto viene de la narrativa."""
 from __future__ import annotations
 
-from datos import CONCEPTOS, OPERATIVOS, OVERHEAD
-from formato import (GRIS, bullet, h1, h2, h3, nota, par, pc, pct_var, tabla, us,
+from app.informes.datos import CONCEPTOS, OPERATIVOS, OVERHEAD
+from app.informes.formato import (GRIS, bullet, h1, h2, h3, nota, par, pc, pct_var, tabla, us,
                      var, var_gasto)
-from secciones import FALTANTES, N, bloque, textos
+from app.informes.secciones import FALTANTES, N, bloque, textos
 
 
 def seccion4(d, D, agg, nar):

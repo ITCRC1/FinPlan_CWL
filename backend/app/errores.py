@@ -249,6 +249,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "precierre.vuelta_desconocida": {
         "es": "Esa vuelta no existe o es de otro mes: no se puede comparar contra ella.",
         "en": "That round does not exist or belongs to another month: it cannot be compared against."},
+    "informe.falta_dato": {
+        "es": "No se puede armar el informe: {detalle}",
+        "en": "The report cannot be built: {detalle}"},
     "precierre.mes_invalido": {
         "es": "El mes tiene que estar entre 1 y 12.",
         "en": "The month must be between 1 and 12."},

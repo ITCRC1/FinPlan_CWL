@@ -66,13 +66,23 @@ OVERHEAD = [
 
 
 class Datos:
-    def __init__(self, anio: int, mes: int):
-        ruta = AQUI / "datos" / f"{anio}_{mes:02d}.json"
-        if not ruta.exists():
-            raise SystemExit(
-                f"Falta {ruta}. Corra primero:\n"
-                f"  python informes/generador/extraer.py --anio {anio} --mes {mes}")
-        self.d = json.loads(ruta.read_text(encoding="utf-8"))
+    """La lectura del corte del mes.
+
+    Se construye de dos formas, y las dos tienen que existir: el ENDPOINT
+    extrae en memoria y pasa el dict; el SCRIPT de linea de comandos trabaja
+    sobre el archivo guardado, para poder rearmar el informe sin volver a tocar
+    produccion.
+    """
+
+    def __init__(self, anio, mes, corte=None):
+        if corte is None:
+            ruta = AQUI / "datos" / f"{anio}_{mes:02d}.json"
+            if not ruta.exists():
+                raise SystemExit(
+                    f"Falta {ruta}. Corra primero: "
+                    f"  python informes/extraer.py --anio {anio} --mes {mes}")
+            corte = json.loads(ruta.read_text(encoding="utf-8"))
+        self.d = corte
         self.anio = anio
         self.mes = mes
         self.idx = mes - 1

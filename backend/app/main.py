@@ -70,6 +70,7 @@ from app.api.costos_grupos_resumen_api import router as costos_grupos_resumen_ro
 from app.api.costos_grupos_master_api import router as costos_grupos_master_router
 from app.api.cierre_periodos_api import router as cierre_router
 from app.api.guillermo_api import router as guillermo_router
+from app.api.informe_api import router as informe_router
 from app.api.pacing_api import router as pacing_router
 from app.hotel_actual import HOTEL_ID, HOTEL_NAME
 
@@ -215,6 +216,7 @@ app.include_router(cierre_router, prefix="/api", dependencies=_guard)
 app.include_router(guillermo_router, prefix="/api", dependencies=_guard)
 # PACING: fotos de Opera y reservas, de la PROPIEDAD (ver app/api/pacing_api.py).
 app.include_router(pacing_router, prefix="/api", dependencies=_guard)
+app.include_router(informe_router, prefix="/api", dependencies=_guard)
 app.include_router(auth_router, prefix="/api")   # público (login/bootstrap/status)
 
 
