@@ -491,3 +491,86 @@ def test_la_pagina_del_USALI_muestra_los_renglones_del_departamento():
     assert "usaliSchedule" in txt
     assert "Renglones aprobados de" in txt
     assert "el estándar no da lista cerrada" in txt
+
+
+# ── el glosario en español de los rótulos ───────────────────────────────────
+#
+# Owner, 2026-10-09: *«ahora el usali en la app esta en ingles, se podra pasar
+# al espanol para que se mas facil el match contra los movimientos de
+# integrity»*.
+#
+# ⚠️ **No mejora el apareo, y se midió.** El traslape entre dos listas es
+# simétrico: da igual traducir el libro al español que traducir los artículos al
+# inglés, que es lo que ya se probó (19% de cobertura, la mitad mal). La razón la
+# dan sus datos: de los 40 artículos que más plata mueven en setiembre 2026, unos
+# seis son sustantivos que el diccionario nombraría — el resto son servicios
+# («Payroll Processing», «Oracle Hospitality»), combustible por marca («PLUS 91»,
+# «DIESEL»), códigos («100libRo») y comida. El libro no los nombra en ningún
+# idioma. Esto es para LEER, y así está escrito en el archivo.
+
+def test_el_glosario_cubre_TODOS_los_rotulos_del_libro():
+    """335 rótulos distintos entre renglones y nombres de cuenta: los 335.
+
+    Un glosario a medias es peor que ninguno: media pantalla en español y media
+    en inglés se lee como que al sistema le falta algo.
+    """
+    from app.api.usali_api import _norm, _terminos_es
+
+    glos = _terminos_es()
+    assert len(glos) > 300, f"el glosario trae {len(glos)} términos"
+    # Los que el panel muestra primero, uno por clase de cosa.
+    for en, es in (("Building", "Edificio"),
+                   ("Cleaning Supplies", "Suministros de Limpieza"),
+                   ("Guest Supplies", "Suministros para el Huésped"),
+                   ("Paper and Plastics", "Papel y Plásticos"),
+                   ("Salaries and Wages", "Salarios y Sueldos"),
+                   ("Water/Sewer", "Agua y Alcantarillado"),
+                   ("STAFF DINING", "Comedor de Empleados"),
+                   ("HOUSE LAUNDRY", "Lavandería Interna")):
+        assert glos.get(_norm(en)) == es, f"{en} -> {glos.get(_norm(en))}"
+
+
+def test_las_variantes_abreviadas_del_libro_caen_en_el_MISMO_termino():
+    """El libro escribe la misma cuenta de dos formas y las dos tienen que
+    resolver igual: si no, la pantalla muestra una en español y otra en inglés
+    para lo que es la misma cosa."""
+    from app.api.usali_api import _es, _terminos_es
+
+    glos = _terminos_es()
+    for a, b in (("Elec. & Mech", "Electrical and Mechanical Equipment"),
+                 ("Grounds M&L", "Grounds Maintenance and Landscaping"),
+                 ("Cent. Acct. Charges", "Centralized Accounting Charges"),
+                 ("Travel—Meals & Enter", "Travel—Meals and Entertainment")):
+        assert _es(a, glos) and _es(a, glos) == _es(b, glos), (a, b)
+
+
+def test_sin_traduccion_devuelve_VACIO_y_no_el_ingles():
+    """⚠️ Vacío y no el inglés repetido.
+
+    La pantalla muestra los dos lado a lado —«Edificio · Building»—, así que un
+    rótulo sin traducir que devolviera el inglés daría «Building · Building»,
+    que se lee como un error del sistema.
+    """
+    from app.api.usali_api import _es
+
+    assert _es("Algo Que El Libro No Dice", {}) == ""
+    assert _es("", {"": "x"}) == ""
+
+
+def test_las_DEFINICIONES_no_se_traducen():
+    """⚠️ Se traducen los RÓTULOS, no el libro.
+
+    Las 468 definiciones son texto de AHLA/HFTP y quedan en el idioma del
+    original: traducirlas a escala sería hacer una obra derivada. Si algún día
+    se decide hacerlo, que sea una decisión tomada y no algo que se filtró.
+    """
+    import json
+    import pathlib
+
+    d = json.loads((pathlib.Path(__file__).resolve().parents[1] / "app"
+                    / "seed_data" / "usali_terminos_es.json")
+                   .read_text(encoding="utf-8"))
+    # Rótulos cortos, no párrafos: nada de más de 70 caracteres del lado inglés.
+    largos = [v["en"] for v in d["terminos"].values() if len(v["en"]) > 70]
+    assert not largos, f"esto no es un rótulo, es texto: {largos}"
+    assert "definicion" in d["_nota"].lower() or "definiciones" in d["_nota"]

@@ -794,7 +794,9 @@ function PanelUsali({ usali, cerrar }: {
                   <div style={{ fontSize: 12, fontWeight: 700,
                                 marginBottom: 4 }}>
                     {usali.schedule.lista_aprobada
-                      ? `Renglones aprobados de ${usali.schedule.titulo ?? usali.schedule.schedule}`
+                      ? `Renglones aprobados de ${usali.schedule.titulo_es
+                          || usali.schedule.titulo
+                          || usali.schedule.schedule}`
                         + ` — Schedule ${usali.schedule.numero}`
                         + ` (${usali.schedule.renglones.length})`
                       : "El estándar no da lista para este departamento"}
@@ -802,12 +804,22 @@ function PanelUsali({ usali, cerrar }: {
                   {usali.schedule.lista_aprobada ? (
                     <div style={{ fontSize: 12, columns: 2,
                                   columnGap: 22 }}>
-                      {usali.schedule.renglones.map((g, i) => (
-                        <div key={i} style={{ breakInside: "avoid",
-                                              padding: "1px 0" }}>
-                          {g}
-                        </div>
-                      ))}
+                      {/* El español primero y el inglés al lado en gris: el
+                          inglés es el nombre con que el libro y el catálogo lo
+                          llaman, así que no se tira. */}
+                      {usali.schedule.renglones.map((g, i) => {
+                        const es = usali.schedule?.renglones_es?.[i];
+                        return (
+                          <div key={i} style={{ breakInside: "avoid",
+                                                padding: "1px 0" }}>
+                            {es || g}
+                            {es && (
+                              <span style={{ color: "var(--text-secondary)",
+                                             fontSize: 11 }}> · {g}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,

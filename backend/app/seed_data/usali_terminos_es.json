@@ -1,0 +1,1387 @@
+{
+ "_nota": "Glosario ES del USALI: los ROTULOS de cuenta y los renglones de los Schedules, para leer el panel en espanol. NO es una traduccion del libro: las 468 definiciones quedan en el idioma del original, que es texto de AHLA/HFTP.",
+ "_llave": "El rotulo en ingles pasado por _norm() de app/api/usali_api.py: minusculas, sin puntuacion. Asi las variantes del libro -'Elec. & Mech' y 'Electrical and Mechanical Equipment'- caen en el mismo termino. Si se cambia ese _norm, hay que reconstruir este archivo.",
+ "_como_corregir": "Si un termino esta mal, se edita aca y listo: no hay migracion ni hay que volver a subir el PDF.",
+ "terminos": {
+  "a g": {
+   "en": "A&G",
+   "es": "Administración"
+  },
+  "accounting": {
+   "en": "Accounting",
+   "es": "Contabilidad"
+  },
+  "administrative and general": {
+   "en": "Administrative and General",
+   "es": "Administración"
+  },
+  "agency fees": {
+   "en": "Agency Fees",
+   "es": "Honorarios de Agencia"
+  },
+  "allocation to department 1": {
+   "en": "Allocation to Department 1",
+   "es": "Reparto al Departamento 1"
+  },
+  "allocation to department 2": {
+   "en": "Allocation to Department 2",
+   "es": "Reparto al Departamento 2"
+  },
+  "allocation to department x": {
+   "en": "Allocation to Department x",
+   "es": "Reparto al Departamento x"
+  },
+  "allocation to food and beverage": {
+   "en": "Allocation to Food and Beverage",
+   "es": "Reparto a Alimentos y Bebidas"
+  },
+  "allocation to rooms": {
+   "en": "Allocation to Rooms",
+   "es": "Reparto a Habitaciones"
+  },
+  "allowances": {
+   "en": "Allowances",
+   "es": "Rebajas y Ajustes"
+  },
+  "ambience": {
+   "en": "Ambience",
+   "es": "Ambientación"
+  },
+  "association convention": {
+   "en": "Association/Convention",
+   "es": "Asociación / Convención"
+  },
+  "athletic supplies": {
+   "en": "Athletic Supplies",
+   "es": "Suministros Deportivos"
+  },
+  "attrition fees": {
+   "en": "Attrition Fees",
+   "es": "Cargos por Incumplimiento de Grupo"
+  },
+  "audiovisual": {
+   "en": "Audiovisual",
+   "es": "Audiovisuales"
+  },
+  "audiovisual cost": {
+   "en": "Audiovisual Cost",
+   "es": "Costo de Audiovisuales"
+  },
+  "audit charges": {
+   "en": "Audit Charges",
+   "es": "Honorarios de Auditoría"
+  },
+  "automobile allowance": {
+   "en": "Automobile Allowance",
+   "es": "Asignación de Vehículo"
+  },
+  "b o taxes": {
+   "en": "B&O Taxes",
+   "es": "Patentes Municipales"
+  },
+  "bank charges": {
+   "en": "Bank Charges",
+   "es": "Comisiones Bancarias"
+  },
+  "banq conf catering bev rev": {
+   "en": "Banq./Conf./Catering Bev. Rev",
+   "es": "Ingreso de Bebidas de Banquetes"
+  },
+  "banq conf catering food rev": {
+   "en": "Banq./Conf./Catering Food Rev",
+   "es": "Ingreso de Alimentos de Banquetes"
+  },
+  "banquet conference catering beverage rev": {
+   "en": "Banquet/Conference/ Catering Beverage Rev",
+   "es": "Ingreso de Bebidas de Banquetes y Eventos"
+  },
+  "banquet conference catering beverage revenue": {
+   "en": "Banquet/Conference/Catering Beverage Revenue",
+   "es": "Ingreso de Bebidas de Banquetes y Eventos"
+  },
+  "banquet conference catering food revenue": {
+   "en": "Banquet/Conference/Catering Food Revenue",
+   "es": "Ingreso de Alimentos de Banquetes y Eventos"
+  },
+  "banquet conference catering service": {
+   "en": "Banquet/Conference/Catering Service",
+   "es": "Servicio de Banquetes y Eventos"
+  },
+  "banquet expense": {
+   "en": "Banquet Expense",
+   "es": "Gastos de Banquetes"
+  },
+  "banquet expenses": {
+   "en": "Banquet Expenses",
+   "es": "Gastos de Banquetes"
+  },
+  "base fee": {
+   "en": "Base Fee",
+   "es": "Honorario Base"
+  },
+  "beverage revenue": {
+   "en": "Beverage Revenue",
+   "es": "Ingreso de Bebidas"
+  },
+  "bonuses and incentives": {
+   "en": "Bonuses and Incentives",
+   "es": "Bonos e Incentivos"
+  },
+  "breakage": {
+   "en": "Breakage",
+   "es": "Breakage (paquete no consumido)"
+  },
+  "building": {
+   "en": "Building",
+   "es": "Edificio"
+  },
+  "building and contents": {
+   "en": "Building and Contents",
+   "es": "Edificio y Contenido"
+  },
+  "business and occupation taxes": {
+   "en": "Business and Occupation Taxes",
+   "es": "Patentes Municipales"
+  },
+  "cancellation fees": {
+   "en": "Cancellation Fees",
+   "es": "Cargos por Cancelación"
+  },
+  "cancellations fees": {
+   "en": "Cancellations Fees",
+   "es": "Cargos por Cancelación"
+  },
+  "cash discounts earned": {
+   "en": "Cash Discounts Earned",
+   "es": "Descuentos por Pronto Pago"
+  },
+  "cash overages and shortages": {
+   "en": "Cash Overages and Shortages",
+   "es": "Sobrantes y Faltantes de Caja"
+  },
+  "cash overages shortages": {
+   "en": "Cash Overages/Shortages",
+   "es": "Sobrantes y Faltantes de Caja"
+  },
+  "cent acct charges": {
+   "en": "Cent. Acct. Charges",
+   "es": "Cargos de Contabilidad Centralizada"
+  },
+  "centralized accounting charges": {
+   "en": "Centralized Accounting Charges",
+   "es": "Cargos de Contabilidad Centralizada"
+  },
+  "centralized information system charges": {
+   "en": "Centralized Information System Charges",
+   "es": "Cargos de Sistemas Centralizados"
+  },
+  "child care": {
+   "en": "Child Care",
+   "es": "Cuido de Niños"
+  },
+  "chilled water": {
+   "en": "Chilled Water",
+   "es": "Agua Helada"
+  },
+  "china": {
+   "en": "China",
+   "es": "Vajilla"
+  },
+  "cleaning supplies": {
+   "en": "Cleaning Supplies",
+   "es": "Suministros de Limpieza"
+  },
+  "clothing revenue": {
+   "en": "Clothing Revenue",
+   "es": "Ingreso de Ropa"
+  },
+  "cluster services": {
+   "en": "Cluster Services",
+   "es": "Servicios Compartidos"
+  },
+  "collateral material": {
+   "en": "Collateral Material",
+   "es": "Material Promocional"
+  },
+  "commissions": {
+   "en": "Commissions",
+   "es": "Comisiones"
+  },
+  "commissions and fees group": {
+   "en": "Commissions and Fees— Group",
+   "es": "Comisiones y Honorarios — Grupos"
+  },
+  "commissions fees group": {
+   "en": "Commissions & Fees—Group",
+   "es": "Comisiones y Honorarios — Grupos"
+  },
+  "comp in room media entertainment": {
+   "en": "Comp. In-Room/Media Entertainment",
+   "es": "Entretenimiento en Habitación de Cortesía"
+  },
+  "complimentary f b": {
+   "en": "Complimentary F&B",
+   "es": "Alimentos y Bebidas de Cortesía"
+  },
+  "complimentary in room media entertainment": {
+   "en": "Complimentary In-Room/Media Entertainment",
+   "es": "Entretenimiento en Habitación de Cortesía"
+  },
+  "complimentary services and gifts": {
+   "en": "Complimentary Services and Gifts",
+   "es": "Servicios y Obsequios de Cortesía"
+  },
+  "complimentary services gifts": {
+   "en": "Complimentary Services/Gifts",
+   "es": "Servicios y Obsequios de Cortesía"
+  },
+  "concessionaires laundry": {
+   "en": "Concessionaires Laundry",
+   "es": "Lavandería de Concesionarios"
+  },
+  "contract rooms revenue": {
+   "en": "Contract Rooms Revenue",
+   "es": "Ingreso de Habitaciones por Contrato"
+  },
+  "contract services": {
+   "en": "Contract Services",
+   "es": "Servicios Contratados"
+  },
+  "contracted labor and bonuses": {
+   "en": "Contracted Labor and Bonuses",
+   "es": "Mano de Obra Contratada y Bonos"
+  },
+  "contracted leased and outsourced labor": {
+   "en": "Contracted, Leased and Outsourced Labor",
+   "es": "Mano de Obra Contratada y Tercerizada"
+  },
+  "contributory savings plan": {
+   "en": "Contributory Savings Plan",
+   "es": "Plan de Ahorro Contributivo"
+  },
+  "corporate": {
+   "en": "Corporate",
+   "es": "Corporativa"
+  },
+  "corporate office reimbursables": {
+   "en": "Corporate Office Reimbursables",
+   "es": "Reembolsos a Oficina Corporativa"
+  },
+  "cost of beverage sales": {
+   "en": "Cost of Beverage Sales",
+   "es": "Costo de Ventas de Bebidas"
+  },
+  "cost of cell phones": {
+   "en": "Cost of Cell Phones",
+   "es": "Costo de Telefonía Celular"
+  },
+  "cost of clothing sales": {
+   "en": "Cost of Clothing Sales",
+   "es": "Costo de Ventas de Ropa"
+  },
+  "cost of food sales": {
+   "en": "Cost of Food Sales",
+   "es": "Costo de Ventas de Alimentos"
+  },
+  "cost of internet services": {
+   "en": "Cost of Internet Services",
+   "es": "Costo de Servicios de Internet"
+  },
+  "cost of local calls": {
+   "en": "Cost of Local Calls",
+   "es": "Costo de Llamadas Locales"
+  },
+  "cost of long distance calls": {
+   "en": "Cost of Long Distance Calls",
+   "es": "Costo de Llamadas de Larga Distancia"
+  },
+  "cost of merch sales": {
+   "en": "Cost of Merch. Sales",
+   "es": "Costo de Ventas de Mercadería"
+  },
+  "cost of merchandise sales": {
+   "en": "Cost of Merchandise Sales",
+   "es": "Costo de Ventas de Mercadería"
+  },
+  "cost of sales": {
+   "en": "Cost of Sales",
+   "es": "Costo de Ventas"
+  },
+  "cost recovery expense": {
+   "en": "Cost Recovery Expense",
+   "es": "Gasto por Recuperación de Costo"
+  },
+  "cost recovery income": {
+   "en": "Cost Recovery Income",
+   "es": "Ingreso por Recuperación de Costo"
+  },
+  "cover charges": {
+   "en": "Cover Charges",
+   "es": "Cargo de Entrada (cover)"
+  },
+  "credit and collection": {
+   "en": "Credit and Collection",
+   "es": "Crédito y Cobro"
+  },
+  "credit card commissions": {
+   "en": "Credit Card Commissions",
+   "es": "Comisiones de Tarjeta de Crédito"
+  },
+  "credits": {
+   "en": "Credits",
+   "es": "Créditos"
+  },
+  "decorations": {
+   "en": "Decorations",
+   "es": "Decoración"
+  },
+  "deductible": {
+   "en": "Deductible",
+   "es": "Deducible"
+  },
+  "dental insurance": {
+   "en": "Dental Insurance",
+   "es": "Seguro Dental"
+  },
+  "direct mail": {
+   "en": "Direct Mail",
+   "es": "Correo Directo"
+  },
+  "disability insurance": {
+   "en": "Disability Insurance",
+   "es": "Seguro de Invalidez"
+  },
+  "discount": {
+   "en": "Discount",
+   "es": "Descuento"
+  },
+  "dishwashing supplies": {
+   "en": "Dishwashing Supplies",
+   "es": "Suministros de Lavaplatos"
+  },
+  "donations": {
+   "en": "Donations",
+   "es": "Donaciones"
+  },
+  "dues and subscriptions": {
+   "en": "Dues and Subscriptions",
+   "es": "Cuotas y Suscripciones"
+  },
+  "elec mech": {
+   "en": "Elec. & Mech",
+   "es": "Equipo Eléctrico y Mecánico"
+  },
+  "electrical and mechanical equipment": {
+   "en": "Electrical and Mechanical Equipment",
+   "es": "Equipo Eléctrico y Mecánico"
+  },
+  "electricity": {
+   "en": "Electricity",
+   "es": "Electricidad"
+  },
+  "elevators and escalators": {
+   "en": "Elevators and Escalators",
+   "es": "Ascensores y Escaleras Mecánicas"
+  },
+  "elevators escalators": {
+   "en": "Elevators & Escalators",
+   "es": "Ascensores y Escaleras Mecánicas"
+  },
+  "employee benefits": {
+   "en": "Employee Benefits",
+   "es": "Beneficios al Personal"
+  },
+  "energy management": {
+   "en": "Energy Management",
+   "es": "Gestión Energética"
+  },
+  "engineering supplies": {
+   "en": "Engineering Supplies",
+   "es": "Suministros de Ingeniería"
+  },
+  "entertainment in house": {
+   "en": "Entertainment—In-House",
+   "es": "Entretenimiento en la Propiedad"
+  },
+  "equipment": {
+   "en": "Equipment",
+   "es": "Equipo"
+  },
+  "equipment rental": {
+   "en": "Equipment Rental",
+   "es": "Alquiler de Equipo"
+  },
+  "expat benefits": {
+   "en": "Expat Benefits",
+   "es": "Beneficios de Expatriados"
+  },
+  "familiarization trips": {
+   "en": "Familiarization Trips",
+   "es": "Viajes de Familiarización"
+  },
+  "fitness revenue": {
+   "en": "Fitness Revenue",
+   "es": "Ingreso de Gimnasio"
+  },
+  "flatware": {
+   "en": "Flatware",
+   "es": "Cubertería"
+  },
+  "floor covering": {
+   "en": "Floor Covering",
+   "es": "Pisos y Alfombras"
+  },
+  "food and beverage": {
+   "en": "Food and Beverage",
+   "es": "Alimentos y Bebidas"
+  },
+  "food beverage": {
+   "en": "Food & Beverage",
+   "es": "Alimentos y Bebidas"
+  },
+  "food revenue": {
+   "en": "Food Revenue",
+   "es": "Ingreso de Alimentos"
+  },
+  "franchise affiliation fees royalties": {
+   "en": "Franchise & Affiliation Fees—Royalties",
+   "es": "Honorarios de Franquicia — Regalías"
+  },
+  "franchise and affiliation fees royalties": {
+   "en": "Franchise and Affiliation Fees—Royalties",
+   "es": "Honorarios de Franquicia y Afiliación — Regalías"
+  },
+  "franchise and affiliation marketing": {
+   "en": "Franchise and Affiliation Marketing",
+   "es": "Mercadeo de Franquicia y Afiliación"
+  },
+  "front office": {
+   "en": "Front Office",
+   "es": "Recepción"
+  },
+  "function room rental and setup charges": {
+   "en": "Function Room Rental and Setup Charges",
+   "es": "Alquiler de Salones y Montaje"
+  },
+  "function room rentals and setup charges": {
+   "en": "Function Room Rentals and Setup Charges",
+   "es": "Alquiler de Salones y Montaje"
+  },
+  "furniture and equipment": {
+   "en": "Furniture and Equipment",
+   "es": "Mobiliario y Equipo"
+  },
+  "gain loss on fixed assets": {
+   "en": "Gain/Loss on Fixed Assets",
+   "es": "Ganancia o Pérdida en Activos Fijos"
+  },
+  "gas": {
+   "en": "Gas",
+   "es": "Gas"
+  },
+  "gasoline and lubricants": {
+   "en": "Gasoline and Lubricants",
+   "es": "Gasolina y Lubricantes"
+  },
+  "general support": {
+   "en": "General Support",
+   "es": "Soporte General"
+  },
+  "glassware": {
+   "en": "Glassware",
+   "es": "Cristalería"
+  },
+  "golf": {
+   "en": "Golf",
+   "es": "Golf"
+  },
+  "golf cart rental revenue": {
+   "en": "Golf Cart Rental Revenue",
+   "es": "Ingreso por Alquiler de Carritos de Golf"
+  },
+  "golf club maintenance revenue": {
+   "en": "Golf Club Maintenance Revenue",
+   "es": "Ingreso por Mantenimiento de Palos de Golf"
+  },
+  "golf equipment rental revenue": {
+   "en": "Golf Equipment Rental Revenue",
+   "es": "Ingreso por Alquiler de Equipo de Golf"
+  },
+  "government": {
+   "en": "Government",
+   "es": "Gobierno"
+  },
+  "greens fee revenue": {
+   "en": "Greens Fee Revenue",
+   "es": "Ingreso por Green Fee"
+  },
+  "grounds m l": {
+   "en": "Grounds M&L",
+   "es": "Zonas Verdes y Jardinería"
+  },
+  "grounds maintenance and landscaping": {
+   "en": "Grounds Maintenance and Landscaping",
+   "es": "Zonas Verdes y Jardinería"
+  },
+  "group life insurance": {
+   "en": "Group Life Insurance",
+   "es": "Seguro de Vida Colectivo"
+  },
+  "group rooms revenue relevant account": {
+   "en": "Group Rooms Revenue—(relevant account)",
+   "es": "Ingreso de Habitaciones de Grupo"
+  },
+  "guest communications": {
+   "en": "Guest Communications",
+   "es": "Comunicaciones al Huésped"
+  },
+  "guest foreign cur exch gains losses": {
+   "en": "Guest Foreign Cur. Exch. Gains (Losses)",
+   "es": "Diferencial Cambiario de Huéspedes"
+  },
+  "guest foreign currency exchange gains losses": {
+   "en": "Guest Foreign Currency Exchange Gains (Losses)",
+   "es": "Diferencial Cambiario de Huéspedes"
+  },
+  "guest laundry and dry cleaning": {
+   "en": "Guest Laundry and Dry Cleaning",
+   "es": "Lavandería del Huésped"
+  },
+  "guest laundry dry cleaning": {
+   "en": "Guest Laundry & Dry Cleaning",
+   "es": "Lavandería del Huésped"
+  },
+  "guest laundry revenue": {
+   "en": "Guest Laundry Revenue",
+   "es": "Ingreso de Lavandería del Huésped"
+  },
+  "guest related foreign currency transaction gains": {
+   "en": "Guest-Related Foreign Currency Transaction Gains",
+   "es": "Ganancia Cambiaria en Transacciones de Huéspedes"
+  },
+  "guest related foreign currency transactions": {
+   "en": "Guest-Related Foreign Currency Transactions",
+   "es": "Transacciones Cambiarias de Huéspedes"
+  },
+  "guest relocation": {
+   "en": "Guest Relocation",
+   "es": "Reubicación de Huéspedes"
+  },
+  "guest services": {
+   "en": "Guest Services",
+   "es": "Servicios al Huésped"
+  },
+  "guest supplies": {
+   "en": "Guest Supplies",
+   "es": "Suministros para el Huésped"
+  },
+  "guest transportation": {
+   "en": "Guest Transportation",
+   "es": "Transporte del Huésped"
+  },
+  "hair care revenue": {
+   "en": "Hair Care Revenue",
+   "es": "Ingreso de Peluquería"
+  },
+  "hardware": {
+   "en": "Hardware",
+   "es": "Equipo de Cómputo"
+  },
+  "health and beauty products": {
+   "en": "Health and Beauty Products",
+   "es": "Productos de Salud y Belleza"
+  },
+  "health and wellness revenue": {
+   "en": "Health and Wellness Revenue",
+   "es": "Ingreso de Salud y Bienestar"
+  },
+  "health club spa": {
+   "en": "Health Club/Spa",
+   "es": "Spa / Club de Salud"
+  },
+  "health insurance": {
+   "en": "Health Insurance",
+   "es": "Seguro Médico"
+  },
+  "heating ventilation and air conditioning": {
+   "en": "Heating, Ventilation, and Air Conditioning",
+   "es": "Calefacción, Ventilación y Aire Acondicionado"
+  },
+  "holiday pay": {
+   "en": "Holiday Pay",
+   "es": "Pago de Feriados"
+  },
+  "house laundry": {
+   "en": "HOUSE LAUNDRY",
+   "es": "Lavandería Interna"
+  },
+  "housekeeping": {
+   "en": "Housekeeping",
+   "es": "Ama de Llaves"
+  },
+  "housing and educational": {
+   "en": "Housing and Educational",
+   "es": "Vivienda y Educación"
+  },
+  "human resources": {
+   "en": "Human Resources",
+   "es": "Recursos Humanos"
+  },
+  "hvac equipment": {
+   "en": "HVAC Equipment",
+   "es": "Equipo de Aire Acondicionado"
+  },
+  "ice": {
+   "en": "Ice",
+   "es": "Hielo"
+  },
+  "in house graphics": {
+   "en": "In-House Graphics",
+   "es": "Diseño Gráfico Interno"
+  },
+  "in room beverage rev": {
+   "en": "In-Room Beverage Rev",
+   "es": "Ingreso de Bebidas en Habitación"
+  },
+  "in room dining beverage revenue": {
+   "en": "In-Room Dining Beverage Revenue",
+   "es": "Ingreso de Bebidas de Room Service"
+  },
+  "in room dining food revenue": {
+   "en": "In-Room Dining Food Revenue",
+   "es": "Ingreso de Alimentos de Room Service"
+  },
+  "in room movie rentals": {
+   "en": "In-Room Movie Rentals",
+   "es": "Alquiler de Películas en Habitación"
+  },
+  "incentive fees": {
+   "en": "Incentive Fees",
+   "es": "Honorarios por Incentivo"
+  },
+  "income": {
+   "en": "Income",
+   "es": "Ingreso"
+  },
+  "information and telecommunications systems": {
+   "en": "INFORMATION AND TELECOMMUNICATIONS SYSTEMS",
+   "es": "Sistemas de Información y Telecomunicaciones"
+  },
+  "information security": {
+   "en": "Information Security",
+   "es": "Seguridad de la Información"
+  },
+  "information systems": {
+   "en": "Information Systems",
+   "es": "Sistemas de Información"
+  },
+  "information technology": {
+   "en": "Information Technology",
+   "es": "Tecnología de Información"
+  },
+  "interest income": {
+   "en": "Interest Income",
+   "es": "Ingreso por Intereses"
+  },
+  "irrigation": {
+   "en": "Irrigation",
+   "es": "Riego"
+  },
+  "kitchen": {
+   "en": "Kitchen",
+   "es": "Cocina"
+  },
+  "kitchen equipment": {
+   "en": "Kitchen Equipment",
+   "es": "Equipo de Cocina"
+  },
+  "kitchen fuel": {
+   "en": "Kitchen Fuel",
+   "es": "Combustible de Cocina"
+  },
+  "kitchen smallwares": {
+   "en": "Kitchen Smallwares",
+   "es": "Utensilios Menores de Cocina"
+  },
+  "land and buildings": {
+   "en": "Land and Buildings",
+   "es": "Terrenos y Edificios"
+  },
+  "laundry": {
+   "en": "Laundry",
+   "es": "Lavandería"
+  },
+  "laundry and dry cleaning": {
+   "en": "Laundry and Dry Cleaning",
+   "es": "Lavandería y Lavado en Seco"
+  },
+  "laundry equipment": {
+   "en": "Laundry Equipment",
+   "es": "Equipo de Lavandería"
+  },
+  "laundry supplies": {
+   "en": "Laundry Supplies",
+   "es": "Suministros de Lavandería"
+  },
+  "legal services": {
+   "en": "Legal Services",
+   "es": "Servicios Legales"
+  },
+  "lesson fee revenue": {
+   "en": "Lesson Fee Revenue",
+   "es": "Ingreso por Lecciones"
+  },
+  "liability": {
+   "en": "Liability",
+   "es": "Responsabilidad Civil"
+  },
+  "licenses and permits": {
+   "en": "Licenses and Permits",
+   "es": "Licencias y Permisos"
+  },
+  "life safety": {
+   "en": "Life/Safety",
+   "es": "Seguridad y Vida Humana"
+  },
+  "light bulbs": {
+   "en": "Light Bulbs",
+   "es": "Bombillos"
+  },
+  "linen": {
+   "en": "Linen",
+   "es": "Blancos y Mantelería"
+  },
+  "loss and damage": {
+   "en": "Loss and Damage",
+   "es": "Pérdidas y Daños"
+  },
+  "loyalty programs": {
+   "en": "Loyalty Programs",
+   "es": "Programas de Lealtad"
+  },
+  "management fees": {
+   "en": "Management Fees",
+   "es": "Honorarios de Administración"
+  },
+  "massage and body treatment revenue": {
+   "en": "Massage and Body Treatment Revenue",
+   "es": "Ingreso de Masajes y Tratamientos Corporales"
+  },
+  "meals": {
+   "en": "Meals",
+   "es": "Alimentación del Personal"
+  },
+  "media": {
+   "en": "Media",
+   "es": "Medios"
+  },
+  "membership fee revenue": {
+   "en": "Membership Fee Revenue",
+   "es": "Ingreso por Membresías"
+  },
+  "menus and beverage lists": {
+   "en": "Menus and Beverage Lists",
+   "es": "Menús y Cartas de Bebidas"
+  },
+  "merchandise revenue": {
+   "en": "Merchandise Revenue",
+   "es": "Ingreso de Mercadería"
+  },
+  "mini bar beverage revenue": {
+   "en": "Mini Bar Beverage Revenue",
+   "es": "Ingreso de Bebidas de Minibar"
+  },
+  "mini bar food revenue": {
+   "en": "Mini Bar Food Revenue",
+   "es": "Ingreso de Alimentos de Minibar"
+  },
+  "minor operated departments": {
+   "en": "Minor Operated Departments",
+   "es": "Departamentos Menores"
+  },
+  "misc cost of other rev": {
+   "en": "Misc. Cost (of Other Rev.)",
+   "es": "Costo Varios (de Otros Ingresos)"
+  },
+  "misc cost of other revenue": {
+   "en": "Misc. Cost (of Other Revenue)",
+   "es": "Costo Varios (de Otros Ingresos)"
+  },
+  "misc other rev": {
+   "en": "Misc. Other Rev",
+   "es": "Otros Ingresos Varios"
+  },
+  "miscellaneous": {
+   "en": "Miscellaneous",
+   "es": "Varios"
+  },
+  "miscellaneous cost": {
+   "en": "Miscellaneous Cost",
+   "es": "Costo Varios"
+  },
+  "miscellaneous income": {
+   "en": "MISCELLANEOUS INCOME",
+   "es": "Ingresos Varios"
+  },
+  "miscellaneous other revenue": {
+   "en": "Miscellaneous Other Revenue",
+   "es": "Otros Ingresos Varios"
+  },
+  "music and entertainment": {
+   "en": "Music and Entertainment",
+   "es": "Música y Entretenimiento"
+  },
+  "national disability insurance": {
+   "en": "National Disability Insurance",
+   "es": "Seguro Nacional de Invalidez"
+  },
+  "national medical insurance": {
+   "en": "National Medical Insurance",
+   "es": "Seguro Nacional de Salud"
+  },
+  "national retirement contribution": {
+   "en": "National Retirement Contribution",
+   "es": "Aporte Nacional de Pensión"
+  },
+  "national unemployment insurance": {
+   "en": "National Unemployment Insurance",
+   "es": "Seguro Nacional de Desempleo"
+  },
+  "negotiated": {
+   "en": "Negotiated",
+   "es": "Negociada"
+  },
+  "no show": {
+   "en": "No-show",
+   "es": "No-show"
+  },
+  "non guest related foreign currency exchange": {
+   "en": "Non-Guest-Related Foreign Currency Exchange",
+   "es": "Diferencial Cambiario No Relacionado a Huéspedes"
+  },
+  "non operating income and expenses": {
+   "en": "NON-OPERATING INCOME AND EXPENSES",
+   "es": "Ingresos y Gastos No Operativos"
+  },
+  "nonunion insurance": {
+   "en": "Nonunion Insurance",
+   "es": "Seguro No Sindical"
+  },
+  "nonunion pension": {
+   "en": "Nonunion Pension",
+   "es": "Pensión No Sindical"
+  },
+  "occasional food and bev rev": {
+   "en": "Occasional Food and Bev. Rev",
+   "es": "Ingreso Ocasional de A&B"
+  },
+  "occasional food and beverage revenue": {
+   "en": "Occasional Food and Beverage Revenue",
+   "es": "Ingreso Ocasional de Alimentos y Bebidas"
+  },
+  "oil": {
+   "en": "Oil",
+   "es": "Combustible (fuel oil)"
+  },
+  "operating supplies": {
+   "en": "Operating Supplies",
+   "es": "Suministros de Operación"
+  },
+  "other": {
+   "en": "Other",
+   "es": "Otros"
+  },
+  "other beverage revenue": {
+   "en": "Other Beverage Revenue",
+   "es": "Otros Ingresos de Bebidas"
+  },
+  "other breakage": {
+   "en": "Other Breakage",
+   "es": "Otro Breakage"
+  },
+  "other cost of services": {
+   "en": "Other Cost of Services",
+   "es": "Otros Costos de Servicios"
+  },
+  "other equipment": {
+   "en": "Other Equipment",
+   "es": "Otro Equipo"
+  },
+  "other food revenue": {
+   "en": "Other Food Revenue",
+   "es": "Otros Ingresos de Alimentos"
+  },
+  "other fuels": {
+   "en": "Other Fuels",
+   "es": "Otros Combustibles"
+  },
+  "other income": {
+   "en": "Other Income",
+   "es": "Otros Ingresos"
+  },
+  "other operated department 1": {
+   "en": "Other Operated Department 1",
+   "es": "Otro Departamento Operado 1"
+  },
+  "other operated department 2": {
+   "en": "Other Operated Department 2",
+   "es": "Otro Departamento Operado 2"
+  },
+  "other operated department x": {
+   "en": "Other Operated Department x",
+   "es": "Otro Departamento Operado x"
+  },
+  "other operated departments": {
+   "en": "OTHER OPERATED DEPARTMENTS",
+   "es": "Otros Departamentos Operados"
+  },
+  "other pay": {
+   "en": "Other Pay",
+   "es": "Otros Pagos"
+  },
+  "other property and equipment": {
+   "en": "Other Property and Equipment",
+   "es": "Otra Propiedad y Equipo"
+  },
+  "other property equipment": {
+   "en": "Other Property & Equipment",
+   "es": "Otra Propiedad y Equipo"
+  },
+  "other revenue": {
+   "en": "Other Revenue",
+   "es": "Otros Ingresos"
+  },
+  "other rooms revenue": {
+   "en": "Other Rooms Revenue",
+   "es": "Otros Ingresos de Habitaciones"
+  },
+  "other taxes and assessments": {
+   "en": "Other Taxes and Assessments",
+   "es": "Otros Impuestos y Contribuciones"
+  },
+  "outlet beverage rev": {
+   "en": "Outlet Beverage Rev",
+   "es": "Ingreso de Bebidas por Punto de Venta"
+  },
+  "outlet food rev": {
+   "en": "Outlet Food Rev",
+   "es": "Ingreso de Alimentos por Punto de Venta"
+  },
+  "outside sales representation": {
+   "en": "Outside Sales Representation",
+   "es": "Representación de Ventas Externa"
+  },
+  "outside services market research": {
+   "en": "Outside Services Market Research",
+   "es": "Investigación de Mercado Externa"
+  },
+  "outside signage": {
+   "en": "Outside Signage",
+   "es": "Rotulación Externa"
+  },
+  "owner expenses": {
+   "en": "Owner Expenses",
+   "es": "Gastos del Propietario"
+  },
+  "p odc": {
+   "en": "P&ODC",
+   "es": "Correo y Mensajería"
+  },
+  "package breakage": {
+   "en": "Package Breakage",
+   "es": "Breakage de Paquete"
+  },
+  "painting and decorating": {
+   "en": "Painting and Decorating",
+   "es": "Pintura y Decoración"
+  },
+  "painting and wallcovering": {
+   "en": "Painting and Wallcovering",
+   "es": "Pintura y Revestimientos"
+  },
+  "paper and plastics": {
+   "en": "Paper and Plastics",
+   "es": "Papel y Plásticos"
+  },
+  "parking": {
+   "en": "Parking",
+   "es": "Estacionamiento"
+  },
+  "payroll processing": {
+   "en": "Payroll Processing",
+   "es": "Procesamiento de Planilla"
+  },
+  "payroll related expenses": {
+   "en": "PAYROLL-RELATED EXPENSES",
+   "es": "Gastos Relacionados con la Planilla"
+  },
+  "payroll taxes": {
+   "en": "Payroll Taxes",
+   "es": "Cargas Sociales"
+  },
+  "personal days": {
+   "en": "Personal Days",
+   "es": "Días Personales"
+  },
+  "personal property taxes": {
+   "en": "Personal Property Taxes",
+   "es": "Impuesto sobre Bienes Muebles"
+  },
+  "photography": {
+   "en": "Photography",
+   "es": "Fotografía"
+  },
+  "plumbing": {
+   "en": "Plumbing",
+   "es": "Fontanería"
+  },
+  "pom": {
+   "en": "POM",
+   "es": "Mantenimiento"
+  },
+  "postage and overnight delivery charges": {
+   "en": "Postage and Overnight Delivery Charges",
+   "es": "Correo y Mensajería"
+  },
+  "practice range fee revenue": {
+   "en": "Practice Range Fee Revenue",
+   "es": "Ingreso del Campo de Práctica"
+  },
+  "printing and stationery": {
+   "en": "Printing and Stationery",
+   "es": "Imprenta y Papelería"
+  },
+  "proceeds from business interruption insurance": {
+   "en": "Proceeds from Business Interruption Insurance",
+   "es": "Indemnización por Interrupción de Negocio"
+  },
+  "professional fees": {
+   "en": "Professional Fees",
+   "es": "Honorarios Profesionales"
+  },
+  "profit sharing": {
+   "en": "Profit Sharing",
+   "es": "Reparto de Utilidades"
+  },
+  "promotion": {
+   "en": "Promotion",
+   "es": "Promoción"
+  },
+  "property and other taxes": {
+   "en": "ProPertY and other taxes",
+   "es": "Impuestos sobre la Propiedad y Otros"
+  },
+  "property operation and maintenance": {
+   "en": "Property Operation and Maintenance",
+   "es": "Operación y Mantenimiento"
+  },
+  "provision for doubtful accounts": {
+   "en": "Provision for Doubtful Accounts",
+   "es": "Provisión de Cuentas Dudosas"
+  },
+  "public subsidized transportation": {
+   "en": "Public Subsidized Transportation",
+   "es": "Transporte Público Subsidiado"
+  },
+  "purchasing receiving": {
+   "en": "Purchasing/Receiving",
+   "es": "Compras / Recibo"
+  },
+  "qualified": {
+   "en": "Qualified",
+   "es": "Calificada"
+  },
+  "real estate taxes": {
+   "en": "Real Estate Taxes",
+   "es": "Impuesto sobre Bienes Inmuebles"
+  },
+  "rent": {
+   "en": "Rent",
+   "es": "Alquiler"
+  },
+  "reservation fees": {
+   "en": "Reservation Fees",
+   "es": "Cargos de Reservación"
+  },
+  "reservations": {
+   "en": "Reservations",
+   "es": "Reservaciones"
+  },
+  "resort fees": {
+   "en": "Resort Fees",
+   "es": "Cargo de Resort"
+  },
+  "retail": {
+   "en": "Retail",
+   "es": "Tarifa Rack"
+  },
+  "retail kiosk sales": {
+   "en": "Retail Kiosk Sales",
+   "es": "Ventas de Kiosco"
+  },
+  "retail revenue": {
+   "en": "Retail Revenue",
+   "es": "Ingreso de Tienda"
+  },
+  "rooms": {
+   "en": "Rooms",
+   "es": "Habitaciones"
+  },
+  "royalty fees": {
+   "en": "Royalty Fees",
+   "es": "Regalías"
+  },
+  "salaries and wages": {
+   "en": "Salaries and Wages",
+   "es": "Salarios y Sueldos"
+  },
+  "sales and marketing": {
+   "en": "Sales and Marketing",
+   "es": "Ventas y Mercadeo"
+  },
+  "security": {
+   "en": "Security",
+   "es": "Seguridad"
+  },
+  "self parking revenue": {
+   "en": "Self-Parking Revenue",
+   "es": "Ingreso de Estacionamiento Propio"
+  },
+  "service": {
+   "en": "Service",
+   "es": "Servicio"
+  },
+  "service charge distribution": {
+   "en": "Service Charge Distribution",
+   "es": "Distribución del Cargo por Servicio"
+  },
+  "settlement costs": {
+   "en": "Settlement Costs",
+   "es": "Costos de Arreglo"
+  },
+  "severance pay": {
+   "en": "Severance Pay",
+   "es": "Preaviso y Cesantía"
+  },
+  "sick pay": {
+   "en": "Sick Pay",
+   "es": "Pago de Incapacidades"
+  },
+  "skin care revenue": {
+   "en": "Skin Care Revenue",
+   "es": "Ingreso de Cuidado de la Piel"
+  },
+  "smerf": {
+   "en": "SMERF",
+   "es": "SMERF (social, militar, educativo, religioso, fraternal)"
+  },
+  "space rental and concessions": {
+   "en": "Space Rental and Concessions",
+   "es": "Alquiler de Espacio y Concesiones"
+  },
+  "space rental concessions": {
+   "en": "Space Rental & Concessions",
+   "es": "Alquiler de Espacio y Concesiones"
+  },
+  "staff dining": {
+   "en": "STAFF DINING",
+   "es": "Comedor de Empleados"
+  },
+  "staff transportation": {
+   "en": "Staff Transportation",
+   "es": "Transporte del Personal"
+  },
+  "state disability insurance": {
+   "en": "State Disability Insurance",
+   "es": "Seguro Estatal de Invalidez"
+  },
+  "state medical insurance": {
+   "en": "State Medical Insurance",
+   "es": "Seguro Estatal de Salud"
+  },
+  "state retirement contribution": {
+   "en": "State Retirement Contribution",
+   "es": "Aporte Estatal de Pensión"
+  },
+  "state unemployment insurance": {
+   "en": "State Unemployment Insurance",
+   "es": "Seguro Estatal de Desempleo"
+  },
+  "steam": {
+   "en": "Steam",
+   "es": "Vapor"
+  },
+  "stock benefits": {
+   "en": "Stock Benefits",
+   "es": "Beneficios en Acciones"
+  },
+  "stock options": {
+   "en": "Stock Options",
+   "es": "Opciones sobre Acciones"
+  },
+  "storage fee revenue": {
+   "en": "Storage Fee Revenue",
+   "es": "Ingreso por Almacenaje"
+  },
+  "supplemental pay": {
+   "en": "Supplemental Pay",
+   "es": "Pagos Complementarios"
+  },
+  "surcharges and service charges": {
+   "en": "Surcharges and Service Charges",
+   "es": "Recargos y Cargos por Servicio"
+  },
+  "swimming pool": {
+   "en": "Swimming Pool",
+   "es": "Piscina"
+  },
+  "system costs": {
+   "en": "System Costs",
+   "es": "Costos de Sistemas"
+  },
+  "system expenses": {
+   "en": "System Expenses",
+   "es": "Gastos de Sistemas"
+  },
+  "system storage and optimization": {
+   "en": "System Storage and Optimization",
+   "es": "Almacenamiento y Optimización de Sistemas"
+  },
+  "telecommunications": {
+   "en": "Telecommunications",
+   "es": "Telecomunicaciones"
+  },
+  "tour wholesalers": {
+   "en": "Tour/Wholesalers",
+   "es": "Tour / Mayoristas"
+  },
+  "tournament expenses": {
+   "en": "Tournament Expenses",
+   "es": "Gastos de Torneos"
+  },
+  "tournament fee revenue": {
+   "en": "Tournament Fee Revenue",
+   "es": "Ingreso por Torneos"
+  },
+  "trade shows": {
+   "en": "Trade Shows",
+   "es": "Ferias Comerciales"
+  },
+  "training": {
+   "en": "Training",
+   "es": "Capacitación"
+  },
+  "transportation": {
+   "en": "Transportation",
+   "es": "Transporte (gasto del departamento)"
+  },
+  "travel meals and entertainment": {
+   "en": "Travel—Meals and Entertainment",
+   "es": "Viajes — Alimentación y Representación"
+  },
+  "travel meals enter": {
+   "en": "Travel—Meals & Enter",
+   "es": "Viajes — Alimentación y Representación"
+  },
+  "travel other": {
+   "en": "Travel—Other",
+   "es": "Viajes — Otros"
+  },
+  "uniform costs": {
+   "en": "Uniform Costs",
+   "es": "Costo de Uniformes"
+  },
+  "uniform laundry": {
+   "en": "Uniform Laundry",
+   "es": "Lavado de Uniformes"
+  },
+  "union insurance": {
+   "en": "Union Insurance",
+   "es": "Seguro Sindical"
+  },
+  "union other": {
+   "en": "Union Other",
+   "es": "Otros Sindicales"
+  },
+  "union pension": {
+   "en": "Union Pension",
+   "es": "Pensión Sindical"
+  },
+  "unrealized foreign exchange gains or losses": {
+   "en": "Unrealized Foreign Exchange Gains or Losses",
+   "es": "Diferencial Cambiario No Realizado"
+  },
+  "utensils": {
+   "en": "Utensils",
+   "es": "Utensilios"
+  },
+  "utilities": {
+   "en": "UTILITIES",
+   "es": "Servicios Públicos"
+  },
+  "vacation paid time off": {
+   "en": "Vacation/Paid Time Off",
+   "es": "Vacaciones y Tiempo Pagado"
+  },
+  "valet parking revenue": {
+   "en": "Valet Parking Revenue",
+   "es": "Ingreso de Valet Parking"
+  },
+  "vehicle rep maint": {
+   "en": "Vehicle Rep. & Maint",
+   "es": "Reparación y Mantenimiento de Vehículos"
+  },
+  "vehicle repair": {
+   "en": "Vehicle Repair",
+   "es": "Reparación de Vehículos"
+  },
+  "vehicle repairs": {
+   "en": "Vehicle Repairs",
+   "es": "Reparación de Vehículos"
+  },
+  "vending revenue": {
+   "en": "Vending Revenue",
+   "es": "Ingreso de Máquinas Expendedoras"
+  },
+  "venue beverage revenue": {
+   "en": "Venue Beverage Revenue",
+   "es": "Ingreso de Bebidas por Punto de Venta"
+  },
+  "venue food revenue": {
+   "en": "Venue Food Revenue",
+   "es": "Ingreso de Alimentos por Punto de Venta"
+  },
+  "venues": {
+   "en": "Venues",
+   "es": "Puntos de Venta"
+  },
+  "video game sales": {
+   "en": "Video Game Sales",
+   "es": "Venta de Videojuegos"
+  },
+  "waste removal": {
+   "en": "Waste Removal",
+   "es": "Recolección de Basura"
+  },
+  "water": {
+   "en": "Water",
+   "es": "Agua"
+  },
+  "water sewer": {
+   "en": "Water/Sewer",
+   "es": "Agua y Alcantarillado"
+  },
+  "website": {
+   "en": "Website",
+   "es": "Sitio Web"
+  },
+  "wholesale": {
+   "en": "Wholesale",
+   "es": "Mayorista"
+  },
+  "workers compensation insurance": {
+   "en": "Workers' Compensation Insurance",
+   "es": "Seguro de Riesgos del Trabajo"
+  }
+ }
+}

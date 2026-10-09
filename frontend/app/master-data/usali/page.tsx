@@ -40,6 +40,8 @@ interface Estado {
 
 interface Fila {
   item: string; schedule: string; cuenta: string;
+  /** El nombre de la cuenta en espanol. Vacio si el glosario no lo tiene. */
+  cuenta_es?: string;
   confianza: string; paginas: string;
 }
 
@@ -287,17 +289,27 @@ export default function UsaliPage() {
                       background: "var(--bg-surface)" }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>
             {ren.lista_aprobada
-              ? `Renglones aprobados de ${ren.titulo ?? ren.schedule}`
+              ? `Renglones aprobados de ${ren.titulo_es || ren.titulo
+                          || ren.schedule}`
                 + ` — Schedule ${ren.numero} (${ren.renglones.length})`
               : `${ren.schedule} — el estándar no da lista cerrada`}
           </div>
           {ren.lista_aprobada ? (
             <div style={{ fontSize: 12, columns: 3, columnGap: 24 }}>
-              {ren.renglones.map((g, i) => (
-                <div key={i} style={{ breakInside: "avoid", padding: "1px 0" }}>
-                  {g}
-                </div>
-              ))}
+              {/* El español primero y el inglés al lado en gris: el inglés
+                  es el nombre con que el libro y el catálogo lo llaman. */}
+              {ren.renglones.map((g, i) => {
+                const es = ren.renglones_es?.[i];
+                return (
+                  <div key={i} style={{ breakInside: "avoid", padding: "1px 0" }}>
+                    {es || g}
+                    {es && (
+                      <span style={{ color: "var(--text-secondary)",
+                                     fontSize: 11 }}> · {g}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,
@@ -372,7 +384,17 @@ export default function UsaliPage() {
                             style={{ fontSize: 12.5, padding: 0, border: "none",
                                      background: "none", cursor: "pointer",
                                      color: "var(--brand)", textAlign: "left" }}>
-                      {f.cuenta}
+                      {/* El español manda acá: esta columna contesta «¿dónde
+                          va esto?» y la respuesta se tiene que leer de un
+                          golpe. El inglés abajo, porque es el nombre con que
+                          hay que buscarlo en el libro. */}
+                      {f.cuenta_es || f.cuenta}
+                      {f.cuenta_es && (
+                        <div style={{ fontSize: 10.5,
+                                      color: "var(--text-secondary)" }}>
+                          {f.cuenta}
+                        </div>
+                      )}
                     </button>
                   </td>
                   <td style={{ ...td, fontSize: 11, whiteSpace: "nowrap",

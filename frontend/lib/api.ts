@@ -6082,6 +6082,11 @@ export interface UsaliSchedule {
   /** 1 Rooms, 2 F&B, … 14 Payroll-Related. Nulo si no es un solo schedule. */
   numero: number | null;
   titulo?: string;
+  /** El titulo en espanol. Vacio si el glosario no lo tiene — vacio y NO el
+   *  ingles repetido: «Building — Building» se lee como un error. */
+  titulo_es?: string;
+  /** Los MISMOS renglones en espanol y en el mismo orden. */
+  renglones_es?: string[];
   /** ⚠️ Falso en el Schedule 3 —Spa, Tours, Transporte, Retail—: el libro NO da
    *  lista para esos. Decirlo es la mitad util de la respuesta. */
   lista_aprobada: boolean;

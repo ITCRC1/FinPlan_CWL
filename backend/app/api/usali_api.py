@@ -200,13 +200,18 @@ async def buscar(
                               func.lower(UsaliItem.cuenta).like(f"%{q.lower()}%")))
     if schedule:
         stmt = stmt.where(UsaliItem.schedule == schedule)
+    glos = _terminos_es()
     filas = (await db.execute(stmt.order_by(UsaliItem.item_norm)
                               .limit(limite))).scalars().all()
     total = (await db.execute(
         select(func.count()).select_from(stmt.subquery()))).scalar() or 0
     return {
         "total": total, "recortado": total > len(filas),
+        # La cuenta en espanol al lado del ingles: el que busca «¿donde va
+        # el cemento?» lee el destino sin traducir de cabeza. El ingles se
+        # mantiene porque es el nombre que el libro y el catalogo usan.
         "filas": [{"item": f.item, "schedule": f.schedule, "cuenta": f.cuenta,
+                   "cuenta_es": _es(f.cuenta, glos),
                    "confianza": f.confianza, "paginas": f.paginas}
                   for f in filas],
     }
@@ -242,6 +247,47 @@ def _norm_cta(s: str) -> str:
                  ("admin ", "administrative ")):
         s = s.replace(a, b)
     return " ".join(s.split())
+
+
+#: El glosario ES de los ROTULOS del USALI: los nombres de cuenta y los
+#: renglones de los Schedules, para leer el panel en espanol.
+#:
+#: ⚠️ **No es una traduccion del libro, y la distincion importa.** Se traducen
+#: los 335 rotulos —etiquetas cortas de cuenta, terminologia contable estandar—
+#: y las 468 definiciones quedan en el idioma del original, que es texto de
+#: AHLA/HFTP.
+#:
+#: ⚠️ **Tampoco mejora el apareo automatico, y eso se midio.** El traslape
+#: entre dos listas es simetrico: da igual traducir el libro al espanol que
+#: traducir los articulos al ingles, que es lo que ya se probo (19% de
+#: cobertura, la mitad mal). La razon de fondo la dan los datos del hotel: de
+#: los 40 articulos que mas plata mueven en setiembre 2026, unos seis son
+#: sustantivos que el diccionario nombraria — el resto son servicios
+#: («Payroll Processing», «Oracle Hospitality», «I Prefer Charges»),
+#: combustible por marca («PLUS 91», «DIESEL», CRC 13 M entre los dos), codigos
+#: («100libRo», «217846») y comida. El libro no los nombra en ningun idioma.
+#:
+#: Esto es para LEER. Ver `el-usali-explica-no-alarma` en la memoria.
+def _terminos_es() -> dict[str, str]:
+    """{llave normalizada: termino en espanol}. Vacio si no hay glosario."""
+    from app.seed_data import semilla_del_grupo
+    try:
+        d = (semilla_del_grupo("usali_terminos_es") or {})["terminos"]
+    except Exception:      # noqa: BLE001 — sin glosario se queda en ingles
+        return {}
+    return {k: v["es"] for k, v in d.items() if v.get("es")}
+
+
+def _es(rotulo: str, glosario: dict[str, str]) -> str:
+    """El rotulo en espanol, o cadena vacia si el glosario no lo tiene.
+
+    Vacio y NO el ingles repetido: la pantalla muestra los dos lado a lado, y
+    «Building — Building» se lee como un error del sistema.
+    """
+    # Un rotulo vacio no se traduce. Sin esto se llevaba lo que hubiera en la
+    # llave vacia, que es un termino que no es de nadie.
+    k = _norm(rotulo)
+    return glosario.get(k, "") if k else ""
 
 
 #: Departamento de la contabilidad -> departamento del USALI. Es la parte que no
@@ -410,14 +456,20 @@ async def _renglones_del_schedule(db: AsyncSession, schedule: str) -> dict:
         return {"schedule": schedule, "numero": num, "lista_aprobada": False,
                 "renglones": [], "motivo": "no hay USALI cargado"}
     aprobada = bool(filas[0].lista_aprobada)
+    glos = _terminos_es()
     return {
         "schedule": schedule,
         "numero": num,
         "titulo": filas[0].titulo,
+        "titulo_es": _es(filas[0].titulo, glos),
         "lista_aprobada": aprobada,
         "motivo": "" if aprobada else
                   "el estandar no da lista cerrada para este departamento",
         "renglones": [g.renglon for g in filas],
+        # El mismo renglon en espanol, en el MISMO orden. Lista aparte y no
+        # un campo dentro de cada fila: el que ya consume `renglones` sigue
+        # funcionando sin cambiar nada.
+        "renglones_es": [_es(g.renglon, glos) for g in filas],
     }
 
 
@@ -522,6 +574,7 @@ async def para_cuenta(
         "grado": grado,
         "parecido": round(calidad, 3),
         "cuenta_usali": cuenta_usali,
+        "cuenta_usali_es": _es(cuenta_usali or "", _terminos_es()),
         "definiciones": [{"cuenta": d.cuenta, "texto": d.texto,
                           "pagina": d.pagina,
                           "schedule": dep_de.get(d.pagina, ""),
