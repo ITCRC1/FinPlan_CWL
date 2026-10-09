@@ -912,7 +912,15 @@ export interface PlanillaPorPosicion {
   /** El desglose del total, por si hace falta explicarlo. */
   total_con_posicion: number;
   total_sin_posicion: number;
-  comparar: { scenario_id: string; version: string; total: number }[];
+  comparar: {
+    scenario_id: string; version: string; total: number;
+    /** ⚠️ `false` = esa version NO abre el tercer nivel. Su columna de
+     *  sub-linea va VACIA, no en cero: un cero diria «presupuesto cero aca»,
+     *  y lo que pasa es que presupuesto al nivel de la cuenta y no mas abajo.
+     *  Medido el 2026-10-09: los Forecast 2026 traen el detalle de gasto
+     *  vacio y la planilla colgada de la posicion sintetica del GL. */
+    abre_detalle?: boolean;
+  }[];
   /** Lo que se sabe SIN aparear nombres: por «depto|cuenta» y por depto. El
    *  departamento y la cuenta son los mismos en los dos sistemas, así que
    *  estos totales son exactos aunque el nombre del puesto no coincida. */
@@ -961,7 +969,15 @@ export interface GastoPorDetalle {
   hay_detalle: boolean; motivo: string;
   departamentos: GastoDetalleDepto[];
   total: number;
-  comparar: { scenario_id: string; version: string; total: number }[];
+  comparar: {
+    scenario_id: string; version: string; total: number;
+    /** ⚠️ `false` = esa version NO abre el tercer nivel. Su columna de
+     *  sub-linea va VACIA, no en cero: un cero diria «presupuesto cero aca»,
+     *  y lo que pasa es que presupuesto al nivel de la cuenta y no mas abajo.
+     *  Medido el 2026-10-09: los Forecast 2026 traen el detalle de gasto
+     *  vacio y la planilla colgada de la posicion sintetica del GL. */
+    abre_detalle?: boolean;
+  }[];
 }
 export async function getGastoPorDetalle(
   anio: number, mes: number, scenarioIds: string[] = [],

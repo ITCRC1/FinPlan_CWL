@@ -3958,6 +3958,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                         margin: "0 0 10px", maxWidth: 860, lineHeight: 1.6 }}>
               {t.rich("gastoDetalleIntro", bold)}
             </p>
+            {d.comparar.some(c => c.abre_detalle === false) && (
+              <p style={{ fontSize: 11.5, color: "var(--warning)",
+                          margin: "0 0 10px", maxWidth: 860, lineHeight: 1.55 }}>
+                {t.rich("detalleNoCompara", bold)}
+              </p>
+            )}
             <div className="fin-scroll-x">
               <table style={{ borderCollapse: "collapse", minWidth: 720 }}>
                 <thead><tr>
@@ -4011,7 +4017,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                               <td style={TD}>{usd(f.monto)}</td>
                               {d.comparar.map(c => (
                                 <td key={c.scenario_id} style={TD}>
-                                  {usd(f.otros[c.scenario_id] ?? 0)}
+                                  {/* Vacio, no cero: esa version no abre el
+                                      tercer nivel. Es lo que ya hacia el
+                                      exportador, y la pantalla decia 0.00. */}
+                                  {c.abre_detalle === false
+                                    ? <span style={{ color: "var(--text-disabled)" }}>—</span>
+                                    : usd(f.otros[c.scenario_id] ?? 0)}
                                 </td>
                               ))}
                             </tr>
@@ -4104,6 +4115,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                         margin: "0 0 10px", maxWidth: 860, lineHeight: 1.6 }}>
               {t.rich("planillaPosIntro", { ...bold, n: d.filas.length })}
             </p>
+            {d.comparar.some(c => c.abre_detalle === false) && (
+              <p style={{ fontSize: 11.5, color: "var(--warning)",
+                          margin: "0 0 10px", maxWidth: 860, lineHeight: 1.55 }}>
+                {t.rich("detalleNoCompara", bold)}
+              </p>
+            )}
             <div className="fin-scroll-x">
               <table style={{ borderCollapse: "collapse", minWidth: 720 }}>
                 <thead><tr>
@@ -4173,7 +4190,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                               <td style={TD}>{usd(f.monto)}</td>
                               {d.comparar.map(c => (
                                 <td key={c.scenario_id} style={TD}>
-                                  {usd(f.otros[c.scenario_id] ?? 0)}
+                                  {/* Vacio, no cero: esa version no abre el
+                                      tercer nivel. Es lo que ya hacia el
+                                      exportador, y la pantalla decia 0.00. */}
+                                  {c.abre_detalle === false
+                                    ? <span style={{ color: "var(--text-disabled)" }}>—</span>
+                                    : usd(f.otros[c.scenario_id] ?? 0)}
                                 </td>
                               ))}
                             </tr>

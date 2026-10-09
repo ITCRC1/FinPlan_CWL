@@ -1441,6 +1441,7 @@ async def planilla_por_posicion(
     # drivers. Se aparea por NOMBRE del puesto — ver `_llave_de_puesto`.
     comparar: dict[str, dict[tuple[str, str], float]] = {}
     por_cuenta: dict[str, dict[tuple[str, str], float]] = {}
+    abre: dict[str, bool] = {}
     etiquetas: dict[str, str] = {}
     for sid in [x.strip() for x in scenarios.split(",") if x.strip()]:
         esc = await db.get(Scenario, sid)
@@ -1449,6 +1450,9 @@ async def planilla_por_posicion(
         etiquetas[sid] = f"{esc.year} · {esc.type} {esc.version}".strip()
         comparar[sid] = await _planilla_por_puesto(db, sid, {mes})
         por_cuenta[sid] = await _planilla_por_cuenta_dep(db, sid, {mes})
+        # ¿Esta version tiene puestos de verdad, o solo la posicion
+        # sintetica del GL? Ver la nota de `_llave_detalle`.
+        abre[sid] = bool(comparar[sid])
 
     def _llave_fila(f) -> tuple[str, str]:
         return (str(f.cuenta_base or ""),
@@ -1532,7 +1536,8 @@ async def planilla_por_posicion(
         # los puestos que aparearon: si un nombre no coincide, el total del
         # presupuesto no puede cambiar por eso.
         "comparar": [{"scenario_id": sid, "version": etiquetas[sid],
-                      "total": round(sum(por_cuenta[sid].values()), 2)}
+                      "total": round(sum(por_cuenta[sid].values()), 2),
+                      "abre_detalle": bool(abre.get(sid))}
                      for sid in comparar],
         # Lo que se sabe SIN aparear: por (departamento, cuenta) y por
         # departamento. Es lo que se muestra en los subtotales.
@@ -1585,6 +1590,29 @@ async def planilla_por_posicion(
         "total_con_posicion": round(float(sum(f.mes_usd for f in filas)), 2),
         "total_sin_posicion": round(sum(r["monto"] for r in sin_posicion), 2),
     }
+
+
+#: Un cero en la comparacion de una sub-linea significa «esta version
+#: presupuesto cero aca». Cuando la version **no abre el tercer nivel**, eso es
+#: falso: no presupuesto cero, presupuesto al nivel de la cuenta y no mas abajo.
+#:
+#: ⚠️ Es la misma regla que ya aplica `detalle_celda_api`: *«La version que no
+#: abrio NO va en cero: no va»*. Estas dos puertas la violaban.
+#:
+#: Medido el 2026-10-09 contra setiembre: **405 celdas de comparacion en cero**
+#: —316 de planilla y 89 de gasto— y las 405 significaban «no hay tercer
+#: nivel», no «es cero». Las causas, distintas por clase:
+#:
+#: * **Gasto.** Ningun escenario trae la serie 800-810 que usa Integrity: los
+#:   Forecast 2026 y el ACTUAL traen el detalle VACIO y los Budget 2027 usan
+#:   otra numeracion (005-011).
+#: * **Planilla.** Los conceptos de 2026 cuelgan todos de la posicion sintetica
+#:   `GL` «(Actual GL)», que no nombra a nadie. El Budget Final tiene 94
+#:   posiciones y solo 11 con conceptos, las 11 sinteticas.
+#:
+#: Mientras el presupuesto no se construya al tercer nivel, la columna de la
+#: sub-linea no puede comparar. Decirlo es lo unico honesto que se puede hacer
+#: desde el codigo.
 
 
 def _llave_detalle(v) -> str:
@@ -1693,6 +1721,7 @@ async def gasto_por_detalle(
     # subcuentas 800-810 (CLAUDE.md §19.2) y el tercer nivel de Integrity usa
     # la misma numeración. Es la misma llave en los dos sistemas.
     comparar: dict[str, dict[tuple[str, str, str], float]] = {}
+    abre: dict[str, bool] = {}
     etiquetas: dict[str, str] = {}
     for sid in [x.strip() for x in scenarios.split(",") if x.strip()]:
         esc = await db.get(Scenario, sid)
@@ -1700,6 +1729,8 @@ async def gasto_por_detalle(
             continue
         etiquetas[sid] = f"{esc.year} · {esc.type} {esc.version}".strip()
         comparar[sid] = await _gasto_por_detalle_del_checkbook(db, sid, mes)
+        # ¿Esta version abre el tercer nivel, o solo llega a la cuenta?
+        abre[sid] = any(det for (_d, _c, det) in comparar[sid])
 
     deptos: dict[str, dict] = {}
     for f in detalle:
@@ -1798,6 +1829,10 @@ async def gasto_por_detalle(
             "hay_detalle": bool(detalle),
             "motivo": "" if detalle else "borrador_sin_detalle",
             "comparar": [{"scenario_id": sid, "version": etiquetas[sid],
-                          "total": round(otros_gran.get(sid, 0.0), 2)}
+                          "total": round(otros_gran.get(sid, 0.0), 2),
+                          # Si no abre el tercer nivel, su columna de
+                          # sub-linea no es cero: no existe. Ver la nota
+                          # de `_llave_detalle`.
+                          "abre_detalle": bool(abre.get(sid))}
                          for sid in comparar],
             "departamentos": salida, "total": round(float(gran_total), 2)}

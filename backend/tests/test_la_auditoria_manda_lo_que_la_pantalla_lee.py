@@ -69,3 +69,56 @@ def test_el_motor_lo_calcula():
     from app.engine.auditoria_gl import Resumen
 
     assert "por_grupo" in Resumen.__dataclass_fields__
+
+# ── La sub-linea que el presupuesto no abre: VACIA, no cero ─────────────────
+
+def test_el_detalle_dice_si_la_version_abre_el_tercer_nivel():
+    """⚠️ Un cero en la sub-linea es una AFIRMACION, y era falsa.
+
+    Medido contra setiembre 2026 el 2026-10-09: **405 celdas de comparacion en
+    cero** —316 de planilla y 89 de gasto— y las 405 significaban «esta version
+    no abre el tercer nivel», no «presupuesto cero aca». Dos causas distintas:
+
+    * **Gasto.** Ningun escenario trae la serie 800-810 que usa Integrity: los
+      Forecast 2026 y el ACTUAL traen el detalle VACIO, y los Budget 2027 usan
+      otra numeracion (005-011).
+    * **Planilla.** Los conceptos de 2026 cuelgan todos de la posicion
+      sintetica `GL` «(Actual GL)». El Budget Final tiene 94 posiciones y solo
+      11 con conceptos: las 11 sinteticas.
+
+    El exportador ya lo hacia bien —`const vacias = comp.map(() => null)`, con
+    el comentario «El detalle no compara: vacio, no cero»— y la pantalla
+    escribia 0.00. Los dos decian cosas distintas del mismo dato, que es el
+    defecto que este proyecto ya pago una vez al reves («el excel no baja lo
+    que esta viendo», 2026-08-27).
+
+    Es la misma regla que `detalle_celda_api` ya tenia escrita: *«La version
+    que no abrio NO va en cero: no va»*.
+    """
+    import inspect
+
+    from app.api import precierre_api
+
+    for fn in (precierre_api.gasto_por_detalle,
+               precierre_api.planilla_por_posicion):
+        fuente = inspect.getsource(fn)
+        assert '"abre_detalle"' in fuente, fn.__name__
+
+
+def test_la_pantalla_y_el_excel_dicen_LO_MISMO_de_la_sub_linea():
+    """Si el exportador deja la celda vacia, la pantalla tambien.
+
+    Es la regla de este proyecto desde el 2026-08-27: lo que se baja es lo que
+    se ve. Que difieran en un cero es peor que no tener la columna.
+    """
+    import pathlib
+
+    pantalla = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+                / "month-end" / "pl" / "Pantalla.tsx")
+    txt = pantalla.read_text(encoding="utf-8", errors="replace")
+    # El exportador: vacio.
+    assert "const vacias = comp.map(() => null)" in txt
+    # La pantalla: el guion largo cuando la version no abre el detalle.
+    assert "c.abre_detalle === false" in txt
+    # Y se dice por que, en vez de dejar una columna muda.
+    assert "detalleNoCompara" in txt

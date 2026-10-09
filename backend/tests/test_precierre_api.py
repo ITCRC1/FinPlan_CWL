@@ -542,3 +542,4 @@ async def test_sin_escenario_destino_NO_se_marca_como_final(cliente):
         pc = await db.get(Precierre, pid)
     assert pc.estado == "borrador", "el mes tiene que seguir en revisión"
 
+

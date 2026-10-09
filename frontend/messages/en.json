@@ -409,7 +409,8 @@
     "clubTotalNote": "The year total is December's closing balance, not the sum of the twelve months: these are members, not revenue.",
     "clubNoData": "No members loaded in this scenario.",
     "concept": "Concept",
-    "breakdownChip": "breakdown — not summed"
+    "breakdownChip": "breakdown — not summed",
+    "detalleNoCompara": "The comparison goes down to the <b>account</b>, not to the detail: this year's Budget and Forecast were built at account level. That is why the sub-line column is blank and not zero — a zero would say «budgeted nothing here», which is not what happened."
   },
   "scenarios": {
     "title": "Scenarios — Budgets & Forecasts",
