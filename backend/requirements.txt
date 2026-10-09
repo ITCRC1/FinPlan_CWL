@@ -17,6 +17,9 @@ python-dotenv>=1.0.0
 pandas>=2.2.0
 openpyxl>=3.1.0
 python-docx>=1.1.0
+# Para leer el USALI: solo extrae texto, no renderiza. Ver
+# app/importers/usali_pdf.py
+pypdf>=5.1.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 httpx>=0.27.0

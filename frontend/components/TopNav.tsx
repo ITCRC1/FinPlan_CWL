@@ -284,6 +284,11 @@ export const NAV: NavGroup[] = [
       // El mixer va en Master Data porque es donde se planifica el mix: los
       // tres canales de comision dejaron de digitarse y ahora se derivan de aca.
       { key: "canales", href: "/master-data/canales" },
+      // El estandar contra el que se revisa. Va en Master Data porque es
+      // eso: dato maestro del grupo, no un reporte. Por ahora es consulta
+      // —el puente contra las cuentas de Integrity y las reglas de
+      // discrepancia vienen despues.
+      { key: "usali", href: "/master-data/usali" },
       // Chequeo de la instalacion: existe por el clonado de propiedades,
       // pero sirve cualquier dia — la forma en que esto sale mal no da error.
       // El par del chequeo: aquel pregunta si la INSTALACION quedo sana,

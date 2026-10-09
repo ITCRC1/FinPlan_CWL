@@ -249,6 +249,25 @@ MENSAJES: dict[str, dict[str, str]] = {
     "precierre.vuelta_desconocida": {
         "es": "Esa vuelta no existe o es de otro mes: no se puede comparar contra ella.",
         "en": "That round does not exist or belongs to another month: it cannot be compared against."},
+    "usali.archivo_vacio": {
+        "es": "El archivo vino vacio.",
+        "en": "The file came in empty."},
+    "usali.archivo_grande": {
+        "es": "El archivo pesa mas de {tope} MB.",
+        "en": "The file is larger than {tope} MB."},
+    "usali.no_es_pdf": {
+        "es": "Eso no es un PDF.",
+        "en": "That is not a PDF."},
+    "usali.no_se_pudo_leer": {
+        "es": "No se pudo leer el PDF: {detalle}",
+        "en": "The PDF could not be read: {detalle}"},
+    "usali.sin_entradas": {
+        "es": "El PDF tiene {paginas} paginas y {con_texto} con texto, pero no se "
+              "encontro el diccionario de ingresos y gastos. Si el archivo es un "
+              "escaneo, el texto no se puede extraer.",
+        "en": "The PDF has {paginas} pages and {con_texto} with text, but the "
+              "revenue and expense guide was not found. If the file is a scan, "
+              "its text cannot be extracted."},
     "informe.falta_dato": {
         "es": "No se puede armar el informe: {detalle}",
         "en": "The report cannot be built: {detalle}"},

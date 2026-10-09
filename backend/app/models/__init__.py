@@ -142,3 +142,5 @@ from app.models.guillermo import (
 # Módulo PACING (2026-09-30): fotos de Opera, reservas y configuración.
 from app.models.pacing import (
     PacingSnapshot, PacingReservation, PacingResvLoad, PacingConfig)
+from app.models.usali import (UsaliDefinicion, UsaliDocumento,  # noqa: F401
+                              UsaliItem)
