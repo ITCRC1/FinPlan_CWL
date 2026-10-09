@@ -5646,6 +5646,45 @@ export function hallazgosPrecierre(id: string, opts?: {
   return api.get(`/precierre/${id}/hallazgos/${q.toString() ? `?${q}` : ""}`);
 }
 
+/** Una línea del cotejo entre el borrador y lo que se escribió. */
+export interface DifCotejo {
+  dept_code: string; cuenta: string; descripcion: string;
+  linea_pl: string; borrador: number; destino: number; diferencia: number;
+  donde: string;
+}
+
+export interface LadoCotejo {
+  hay: boolean; vacio?: boolean; motivo?: string;
+  escenario?: string;
+  pares_borrador?: number; pares_destino?: number;
+  omitidas_por_allocation?: number;
+  coinciden?: number; difieren?: number; difieren_relevantes?: number;
+  cuadra?: boolean;
+  total_borrador?: number; total_destino?: number;
+  diferencias?: DifCotejo[]; recortado?: boolean;
+  /** Las líneas del P&L que de verdad cambiaron de monto. Vacía = todo lo que
+   *  difiere es diferencia de CÓDIGO y el estado de resultados dice lo mismo. */
+  lineas_movidas?: { linea_pl: string; diferencia: number }[];
+}
+
+export interface Cotejo {
+  precierre_id: string; anio: number; mes: number; estado: string;
+  archivo: string;
+  espejo: LadoCotejo;
+  actual: LadoCotejo;
+}
+
+/**
+ * «¿Quedó igual que lo que revisé?» — el borrador contra lo que se escribió.
+ *
+ * Compara contra los dos destinos porque fallan distinto: el ESPEJO puede
+ * quedarse atrás si la subida se corta a medias (no es todo-o-nada), y el
+ * ACTUAL responde si pasar a final cambió algo en el camino.
+ */
+export async function cotejarPrecierre(id: string): Promise<Cotejo> {
+  return api.get(`/precierre/${id}/contra-actual/`);
+}
+
 export async function pasarPrecierreAFinal(id: string, opts?: {
   dryRun?: boolean; confirmarDiferencias?: boolean;
 }): Promise<{ estado?: string; hallazgos_abiertos?: number; dry_run?: boolean }> {

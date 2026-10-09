@@ -36,6 +36,7 @@ import {
   pasarPrecierreAFinal, subirPrecierre, verPrecierre,
   type PrecierreCambios, type PrecierreFilaHoja, type PrecierreHallazgo,
   type PrecierreResumen,
+  cotejarPrecierre, type Cotejo,
 } from "@/lib/api";
 
 const MESES = ["January", "February", "March", "April", "May", "June", "July",
@@ -174,6 +175,23 @@ export default function PreCierrePage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setSubiendo(false); }
+  }
+
+  /** El cotejo: el borrador contra lo que se escribio, linea por linea.
+   *
+   *  Owner, 2026-09-16: *«deja una mejoria»*. Era esta — que la pregunta
+   *  «¿quedo igual que lo que revise?» la conteste la app en vez de un calculo
+   *  a mano cada vez. */
+  const [cotejo, setCotejo] = useState<Cotejo | "cargando" | null>(null);
+
+  async function cotejar() {
+    if (!id) return;
+    setCotejo("cargando");
+    try {
+      setCotejo(await cotejarPrecierre(id));
+    } catch {
+      setCotejo(null);
+    }
   }
 
   async function pasarAFinal(confirmar: boolean) {
@@ -320,6 +338,11 @@ export default function PreCierrePage() {
           )}
           {pestana === "descargas" && dl && <Descargas dl={dl} t={t} />}
 
+          {/* ── ¿Quedo igual que lo que revise? ──────────────────────────── */}
+          {cotejo && cotejo !== "cargando" && (
+            <CotejoPanel c={cotejo} cerrar={() => setCotejo(null)} caja={caja} />
+          )}
+
           {/* ── Pasar a Final ─────────────────────────────────────────────── */}
           {estado !== "pasado_a_final" && (
             <section style={{ ...caja, marginTop: 20 }}>
@@ -331,7 +354,14 @@ export default function PreCierrePage() {
                   ? t("final.conHallazgos", { n: hallazgos.length, criticos })
                   : t("final.sinHallazgos")}
               </p>
-              <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {/* Antes de pasar a final, y tambien despues: ¿lo que se
+                    escribio es lo que se reviso? */}
+                <button onClick={() => void cotejar()} style={botonSecundario}
+                        title="Compara este borrador contra el espejo y contra el Actual, linea por linea">
+                  {cotejo === "cargando" ? "cotejando…"
+                    : "¿Quedo igual que lo que revise?"}
+                </button>
                 <button onClick={() => pasarAFinal(false)} style={boton}>
                   {t("final.pasar")}
                 </button>
@@ -1029,3 +1059,141 @@ const pre: React.CSSProperties = {
   fontSize: 11, background: "var(--surface-2, #0000000a)", padding: 10,
   borderRadius: 6, overflowX: "auto", maxHeight: 260,
 };
+
+/**
+ * El cotejo del borrador contra lo que se escribio.
+ *
+ * ⚠️ Lo que de verdad importa no es cuantas lineas difieren, sino si alguna
+ * LINEA DEL P&L cambio de monto. Una cuenta distinta que cae en la misma linea
+ * no mueve plata: en agosto 2026 el borrador tenia `0152/4500` y el ACTUAL
+ * `0152/4400`, y las dos van a REV_TRANSPORTATION. Mostrarlas igual de graves
+ * que un cambio de renglon hace que el cuadro no se use.
+ */
+function CotejoPanel({ c, cerrar, caja }: {
+  c: Cotejo; cerrar: () => void; caja: React.CSSProperties;
+}) {
+  const usd = (n: number) =>
+    n.toLocaleString("en-US", { minimumFractionDigits: 2,
+                                maximumFractionDigits: 2 });
+
+  function Lado({ nombre, d }: { nombre: string; d: Cotejo["espejo"] }) {
+    if (d.vacio) {
+      return (
+        <div style={{ marginTop: 8, fontSize: 12.5,
+                      color: "var(--text-secondary)" }}>
+          <b>{nombre}:</b> {d.motivo}.
+        </div>
+      );
+    }
+    const movidas = d.lineas_movidas ?? [];
+    return (
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 13 }}>
+          <b>{nombre}</b> — {d.escenario}:{" "}
+          <b style={{ color: d.cuadra ? "var(--positive)" : "var(--negative)" }}>
+            {d.cuadra ? "quedo igual" : "NO quedo igual"}
+          </b>
+          <span style={{ color: "var(--text-secondary)" }}>
+            {" "}· {d.coinciden} coinciden, {d.difieren} difieren
+            {d.omitidas_por_allocation
+              ? `, ${d.omitidas_por_allocation} de allocation no se comparan`
+              : ""}
+          </span>
+        </div>
+
+        {movidas.length > 0 ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>
+              Lineas del P&amp;L que cambiaron de monto
+            </div>
+            <table style={{ borderCollapse: "collapse", marginTop: 3 }}>
+              <tbody>
+                {movidas.map(L => (
+                  <tr key={L.linea_pl}>
+                    <td style={{ fontSize: 12.5, padding: "2px 14px 2px 0" }}>
+                      {L.linea_pl}
+                    </td>
+                    <td style={{ fontSize: 12.5, textAlign: "right",
+                                 fontVariantNumeric: "tabular-nums",
+                                 color: "var(--negative)" }}>
+                      {usd(L.diferencia)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: 11.5, marginTop: 4,
+                          color: "var(--text-secondary)" }}>
+              Las que se cancelan entre si son plata que cambio de renglon; las
+              que quedan solas son monto que aparecio o se fue.
+            </div>
+          </>
+        ) : d.difieren ? (
+          <div style={{ fontSize: 12, marginTop: 4,
+                        color: "var(--text-secondary)" }}>
+            Ninguna linea del P&amp;L cambio de monto: lo que difiere es el{" "}
+            <b>codigo de cuenta</b>, no la plata.
+          </div>
+        ) : null}
+
+        {(d.diferencias?.length ?? 0) > 0 && (
+          <details style={{ marginTop: 6 }}>
+            <summary style={{ fontSize: 12, cursor: "pointer",
+                              color: "var(--text-secondary)" }}>
+              ver las {d.difieren} lineas
+            </summary>
+            <table style={{ borderCollapse: "collapse", marginTop: 4 }}>
+              <tbody>
+                {d.diferencias!.map((x, i) => (
+                  <tr key={i}>
+                    <td style={{ fontSize: 12, padding: "1px 10px 1px 0",
+                                 whiteSpace: "nowrap" }}>
+                      {x.dept_code} · {x.cuenta}
+                    </td>
+                    <td style={{ fontSize: 12, padding: "1px 10px 1px 0" }}>
+                      {x.descripcion || x.linea_pl}
+                    </td>
+                    <td style={{ fontSize: 12, textAlign: "right",
+                                 fontVariantNumeric: "tabular-nums",
+                                 padding: "1px 10px 1px 0" }}>
+                      {usd(x.borrador)}
+                    </td>
+                    <td style={{ fontSize: 12, textAlign: "right",
+                                 fontVariantNumeric: "tabular-nums",
+                                 padding: "1px 10px 1px 0" }}>
+                      {usd(x.destino)}
+                    </td>
+                    <td style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+                      {x.donde}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <section style={{ ...caja, marginTop: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
+          ¿Quedo igual que lo que revise?
+        </h2>
+        <button onClick={cerrar}
+                style={{ border: "none", background: "none", cursor: "pointer",
+                         fontSize: 18, color: "var(--text-secondary)" }}>×</button>
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--text-secondary)",
+                  margin: "4px 0 0" }}>
+        El borrador de <b>{c.archivo}</b> contra lo que esta escrito. El{" "}
+        <b>espejo</b> es lo que miran los sub-tabs de Pre-Closing; el{" "}
+        <b>Actual</b> es donde queda el mes al pasar a final.
+      </p>
+      <Lado nombre="Espejo" d={c.espejo} />
+      <Lado nombre="Actual" d={c.actual} />
+    </section>
+  );
+}

@@ -38,6 +38,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
+import sqlalchemy as sa
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -921,6 +922,209 @@ async def _plantilla_para_importar(db: AsyncSession, pc: Precierre) -> bytes:
                (await db.execute(select(DepartmentCatalog))).scalars().all()}
     return precierre_xlsx.plantilla_finplan(
         pc.mes, pc.anio, f"Actual {pc.anio}", filas, valores, nombres, linea_de)
+
+
+@router.get("/precierre/{precierre_id}/contra-actual/")
+async def contra_actual(
+    precierre_id: str,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """¿Quedó escrito lo mismo que revisé? Línea por línea.
+
+    Owner, 2026-09-16: *«dejá una mejoría»*. Esta es: que la pregunta
+    **«¿quedó igual que lo que revisé?»** la conteste la aplicación, en vez de
+    un cálculo a mano cada vez.
+
+    Compara el borrador —lo que se ve en la pantalla de revisión— contra los dos
+    destinos que escribe el mismo camino:
+
+    * **el espejo**, que es lo que miran los sub-tabs de Pre-Closing;
+    * **el ACTUAL**, que es donde queda el mes cuando se pasa a final.
+
+    ## Por qué los dos
+
+    Porque fallan distinto. La subida escribe el borrador y después el espejo, y
+    **no es todo-o-nada**: si el espejo falla, el borrador queda igual y la
+    respuesta lo dice — pero un rato después nadie se acuerda. Esto lo vuelve
+    una pregunta que se puede hacer en cualquier momento.
+
+    Y el ACTUAL responde la otra mitad: que pasar a final no haya cambiado nada
+    en el camino.
+
+    ## La comparación
+
+    El borrador se agrupa por `(destino_finplan, cuenta_base)` —el departamento
+    de FinPlan y la cuenta de cuatro dígitos— y el destino por
+    `actual_rows_for_month`, que es **lo que leen todos los reportes**. No es
+    una tercera forma de sumar: es la del borrador contra la de los reportes.
+
+    Verificado contra producción con setiembre 2026: 195 pares de (departamento,
+    cuenta) en los dos lados, **195 coinciden, cero difieren**.
+
+    ⚠️ Tolerancia de un centavo. El borrador guarda seis decimales y el destino
+    cuatro; exigir igualdad exacta marcaría el redondeo como diferencia, que es
+    el mismo error que disparaba el 409 de la plantilla.
+    """
+    from collections import defaultdict
+
+    from app.engine import recalculate as recalc
+    from app.api.gasto_por_clase_api import CUENTAS_DE_REPARTO, EXCLUIR_DE_GASTO
+    from app.engine.recalculate import load_active_account_mappings
+    from app.importers.gl_detail_importer import excluida_del_archivo
+
+    # ⚠️ **La pregunta que de verdad importa: ¿cambió de RENGLÓN?**
+    #
+    # Una cuenta distinta no siempre mueve plata. En agosto 2026 el borrador
+    # tenía `0152/4500` y el ACTUAL `0152/4400`: códigos distintos que el mapeo
+    # manda a la MISMA línea —`REV_TRANSPORTATION`—, así que el P&L dice lo
+    # mismo. Pero `0165/4316` (REV_RETAIL) contra `0151/4304` (REV_TIENDA) sí
+    # cambia el renglón, y ahí la plata se movió de línea.
+    #
+    # Sin separarlas, las dos se ven igual de graves y el cuadro no se usa.
+    resolver = pl_engine.construir_resolvedor(await load_active_account_mappings(db))
+
+    def linea_de(dept: str, cuenta: str) -> str:
+        regla, _como = resolver(dept, cuenta)
+        return (regla or {}).get("report_line_code", "") if regla else ""
+
+    #: Dos centavos. El borrador guarda seis decimales y el destino cuatro, y
+    #: cada par (departamento, cuenta) es la suma de hasta cientos de filas
+    #: redondeadas: la deriva se acumula. Medido en setiembre 2026, el peor par
+    #: difiere en UN centavo (6021 de Administracion, 1.723,33 contra 1.723,34).
+    #:
+    #: Exigir igualdad exacta marcaria el redondeo como diferencia — el mismo
+    #: error que disparaba el 409 de la plantilla, y por el que
+    #: `candado_meses.TOLERANCIA` existe.
+    TOLERANCIA = 0.02
+    pc = await _traer(db, precierre_id)
+
+    izq: dict[tuple, float] = defaultdict(float)
+    desc: dict[tuple, str] = {}
+    for f in (await db.execute(select(PrecierreFila).where(
+            PrecierreFila.precierre_id == pc.id))).scalars().all():
+        k = (f.destino_finplan or "", str(f.cuenta_base or ""))
+        izq[k] += float(f.mes_usd or 0)
+        desc.setdefault(k, f.descripcion or "")
+    izq = {k: v for k, v in izq.items() if abs(v) > TOLERANCIA}
+
+    async def comparar(scenario) -> dict:
+        if scenario is None:
+            return {"hay": False, "motivo": "no existe ese escenario"}
+        espejo_mode = bool(getattr(scenario, "es_precierre", False))
+        der: dict[tuple, float] = defaultdict(float)
+        for r in await recalc.actual_rows_for_month(db, scenario.id, pc.mes):
+            der[(str(r.get("dept_code") or ""), str(r["account_code"]))] +=                 float(r["amount"] or 0)
+        der = {k: v for k, v in der.items() if abs(v) > TOLERANCIA}
+
+        if not der:
+            # ⚠️ Decir que el destino esta vacio, y no listar 195 diferencias.
+            # Un mes que todavia no se paso a final no tiene 195 problemas:
+            # tiene uno, y es que no se paso. Medido en setiembre 2026: contra
+            # el ACTUAL salian 195 «solo en el borrador», que es ruido con
+            # forma de hallazgo.
+            return {"hay": True, "vacio": True,
+                    "escenario": f"{scenario.type} {scenario.version} {scenario.year}",
+                    "scenario_id": scenario.id,
+                    "motivo": f"{scenario.type} {scenario.version} no tiene nada "
+                              f"escrito en el mes {pc.mes}",
+                    "pares_borrador": len(izq), "pares_destino": 0,
+                    "coinciden": 0, "difieren": 0, "cuadra": False,
+                    "total_borrador": round(sum(izq.values()), 2),
+                    "total_destino": 0.0, "diferencias": [], "recortado": False}
+
+        # ⚠️ **La regla permanente de allocation.** Fuera del espejo, las clases
+        # 5/6/7 de Cafeteria y Lavanderia —y el credito 4999— NO entran al
+        # destino: `ALLOCATION_EXCLUDE` las deja fuera a proposito. Compararlas
+        # igual marcaria esas lineas como diferencia TODOS los meses.
+        #
+        # Medido en agosto 2026: de 44 diferencias contra el ACTUAL, la mayoria
+        # eran esto. Una revision que llora lobo todos los meses deja de
+        # mirarse, y entonces el dia que tenga razon tampoco.
+        def fuera_del_destino(k) -> bool:
+            if espejo_mode:
+                return False
+            # Las clases 5/6/7 de los departamentos de allocation…
+            if excluida_del_archivo(k[0], k[1]):
+                return True
+            # …y su CREDITO de reparto, que es clase 4 y por eso no lo agarra la
+            # regla de arriba. Fuera del espejo tampoco entra al destino.
+            return k[1] in CUENTAS_DE_REPARTO and k[0] in EXCLUIR_DE_GASTO
+
+        difs = []
+        omitidas = 0
+        for k in sorted(set(izq) | set(der)):
+            if fuera_del_destino(k):
+                omitidas += 1
+                continue
+            a, b = izq.get(k, 0.0), der.get(k, 0.0)
+            if abs(a - b) <= TOLERANCIA:
+                continue
+            difs.append({
+                "dept_code": k[0], "cuenta": k[1],
+                "descripcion": desc.get(k, ""),
+                "linea_pl": linea_de(k[0], k[1]),
+                "borrador": round(a, 2), "destino": round(b, 2),
+                "diferencia": round(a - b, 2),
+                "donde": ("solo en el borrador" if abs(b) <= TOLERANCIA
+                          else "solo en el destino" if abs(a) <= TOLERANCIA
+                          else "distinto monto"),
+            })
+        difs.sort(key=lambda x: -abs(x["diferencia"]))
+
+        # Y el mismo saldo agrupado por LÍNEA del P&L. Si una línea queda en
+        # cero, las diferencias de adentro son de código y no de plata: el
+        # renglón dice lo mismo. Si no queda en cero, la plata se movió.
+        por_linea: dict[str, float] = defaultdict(float)
+        for x in difs:
+            por_linea[x["linea_pl"] or "(sin línea)"] += x["diferencia"]
+        lineas = sorted(
+            ({"linea_pl": L, "diferencia": round(v, 2)}
+             for L, v in por_linea.items() if abs(v) > 1.0),
+            key=lambda x: -abs(x["diferencia"]))
+        #: Un dolar es la tolerancia de la casa para este tipo de comparacion
+        #: —la misma que usa la verificacion de `_reflejar`—. Las de centavos se
+        #: siguen LISTANDO, para que nada se esconda, pero no tumban el «cuadra»:
+        #: un mes que difiere en dos centavos no es un mes con un problema.
+        relevantes = [x for x in difs if abs(x["diferencia"]) > 1.0]
+        return {
+            "hay": True,
+            "escenario": f"{scenario.type} {scenario.version} {scenario.year}",
+            "scenario_id": scenario.id,
+            "pares_borrador": len(izq), "pares_destino": len(der),
+            # Las de allocation no son ni coincidencia ni diferencia: no se
+            # comparan. Se dicen aparte para que el total siga sumando.
+            "omitidas_por_allocation": omitidas,
+            "coinciden": len(set(izq) | set(der)) - len(difs) - omitidas,
+            "difieren": len(difs),
+            "difieren_relevantes": len(relevantes),
+            "cuadra": not relevantes,
+            "total_borrador": round(sum(izq.values()), 2),
+            "total_destino": round(sum(der.values()), 2),
+            # Se recortan a 200: una lista de miles no se revisa, y si hay miles
+            # el problema no es cuál línea sino que no se escribió nada.
+            "diferencias": difs[:200],
+            "recortado": len(difs) > 200,
+            #: Las líneas del P&L que de verdad cambiaron de monto. Vacía
+            #: significa que todo lo de arriba es diferencia de CÓDIGO: el
+            #: estado de resultados dice lo mismo.
+            "lineas_movidas": lineas,
+        }
+
+    espejo = await _espejo(db, pc.anio)
+    actual = (await db.execute(select(Scenario).where(
+        Scenario.hotel_id == pc.hotel_id, Scenario.year == pc.anio,
+        Scenario.type == "ACTUAL",
+        sa.or_(Scenario.es_precierre.is_(False),
+               Scenario.es_precierre.is_(None))))).scalars().first()
+
+    return {
+        "precierre_id": pc.id, "anio": pc.anio, "mes": pc.mes,
+        "estado": pc.estado,
+        "archivo": pc.archivo_nombre,
+        "espejo": await comparar(espejo),
+        "actual": await comparar(actual),
+    }
 
 
 @router.post("/precierre/{precierre_id}/pasar-a-final/")
