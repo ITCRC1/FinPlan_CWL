@@ -6089,6 +6089,11 @@ export interface UsaliSchedule {
   renglones: string[];
 }
 
+/** Los renglones aprobados del reporte de un departamento del USALI. */
+export async function usaliSchedule(schedule: string): Promise<UsaliSchedule> {
+  return api.get(`/usali/schedule/?schedule=${encodeURIComponent(schedule)}`);
+}
+
 /** Lo que el USALI dice de una cuenta del hotel. */
 export interface UsaliParaCuenta {
   nombre: string;

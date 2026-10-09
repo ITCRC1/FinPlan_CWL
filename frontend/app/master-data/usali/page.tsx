@@ -14,7 +14,9 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { api, getToken } from "@/lib/api";
+import { api, getToken,
+  usaliSchedule, type UsaliSchedule,
+} from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -127,6 +129,19 @@ export default function UsaliPage() {
       setSubiendo(false);
     }
   }
+
+  /** Los renglones aprobados del departamento elegido. Se trae al elegirlo:
+   *  son 399 en total y no vale cargarlos todos de entrada. */
+  const [ren, setRen] = useState<UsaliSchedule | null>(null);
+
+  useEffect(() => {
+    if (!schedule) { setRen(null); return; }
+    let vivo = true;
+    void usaliSchedule(schedule)
+      .then(r => { if (vivo) setRen(r); })
+      .catch(() => { if (vivo) setRen(null); });
+    return () => { vivo = false; };
+  }, [schedule]);
 
   async function bajarExcel() {
     try {
@@ -254,6 +269,50 @@ export default function UsaliPage() {
           </span>
         )}
       </div>
+
+      {/* ── Los renglones aprobados del departamento elegido ──────────────
+        *
+        * Owner, 2026-10-08: *«cada cuenta tiene la descripción y va por
+        * departamento»*. La tabla de abajo filtra los ARTÍCULOS del
+        * diccionario —ejemplos de qué va dónde—; esto es la otra mitad: los
+        * RENGLONES del reporte, que es lo que el estándar aprueba como línea.
+        *
+        * ⚠️ Cuando el libro no da lista —el Schedule 3, donde viven el Spa,
+        * los tours y el transporte— lo dice en vez de mostrar un panel vacío.
+        * Un hueco silencioso se lee como «falta cargar algo». */}
+      {estado?.hay && schedule && ren && (
+        <div style={{ border: "1px solid var(--border-medium)", borderRadius: 6,
+                      borderLeft: "3px solid var(--brand)",
+                      padding: "10px 14px", marginBottom: 12,
+                      background: "var(--bg-surface)" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>
+            {ren.lista_aprobada
+              ? `Renglones aprobados de ${ren.titulo ?? ren.schedule}`
+                + ` — Schedule ${ren.numero} (${ren.renglones.length})`
+              : `${ren.schedule} — el estándar no da lista cerrada`}
+          </div>
+          {ren.lista_aprobada ? (
+            <div style={{ fontSize: 12, columns: 3, columnGap: 24 }}>
+              {ren.renglones.map((g, i) => (
+                <div key={i} style={{ breakInside: "avoid", padding: "1px 0" }}>
+                  {g}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,
+                        color: "var(--text-secondary)" }}>
+              {ren.numero === 3
+                ? "Es un Other Operated Department — Schedule 3. El libro no "
+                  + "aprueba una lista cerrada: «only the revenues and expenses "
+                  + "that exist at an individual property». Acá cada propiedad "
+                  + "define sus departamentos menores — en CWL son el Spa, los "
+                  + "tours, el transporte, retail e Innoceana."
+                : ren.motivo}
+            </p>
+          )}
+        </div>
+      )}
 
       {estado?.hay && (
         <>

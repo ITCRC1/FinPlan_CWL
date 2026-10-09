@@ -470,3 +470,24 @@ def test_las_definiciones_de_otros_departamentos_NO_se_descartan():
     # Y si NINGUNA es de su departamento, se dice en vez de mostrar una ajena
     # como si fuera la suya.
     assert "el libro no define esta cuenta para este" in txt
+
+
+def test_la_pagina_del_USALI_muestra_los_renglones_del_departamento():
+    """La otra mitad de «va por departamento», fuera de Audit Integral.
+
+    La tabla de esa pantalla filtra los ARTICULOS del diccionario —ejemplos de
+    que va donde—. Los RENGLONES del reporte, que es lo que el estandar aprueba
+    como linea, solo se veian al abrir una cuenta en Audit Integral.
+
+    ⚠️ Y dice cuando NO hay lista. Un panel vacio se lee como «falta cargar
+    algo», y lo que pasa es que el Schedule 3 no da lista: ahi viven el Spa, los
+    tours, el transporte, retail e Innoceana de esta propiedad.
+    """
+    import pathlib
+
+    pagina = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+              / "master-data" / "usali" / "page.tsx")
+    txt = pagina.read_text(encoding="utf-8", errors="replace")
+    assert "usaliSchedule" in txt
+    assert "Renglones aprobados de" in txt
+    assert "el estándar no da lista cerrada" in txt
