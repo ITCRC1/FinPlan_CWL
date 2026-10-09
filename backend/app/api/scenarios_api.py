@@ -2790,11 +2790,32 @@ def repartir_entre_destinos(destinos: list, pesos: list, monto: Decimal) -> list
 async def export_scenario_detail(
     scenario_id: str,
     month: int = Query(0, description="0 = año completo (12 meses); 1..12 = solo ese mes"),
+    solo_abiertos: bool = Query(
+        False,
+        description="Deja fuera los meses cerrados del escenario (FORECAST). "
+                    "Asi la plantilla no puede chocar con el candado al subirla."),
     db: AsyncSession = Depends(get_db),
 ):
     """Genera la plantilla de Detalle de una versión (escenario), con los meses
     elegidos (todo el año o solo el mes cerrado), desde los datos del sistema. El
-    owner la baja, edita solo las filas que necesita y la vuelve a subir a esa versión."""
+    owner la baja, edita solo las filas que necesita y la vuelve a subir a esa
+    versión.
+
+    ## `solo_abiertos`: por qué existe
+
+    Owner, 2026-10-06, después de dos horas y **siete 409 seguidos** subiendo el
+    Forecast de setiembre: *«por qué no tienes capacidad de corregir esto, ya
+    estoy harto»*. La plantilla del año completo trae los meses CERRADOS, y al
+    volver a subirla el candado los frena — con razón: son meses buenos que nadie
+    quiere pisar.
+
+    Lo que lo destrabó fue sacar a mano, en Excel, las columnas de enero a
+    agosto. Eso es lo que hace este parámetro, y lo hace el sistema: exporta
+    **solo los meses que el escenario tiene abiertos**, con la MISMA definición
+    que usa el candado (`candado_meses.cerrados_de`). Bajar la plantilla y
+    subirla deja de poder chocar.
+
+    En un BUDGET o un ACTUAL no cambia nada: ahí no hay meses cerrados."""
     from starlette.responses import Response
     from app.export.detail_excel import build_detail_workbook, CLASE_BY_PREFIX
     from app.models.mapping import AccountMapping
@@ -2808,6 +2829,15 @@ async def export_scenario_detail(
     if scen is None:
         raise ErrorApi(404, "escenario.no_encontrado")
     months = list(range(1, 13)) if not month else [month]
+    # ⚠️ La misma definición que el candado, importada y no repetida: dos
+    # definiciones de «mes cerrado» se separan sin que nadie lo note.
+    from app.candado_meses import cerrados_de
+    cerrados = cerrados_de(scen) if solo_abiertos else set()
+    if cerrados:
+        months = [m for m in months if m not in cerrados]
+        if not months:
+            raise ErrorApi(409, "escenario.sin_meses_abiertos",
+                           version=f"{scen.type} {scen.version} {scen.year}")
     label = f"{scen.type.title()} {scen.version} {scen.year}"
     dept_names = {d.dept_code: d.dept_name for d in
                   (await db.execute(select(DepartmentCatalog))).scalars().all()}
@@ -3040,7 +3070,8 @@ async def export_scenario_detail(
 
     xls = build_detail_workbook([label], list(accts.values()), stats, dept_names,
                                 verificacion={label: verif})
-    scope = f"m{month:02d}" if month else "full"
+    scope = (f"m{month:02d}" if month
+             else ("abiertos" if cerrados else "full"))
     fn = f"{hotel_slug()}_Detalle_{scen.type}_{scen.version}_{scen.year}_{scope}.xlsx".replace(" ", "-")
     return Response(content=xls,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -268,6 +268,9 @@ MENSAJES: dict[str, dict[str, str]] = {
         "en": "The PDF has {paginas} pages and {con_texto} with text, but the "
               "revenue and expense guide was not found. If the file is a scan, "
               "its text cannot be extracted."},
+    "escenario.sin_meses_abiertos": {
+        "es": "{version} no tiene meses abiertos: todos estan cerrados.",
+        "en": "{version} has no open months: they are all closed."},
     "informe.falta_dato": {
         "es": "No se puede armar el informe: {detalle}",
         "en": "The report cannot be built: {detalle}"},

@@ -87,6 +87,20 @@ def columnas_de_mes() -> dict[type, dict[str, int]]:
     return fuera
 
 
+def cerrados_de(sc) -> set[int]:
+    """Los meses cerrados de un escenario. Vacío si no aplica.
+
+    ⚠️ **Es la ÚNICA definición de «mes cerrado» del sistema**, y tiene que
+    seguir siéndolo. La plantilla de Detalle la usa para no exportar esos meses
+    —así bajarla y subirla no puede chocar con el candado—; si cada lado tuviera
+    la suya, se separarían sin que nadie lo note y volveríamos al 409 de siempre.
+    """
+    if sc is None or (getattr(sc, "type", "") or "").upper() != "FORECAST":
+        return set()
+    corte = int(getattr(sc, "actuals_through", 0) or 0)
+    return set(range(1, corte + 1))
+
+
 def _cerrados(session: Session, scenario_id: str | None) -> set[int]:
     """Los meses cerrados del escenario de esta fila. Vacío si no aplica."""
     if not scenario_id:
@@ -95,10 +109,7 @@ def _cerrados(session: Session, scenario_id: str | None) -> set[int]:
 
     with session.no_autoflush:
         sc = session.get(Scenario, scenario_id)
-    if sc is None or (getattr(sc, "type", "") or "").upper() != "FORECAST":
-        return set()
-    corte = int(getattr(sc, "actuals_through", 0) or 0)
-    return set(range(1, corte + 1))
+    return cerrados_de(sc)
 
 
 #: Medio centimo: el error MAXIMO de redondear a dos decimales. Una diferencia

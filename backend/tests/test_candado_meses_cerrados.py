@@ -62,10 +62,17 @@ def test_se_mira_si_el_valor_CAMBIA_no_si_viaja():
 
 def test_el_candado_es_SOLO_para_FORECAST():
     """⚠️ En un ACTUAL «cerrado» es «tiene dato»: aplicarlo impediría corregir
-    un histórico, que es trabajo normal y otra conversación."""
-    fuente = inspect.getsource(cm._cerrados)
+    un histórico, que es trabajo normal y otra conversación.
+
+    La regla vive en `cerrados_de`, que es la ÚNICA definición de «mes cerrado»
+    del sistema — la comparte con la plantilla de Detalle, para que bajarla y
+    subirla no pueda chocar con el candado.
+    """
+    fuente = inspect.getsource(cm.cerrados_de)
     assert '!= "FORECAST"' in fuente
     assert "actuals_through" in fuente
+    # Y `_cerrados` la usa en vez de repetirla.
+    assert "cerrados_de(sc)" in inspect.getsource(cm._cerrados)
 
 
 def test_bloquea_CAMBIAR_CREAR_y_BORRAR():
@@ -171,3 +178,73 @@ def test_el_error_dice_CUANTO_cambio_y_en_que_cuenta():
     assert "diferencia" in fuente, "el detalle tiene que traer la diferencia"
     assert 'frenar(obj, mes, col, "cambiar", antes, ahora)' in fuente
     assert "account_code" in fuente, "y en que cuenta fue"
+
+
+# ── La plantilla no puede chocar con el candado ─────────────────────────────
+#
+# Owner, 2026-10-06, tras dos horas y SIETE 409 seguidos subiendo el Forecast de
+# setiembre: «por qué no tienes capacidad de corregir esto, ya estoy harto».
+#
+# La plantilla del año completo traía los meses CERRADOS; al volver a subirla el
+# candado los frenaba, con razón. Lo que destrabó aquello fue sacar a mano las
+# columnas de enero a agosto en Excel. `solo_abiertos=true` lo hace el sistema.
+
+
+def test_hay_UNA_sola_definicion_de_mes_cerrado():
+    """⚠️ La plantilla y el candado tienen que usar la MISMA.
+
+    Si cada lado tuviera la suya se separarían sin que nadie lo note, y
+    volveríamos al 409: la plantilla exportaría un mes que el candado considera
+    cerrado.
+    """
+    import inspect
+
+    from app.api import scenarios_api
+    from app.candado_meses import _cerrados, cerrados_de
+
+    assert "cerrados_de(sc)" in inspect.getsource(_cerrados)
+    fuente = inspect.getsource(scenarios_api.export_scenario_detail)
+    assert "from app.candado_meses import cerrados_de" in fuente
+    assert "cerrados_de(scen)" in fuente
+
+
+def test_cerrados_de_solo_aplica_a_FORECAST():
+    """Un BUDGET y un ACTUAL no tienen meses cerrados: la plantilla sale entera."""
+    from app.candado_meses import cerrados_de
+
+    class Esc:
+        def __init__(self, tipo, corte):
+            self.type, self.actuals_through = tipo, corte
+
+    assert cerrados_de(Esc("FORECAST", 8)) == set(range(1, 9))
+    assert cerrados_de(Esc("BUDGET", 8)) == set()
+    assert cerrados_de(Esc("ACTUAL", 8)) == set()
+    assert cerrados_de(Esc("FORECAST", 0)) == set()
+    assert cerrados_de(None) == set()
+
+
+def test_lo_que_la_plantilla_exporta_es_LO_QUE_EL_CANDADO_DEJA():
+    """El invariante: ningún mes exportado puede estar cerrado.
+
+    Con corte 8 —el caso de setiembre 2026— la plantilla tiene que traer
+    setiembre a diciembre y nada más.
+    """
+    from app.candado_meses import cerrados_de
+
+    class Esc:
+        type, actuals_through = "FORECAST", 8
+
+    cerrados = cerrados_de(Esc())
+    abiertos = [m for m in range(1, 13) if m not in cerrados]
+    assert abiertos == [9, 10, 11, 12]
+    assert not (set(abiertos) & cerrados)
+
+
+def test_un_escenario_sin_meses_abiertos_lo_DICE():
+    """Diciembre cerrado y pedir la plantilla recortada: contestar un archivo
+    vacío sería peor que contestar que no hay nada que editar."""
+    import inspect
+
+    from app.api import scenarios_api
+    fuente = inspect.getsource(scenarios_api.export_scenario_detail)
+    assert "escenario.sin_meses_abiertos" in fuente

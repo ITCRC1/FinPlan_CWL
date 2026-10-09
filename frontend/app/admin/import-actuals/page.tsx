@@ -517,15 +517,34 @@ export default function ImportActualsPage() {
           </div>
         )}
 
-        {camino && scenarioId && (
-          <div style={{ marginTop: 14 }}>
-            <a href={exportDetailUrl(scenarioId, monthParam)} style={btn("var(--brand)")}>
-              {camino === "mensual"
-                ? t("downloadTemplateMonth", { mes: MESES[month - 1] })
-                : t("downloadTemplateYear")}
-            </a>
-          </div>
-        )}
+        {camino && scenarioId && (() => {
+          // ⚠️ En el camino ANUAL, si el escenario tiene meses cerrados la
+          // plantilla sale SIN ellos. La del año completo los traía, y al
+          // volver a subirla el candado los frenaba: dos horas y siete 409 el
+          // 2026-10-06, destrabados sacando las columnas a mano en Excel. Eso
+          // ahora lo hace el sistema.
+          const cerrados = estado?.meses_cerrados ?? [];
+          const recorta = camino !== "mensual" && cerrados.length > 0;
+          return (
+            <div style={{ marginTop: 14 }}>
+              <a href={exportDetailUrl(scenarioId, monthParam, recorta)}
+                 style={btn("var(--brand)")}>
+                {camino === "mensual"
+                  ? t("downloadTemplateMonth", { mes: MESES[month - 1] })
+                  : t("downloadTemplateYear")}
+              </a>
+              {recorta && (
+                <div style={{ fontSize: 12, marginTop: 6,
+                              color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                  Sale con los <b>{12 - cerrados.length} meses abiertos</b> —
+                  {" "}{MESES[cerrados.length]} a {MESES[11]}. Los{" "}
+                  {cerrados.length} cerrados quedan fuera a propósito: están
+                  bien y subirlos de nuevo choca con el candado.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* 3 · subir */}

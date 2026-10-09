@@ -2190,10 +2190,23 @@ export async function ensureWorkingBudgets(fromYear = 2027, toYear = 2035, hotel
   return api.post(`/scenarios/ensure-working/`, { hotel_id: hotelId, from_year: fromYear, to_year: toYear });
 }
 
-// Descarga de la plantilla de Detalle de una versión (month=0 → año completo).
-export function exportDetailUrl(scenarioId: string, month = 0): string {
+/**
+ * Descarga de la plantilla de Detalle de una versión (month=0 → año completo).
+ *
+ * `soloAbiertos` deja fuera los meses CERRADOS del escenario. Existe por las dos
+ * horas y los siete 409 del 2026-10-06: la plantilla del año completo trae los
+ * meses cerrados, y al volver a subirla el candado los frena —con razón—. Lo
+ * que destrabó aquello fue sacar a mano las columnas de enero a agosto en
+ * Excel; esto lo hace el sistema, con la misma definición de «cerrado» que usa
+ * el candado.
+ */
+export function exportDetailUrl(
+  scenarioId: string, month = 0, soloAbiertos = false,
+): string {
   const t = getToken();
-  const q = `month=${month}` + (t ? `&token=${encodeURIComponent(t)}` : "");
+  const q = `month=${month}`
+    + (soloAbiertos ? "&solo_abiertos=true" : "")
+    + (t ? `&token=${encodeURIComponent(t)}` : "");
   return `${BASE}/scenarios/${scenarioId}/export-detail/?${q}`;
 }
 
