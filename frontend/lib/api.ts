@@ -6001,6 +6001,33 @@ export interface AuditoriaGL {
   hallazgos: AuditoriaHallazgo[];
 }
 
+/** Lo que el USALI dice de una cuenta del hotel. */
+export interface UsaliParaCuenta {
+  nombre: string;
+  /** `exacto` = el nombre es el mismo · `parecido` = variante · `ninguno`. */
+  grado: "exacto" | "parecido" | "ninguno";
+  parecido: number;
+  cuenta_usali: string | null;
+  definiciones: { cuenta: string; texto: string; pagina: number }[];
+  items: { item: string; schedule: string }[];
+}
+
+/**
+ * Que dice el estandar de una cuenta del hotel.
+ *
+ * ⚠️ NO afirma nada: devuelve lo que el libro dice de una cuenta que se llama
+ * parecido, con el parecido a la vista. Aparear ASIENTO contra estandar no se
+ * puede —el mayor dice el proveedor en espanol y el libro el articulo en
+ * ingles, y el 98,3% no comparte una palabra—; aparear NOMBRE DE CUENTA si,
+ * porque el catalogo del hotel se armo sobre USALI.
+ */
+export async function usaliParaCuenta(
+  nombre: string, schedule = "",
+): Promise<UsaliParaCuenta> {
+  return api.get(`/usali/para-cuenta/?nombre=${encodeURIComponent(nombre)}`
+    + `&schedule=${encodeURIComponent(schedule)}`);
+}
+
 /** Una linea del AUDIT INTEGRAL: una cuenta del mes contra las versiones. */
 export interface DetalleIntegral {
   detalle: string; nombre: string; actual: number; lineas: number;

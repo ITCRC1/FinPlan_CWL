@@ -217,3 +217,67 @@ def test_los_endpoints_estan_registrados_y_piden_token():
         assert r in rutas, f"falta {r}"
     assert cliente.get("/api/usali/buscar/?q=cots").status_code in (401, 403)
     assert cliente.post("/api/usali/subir/").status_code in (401, 403, 422)
+
+
+# ── el USALI como capa de explicación ───────────────────────────────────────
+#
+# Owner, 2026-10-08: «ok, A» — el estándar al lado de la cuenta, para leer. NO
+# como regla que marca. La diferencia no es de estilo: aparear ASIENTO contra
+# estándar no se puede —medido, el 98,3% de las descripciones del mayor no
+# comparte una palabra con el libro, porque el mayor dice el proveedor en
+# español y el libro el artículo en inglés—. Aparear NOMBRE DE CUENTA sí: el
+# catálogo del hotel se armó sobre USALI y el 61,5% de las cuentas de setiembre
+# 2026 tiene el nombre idéntico.
+
+
+def test_el_umbral_rechaza_lo_que_no_se_parece():
+    """⚠️ «Cafetería → Collateral Material» (0,57) NO se puede mostrar.
+
+    Una referencia que acierta ahorra tiempo; una que inventa enseña a
+    desconfiar de la pantalla, y eso no se recupera.
+    """
+    from app.api.usali_api import (UMBRAL_EXACTO, UMBRAL_PARECIDO, _parecido)
+
+    assert _parecido("Cafeteria", "Collateral Material") < UMBRAL_PARECIDO
+    assert _parecido("Massage Spa", "Management Fees") < UMBRAL_PARECIDO
+    assert _parecido("Christmas bonus", "Commissions") < UMBRAL_PARECIDO
+    assert UMBRAL_PARECIDO < UMBRAL_EXACTO
+
+
+def test_el_umbral_acepta_la_misma_cuenta():
+    from app.api.usali_api import UMBRAL_EXACTO, _parecido
+
+    for n in ("Operating Supplies", "Water/Sewer", "Uniform Costs",
+              "Payroll Processing", "Waste Removal"):
+        assert _parecido(n, n) >= UMBRAL_EXACTO
+
+
+def test_las_abreviaturas_del_libro_no_rompen_el_apareo():
+    """El libro abrevia en la columna angosta. Sin resolverlas, dos nombres de
+    la MISMA cuenta caen por debajo del umbral y la definición no se muestra."""
+    from app.api.usali_api import UMBRAL_PARECIDO, _parecido
+
+    assert _parecido("Misc. Other Rev", "Miscellaneous Other Revenue") >= UMBRAL_PARECIDO
+    assert _parecido("Equip. Rental", "Equipment Rental") >= UMBRAL_PARECIDO
+
+
+def test_sin_parecido_NO_devuelve_el_candidato_malo():
+    """El endpoint contesta «ninguno» y deja la cuenta en nulo: la pantalla no
+    puede mostrar un nombre que el servidor ya descartó."""
+    import inspect
+
+    from app.api import usali_api
+    fuente = inspect.getsource(usali_api.para_cuenta)
+    assert '"grado": "ninguno"' in fuente
+    assert '"cuenta_usali": None' in fuente
+
+
+def test_el_estandar_no_marca_nada():
+    """⚠️ Es referencia, no regla. Si algún día esto empieza a generar
+    hallazgos, tiene que ser una decisión tomada, no algo que se filtró."""
+    import inspect
+
+    from app.api import usali_api
+    fuente = inspect.getsource(usali_api)
+    for palabra in ("hallazgo", "Hallazgo", "severidad", "REGLAS"):
+        assert palabra not in fuente

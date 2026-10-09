@@ -30,7 +30,8 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
-import { api, getScenarios, type Scenario } from "@/lib/api";
+import { api, getScenarios, usaliParaCuenta, type Scenario,
+         type UsaliParaCuenta } from "@/lib/api";
 import { HOTEL_ID } from "@/lib/hotel";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 
@@ -108,6 +109,22 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  ~285 cuentas seguidas; de a un departamento se revisa y se cierra. */
   const [depts, setDepts] = useState<string[]>([]);
   const [abrirDepts, setAbrirDepts] = useState(false);
+  /** La cuenta cuya definicion del USALI se esta mirando.
+   *
+   *  Owner, 2026-10-08, al pedirlo: *«ok, A»* — el estandar como capa de
+   *  EXPLICACION y no de deteccion. No marca nada: muestra lo que el libro dice
+   *  que incluye esa cuenta, para que el ojo decida mas rapido. */
+  const [usali, setUsali] = useState<UsaliParaCuenta | "cargando" | null>(null);
+
+  const verUsali = useCallback(async (nombre: string) => {
+    setUsali("cargando");
+    try {
+      setUsali(await usaliParaCuenta(nombre));
+    } catch {
+      setUsali(null);
+    }
+  }, []);
+
   const [copiado, setCopiado] = useState("");
   /** Qué cuentas están abiertas, y sus asientos ya traídos.
    *
@@ -495,7 +512,20 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                                      fontWeight: 600 }}>
                           {f.cuenta}
                         </td>
-                        <td style={{ ...td, fontWeight: 600 }}>{f.nombre}</td>
+                        <td style={{ ...td, fontWeight: 600 }}>
+                          {/* El nombre abre lo que el USALI dice que va aca.
+                              Es referencia, no regla: si el estandar no tiene
+                              una cuenta parecida, lo dice y no inventa. */}
+                          <button onClick={() => void verUsali(f.nombre)}
+                                  title="Que dice el USALI que incluye esta cuenta"
+                                  style={{ font: "inherit", fontWeight: 600,
+                                           padding: 0, border: "none",
+                                           background: "none", cursor: "pointer",
+                                           textAlign: "left",
+                                           color: "var(--text-primary)" }}>
+                            {f.nombre}
+                          </button>
+                        </td>
                         <td style={num}>
                           {f.lineas ? (
                             <button onClick={() => abrir(f)}
@@ -575,6 +605,104 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
           </tbody>
         </table>
       </div>
+
+      {/* ── Lo que el USALI dice de la cuenta ─────────────────────────── */}
+      {usali && (
+        <>
+          <span onClick={() => setUsali(null)}
+                style={{ position: "fixed", inset: 0, zIndex: 50,
+                         background: "rgba(0,0,0,0.45)" }} />
+          <div style={{ position: "fixed", zIndex: 51, top: "7%", left: "50%",
+                        transform: "translateX(-50%)", width: "min(780px, 93vw)",
+                        maxHeight: "82vh", overflowY: "auto", padding: 18,
+                        borderRadius: 8, border: "1px solid var(--border-medium)",
+                        background: "var(--bg-surface)",
+                        boxShadow: "0 12px 40px rgba(0,0,0,0.45)" }}>
+            {usali === "cargando" ? (
+              <p style={{ fontSize: 13, margin: 0 }}>Buscando en el USALI…</p>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between",
+                              alignItems: "start", gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+                      USALI · lo que el estándar dice de
+                    </div>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+                      {usali.nombre}
+                    </h2>
+                  </div>
+                  <button onClick={() => setUsali(null)}
+                          style={{ border: "none", background: "none",
+                                   cursor: "pointer", fontSize: 20,
+                                   color: "var(--text-secondary)" }}>×</button>
+                </div>
+
+                {usali.grado === "ninguno" ? (
+                  // ⚠️ Se dice que no hay, y no se muestra el candidato malo.
+                  // «Cafetería → Collateral Material» enseña a desconfiar de la
+                  // pantalla, y eso no se recupera.
+                  <p style={{ fontSize: 13, marginTop: 12,
+                              color: "var(--text-secondary)" }}>
+                    El estándar no tiene una cuenta que se llame así. Puede ser
+                    una cuenta propia de la propiedad, o estar con otro nombre —
+                    buscala en <b>Master Data → USALI</b>.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 11.5, marginTop: 8,
+                                  color: usali.grado === "exacto"
+                                    ? "var(--positive)" : "var(--warning)" }}>
+                      {usali.grado === "exacto"
+                        ? `El estándar tiene la misma cuenta: «${usali.cuenta_usali}»`
+                        : `Lo más parecido en el estándar es «${usali.cuenta_usali}» `
+                          + `(${Math.round(usali.parecido * 100)}% de parecido) — `
+                          + `conviene confirmarlo`}
+                    </div>
+
+                    {usali.definiciones.map((d, i) => (
+                      <div key={i} style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                          página {d.pagina}
+                        </div>
+                        <p style={{ fontSize: 13, lineHeight: 1.5,
+                                    textAlign: "justify", margin: "2px 0 0" }}>
+                          {d.texto}
+                        </p>
+                      </div>
+                    ))}
+
+                    {usali.items.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16,
+                                      marginBottom: 4 }}>
+                          Lo que va acá según el diccionario ({usali.items.length})
+                        </div>
+                        <div style={{ fontSize: 12, columns: 2, columnGap: 22 }}>
+                          {usali.items.map((it, i) => (
+                            <div key={i} style={{ breakInside: "avoid",
+                                                  padding: "1px 0" }}>
+                              {it.item}
+                              <span style={{ color: "var(--text-secondary)" }}>
+                                {" "}· {it.schedule}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+                <p style={{ fontSize: 11, marginTop: 16, marginBottom: 0,
+                            color: "var(--text-secondary)" }}>
+                  Referencia, no regla: esto no marca ni corrige nada. Uniform
+                  System of Accounts for the Lodging Industry — AHLA/HFTP.
+                </p>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {visibles.length === 0 && (
         <p style={{ fontSize: 13, color: "var(--positive)", marginTop: 10 }}>

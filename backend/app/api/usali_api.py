@@ -191,6 +191,110 @@ async def buscar(
     }
 
 
+#: Cuando una cuenta del hotel se parece lo suficiente a una del estandar como
+#: para mostrar su definicion al lado. Medido sobre las 65 cuentas de setiembre
+#: 2026: con 0,90 entran 40 (61,5%) y todas son el mismo nombre escrito igual
+#: —el catalogo del hotel se armo sobre USALI—; entre 0,75 y 0,90 entran 6 mas,
+#: que son variantes reales; por debajo de 0,75 empieza la basura («Cafeteria»
+#: contra «Collateral Material»).
+UMBRAL_EXACTO = 0.90
+UMBRAL_PARECIDO = 0.75
+
+
+def _parecido(a: str, b: str) -> float:
+    import difflib
+    return difflib.SequenceMatcher(None, _norm_cta(a), _norm_cta(b)).ratio()
+
+
+def _norm_cta(s: str) -> str:
+    """Normaliza para comparar NOMBRES DE CUENTA.
+
+    Resuelve las abreviaturas que el libro y la contabilidad escriben distinto
+    —«Misc. Other Rev» contra «Miscellaneous Other Revenue»— antes de medir el
+    parecido. Sin esto, dos nombres de la misma cuenta caen por debajo del
+    umbral y la definicion no se muestra.
+    """
+    s = _norm(s)
+    for a, b in (("exp ", "expense "), ("rev ", "revenue "),
+                 ("misc ", "miscellaneous "), ("supp ", "supplies "),
+                 ("equip ", "equipment "), ("maint ", "maintenance "),
+                 ("admin ", "administrative ")):
+        s = s.replace(a, b)
+    return " ".join(s.split())
+
+
+@router.get("/usali/para-cuenta/")
+async def para_cuenta(
+    nombre: str = Query(..., description="el nombre de la cuenta del hotel"),
+    schedule: str = Query("", description="el departamento, si se sabe"),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Que dice el estandar de una cuenta del hotel.
+
+    Owner, 2026-10-08, sobre por que esto y no una regla automatica: el
+    diccionario del USALI habla de ARTICULOS en ingles y el mayor del hotel de
+    PROVEEDORES en espanol —medido: 98,3% de las descripciones no comparte una
+    sola palabra con el libro—. Aparear asiento contra estandar no se puede.
+
+    Aparear NOMBRE DE CUENTA si: el catalogo del hotel se armo sobre USALI y el
+    61,5% de las cuentas de setiembre 2026 tiene el nombre identico.
+
+    ⚠️ **Esto NO afirma nada.** Devuelve lo que el libro dice de una cuenta que
+    se llama parecido, con el parecido a la vista, para que una persona lo lea y
+    decida. La diferencia importa: una regla que afirma mal deja de mirarse; una
+    referencia que se equivoca se ignora y no cuesta nada.
+    """
+    filas = (await db.execute(
+        select(UsaliDefinicion)
+        .where(UsaliDefinicion.hotel_id == HOTEL_ID))).scalars().all()
+    nombres_dic = [r[0] for r in (await db.execute(
+        select(UsaliItem.cuenta).where(UsaliItem.hotel_id == HOTEL_ID)
+        .distinct())).all()]
+
+    mejor, punt = None, 0.0
+    for d in filas:
+        p = _parecido(nombre, d.cuenta)
+        if p > punt:
+            mejor, punt = d, p
+    # El diccionario tambien nombra cuentas, y algunas no tienen definicion.
+    mejor_dic, punt_dic = None, 0.0
+    for c in nombres_dic:
+        p = _parecido(nombre, c)
+        if p > punt_dic:
+            mejor_dic, punt_dic = c, p
+
+    cuenta_usali = (mejor.cuenta if punt >= punt_dic and mejor else mejor_dic)
+    calidad = max(punt, punt_dic)
+    grado = ("exacto" if calidad >= UMBRAL_EXACTO
+             else "parecido" if calidad >= UMBRAL_PARECIDO else "ninguno")
+
+    if grado == "ninguno":
+        # ⚠️ Se contesta que no hay, y no el candidato malo. Mostrar
+        # «Cafeteria -> Collateral Material» ensena a desconfiar de la pantalla.
+        return {"nombre": nombre, "grado": "ninguno", "parecido": round(calidad, 3),
+                "cuenta_usali": None, "definiciones": [], "items": []}
+
+    defs = [d for d in filas if _norm_cta(d.cuenta) == _norm_cta(cuenta_usali or "")]
+    items = (await db.execute(
+        select(UsaliItem)
+        .where(UsaliItem.hotel_id == HOTEL_ID, UsaliItem.cuenta == cuenta_usali)
+        .order_by(UsaliItem.item_norm).limit(200))).scalars().all()
+    if schedule:
+        propios = [i for i in items if i.schedule == schedule]
+        otros = [i for i in items if i.schedule != schedule]
+        items = propios + otros
+    return {
+        "nombre": nombre,
+        "grado": grado,
+        "parecido": round(calidad, 3),
+        "cuenta_usali": cuenta_usali,
+        "definiciones": [{"cuenta": d.cuenta, "texto": d.texto, "pagina": d.pagina}
+                         for d in defs],
+        "items": [{"item": i.item, "schedule": i.schedule} for i in items],
+    }
+
+
 @router.get("/usali/excel/")
 async def excel(
     q: str = Query(""),
