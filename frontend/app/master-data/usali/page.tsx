@@ -87,21 +87,38 @@ export default function UsaliPage() {
     return () => clearTimeout(t);
   }, [estado?.hay, buscar]);
 
-  async function subir(f: File) {
+  /** El archivo que el servidor rechazo por repetido, esperando confirmacion.
+   *
+   *  ⚠️ El guard de reimport es correcto —frena la subida doble por error— pero
+   *  en esta pantalla «reemplazar» ES la intencion: el libro se vuelve a subir
+   *  cuando el lector aprendio a sacarle algo mas. Sin este boton el mensaje
+   *  pedia `permitir_reimport=true`, un parametro que ninguna parte de la UI
+   *  podia mandar. Ya habia pasado en el cierre de agosto 2026 por otra ruta y
+   *  costo una tarde; esta es la misma falla en otro lado. */
+  const [repetido, setRepetido] = useState<File | null>(null);
+
+  async function subir(f: File, igual = false) {
     setSubiendo(true);
     setError("");
+    setRepetido(null);
     try {
       const fd = new FormData();
       fd.append("file", f);
       const token = getToken();
-      const res = await fetch(`${BASE}/usali/subir/`, {
+      const res = await fetch(
+        `${BASE}/usali/subir/${igual ? "?permitir_reimport=true" : ""}`, {
         method: "POST", body: fd,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const j = await res.json();
       if (!res.ok) {
+        // 409 «ya subido» no es un error: es una pregunta. Se guarda el archivo
+        // para poder contestarla sin volver a elegirlo del disco.
+        if (res.status === 409) {
+          setRepetido(f);
+        }
         throw new Error(typeof j?.detail === "string" ? j.detail
-          : j?.detail?.mensaje || `HTTP ${res.status}`);
+          : j?.detail?.mensaje || j?.detail?.detalle || `HTTP ${res.status}`);
       }
       await cargarEstado();
     } catch (e) {
@@ -158,6 +175,38 @@ export default function UsaliPage() {
         <p style={{ fontSize: 12.5, color: "var(--negative)", marginBottom: 10 }}>
           {error}
         </p>
+      )}
+
+      {/* El 409 «ya subido» no es un error que se lea y se cierre: es una
+          pregunta con una sola respuesta sensata acá. El archivo ya está en
+          memoria, así que contestarla no obliga a buscarlo otra vez en el
+          disco. */}
+      {repetido && !subiendo && (
+        <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 6,
+                      border: "1px solid var(--warning)",
+                      background: "var(--bg-elevated)" }}>
+          <div style={{ fontSize: 12.5, marginBottom: 8 }}>
+            Es el mismo archivo que ya está cargado. Subirlo de nuevo es lo
+            correcto cuando el sistema aprendió a leerle algo más — hoy, los{" "}
+            <b>renglones de los 14 Schedules</b>. El diccionario y las
+            definiciones se releen idénticos: no se pierde nada.
+          </div>
+          <button onClick={() => void subir(repetido, true)}
+                  style={{ fontSize: 12, padding: "5px 12px", borderRadius: 5,
+                           cursor: "pointer", fontWeight: 600,
+                           border: "1px solid var(--brand)",
+                           background: "var(--brand)", color: "#fff" }}>
+            Subirlo igual
+          </button>
+          <button onClick={() => { setRepetido(null); setError(""); }}
+                  style={{ fontSize: 12, padding: "5px 12px", borderRadius: 5,
+                           marginLeft: 8, cursor: "pointer",
+                           border: "1px solid var(--border-medium)",
+                           background: "var(--bg-input)",
+                           color: "var(--text-primary)" }}>
+            Dejarlo como está
+          </button>
+        </div>
       )}
 
       {/* ── lo que hay cargado ─────────────────────────────────────────── */}

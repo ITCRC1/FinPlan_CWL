@@ -280,3 +280,65 @@ def test_las_puertas_que_si_escriben_siguen_bloqueadas():
                  "/api/precierre-algo-que-no-existe/"[:20] + "/",
                  "/api/scenarios/import-all/"):
         assert not _sin_bloqueo(ruta), ruta
+
+
+# ─── Si una puerta frena el duplicado, la pantalla tiene que poder insistir ───
+
+def test_la_pantalla_del_usali_puede_contestar_el_409():
+    """⚠️ La misma falla, por tercera vez, en otra ruta.
+
+    El 2026-10-09 el owner fue a volver a subir el PDF del USALI —hacía falta,
+    porque el lector había aprendido a sacarle los renglones de los 14
+    Schedules— y el guard lo frenó con «Para subirlo igual:
+    permitir_reimport=true». La pantalla no tenía cómo mandarlo. Es
+    literalmente lo que el comentario de `registro_dep.py` ya advertía que
+    había costado una tarde del cierre de agosto 2026.
+
+    `/api/usali/subir/` **sí** escribe el dato definitivo, así que NO puede
+    entrar en `RUTAS_SIN_BLOQUEO`: el guard está bien y lo que faltaba era el
+    botón. Reemplazar el documento es la intención declarada de esa pantalla
+    —«subir otro reemplaza el que está»—, así que el 409 ahí no es un error:
+    es una pregunta, y ahora se puede contestar.
+    """
+    import pathlib
+
+    from app.importers.registro_dep import _sin_bloqueo
+
+    assert not _sin_bloqueo("/api/usali/subir/"), (
+        "la puerta del USALI escribe el dato definitivo: el guard la protege a "
+        "proposito, y la pantalla contesta el 409 con un boton")
+    pagina = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+              / "master-data" / "usali" / "page.tsx")
+    txt = pagina.read_text(encoding="utf-8", errors="replace")
+    assert "permitir_reimport=true" in txt
+    # Y que el reintento sea un acto del usuario, no automatico: subir dos veces
+    # sin querer es exactamente lo que el guard existe para frenar.
+    assert "Subirlo igual" in txt
+    assert "res.status === 409" in txt
+
+
+def test_cuantas_pantallas_suben_sin_poder_insistir():
+    """El hueco es de toda la aplicacion, y esta prueba lo deja medido.
+
+    Al 2026-10-09 hay **28** funciones que suben archivo en `lib/api.ts` y
+    NINGUNA manda `permitir_reimport`. No se arregla de a una: son 28 pantallas
+    y la forma correcta es que el cliente de API sepa reintentar una sola vez,
+    lo que es un cambio de alcance propio. El owner lo decide.
+
+    ⚠️ Esta prueba NO congela el defecto: cuenta. Si alguien arregla una
+    pantalla, el numero baja y la prueba lo pide actualizado — con el numero a
+    la vista en vez de un «pendiente» que nadie vuelve a leer.
+    """
+    import pathlib
+
+    api = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "lib"
+           / "api.ts").read_text(encoding="utf-8", errors="replace")
+    suben = api.count("new FormData()")
+    pueden = api.count("permitir_reimport")
+    assert suben >= 25, (
+        f"bajaron de 28 a {suben} las funciones que suben archivo: si se "
+        f"unificaron, actualizar esta cuenta")
+    assert pueden == 0, (
+        f"{pueden} funciones de `lib/api.ts` ya pueden reintentar un duplicado: "
+        f"se arreglo el hueco general — actualizar esta prueba y borrar la "
+        f"nota del pendiente")
