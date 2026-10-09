@@ -771,6 +771,14 @@ async def get_pl_compare(scenarios: str, month: int = 12):
                 "month": one,
                 "ytd": ytd,
                 "full": full,
+                #: ⚠️ El cero mas caro del sistema, tambien aca. Viajaba en
+                #: `/pl/monthly/` y `/pl/doce-meses/`, asi que el aviso existia
+                #: en el 12m Summary — pero el P&L Statement, que es donde el
+                #: owner mira, lee por ESTE camino y no lo tenia. Un mes dentro
+                #: del corte sale en CERO si el Actual no esta subido, pisa la
+                #: proyeccion y nada lo dice. Ver `meses_cerrados_sin_dato`.
+                "meses_cerrados_sin_dato":
+                    await meses_cerrados_sin_dato(session, scenario),
             })
     return {"month": month, "versions": versions}
 
@@ -809,6 +817,10 @@ async def get_pl_compare_range(scenarios: str, from_month: int = 1, to_month: in
                 "year": scenario.year,
                 "version": scenario.version,
                 "range": rango,
+                # El mismo aviso que en `/pl/compare/`: un rango que incluya un
+                # mes cerrado sin dato lo suma como cero.
+                "meses_cerrados_sin_dato":
+                    await meses_cerrados_sin_dato(session, scenario),
             })
     return {"from_month": from_month, "to_month": to_month, "versions": versions}
 

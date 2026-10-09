@@ -3303,6 +3303,50 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
               </div>
             </div>
 
+            {/* ⚠️ El cero mas caro del sistema. Un mes dentro del corte de un
+                forecast NO se calcula con su checkbook: se lee del ACTUAL
+                enlazado. Si ese mes no se subio, la columna sale en CERO y tapa
+                la proyeccion que el forecast si tenia — sin error y sin aviso.
+
+                Owner, 2026-10-06: «por que no hay ingresos forecast en
+                setiembre». El aviso existia en el 12m Summary desde entonces,
+                pero esta pantalla —donde el mira— lee por `/pl/compare/`, que
+                no traia la senal. Ahora si.
+
+                Aca pueden convivir hasta cuatro versiones, asi que el aviso
+                NOMBRA cual: decir «hay un mes en cero» sin decir de quien
+                obliga a adivinar entre cuatro columnas. */}
+            {(() => {
+              const afectadas = usadas
+                .map(u => datos.find(d => d.scenario_id === u.id))
+                .filter((d): d is PLCompareVersion =>
+                  !!d && (d.meses_cerrados_sin_dato?.length ?? 0) > 0);
+              if (!afectadas.length) return null;
+              return (
+                <div style={{
+                  padding: "9px 12px", borderRadius: 6, marginBottom: 12,
+                  fontSize: 12.5, background: "rgba(230,168,23,0.12)",
+                  border: "1px solid rgba(230,168,23,0.4)",
+                }}>
+                  {afectadas.map((d, i) => {
+                    const ms = d.meses_cerrados_sin_dato ?? [];
+                    return (
+                      <div key={d.scenario_id} style={{ marginTop: i ? 6 : 0 }}>
+                        <b>{d.label}</b> da por cerrado{ms.length > 1 ? "s" : ""}{" "}
+                        <b>{ms.map(m => MESES[m - 1]).join(", ")}</b>, y
+                        {ms.length > 1 ? " esos meses no están cargados"
+                          : " ese mes no está cargado"} en el Actual: un mes
+                        cerrado se lee del Actual y no del checkbook, así que sale
+                        en <b>cero</b> y tapa la proyección. Se arregla subiendo
+                        el mes, o moviendo el corte hacia atrás en Admin → Cierre
+                        de períodos.
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {hayBrecha && (
               <div style={{
                 padding: "9px 12px", borderRadius: 6, marginBottom: 12, fontSize: 12.5,

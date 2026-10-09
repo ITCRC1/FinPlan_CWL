@@ -3177,6 +3177,13 @@ export interface PLCompareVersion {
   month: PLColumn;   // single month
   ytd: PLColumn;     // jan..month
   full: PLColumn;    // 12 months
+  /** Meses que este forecast da por CERRADOS y que el Actual no tiene cargados.
+   *
+   *  ⚠️ Es el cero más caro del sistema: un mes dentro del corte no se calcula
+   *  con el checkbook del forecast, se lee del Actual enlazado. Si ese mes no se
+   *  subió, la columna sale en CERO y tapa la proyección que el forecast sí
+   *  tenía — sin error y sin aviso. */
+  meses_cerrados_sin_dato?: number[];
 }
 
 export interface PLCompare {
