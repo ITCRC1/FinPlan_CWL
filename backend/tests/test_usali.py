@@ -384,3 +384,89 @@ async def test_sin_USALI_cargado_el_panel_dice_que_no_hay(base):
     assert r["renglones"] == []
     assert r["lista_aprobada"] is False
     assert "no hay USALI cargado" in r["motivo"]
+
+
+# ── cual de las trece definiciones es la que importa ────────────────────────
+#
+# Owner, 2026-10-09, mirando el panel: la cuenta «Miscellaneous» trae TRECE
+# definiciones. El libro define «cualquier gasto de este departamento que no
+# encaje en los otros renglones» una vez por departamento, asi que salian las
+# trece de corrido y la de Parking podia quedar arriba de la que importa.
+
+def test_el_texto_del_libro_dice_de_que_departamento_habla():
+    from app.api.usali_api import _habla_de
+
+    assert _habla_de("Includes any expenses of the Rooms department that do "
+                     "not apply to the other line items", "Rooms")
+    assert _habla_de("Includes any expenses of the Health Club/Spa department",
+                     "Health Club/Spa")
+    assert _habla_de("Includes any Administrative and General department "
+                     "expenses that do not apply", "A&G")
+    # Y no confunde departamentos distintos.
+    assert not _habla_de("Includes any expenses of the Parking department",
+                         "Health Club/Spa")
+
+
+def test_a_TOURS_no_le_sale_primero_la_definicion_del_CAMPO_DE_GOLF():
+    """⚠️ El error sutil, y el unico que se vio en la medicion.
+
+    Tours, Transporte, Retail e Innoceana son Other Operated Departments —el
+    Schedule 3—, y ese schedule tiene CUATRO definiciones de «Miscellaneous»
+    en el mismo rango de paginas: golf, spa, parking y other operated. Por
+    pagina las cuatro parecen suyas, asi que a Tours le salia primero la del
+    campo de golf.
+
+    Lo correcto es la generica, «Other Operated Department». Lo decide el
+    TEXTO, no la pagina.
+    """
+    from app.api.usali_api import _habla_de, _nombra_otro
+
+    golf = "Includes any expenses of the Golf Course and Pro Shop department"
+    gen = "Includes any expenses of the Other Operated Department that do not"
+    # La del golf NO es de Tours: nombra otro departamento.
+    assert not _habla_de(golf, "Minor Oper. Dept")
+    assert _nombra_otro(golf, "Minor Oper. Dept")
+    # La generica si.
+    assert _habla_de(gen, "Minor Oper. Dept")
+    assert not _nombra_otro(gen, "Minor Oper. Dept")
+    # Y al reves: al Spa le toca la del Spa, no la generica ni la del golf.
+    spa = "Includes any expenses of the Health Club/Spa department"
+    assert _habla_de(spa, "Health Club/Spa")
+    assert _nombra_otro(golf, "Health Club/Spa")
+
+
+def test_la_pagina_atribuye_la_definicion_a_su_schedule():
+    """Las definiciones van DETRAS del cuadro de su Schedule, asi que la pagina
+    alcanza donde el texto no dice nada.
+
+    Los cortes salen de `usali_renglones` y no de una tabla a mano: otra
+    edicion del libro mueve las paginas y esto sigue funcionando. Medido sobre
+    el libro del owner: en las 9 definiciones cuyo texto nombra el
+    departamento, la pagina coincide en las 9.
+    """
+    import inspect
+
+    from app.api import usali_api
+    fuente = inspect.getsource(usali_api._schedule_por_pagina)
+    # Los cortes se LEEN de la tabla, no se escriben.
+    assert "UsaliRenglon.pagina" in fuente
+    assert "min" in fuente.lower()
+
+
+def test_las_definiciones_de_otros_departamentos_NO_se_descartan():
+    """Se pliegan, no se tiran.
+
+    A veces la cuenta esta en el departamento equivocado —que es justo lo que
+    este panel ayuda a ver— y la definicion del departamento de al lado es la
+    pista. Descartarlas esconderia el caso que se esta buscando.
+    """
+    import pathlib
+
+    pagina = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+              / "pre-cierre" / "AuditIntegral.tsx")
+    txt = pagina.read_text(encoding="utf-8", errors="replace")
+    assert "la misma cuenta en otros departamentos" in txt
+    assert "d.es_del_depto" in txt
+    # Y si NINGUNA es de su departamento, se dice en vez de mostrar una ajena
+    # como si fuera la suya.
+    assert "el libro no define esta cuenta para este" in txt

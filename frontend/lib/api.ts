@@ -6080,7 +6080,17 @@ export interface UsaliParaCuenta {
   grado: "exacto" | "parecido" | "ninguno";
   parecido: number;
   cuenta_usali: string | null;
-  definiciones: { cuenta: string; texto: string; pagina: number }[];
+  /** Las definiciones de esa cuenta. El libro define «cualquier gasto de este
+   *  departamento que no encaje en los otros renglones» UNA VEZ POR
+   *  DEPARTAMENTO, asi que «Miscellaneous» trae trece. Vienen ordenadas con la
+   *  del departamento de la cuenta primero. */
+  definiciones: {
+    cuenta: string; texto: string; pagina: number;
+    /** De que departamento del USALI habla esta definicion. */
+    schedule: string;
+    /** `true` si es la del departamento de la cuenta que se abrio. */
+    es_del_depto: boolean;
+  }[];
   items: { item: string; schedule: string }[];
   /** Que lleva ESE departamento segun el estandar. Nulo si no se dijo cual. */
   schedule: UsaliSchedule | null;

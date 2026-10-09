@@ -712,10 +712,20 @@ function PanelUsali({ usali, cerrar }: {
                       + `conviene confirmarlo`}
                 </div>
 
-                {usali.definiciones.map((d, i) => (
-                  <div key={i} style={{ marginTop: 12 }}>
+                {/* Owner, 2026-10-09, mirando el panel: la cuenta
+                    «Miscellaneous» trae TRECE definiciones, porque el libro
+                    define «cualquier gasto de este departamento que no encaje
+                    en los otros renglones» una vez por departamento. Antes
+                    salian las trece de corrido y la de Parking podia quedar
+                    arriba de la que importa.
+
+                    Ahora: la de su departamento abierta, las demas plegadas.
+                    No se descartan —a veces la cuenta esta en el departamento
+                    equivocado y la definicion de al lado es justo la pista—. */}
+                {usali.definiciones.filter(d => d.es_del_depto).map((d, i) => (
+                  <div key={"m" + i} style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                      página {d.pagina}
+                      {d.schedule || "USALI"} · página {d.pagina}
                     </div>
                     <p style={{ fontSize: 13, lineHeight: 1.5,
                                 textAlign: "justify", margin: "2px 0 0" }}>
@@ -723,6 +733,32 @@ function PanelUsali({ usali, cerrar }: {
                     </p>
                   </div>
                 ))}
+
+                {usali.definiciones.some(d => !d.es_del_depto) && (
+                  <details style={{ marginTop: 10 }}>
+                    <summary style={{ fontSize: 11.5, cursor: "pointer",
+                                      color: "var(--text-secondary)" }}>
+                      {usali.definiciones.some(d => d.es_del_depto)
+                        ? `la misma cuenta en otros departamentos `
+                          + `(${usali.definiciones.filter(d => !d.es_del_depto).length})`
+                        : `el libro no define esta cuenta para este `
+                          + `departamento — así la define en otros `
+                          + `(${usali.definiciones.length})`}
+                    </summary>
+                    {usali.definiciones.filter(d => !d.es_del_depto).map((d, i) => (
+                      <div key={"o" + i} style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                          {d.schedule || "USALI"} · página {d.pagina}
+                        </div>
+                        <p style={{ fontSize: 12.5, lineHeight: 1.5,
+                                    textAlign: "justify", margin: "2px 0 0",
+                                    color: "var(--text-secondary)" }}>
+                          {d.texto}
+                        </p>
+                      </div>
+                    ))}
+                  </details>
+                )}
 
                 {usali.items.length > 0 && (
                   <>

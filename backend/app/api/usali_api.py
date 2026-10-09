@@ -301,6 +301,93 @@ SCHEDULE_DEL_DICCIONARIO = {
 }
 
 
+#: Como nombra el TEXTO del libro a cada casilla del diccionario. Hace falta
+#: solo donde la pagina no alcanza: las cuatro definiciones del Schedule 3
+#: —golf, spa, parking, other operated— viven en el mismo rango de paginas, y
+#: lo unico que las distingue es que el texto dice de cual habla.
+NOMBRA_AL_DEPTO = {
+    "Health Club/Spa": ("health club", "spa"),
+    "Golf Pro Shop": ("golf",),
+    "Parking": ("parking", "garage"),
+    "Garage Parking": ("parking", "garage"),
+    "Minor Oper. Dept": ("other operated", "minor operated"),
+    "Rooms": ("rooms",),
+    "F&B": ("food and beverage",),
+    "A&G": ("administrative and general",),
+    "Info & Telecom": ("information and telecommunications",),
+    "Sales/Marketing": ("sales and marketing",),
+    "POM": ("property operation",),
+    "Utilities": ("utilities",),
+    "Laundry": ("house laundry",),
+    "Staff Dining": ("staff dining",),
+}
+
+
+def _habla_de(texto: str, schedule: str) -> bool:
+    """¿Esta definicion dice explicitamente que habla de ESTE departamento?"""
+    t = (texto or "")[:300].lower()
+    return any(p in t for p in NOMBRA_AL_DEPTO.get(schedule, ()))
+
+
+def _nombra_otro(texto: str, schedule: str) -> bool:
+    """¿Nombra un departamento que NO es este?
+
+    Es lo que evita el error de Tours. El Schedule 3 tiene cuatro definiciones
+    de «Miscellaneous» —golf, spa, parking y other operated— en el mismo rango
+    de paginas, asi que por pagina las cuatro parecen suyas. Sin este chequeo,
+    a Tours le salia primero la del campo de golf.
+    """
+    t = (texto or "")[:300].lower()
+    mias = set(NOMBRA_AL_DEPTO.get(schedule, ()))
+    for otro, patrones in NOMBRA_AL_DEPTO.items():
+        if otro == schedule:
+            continue
+        for p in patrones:
+            if p in t and p not in mias:
+                return True
+    return False
+
+
+async def _schedule_por_pagina(db: AsyncSession):
+    """Una funcion que dice a que Schedule pertenece cada pagina del libro.
+
+    Las definiciones del libro van DETRAS del cuadro de su Schedule, asi que la
+    pagina alcanza para saber de que departamento habla cada una. Los cortes
+    salen de `usali_renglones` —la pagina donde esta cada cuadro— y no de una
+    tabla escrita a mano: otra edicion del libro mueve las paginas y esto sigue.
+
+    ## Por que hace falta
+
+    Owner, 2026-10-09, mirando el panel: la cuenta «Miscellaneous» trae SEIS
+    definiciones —paginas 57, 70, 80, 89, 98 y 112—, una por departamento,
+    porque el libro define «cualquier gasto de este departamento que no encaje
+    en los otros renglones» una vez por cada uno. Sin saber a cual pertenece
+    cada una, el panel mostraba las de Parking y Golf arriba de la que importa.
+
+    ## Medido
+
+    En las 9 definiciones cuyo TEXTO nombra el departamento, la pagina coincide
+    con lo que dice el texto en las 9. («food and beverage» es F&B,
+    «administrative and general» es A&G, y golf, spa y parking son Other
+    Operated Departments — el Schedule 3.)
+    """
+    filas = (await db.execute(
+        select(UsaliRenglon.numero, UsaliRenglon.schedule,
+               func.min(UsaliRenglon.pagina))
+        .where(UsaliRenglon.hotel_id == HOTEL_ID)
+        .group_by(UsaliRenglon.numero, UsaliRenglon.schedule))).all()
+    cortes = sorted((int(p or 0), n, s) for n, s, p in filas)
+
+    def de(pagina: int) -> str:
+        # El ultimo cuadro que quedo ANTES de esta pagina.
+        quien = ""
+        for p0, _n, s in cortes:
+            if p0 <= (pagina or 0):
+                quien = s
+        return quien
+    return de
+
+
 async def _renglones_del_schedule(db: AsyncSession, schedule: str) -> dict:
     """Que renglones aprueba el estandar para este departamento.
 
@@ -406,6 +493,22 @@ async def para_cuenta(
                              if schedule else None)}
 
     defs = [d for d in filas if _norm_cta(d.cuenta) == _norm_cta(cuenta_usali or "")]
+    # De que departamento habla cada definicion, y la que importa primero.
+    # Owner, 2026-10-09: «Miscellaneous» trae seis, una por departamento.
+    de_pagina = await _schedule_por_pagina(db)
+    dep_de = {d.pagina: de_pagina(d.pagina) for d in defs}
+    # Tres niveles: el texto lo dice, o la pagina lo dice y el texto no nombra
+    # a otro, o ninguno. El segundo chequeo es el que evita que a Tours le
+    # salga primero la definicion del campo de golf.
+    propia = {d.pagina: bool(schedule) and (
+                  _habla_de(d.texto, schedule)
+                  or (dep_de.get(d.pagina) == schedule
+                      and not _nombra_otro(d.texto, schedule)))
+              for d in defs}
+    if schedule:
+        # Primero la que habla de SU departamento —por el texto o por la
+        # pagina—, despues el resto en el orden del libro.
+        defs = sorted(defs, key=lambda d: (not propia[d.pagina], d.pagina))
     items = (await db.execute(
         select(UsaliItem)
         .where(UsaliItem.hotel_id == HOTEL_ID, UsaliItem.cuenta == cuenta_usali)
@@ -419,7 +522,10 @@ async def para_cuenta(
         "grado": grado,
         "parecido": round(calidad, 3),
         "cuenta_usali": cuenta_usali,
-        "definiciones": [{"cuenta": d.cuenta, "texto": d.texto, "pagina": d.pagina}
+        "definiciones": [{"cuenta": d.cuenta, "texto": d.texto,
+                          "pagina": d.pagina,
+                          "schedule": dep_de.get(d.pagina, ""),
+                          "es_del_depto": bool(propia.get(d.pagina))}
                          for d in defs],
         "items": [{"item": i.item, "schedule": i.schedule} for i in items],
         # Que lleva ESE departamento segun el estandar. Es lo que el owner
