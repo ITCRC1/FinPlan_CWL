@@ -109,21 +109,35 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  ~285 cuentas seguidas; de a un departamento se revisa y se cierra. */
   const [depts, setDepts] = useState<string[]>([]);
   const [abrirDepts, setAbrirDepts] = useState(false);
-  /** La cuenta cuya definicion del USALI se esta mirando.
+  /** La cuenta cuya definicion del USALI se esta mirando, y cual es.
    *
    *  Owner, 2026-10-08, al pedirlo: *«ok, A»* — el estandar como capa de
    *  EXPLICACION y no de deteccion. No marca nada: muestra lo que el libro dice
-   *  que incluye esa cuenta, para que el ojo decida mas rapido. */
+   *  que incluye esa cuenta, para que el ojo decida mas rapido.
+   *
+   *  La LLAVE —`dept|cuenta`, la misma que `abiertas`— existe porque el panel
+   *  sale pegado a su fila y no centrado en la pantalla. Owner, 2026-10-09:
+   *  *«siempre esta arriba y a veces hay que subir mucho»*. */
   const [usali, setUsali] = useState<UsaliParaCuenta | "cargando" | null>(null);
+  const [usaliDe, setUsaliDe] = useState("");
 
-  const verUsali = useCallback(async (nombre: string, dept: string) => {
+  const verUsali = useCallback(async (llave: string, nombre: string,
+                                      dept: string) => {
+    if (llave === usaliDe) {           // ya esta abierta: se cierra
+      setUsaliDe(""); setUsali(null);
+      return;
+    }
+    setUsaliDe(llave);
     setUsali("cargando");
     try {
       setUsali(await usaliParaCuenta(nombre, dept));
     } catch {
+      // Se suelta tambien la llave: si queda puesta, el proximo click se lee
+      // como «cerrar» y la cuenta no se puede reintentar.
       setUsali(null);
+      setUsaliDe("");
     }
-  }, []);
+  }, [usaliDe]);
 
   const [copiado, setCopiado] = useState("");
   /** Qué cuentas están abiertas, y sus asientos ya traídos.
@@ -516,7 +530,9 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           {/* El nombre abre lo que el USALI dice que va aca.
                               Es referencia, no regla: si el estandar no tiene
                               una cuenta parecida, lo dice y no inventa. */}
-                          <button onClick={() => void verUsali(f.nombre, f.dept_code)}
+                          <button onClick={() => void verUsali(
+                                    f.dept_code + "|" + f.cuenta,
+                                    f.nombre, f.dept_code)}
                                   title="Que dice el USALI que incluye esta cuenta"
                                   style={{ font: "inherit", fontWeight: 600,
                                            padding: 0, border: "none",
@@ -569,6 +585,18 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           </button>
                         </td>
                       </tr>
+                      {/* El USALI de esta cuenta, PEGADO a esta cuenta: una
+                          fila mas, igual que los asientos del chip. */}
+                      {usaliDe === f.dept_code + "|" + f.cuenta && usali && (
+                        <tr>
+                          <td colSpan={5 + vers.length * 2}
+                              style={{ padding: "0 16px 10px 34px",
+                                       background: "var(--bg-base)" }}>
+                            <PanelUsali usali={usali}
+                                        cerrar={() => { setUsaliDe(""); setUsali(null); }} />
+                          </td>
+                        </tr>
+                      )}
                       {/* El DETALLE de la cuenta — el tercer segmento. Sin
                           comparacion a proposito: ver el tipo `Detalle`. */}
                       {f.detalles.length > 1 && f.detalles.map(x => (
@@ -606,153 +634,166 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
         </table>
       </div>
 
-      {/* ── Lo que el USALI dice de la cuenta ─────────────────────────── */}
-      {usali && (
-        <>
-          <span onClick={() => setUsali(null)}
-                style={{ position: "fixed", inset: 0, zIndex: 50,
-                         background: "rgba(0,0,0,0.45)" }} />
-          <div style={{ position: "fixed", zIndex: 51, top: "7%", left: "50%",
-                        transform: "translateX(-50%)", width: "min(780px, 93vw)",
-                        maxHeight: "82vh", overflowY: "auto", padding: 18,
-                        borderRadius: 8, border: "1px solid var(--border-medium)",
-                        background: "var(--bg-surface)",
-                        boxShadow: "0 12px 40px rgba(0,0,0,0.45)" }}>
-            {usali === "cargando" ? (
-              <p style={{ fontSize: 13, margin: 0 }}>Buscando en el USALI…</p>
-            ) : (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between",
-                              alignItems: "start", gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
-                      USALI · lo que el estándar dice de
-                    </div>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
-                      {usali.nombre}
-                    </h2>
-                  </div>
-                  <button onClick={() => setUsali(null)}
-                          style={{ border: "none", background: "none",
-                                   cursor: "pointer", fontSize: 20,
-                                   color: "var(--text-secondary)" }}>×</button>
-                </div>
-
-                {usali.grado === "ninguno" ? (
-                  // ⚠️ Se dice que no hay, y no se muestra el candidato malo.
-                  // «Cafetería → Collateral Material» enseña a desconfiar de la
-                  // pantalla, y eso no se recupera.
-                  <p style={{ fontSize: 13, marginTop: 12,
-                              color: "var(--text-secondary)" }}>
-                    El estándar no tiene una cuenta que se llame así. Puede ser
-                    una cuenta propia de la propiedad, o estar con otro nombre —
-                    buscala en <b>Master Data → USALI</b>.
-                  </p>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 11.5, marginTop: 8,
-                                  color: usali.grado === "exacto"
-                                    ? "var(--positive)" : "var(--warning)" }}>
-                      {usali.grado === "exacto"
-                        ? `El estándar tiene la misma cuenta: «${usali.cuenta_usali}»`
-                        : `Lo más parecido en el estándar es «${usali.cuenta_usali}» `
-                          + `(${Math.round(usali.parecido * 100)}% de parecido) — `
-                          + `conviene confirmarlo`}
-                    </div>
-
-                    {usali.definiciones.map((d, i) => (
-                      <div key={i} style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-                          página {d.pagina}
-                        </div>
-                        <p style={{ fontSize: 13, lineHeight: 1.5,
-                                    textAlign: "justify", margin: "2px 0 0" }}>
-                          {d.texto}
-                        </p>
-                      </div>
-                    ))}
-
-                    {usali.items.length > 0 && (
-                      <>
-                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16,
-                                      marginBottom: 4 }}>
-                          Lo que va acá según el diccionario ({usali.items.length})
-                        </div>
-                        <div style={{ fontSize: 12, columns: 2, columnGap: 22 }}>
-                          {usali.items.map((it, i) => (
-                            <div key={i} style={{ breakInside: "avoid",
-                                                  padding: "1px 0" }}>
-                              {it.item}
-                              <span style={{ color: "var(--text-secondary)" }}>
-                                {" "}· {it.schedule}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {/* Que lleva ESTE departamento segun el estandar.
-                    *
-                    * Owner, 2026-10-08: *«cada cuenta tiene la descripcion y
-                    * va por departamento»*. Es referencia: cuando el libro no
-                    * da lista —el Spa y los departamentos menores son el
-                    * Schedule 3— lo dice en vez de callarse, porque el
-                    * silencio se lee como «su cuenta esta mal». */}
-                  {usali.schedule && (
-                    <div style={{ marginTop: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700,
-                                    marginBottom: 4 }}>
-                        {usali.schedule.lista_aprobada
-                          ? `Renglones aprobados de ${usali.schedule.titulo ?? usali.schedule.schedule}`
-                            + ` — Schedule ${usali.schedule.numero}`
-                            + ` (${usali.schedule.renglones.length})`
-                          : "El estándar no da lista para este departamento"}
-                      </div>
-                      {usali.schedule.lista_aprobada ? (
-                        <div style={{ fontSize: 12, columns: 2,
-                                      columnGap: 22 }}>
-                          {usali.schedule.renglones.map((g, i) => (
-                            <div key={i} style={{ breakInside: "avoid",
-                                                  padding: "1px 0" }}>
-                              {g}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,
-                                    color: "var(--text-secondary)" }}>
-                          {usali.schedule.numero === 3
-                            ? "Es un Other Operated Department — Schedule 3. "
-                              + "El libro no aprueba una lista cerrada: «only "
-                              + "the revenues and expenses that exist at an "
-                              + "individual property». Que una cuenta no "
-                              + "aparezca en el estándar no dice nada acá."
-                            : usali.schedule.motivo}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                <p style={{ fontSize: 11, marginTop: 16, marginBottom: 0,
-                            color: "var(--text-secondary)" }}>
-                  Referencia, no regla: esto no marca ni corrige nada. Uniform
-                  System of Accounts for the Lodging Industry — AHLA/HFTP.
-                </p>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
       {visibles.length === 0 && (
         <p style={{ fontSize: 13, color: "var(--positive)", marginTop: 10 }}>
           {soloDiferencias
             ? "Todas las cuentas cuadran contra las versiones elegidas."
             : "No hay cuentas en este mes."}
         </p>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * Lo que el USALI dice de una cuenta, PEGADO a la cuenta.
+ *
+ * Owner, 2026-10-09: *«necesito que cuando abra al dar click a la cuenta se
+ * aparezca a la par de la cuenta que le doy click, siempre esta arriba y a
+ * veces hay que subir mucho, por lo grande del documento»*.
+ *
+ * Era un modal centrado con cortina. Dos problemas: tapaba la tabla —que es
+ * justo lo que se esta comparando— y en una tabla larga dejaba de verse donde
+ * estaba parado. Ahora es una fila mas, como los asientos del chip «▸ 16»: sale
+ * debajo de la cuenta que se abrio, scrollea con la tabla y no hay posicion que
+ * calcular ni viewport que se le escape.
+ *
+ * Lleva su propio alto maximo: el libro trae cuentas con cuatro definiciones de
+ * paginas distintas, y sin tope empujaba la tabla una pantalla entera.
+ */
+function PanelUsali({ usali, cerrar }: {
+  usali: UsaliParaCuenta | "cargando"; cerrar: () => void;
+}) {
+  return (
+    <div style={{ maxHeight: "46vh", overflowY: "auto", padding: "12px 16px",
+                  borderRadius: 6, border: "1px solid var(--border-medium)",
+                  borderLeft: "3px solid var(--brand)",
+                  background: "var(--bg-surface)" }}>
+        {usali === "cargando" ? (
+          <p style={{ fontSize: 13, margin: 0 }}>Buscando en el USALI…</p>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between",
+                          alignItems: "start", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+                  USALI · lo que el estándar dice de
+                </div>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+                  {usali.nombre}
+                </h2>
+              </div>
+              <button onClick={cerrar} title="cerrar"
+                      style={{ border: "none", background: "none",
+                               cursor: "pointer", fontSize: 20, lineHeight: 1,
+                               color: "var(--text-secondary)" }}>×</button>
+            </div>
+
+            {usali.grado === "ninguno" ? (
+              // ⚠️ Se dice que no hay, y no se muestra el candidato malo.
+              // «Cafetería → Collateral Material» enseña a desconfiar de la
+              // pantalla, y eso no se recupera.
+              <p style={{ fontSize: 13, marginTop: 12,
+                          color: "var(--text-secondary)" }}>
+                El estándar no tiene una cuenta que se llame así. Puede ser
+                una cuenta propia de la propiedad, o estar con otro nombre —
+                buscala en <b>Master Data → USALI</b>.
+              </p>
+            ) : (
+              <>
+                <div style={{ fontSize: 11.5, marginTop: 8,
+                              color: usali.grado === "exacto"
+                                ? "var(--positive)" : "var(--warning)" }}>
+                  {usali.grado === "exacto"
+                    ? `El estándar tiene la misma cuenta: «${usali.cuenta_usali}»`
+                    : `Lo más parecido en el estándar es «${usali.cuenta_usali}» `
+                      + `(${Math.round(usali.parecido * 100)}% de parecido) — `
+                      + `conviene confirmarlo`}
+                </div>
+
+                {usali.definiciones.map((d, i) => (
+                  <div key={i} style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                      página {d.pagina}
+                    </div>
+                    <p style={{ fontSize: 13, lineHeight: 1.5,
+                                textAlign: "justify", margin: "2px 0 0" }}>
+                      {d.texto}
+                    </p>
+                  </div>
+                ))}
+
+                {usali.items.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 16,
+                                  marginBottom: 4 }}>
+                      Lo que va acá según el diccionario ({usali.items.length})
+                    </div>
+                    <div style={{ fontSize: 12, columns: 2, columnGap: 22 }}>
+                      {usali.items.map((it, i) => (
+                        <div key={i} style={{ breakInside: "avoid",
+                                              padding: "1px 0" }}>
+                          {it.item}
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            {" "}· {it.schedule}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Que lleva ESTE departamento segun el estandar.
+                *
+                * Owner, 2026-10-08: *«cada cuenta tiene la descripcion y
+                * va por departamento»*. Es referencia: cuando el libro no
+                * da lista —el Spa y los departamentos menores son el
+                * Schedule 3— lo dice en vez de callarse, porque el
+                * silencio se lee como «su cuenta esta mal». */}
+              {usali.schedule && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700,
+                                marginBottom: 4 }}>
+                    {usali.schedule.lista_aprobada
+                      ? `Renglones aprobados de ${usali.schedule.titulo ?? usali.schedule.schedule}`
+                        + ` — Schedule ${usali.schedule.numero}`
+                        + ` (${usali.schedule.renglones.length})`
+                      : "El estándar no da lista para este departamento"}
+                  </div>
+                  {usali.schedule.lista_aprobada ? (
+                    <div style={{ fontSize: 12, columns: 2,
+                                  columnGap: 22 }}>
+                      {usali.schedule.renglones.map((g, i) => (
+                        <div key={i} style={{ breakInside: "avoid",
+                                              padding: "1px 0" }}>
+                          {g}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12.5, margin: 0, lineHeight: 1.5,
+                                color: "var(--text-secondary)" }}>
+                      {usali.schedule.numero === 3
+                        ? "Es un Other Operated Department — Schedule 3. "
+                          + "El libro no aprueba una lista cerrada: «only "
+                          + "the revenues and expenses that exist at an "
+                          + "individual property». Que una cuenta no "
+                          + "aparezca en el estándar no dice nada acá."
+                        : usali.schedule.motivo}
+                    </p>
+                  )}
+                </div>
+              )}
+
+            <p style={{ fontSize: 11, marginTop: 16, marginBottom: 0,
+                        color: "var(--text-secondary)" }}>
+              Referencia, no regla: esto no marca ni corrige nada. Uniform
+              System of Accounts for the Lodging Industry — AHLA/HFTP.
+            </p>
+          </>
       )}
     </div>
   );
