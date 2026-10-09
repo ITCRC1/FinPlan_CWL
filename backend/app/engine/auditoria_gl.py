@@ -47,6 +47,7 @@ reparto parejo no es una decision, es la mitad mal en algun lado.
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from typing import Iterable
@@ -335,6 +336,98 @@ def _articulo_en_varias_cuentas(lineas: list) -> list[Hallazgo]:
     return out
 
 
+#: Lo que NO es un proveedor aunque venga en el campo del proveedor: conceptos
+#: de planilla y de reparto, que por diseno caen en TODOS los departamentos.
+#:
+#: Sin esto la regla se ahoga: en setiembre 2026, «ORDINARIO» aparece en 17
+#: departamentos, «C C S S» en 17 y «DISTRIBUCION GASTO CAFETERIA» en 15. No es
+#: un error, es el reparto — y son los casos mas grandes del mes, asi que
+#: taparian todo lo demas.
+NO_ES_PROVEEDOR = re.compile(
+    r"ORDINARIO|C C S S|CCSS|VACACION|AGUINALDO|CESANT|PREAVISO|CAFETER"
+    r"|DISTRIBUCI|HORAS|INCAPACID|FERIADO|SALARIO|PLANILLA|PROVISI|RESERVA",
+    re.I)
+
+#: Que tan dominante tiene que ser la cuenta habitual de un proveedor para que
+#: la rama chica sea sospechosa. Con 80%: 42 contra 2 avisa, 14 contra 3 avisa,
+#: 12 contra 8 no. Medido sobre setiembre 2026: 4 ramas en 92 proveedores.
+UMBRAL_DOMINANTE = 0.80
+
+
+def _proveedor(texto: str) -> str:
+    """El proveedor dentro del texto del asiento, sin numeros de factura.
+
+    Quitar los digitos es lo que junta las variantes: el mismo proveedor viene
+    escrito con el numero de factura pegado, y sin esto cada factura seria un
+    proveedor distinto y la regla no veria nada.
+    """
+    s = (texto or "").upper().strip()
+    s = re.sub(r"\b(FACT|FAC|FACTURA|N[O\u00b0]?\.?|#)\s*[-:]?\s*\w*\d\w*", " ", s)
+    s = re.sub(r"\b\d[\d\-/.,]*\b", " ", s)
+    s = re.sub(r"[^A-Z\u00c1\u00c9\u00cd\u00d3\u00da\u00d1 ]+", " ", s)
+    return " ".join(s.split())
+
+
+def _proveedor_en_cuenta_inusual(lineas: list) -> list[Hallazgo]:
+    """Un proveedor con cuenta habitual clara, y unas pocas lineas en otra.
+
+    ## Por que hace falta si ya existe `_articulo_en_varias_cuentas`
+
+    Son campos distintos y eso cambia todo. `referencia` NO es el proveedor: es
+    el ARTICULO —«DIESEL», «CAMBIO DE LLANTA», «null-INTERNET MOVIL»—. El
+    proveedor vive en `descripcion`.
+
+    Por eso la regla del articulo no puede ver estos casos: la linea minoritaria
+    trae un articulo que aparece una sola vez en el mes, asi que no agrupa con
+    nada. Medido en setiembre 2026, de las 4 ramas que encuentra esta regla,
+    **2 no las encuentra ninguna otra**:
+
+    * SERVICENTRO LA PALMA — 20 lineas en combustible (7395-0210) y 2 en
+      reparacion de vehiculos (7700-0200), con articulos «CAMBIO DE LLANTA» y
+      «NEUMATICO UNIVERSAL» que no se repiten.
+    * ICE TELECOMUNICACIONES — 42 lineas en telefonia (5400-0230) y 2 en
+      electricidad (7160-0210). En Costa Rica el ICE vende las dos cosas, asi
+      que puede estar bien; pero una linea que dice TELECOMUNICACIONES sentada
+      en Electricidad es exactamente lo que hay que mirar.
+
+    ## Clases 5 y 7 solamente
+
+    La planilla (6) es departamental por naturaleza: el mismo concepto va a los
+    17 departamentos a proposito. Incluirla daba los casos mas grandes del mes y
+    todos falsos.
+    """
+    por: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+    for l in lineas:
+        if l.clase not in "57":
+            continue
+        quien = _proveedor(l.descripcion)
+        if len(quien) < 6 or NO_ES_PROVEEDOR.search(quien):
+            continue
+        por[quien][l.seg1 + "-" + l.seg2].append(l)
+
+    out: list[Hallazgo] = []
+    for quien, cuentas in por.items():
+        if len(cuentas) < 2:
+            continue
+        total = sum(len(v) for v in cuentas.values())
+        dom = max(cuentas, key=lambda k: len(cuentas[k]))
+        if len(cuentas[dom]) / total < UMBRAL_DOMINANTE:
+            # Sin cuenta habitual clara no hay nada que sospechar: un proveedor
+            # repartido parejo entre dos cuentas es una decision, no un error.
+            continue
+        for cuenta, ls in cuentas.items():
+            if cuenta == dom:
+                continue
+            out.append(_hallazgo(
+                ls, "PROVEEDOR_EN_CUENTA_INUSUAL", MEDIA, quien,
+                "«{}» se registro {} de {} veces en {} ({}), y {} aca."
+                .format(quien, len(cuentas[dom]), total, dom,
+                        _crc(sum(x.monto_crc for x in cuentas[dom])),
+                        "esta 1 cayo" if len(ls) == 1
+                        else f"estas {len(ls)} cayeron"), dom))
+    return out
+
+
 def _costo_en_depto_sin_costo(lineas: list) -> list[Hallazgo]:
     """Clase 5 en un departamento que no vende nada."""
     por_cuenta: dict[str, list] = defaultdict(list)
@@ -498,7 +591,8 @@ def _puesto_en_varios_departamentos(lineas: list) -> list[Hallazgo]:
 
 REGLAS = (_articulo_en_varias_cuentas, _costo_en_depto_sin_costo, _planilla_depto,
           _planilla_puesto, _cuenta_vertedero, _allocation_no_netea,
-          _premium_en_comida_de_empleados, _puesto_en_varios_departamentos)
+          _premium_en_comida_de_empleados, _puesto_en_varios_departamentos,
+          _proveedor_en_cuenta_inusual)
 
 
 def revisar(lineas: Iterable, desde_clase: int = 4, periodo: str = "") -> Resumen:

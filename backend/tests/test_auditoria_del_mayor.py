@@ -293,3 +293,83 @@ def test_los_hallazgos_salen_agrupados_por_tipo():
           + [L("5420-0220-000-000-000-00-00", "FILETE PARGO") for _ in range(3)])
     grupos = [h.grupo for h in A.revisar(ls).hallazgos]
     assert grupos == sorted(grupos, key=lambda g: A.ORDEN_GRUPOS.index(g))
+
+
+# ───────────────── el PROVEEDOR contra la cuenta ─────────────────
+#
+# Es la otra mitad de «el articulo contra la cuenta», y hacia falta porque son
+# campos distintos: `referencia` es el ARTICULO —«DIESEL», «CAMBIO DE LLANTA»—
+# y `descripcion` es el PROVEEDOR. Un gasto mal clasificado suele traer un
+# articulo que aparece una sola vez en el mes, asi que no agrupa con nada y
+# solo se ve mirando quien cobro.
+
+def test_el_proveedor_con_cuenta_habitual_y_una_rama_chica_se_senala():
+    """Medido en produccion: SERVICENTRO LA PALMA, 20 lineas en combustible y 2
+    en reparacion de vehiculos. Los articulos de esas 2 —«CAMBIO DE LLANTA»,
+    «NEUMATICO UNIVERSAL»— aparecen una sola vez en el mes, asi que ninguna otra
+    regla los ve."""
+    ls = ([L("7395-0210-800-000-000-00-00", "Diesel",
+             desc="SERVICENTRO LA PALMA S A") for _ in range(20)]
+          + [L("7700-0200-800-000-000-00-00", "Cambio De Llanta",
+               desc="SERVICENTRO LA PALMA S A"),
+             L("7700-0200-800-000-000-00-00", "Neumatico Universal",
+               desc="SERVICENTRO LA PALMA S A")])
+    h = A._proveedor_en_cuenta_inusual(ls)
+    assert len(h) == 1
+    assert h[0].cuenta.startswith("7700-0200")
+    assert h[0].sugerencia == "7395-0210"
+    assert "20 de 22" in h[0].porque
+
+
+def test_un_proveedor_repartido_PAREJO_no_se_avisa():
+    """⚠️ El silencio que hace que la regla se use.
+
+    Un proveedor de comida que vende al restaurante y al comedor de empleados
+    esta en las dos cuentas a proposito. Sin cuenta habitual clara no hay nada
+    que sospechar."""
+    ls = ([L("5101-0120-000-000-000-00-00", desc="VERDULERIA EL SOL")
+           for _ in range(12)]
+          + [L("5420-0220-000-000-000-00-00", desc="VERDULERIA EL SOL")
+             for _ in range(8)])
+    assert A._proveedor_en_cuenta_inusual(ls) == []
+
+
+def test_la_planilla_NO_entra_en_la_regla_del_proveedor():
+    """⚠️ Sin esto la regla se ahoga y tapa todo lo demas.
+
+    «ORDINARIO» y «C C S S» caen en los 17 departamentos a proposito, y son los
+    montos mas grandes del mes: en setiembre 2026 el salario ordinario suma
+    decenas de millones repartidos. Incluirlos daba los casos mas grandes del
+    mes y todos falsos."""
+    ls = ([L("6000-0150-000-000-000-00-00", desc="ORDINARIO", monto=5_752_220)
+           for _ in range(8)]
+          + [L("6000-0220-000-000-000-00-00", desc="ORDINARIO", monto=1_455_153)])
+    assert A._proveedor_en_cuenta_inusual(ls) == []
+    # Y tampoco si alguien escribiera un concepto de planilla en clase 7.
+    ls2 = ([L("7400-0150-800-000-000-00-00", desc="DISTRIBUCION GASTO CAFETERIA")
+            for _ in range(8)]
+           + [L("7400-0220-800-000-000-00-00", desc="DISTRIBUCION GASTO CAFETERIA")])
+    assert A._proveedor_en_cuenta_inusual(ls2) == []
+
+
+def test_el_numero_de_factura_no_parte_al_proveedor_en_pedazos():
+    """Sin quitar los digitos, cada factura seria un proveedor distinto y la
+    regla no veria nada."""
+    assert (A._proveedor("FERRETERIA EL COLONO FACT 44821")
+            == A._proveedor("Ferreteria El Colono  fact-9930"))
+    assert A._proveedor("ICE Telecomunicaciones") == "ICE TELECOMUNICACIONES"
+    # Un texto que solo trae numeros no es un proveedor.
+    assert A._proveedor("12345-678") == ""
+
+
+def test_la_regla_del_proveedor_esta_registrada_y_explicada():
+    """Una regla sin explicacion en el cuadro se lee como un reproche sin causa:
+    el owner tiene que poder decirle al gerente por que se le pregunta."""
+    from app.export.auditoria_gl_xlsx import QUE_MIRA
+
+    assert A._proveedor_en_cuenta_inusual in A.REGLAS
+    assert "PROVEEDOR_EN_CUENTA_INUSUAL" in QUE_MIRA
+    # Y la explicacion dice en que se diferencia de la del articulo, que es la
+    # pregunta que va a hacer quien vea las dos juntas.
+    texto = QUE_MIRA["PROVEEDOR_EN_CUENTA_INUSUAL"]
+    assert "ARTICULO_EN_VARIAS_CUENTAS" in texto

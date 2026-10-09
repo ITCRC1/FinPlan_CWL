@@ -56,6 +56,11 @@ QUE_MIRA = {
         "Un mismo nombre de puesto cargado a mas de un departamento. Puede ser "
         "legitimo, pero es lo que hay que mirar: se senala el departamento con menos "
         "plata, que es el candidato a estar de mas."),
+    "PROVEEDOR_EN_CUENTA_INUSUAL": (
+        "Un proveedor con cuenta habitual clara, y unas pocas lineas en otra. Es "
+        "distinto de ARTICULO_EN_VARIAS_CUENTAS: ahi se mira el ARTICULO, aca el "
+        "PROVEEDOR. Un gasto mal clasificado suele traer un articulo que aparece "
+        "una sola vez en el mes, y por eso solo se ve mirando quien cobro."),
     "ALLOCATION_NO_NETEA": (
         "La cuenta 4999 reparte gasto entre departamentos y tiene que sumar cero a "
         "nivel de hotel. Si no suma cero, el reparto quedo a medias."),
