@@ -313,7 +313,10 @@ def seccion10(d, D, nar):
            "resto del informe.")
 
     cred = D.creditos_allocation()
-    if cred:
+    rep = D.gop("ACT")
+    mot = D.pl("ACT", "GOP") or D.pl("ACT", "TOTAL_GOP")
+    # Solo si el descuadre existe. Ver la nota en `secciones.seccion1`.
+    if cred and abs(rep - mot) > 0.02:
         h2(d, "10.1  El credito de allocation no entra al reporte")
         par(d, "Es el hallazgo de sistema recurrente y explica el aviso amarillo de la "
                "pantalla. El tab incluye el GASTO de los departamentos de allocation "
@@ -324,8 +327,6 @@ def seccion10(d, D, nar):
         filas = [[f"Credito 4999 {D.nom(k)}", us(v)] for k, v in sorted(cred.items())]
         suma = sum(cred.values())
         filas.append([("Credito descartado por el reporte", "tot"), (us(suma), "tot")])
-        rep = D.gop("ACT")
-        mot = D.pl("ACT", "GOP") or D.pl("ACT", "TOTAL_GOP")
         filas.append(["GOP del reporte", us(rep)])
         filas.append(["GOP del motor del P&L", us(mot)])
         filas.append([("Diferencia", "sec"), (us(rep - mot), "sec")])

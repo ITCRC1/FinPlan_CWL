@@ -56,19 +56,22 @@ def main(anio: int, mes: int, salida: str | None, extraer: bool):
     for e in c["escenarios"]:
         print(f"   {e['clave']} {e['rotulo']:26s} ingreso {e['ingreso']:>12,.2f}  "
               f"gasto {e['gasto']:>12,.2f}  GOP {e['gop']:>13,.2f}")
+    print("")
+    print(f"   GOP reporte - GOP motor: {c['diferencia']:>13,.2f}  "
+          f"({'coincide' if c['cuadra'] else 'NO COINCIDE'})")
+    if not c["cuadra"]:
+        print(f"      {c['motivo']}")
+        print("      NO se publica el informe hasta entenderlo.")
     if abs(c["credito_allocation"]) > 0.005:
-        ok = "coincide" if c["cuadra"] else "NO COINCIDE - investigar"
-        print(f"\n   credito 4999 descartado por el reporte: "
-              f"{c['credito_allocation']:>13,.2f}")
-        print(f"   GOP reporte - GOP motor:                "
-              f"{c['diferencia']:>13,.2f}  ({ok})")
+        print(f"   credito de reparto 4999 del mes: "
+              f"{c['credito_allocation']:>13,.2f}  (entra al reporte)")
 
     if faltantes:
         print(f"\n⚠  Faltan {len(faltantes)} claves de narrativa:")
         for k in faltantes:
             print(f"     {k}")
         print(f"\n   Se escriben en "
-              f"backend/app/informes/narrativa/n{anio}_{mes:02d}.py")
+              f"backend/app/seed_data/<HOTEL>/informes/{anio}_{mes:02d}.json")
 
 
 if __name__ == "__main__":

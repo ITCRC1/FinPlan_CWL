@@ -165,9 +165,10 @@ Es el mismo camino que usa el Audit Integral, a propósito.
 `armar.py` lo imprime siempre. **No se publica un informe sin verificarlo:**
 
 1. Ingreso, gasto y GOP de los tres escenarios contra la pantalla.
-2. `GOP del reporte − GOP del motor` tiene que ser **exactamente** el crédito
-   4999 descartado. Si dice `⚠ NO COINCIDE`, hay otra causa y hay que buscarla
-   antes de publicar.
+2. `GOP del reporte − GOP del motor` tiene que dar **cero**. Son dos caminos al
+   mismo número: por naturaleza —ingreso menos clases 5/6/7— y por departamento.
+   Si dice `NO COINCIDE`, el mensaje dice si la causa es el crédito de reparto
+   —que volvió a quedar fuera— o es otra. **No se publica hasta entenderlo.**
 
 ---
 
@@ -188,14 +189,18 @@ setiembre; un YTD calculado ahí daba −91% de ingreso y era un artefacto de la
 carga. El informe es **mensual**, con comparativo secuencial contra el mes
 anterior cargado.
 
-**C · El GOP del reporte y el del motor no coinciden.**
-El tab incluye el *gasto* de allocation y descarta el *crédito* — la cuenta
-**4999** — que es lo que hace que esos departamentos neteen a cero. La
-diferencia es exactamente ese crédito. En setiembre: $18.789,30 ($15.663,09 de
-Cafetería + $3.126,21 de Lavandería), y $35.763,30 en los dos meses, que es el
-número del aviso amarillo de la pantalla al centavo.
-→ **Los cuadros usan el GOP del reporte** para que aten con la pantalla, pero la
-conversación con la gerencia general se hace sobre el del motor.
+**C · Cafetería y Lavandería netean a cero** —desde el 2026-10-09—.
+El espejo del Pre-Cierre muestra el *gasto* de los departamentos de allocation
+—para que la plata no se esconda en la revisión— **y también su crédito** de
+reparto, la cuenta 4999.
+
+Hasta esa fecha el crédito se descartaba y el GOP del reporte salía peor que el
+real por exactamente esa cifra: $18.789,30 en setiembre 2026 y $35.763,30 en los
+dos meses cargados — el número del aviso amarillo que mostraba la pantalla.
+
+→ **El invariante ahora es que los dos GOP sean iguales.** `armar.py` lo
+verifica siempre y dice `NO COINCIDE` si vuelve a separarse, nombrando si la
+causa es el crédito o es otra.
 
 **D · El Pre-Cierre no trae estadística de habitaciones.**
 Por eso el encabezado de la pantalla muestra «—» en ocupación, ADR y RevPAR. El
@@ -404,7 +409,7 @@ rearma cuantas veces haga falta **sin volver a tocar producción**.
 
 - [ ] `extraer.py` corrió sin avisos, o los avisos están explicados en la sección 1.2.
 - [ ] El cuadre de `armar.py` coincide con la pantalla en los tres escenarios.
-- [ ] `GOP reporte − GOP motor` dice **coincide**.
+- [ ] `GOP reporte − GOP motor` da cero y dice **coincide**.
 - [ ] `armar.py` no lista claves de narrativa pendientes.
 - [ ] Ningún `[PENDIENTE]` en el documento.
 - [ ] Los hallazgos de la sección 2 están ordenados por impacto, no por tamaño.
@@ -422,7 +427,6 @@ cada mes** — si ya se arreglaron, el informe lo tiene que decir.
 
 | Pendiente | Efecto si sigue |
 |---|---|
-| El reporte descarta el crédito 4999 | El GOP del informe sale peor que el real |
 | El Pre-Cierre no carga estadística de habitaciones | Ocupación y ADR vienen de otra tabla |
 | Cafetería presupuestada en 5700 y real en 5420 | Variación de $10.764,88 en vez de $3.964,88 |
 | Costo de tours presupuestado en 0152 y real en 0150 | Dos variaciones falsas donde hay un hecho |

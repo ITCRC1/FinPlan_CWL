@@ -11,7 +11,7 @@
  ],
  "propiedad": "CORCOVADO WILDERNESS LODGE",
  "resumen": [
-  "Setiembre cerro con $42.203,46 de ingreso contra $86.101,21 presupuestados: −51,0%, $43.897,75 menos. El gasto operativo fue de $319.359,20 contra $251.113,98: 27,2% POR ENCIMA del presupuesto. El resultado es un GOP de −$277.155,74 contra −$165.012,77 presupuestados: $112.142,97 peor.",
+  "Setiembre cerro con $42.203,46 de ingreso contra $86.101,21 presupuestados: −51,0%, $43.897,75 menos. El gasto operativo fue de $300.569,90 contra $251.113,98: 19,7% POR ENCIMA del presupuesto. El resultado es un GOP de −$258.366,44 contra −$165.012,77 presupuestados: $93.353,67 peor.",
   "Ese es el hallazgo central y conviene decirlo sin rodeos: el mes perdio la mitad del ingreso y la estructura de costo no reacciono. Con 35 noches ocupadas de 900 disponibles —3,89% de ocupacion— la propiedad gasto mas de lo que tenia presupuestado para un mes que ya era de temporada baja. La planilla sola fue $181.681,69: 430,5% del ingreso del mes."
  ],
  "hallazgos": [
@@ -60,7 +60,7 @@
  ],
  "contexto_nota": [
   "La pregunta de fondo para la gerencia general",
-  "Con 900 noches disponibles y 35 vendidas, la pregunta no es por que el GOP fue negativo —era inevitable— sino por que la estructura de costo de setiembre fue mayor a la presupuestada para setiembre. El presupuesto ya asumia un mes malo y preveia $251.113,98 de gasto operativo; se gastaron $319.359,20. Esos $68.245,22 de exceso son el objeto de este informe."
+  "Con 900 noches disponibles y 35 vendidas, la pregunta no es por que el GOP fue negativo —era inevitable— sino por que la estructura de costo de setiembre fue mayor a la presupuestada para setiembre. El presupuesto ya asumia un mes malo y preveia $251.113,98 de gasto operativo; se gastaron $300.569,90. Esos $49.455,92 de exceso son el objeto de este informe."
  ],
  "dept_resumen": [
   "Tres departamentos explican casi todo el deterioro operativo: Alimentos y Bebidas (−$25.966 de variacion de resultado), Tours (−$23.443) y Rooms (−$33.316). Los tres tienen el mismo patron: el ingreso cayo a la mitad o menos y la planilla subio. Dos fueron favorables —Transportacion por $7.380 e Innoceana por $1.416— y en el caso de Transportacion la mejora tiene una explicacion que no es gestion: su costo se registro en Tours."
@@ -200,7 +200,7 @@
   },
   "Lavanderia": {
    "comentario": [
-    "Lavanderia es un departamento de allocation: su gasto se reparte via la cuenta 4999 y deberia netear a cero. Aparece con −$3.288,05 no porque perdiera plata, sino porque el reporte incluye el gasto y descarta el credito. Ver la seccion 10.1.",
+    "Lavanderia es un departamento de allocation: su gasto se reparte via la cuenta 4999 a los departamentos que la consumen, y netea a cero. En este cuadro aparece en cero, como corresponde.",
     "La venta externa fue $16,27 contra $900,00 presupuestados. El credito de reparto del mes fue $3.126,21, distribuido a los departamentos consumidores —Rooms recibio $1.304,49—."
    ],
    "preguntas": [
@@ -226,9 +226,9 @@
   },
   "Cafeteria de empleados": {
    "comentario": [
-    "No es un departamento operativo: su gasto se reparte a los departamentos cuyo personal come en la propiedad, via la cuenta 4999, y debe netear a cero. En setiembre el gasto bruto fue $15.663,09 ($10.764,88 de comida, $4.685,83 de planilla, $212,38 de opex) y el credito de reparto fue exactamente −$15.663,09. Netea a cero en el mayor.",
-    "En este reporte aparece con −$15.663,09 porque incluye el gasto y descarta el credito. Es el hallazgo de la seccion 10.1 y explica dos terceras partes del descuadre de GOP que avisa la pantalla.",
-    "Sobre el fondo: el costo de comida de empleados fue $10.764,88 contra $6.800,00 presupuestados —el presupuesto lo registra en la cuenta 5700 y el real en la 5420—, o sea $3.964,88 de exceso real, 58,3%, con la dotacion de un mes de 3,89% de ocupacion."
+    "No es un departamento operativo: su gasto se reparte a los departamentos cuyo personal come en la propiedad, via la cuenta 4999, y netea a cero. En setiembre el gasto bruto fue $15.663,09 ($10.764,88 de comida, $4.685,83 de planilla, $212,38 de opex) y el credito de reparto fue exactamente −$15.663,09.",
+    "Hasta el 2026-10-09 este reporte mostraba el gasto y descartaba el credito, asi que la Cafeteria aparecia con −$15.663,09 de resultado y el GOP del mes salia $18.789,30 peor que el real. Ya esta corregido: los dos lados entran, el departamento netea y el GOP coincide con el del motor del P&L.",
+    "Sobre el fondo, que sigue en pie: el costo de comida de empleados fue $10.764,88 contra $6.800,00 presupuestados —el presupuesto lo registra en la cuenta 5700 y el real en la 5420—, o sea $3.964,88 de exceso real, 58,3%, con la dotacion de un mes de 3,89% de ocupacion."
    ],
    "cuentas": [
     [
@@ -785,6 +785,7 @@
   "nota": "Recomendacion: presupuestar los tres con base historica de agosto y setiembre, que ya estan en el mayor."
  },
  "brechas": [
+  "El descuadre de GOP entre el reporte y el motor —$18.789,30 en setiembre, $35.763,30 en los dos meses— QUEDO CORREGIDO el 2026-10-09: el credito de reparto de la cuenta 4999 ya entra al reporte. Las cifras de este informe son las corregidas.",
   "El Pre-Cierre no carga estadistica de habitaciones, asi que ocupacion, ADR y RevPAR del Actual salen de otra tabla. Mientras el indicador y la plata vengan de fuentes distintas, el RevPAR del cierre no es auditable.",
   "No hay inventario fisico de alimentos al cierre del mes. Sin eso, el costo de alimentos de 128% no se puede descomponer en compra, consumo y merma.",
   "No hay medicion de litros de combustible ni de horas de planta en el sistema. El mayor da el monto y el proveedor, no el consumo.",
@@ -794,9 +795,9 @@
  "agenda": [
   [
    "Gerencia General",
-   "$68.245,22 de exceso de gasto operativo",
+   "$49.455,92 de exceso de gasto operativo",
    [
-    "El presupuesto de setiembre ya preveia un mes malo: $251.113,98 de gasto operativo. Se gastaron $319.359,20. ¿Que decisiones de estructura se tomaron y quien las aprobo?",
+    "El presupuesto de setiembre ya preveia un mes malo: $251.113,98 de gasto operativo. Se gastaron $300.569,90. ¿Que decisiones de estructura se tomaron y quien las aprobo?",
     "El ingreso cayo 84,8% contra agosto y la planilla subio 3,6%. ¿Existe un protocolo de ajuste de dotacion para los meses de cierre, y se aplico?",
     "390 de 900 noches disponibles no registraron una sola venta. ¿Estaban fuera de inventario? Si lo estaban, hay que decirlo en el reporte: cambia la ocupacion de 3,89% a 6,9%.",
     "¿Se autorizo la baja de activo Enertek por $25.248,12?"
@@ -877,10 +878,10 @@
   ],
   [
    "Sistemas / FinPlan",
-   "El descuadre de GOP",
+   "Lo que quedo corregido y lo que falta",
    [
-    "El reporte descarta el credito de allocation de la cuenta 4999 e incluye su gasto: $18.789,30 en setiembre, $35.763,30 en los dos meses. Hay que decidir si el tab incluye las dos puntas o ninguna.",
-    "El Pre-Cierre no carga estadistica de habitaciones, por eso el encabezado muestra «—» en ocupacion, ADR y RevPAR."
+    "El credito de allocation de la cuenta 4999 ya entra al reporte (2026-10-09): Cafeteria y Lavanderia netean a cero y el GOP coincide con el del motor. Antes el GOP salia $18.789,30 peor en setiembre y $35.763,30 en los dos meses cargados.",
+    "El Pre-Cierre sigue sin cargar estadistica de habitaciones, por eso el encabezado muestra «—» en ocupacion, ADR y RevPAR. Mientras el indicador y la plata vengan de tablas distintas, el RevPAR del cierre no es auditable."
    ]
   ]
  ]

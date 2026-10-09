@@ -208,6 +208,33 @@ async def _por_mes(session, scenario_id: str, detalle: dict | None = None,
                     # Clase 8 por CUENTA, no por departamento.
                     if detalle is not None:
                         _suma(detalle, "property", cuenta, m, monto)
+                elif cuenta in CUENTAS_DE_REPARTO and dept in EXCLUIR_DE_GASTO                         and not excluir:
+                    # ⚠️ **El credito de reparto, y por que entra al OPEX.**
+                    #
+                    # Owner, 2026-09-10: *«debe verlos como overhead los
+                    # allocations»*. El espejo del Pre-Cierre muestra el GASTO de
+                    # Cafeteria y Lavanderia para que la plata no se esconda en
+                    # la revision — pero hasta hoy descartaba su CREDITO, que es
+                    # justamente lo que hace que esos departamentos neteen a
+                    # cero.
+                    #
+                    # El resultado era un GOP peor que el real por exactamente
+                    # ese credito: en setiembre 2026, $18.789,30 ($15.663,09 de
+                    # Cafeteria + $3.126,21 de Lavanderia), y $35.763,30 en los
+                    # dos meses cargados. Es el numero del aviso amarillo de la
+                    # pantalla, al centavo.
+                    #
+                    # Entra al opex —negativo— porque es ahi donde vive el gasto
+                    # que cancela. Asi el departamento netea y el GOP por
+                    # naturaleza vuelve a coincidir con el del motor.
+                    #
+                    # `not excluir` es la condicion que lo deja SOLO en el
+                    # Pre-Cierre: fuera de el, el gasto de esos departamentos no
+                    # entra, asi que meter el credito solo dejaria un negativo
+                    # fantasma.
+                    opex += monto
+                    if detalle is not None:
+                        _suma(detalle, "opex", dept, m, monto)
                 elif (cuenta.startswith("4") and detalle is not None
                         and cuenta not in CUENTAS_DE_REPARTO):
                     _suma(detalle, "revenue", FUSION_INGRESO.get(dept, dept), m, monto)

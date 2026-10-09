@@ -87,15 +87,22 @@ def armar(D: Datos, nar: dict | None = None):
 
 def cuadre(D: Datos) -> dict:
     """Los numeros que tienen que coincidir con la pantalla, y la verificacion
-    del credito de allocation.
+    del GOP.
 
-    ⚠️ **No se publica un informe sin mirar esto.** El GOP del reporte y el del
-    motor difieren por el credito 4999 que el tab descarta; si la diferencia NO
-    es exactamente ese credito, hay otra causa y hay que buscarla.
+    ⚠️ **El invariante es que los dos GOP sean IGUALES.** El del reporte —por
+    naturaleza, ingreso menos clases 5/6/7— y el del motor —por departamento—
+    son dos caminos al mismo numero.
+
+    Hasta el 2026-10-09 diferian por el credito de reparto de la cuenta 4999,
+    que el tab descartaba mientras mostraba su gasto: $18.789,30 en setiembre
+    2026 y $35.763,30 en los dos meses cargados. Ya entra, y por eso ahora se
+    exige CERO. Si vuelve a aparecer una diferencia y resulta ser el credito,
+    el aviso lo dice: es la causa que ya se conoce.
     """
     cred = sum(D.creditos_allocation().values())
     motor = D.pl("ACT", "GOP") or D.pl("ACT", "TOTAL_GOP")
     dif = D.gop("ACT") - motor
+    cuadra = abs(dif) < 0.02
     return {
         "escenarios": [
             {"clave": e, "rotulo": D.rotulo(e),
@@ -107,5 +114,9 @@ def cuadre(D: Datos) -> dict:
         "gop_reporte": round(D.gop("ACT"), 2),
         "gop_motor": round(motor, 2),
         "diferencia": round(dif, 2),
-        "cuadra": abs(dif - cred) < 0.02,
+        "cuadra": cuadra,
+        "motivo": ("" if cuadra else
+                   "la diferencia es el credito de reparto 4999: volvio a quedar "
+                   "fuera del reporte" if abs(dif - cred) < 0.02 else
+                   "la diferencia NO es el credito de reparto: hay otra causa"),
     }

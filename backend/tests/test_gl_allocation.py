@@ -255,3 +255,58 @@ def test_el_departamento_del_credito_se_conserva():
                 for r in blk["opex"] if r["account_code"] == "4999"}
     assert round(por_dept["0220"], 2) == -24321.92
     assert round(por_dept["0161"], 2) == -3092.77
+
+
+# ── El crédito de reparto entra al Pre-Cierre ───────────────────────────────
+#
+# Owner, 2026-10-09: «DALE 1» — arreglar el descuadre de GOP.
+#
+# El espejo del Pre-Cierre muestra el GASTO de Cafetería y Lavandería por
+# decisión del owner (2026-09-10, «debe verlos como overhead los allocations»),
+# para que la plata no se esconda en la revisión. Pero descartaba su CRÉDITO —la
+# cuenta 4999—, que es lo que hace que esos departamentos neteen a cero.
+#
+# El efecto: un GOP peor que el real por exactamente ese crédito. En setiembre
+# 2026, $18.789,30; en los dos meses cargados, $35.763,30 — el número del aviso
+# amarillo de la pantalla, al centavo.
+
+
+def test_el_credito_de_reparto_entra_SOLO_en_el_precierre():
+    """Fuera del Pre-Cierre el gasto de esos departamentos no entra, así que
+    meter el crédito solo dejaría un negativo fantasma."""
+    import inspect
+
+    from app.api import gasto_por_clase_api as g
+    fuente = inspect.getsource(g._por_mes)
+    assert "cuenta in CUENTAS_DE_REPARTO" in fuente
+    # La condición que lo limita al espejo: `excluir` está vacío sólo ahí.
+    assert "and not excluir" in fuente
+
+
+def test_el_credito_va_al_OPEX_que_es_donde_vive_su_gasto():
+    """Si fuera a ingreso, la apertura mostraría «Cafetería −15.663» como si
+    fuera una venta negativa — que es el defecto que el owner reportó el
+    2026-08-14 y por el que existe `CUENTAS_DE_REPARTO`."""
+    import inspect
+
+    from app.api import gasto_por_clase_api as g
+    fuente = inspect.getsource(g._por_mes)
+    i = fuente.index("cuenta in CUENTAS_DE_REPARTO")
+    j = fuente.index("elif", i)
+    tramo = fuente[i:j]
+    assert "opex += monto" in tramo
+    assert '"opex", dept' in tramo
+    assert "revenue" not in tramo
+
+
+def test_las_cuentas_de_reparto_y_los_deptos_de_allocation_coinciden():
+    """⚠️ Las dos listas tienen que hablar del mismo hecho. Si alguien agrega un
+    departamento de allocation y no su cuenta de reparto —o al revés—, el
+    departamento deja de netear y nadie se entera: el total sigue cuadrando
+    consigo mismo."""
+    from app.api.gasto_por_clase_api import CUENTAS_DE_REPARTO, EXCLUIR_DE_GASTO
+    from app.importers.gl_detail_importer import ALLOCATION_EXCLUDE
+
+    assert set(ALLOCATION_EXCLUDE) <= EXCLUIR_DE_GASTO, (
+        "hay un departamento de allocation que el reporte no excluye del gasto")
+    assert "4999" in CUENTAS_DE_REPARTO

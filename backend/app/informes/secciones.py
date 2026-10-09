@@ -151,17 +151,29 @@ def seccion1(d, D, nar):
             if len(meses) > 1 else
             "No hay comparativo secuencial porque el mes anterior no esta en el "
             "espejo."))
-    if abs(suma_cred) > 0.005:
-        rep = D.gop("ACT")
-        mot = D.pl("ACT", "GOP") or D.pl("ACT", "TOTAL_GOP")
+    rep = D.gop("ACT")
+    mot = D.pl("ACT", "GOP") or D.pl("ACT", "TOTAL_GOP")
+    # ⚠️ La advertencia sale solo si el descuadre EXISTE. Hasta el 2026-10-09 el
+    # tab mostraba el GASTO de allocation y descartaba su CREDITO, y el GOP salia
+    # peor por exactamente esa cifra. Ya no: dejar el aviso puesto "por las dudas"
+    # enseña a ignorarlo, y el dia que vuelva a tener razon nadie lo va a mirar.
+    if abs(rep - mot) > 0.02:
         nota(d, "C · El GOP de este reporte y el del motor no coinciden",
-             f"El tab incluye el GASTO de allocation y descarta su CREDITO —la cuenta "
-             f"4999—, que es lo que hace que esos departamentos neteen a cero. En el "
-             f"mes el credito descartado es ${us(abs(suma_cred))}, y es exactamente la "
-             f"diferencia entre el GOP del reporte (${us(rep)}) y el del motor del P&L "
-             f"(${us(mot)}). Todos los cuadros de este informe usan el numero del "
-             f"reporte para que aten con la pantalla, pero la conversacion con la "
-             f"gerencia general deberia hacerse sobre el del motor. Ver la seccion 10.1.")
+             f"Hay ${us(abs(rep - mot))} de diferencia entre el GOP por naturaleza "
+             f"—ingreso menos clases 5/6/7, ${us(rep)}— y el GOP por departamento "
+             f"del motor del P&L (${us(mot)}). Los dos caminos tienen que dar lo "
+             f"mismo. Los cuadros de este informe usan el del reporte, para que "
+             f"aten con la pantalla; la conversacion con la gerencia general "
+             f"deberia hacerse sobre el del motor. Ver la seccion 10.1.")
+    elif abs(suma_cred) > 0.005:
+        nota(d, "C · Cafeteria y Lavanderia netean a cero, como corresponde",
+             f"El espejo del Pre-Cierre muestra el GASTO de los departamentos de "
+             f"allocation —para que la plata no se esconda en la revision— y "
+             f"tambien su CREDITO de reparto, ${us(abs(suma_cred))} en el mes. Por "
+             f"eso esos departamentos aparecen en cero y el GOP de este informe "
+             f"(${us(rep)}) coincide con el del motor del P&L. Hasta el 2026-10-09 "
+             f"el credito se descartaba y el GOP salia peor por esa misma cifra.")
+
     nota(d, "D · El Pre-Cierre no trae estadistica de habitaciones",
          "El encabezado de la pantalla muestra «—» en ocupacion, ADR y RevPAR del "
          "Actual porque el espejo no carga esas lineas. Aqui la estadistica real se "
