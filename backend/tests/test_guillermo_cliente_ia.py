@@ -201,4 +201,7 @@ def test_los_ids_de_modelo_NO_llevan_sufijo_de_fecha():
     for m in (ia.MODELO_CHICO, ia.MODELO_GRANDE):
         assert not any(ch.isdigit() for ch in m.split("-")[-1]) or "-20" not in m, m
     assert ia.MODELO_CHICO == "claude-haiku-4-5"
-    assert ia.MODELO_GRANDE == "claude-opus-5"
+    # Opus 5.5, no 5: el id sin el -5 final es la generacion anterior y cuesta
+    # US$5/US$25 por millon contra US$4/US$20. Los dos son validos, asi que el
+    # id viejo NO da error — el sobrecosto solo aparece en la factura.
+    assert ia.MODELO_GRANDE == "claude-opus-5-5"

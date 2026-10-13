@@ -35,7 +35,11 @@ from dataclasses import dataclass
 # y uno inventado no falla al escribirlo: falla con un 404 la primera vez que
 # se llama de verdad, que va a ser el día del clonado y no hoy.
 MODELO_CHICO = "claude-haiku-4-5"            # alto volumen: clasificar
-MODELO_GRANDE = "claude-opus-5"              # bajo volumen: redactar
+MODELO_GRANDE = "claude-opus-5-5"            # bajo volumen: redactar
+# ⚠️ `claude-opus-5` (sin el -5 final) es la generación ANTERIOR y cuesta
+# US$5/US$25 por millón contra US$4/US$20 del 5-5: más caro y más viejo. El id
+# viejo NO falla —es válido— así que el sobrecosto no avisa; solo se ve en la
+# factura.
 
 # ⚠️ **Lo que NUNCA sale de la app** (§9.2). La lista se verifica en las
 # pruebas: agregar un campo al payload sin agregarlo acá hace fallar el test,
