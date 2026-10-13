@@ -113,6 +113,34 @@ def _room_type_to_dict(rt: RoomTypeConfig) -> dict:
         "active": rt.active,
     }
 
+#: ⚠️ Un override VACÍO se hereda de la propiedad, no la pisa.
+#:
+#: Owner, 2026-10-13, sobre la cuarta pantalla con las 930 noches de octubre:
+#: *«ya corrige esta mierda de una vez»*. Tenía razón y ésta era la causa que
+#: quedaba: los seis escenarios 2027 tenían `closed_months = ''` guardado, y
+#: con la regla vieja —`is not None`— eso PISABA el `'10'` de la propiedad. O
+#: sea que marcar octubre cerrado en el hotel no hacía nada en esos escenarios.
+#:
+#: Y el `''` nació de rebote: `put_scenario_master` escribe el campo en CADA
+#: guardado, así que al guardar las UNIDADES del 2027 se llevó puesto el cierre
+#: sin que nadie lo decidiera. No había forma de expresar «heredá»: cualquier
+#: guardado detachaba el escenario de la propiedad, en silencio.
+#:
+#: Lo que se pierde: un escenario ya no puede decir «abro todos los meses que
+#: la propiedad cierra». No lo usaba nadie —los seis valores vacíos eran
+#: accidentales— y el día que haga falta se expresa con un marcador explícito,
+#: no con la ausencia de dato. Un override que se activa solo es peor que no
+#: tenerlo.
+def meses_cerrados_resueltos(hotel, sm) -> list[int]:
+    """Los meses cerrados que aplican: los del escenario si los declaró, si no
+    los de la propiedad."""
+    propios = getattr(sm, "closed_months", None) if sm is not None else None
+    if propios:                      # no vacío: el escenario los declaró
+        return sorted({int(m) for m in str(propios).split(",")
+                       if m.strip().isdigit()})
+    return list(getattr(hotel, "closed_months_list", []) or [])
+
+
 
 @router.get("/hotels/{hotel_id}/room-types/")
 async def get_room_types(
@@ -144,8 +172,8 @@ async def get_room_types(
             select(ScenarioMaster).where(ScenarioMaster.scenario_id == scenario_id)
         )).scalar_one_or_none()
         if sm:
-            if sm.closed_months is not None:
-                closed = [int(m) for m in sm.closed_months.split(",") if m.strip().isdigit()]
+            # Vacío = heredá de la propiedad. Ver `meses_cerrados_resueltos`.
+            closed = meses_cerrados_resueltos(hotel, sm)
             if sm.pax_per_night is not None:
                 pax = str(sm.pax_per_night)
             if sm.units_json:

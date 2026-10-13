@@ -153,12 +153,22 @@ export default function OccupancyPage() {
   const monthOccTotals = MONTHS.map((_, mi) => rows.reduce((s, _r, ri) => s + occNights(ri, mi), 0));
   const grandOcc = monthOccTotals.reduce((s, v) => s + v, 0);
 
-  // Noches DISPONIBLES = unidades totales × días del mes. Los meses cerrados NO
-  // se descuentan del denominador: la capacidad física existe igual, y así el
-  // porcentaje coincide con el que ya muestran Planning y el P&L (45.5% en 2027).
-  // Si se descontara octubre, esta pantalla diría 49.7% y sería la única.
+  // Noches DISPONIBLES = unidades totales × días del mes, y CERO en un mes que
+  // el hotel no opera.
+  //
+  // ⚠️ Antes NO se descontaban, a propósito: el comentario decía «la capacidad
+  // física existe igual, y así el porcentaje coincide con Planning y el P&L».
+  // Ese razonamiento se cayó el 2026-10-13. El owner lo pidió sobre cuatro
+  // pantallas distintas —«las 930 de octubre no deben tomarse»— y el motor ya
+  // dejó de contarlas, así que mantenerlas acá era justo lo contrario: esta
+  // pantalla pasaba a ser la única que no coincide.
+  //
+  // Un hotel cerrado no tiene inventario que vender. Dejar sus noches en el
+  // denominador hace que la ocupación anual salga MÁS BAJA de lo real —46,8 %
+  // en vez de ~51 %—, y un número desfavorable se acepta sin revisarlo.
   const unidadesTotales = rows.reduce((s, r) => s + (unitsById[r.room_type_id] ?? 0), 0);
-  const monthAvail = MONTHS.map((_, mi) => unidadesTotales * daysInMonth(year, mi + 1));
+  const monthAvail = MONTHS.map((_, mi) =>
+    closed.has(mi + 1) ? 0 : unidadesTotales * daysInMonth(year, mi + 1));
   const grandAvail = monthAvail.reduce((s, v) => s + v, 0);
   const pctOcup = (ocupadas: number, disponibles: number) =>
     disponibles ? (ocupadas / disponibles * 100).toFixed(1) + "%" : "—";

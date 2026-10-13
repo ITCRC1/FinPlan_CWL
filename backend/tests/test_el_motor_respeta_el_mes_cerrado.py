@@ -109,8 +109,60 @@ def test_el_recalculo_le_pasa_los_meses_cerrados_al_motor():
 
     from app.engine import recalculate
     fuente = inspect.getsource(recalculate.load_revenue_results)
-    assert "closed_months_list" in fuente
+    # El modelo recibe el mes cerrado...
     assert "cerrado=month in" in fuente
-    # Y el escenario manda sobre la propiedad: es como se abre un octubre para
-    # un año sin tocar los demás.
-    assert "sm.closed_months" in fuente or "sm, \"closed_months\"" in fuente
+    # ...y la resolucion sale de UNA sola funcion, compartida con el API que
+    # alimenta las pantallas. Si cada lado resolviera por su cuenta, volverian
+    # a decir cosas distintas del mismo escenario, que es como empezo todo.
+    assert "meses_cerrados_resueltos" in fuente
+
+
+# ── El override vacío HEREDA, no pisa ───────────────────────────────────────
+
+def test_un_override_vacio_hereda_de_la_propiedad():
+    """⚠️ La causa que quedaba, y la que hizo que esto tomara cuatro vueltas.
+
+    Owner, 2026-10-13: *«ya corrige esta mierda de una vez»*. Los seis
+    escenarios 2027 tenían `closed_months = ''` guardado y con la regla vieja
+    —`is not None`— eso PISABA el `'10'` de la propiedad: marcar octubre cerrado
+    en el hotel no hacía nada en ellos.
+
+    Y el `''` nació de rebote: `put_scenario_master` escribe el campo en CADA
+    guardado, así que al guardar las UNIDADES del 2027 se llevó puesto el
+    cierre. No había forma de decir «heredá» — cualquier guardado detachaba el
+    escenario de la propiedad, en silencio.
+    """
+    from app.api.revenue_api import meses_cerrados_resueltos
+
+    class H:
+        closed_months_list = [10]
+
+    class SM:
+        def __init__(self, v):
+            self.closed_months = v
+
+    # Sin fila de master: la propiedad manda.
+    assert meses_cerrados_resueltos(H(), None) == [10]
+    # Fila con el campo vacío o nulo: hereda. Antes pisaba con «ninguno».
+    assert meses_cerrados_resueltos(H(), SM("")) == [10]
+    assert meses_cerrados_resueltos(H(), SM(None)) == [10]
+    # Declarado: el escenario manda, que es para lo que existe el override.
+    assert meses_cerrados_resueltos(H(), SM("10,11")) == [10, 11]
+    assert meses_cerrados_resueltos(H(), SM("9")) == [9]
+
+
+def test_la_pantalla_de_ocupacion_descuenta_el_mes_cerrado():
+    """Antes NO lo descontaba, a propósito: «la capacidad física existe igual».
+
+    Ese razonamiento se cayó cuando el motor dejó de contarlas: mantenerlo
+    convertía a esta pantalla en la única que no coincide. Y el daño va para el
+    lado que no se revisa — la ocupación anual salía 46,8 % en vez de ~51 %, y
+    un número desfavorable se acepta sin mirarlo.
+    """
+    import pathlib
+
+    pagina = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+              / "revenue" / "occupancy" / "page.tsx")
+    txt = pagina.read_text(encoding="utf-8", errors="replace")
+    assert "closed.has(mi + 1) ? 0" in txt
+    assert "Los meses cerrados NO" not in txt, "volvió el criterio viejo"

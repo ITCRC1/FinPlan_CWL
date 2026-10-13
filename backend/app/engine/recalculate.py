@@ -165,12 +165,9 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
     # di y no lo arregla»*.
     from app.models.hotel import Hotel
     _hotel = await session.get(Hotel, scenario.hotel_id)
-    cerrados_del_hotel = set(_hotel.closed_months_list) if _hotel else set()
-    if sm is not None and getattr(sm, "closed_months", None) is not None:
-        # El escenario manda sobre la propiedad: es como se abre un octubre
-        # para un año sin tocar los demás.
-        cerrados_del_hotel = {int(m) for m in str(sm.closed_months).split(",")
-                              if m.strip().isdigit()}
+    # El escenario manda sobre la propiedad SI los declaró; vacío hereda.
+    from app.api.revenue_api import meses_cerrados_resueltos
+    cerrados_del_hotel = set(meses_cerrados_resueltos(_hotel, sm))
 
     results: dict[int, RevenueResult] = {}
     for month in range(1, 13):
