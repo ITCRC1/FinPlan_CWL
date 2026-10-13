@@ -16,6 +16,7 @@
  * armadas daría un número que no es de nadie.
  */
 import { sembrarTres } from "@/lib/escenarioPreferido";
+import { pctDeFraccion } from "@/lib/fmt";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getPLDoceMeses, getPLManualInputs, savePLManualInput,
@@ -201,7 +202,9 @@ export default function DoceMeses({ escenarios, inicial, compacto = true,
   const valorManual = (campo: keyof PLManualInput, mes: number) => {
     const f = manual.find(x => x.month === mes);
     // Se guarda como fracción y se muestra como porcentaje: 0.05 → 5.
-    return f ? String(Number(f[campo] ?? 0) * 100) : "0";
+    // ⚠️ Por `pctDeFraccion`, no por `* 100`: en punto flotante 0,07 × 100 da
+    // 7.000000000000001 y eso es lo que veía la casilla.
+    return f ? String(pctDeFraccion(f[campo] as string | number | null)) : "0";
   };
 
   /** Guarda UN mes y recarga el año: el P&L lee estos parámetros al calcular,

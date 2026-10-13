@@ -28,6 +28,7 @@
  * vea mientras se escribe, y lo que se guarda son los sub-canales: el cubo
  * nunca se escribe.
  */
+import { pctDeFraccion } from "@/lib/fmt";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -67,8 +68,11 @@ export default function GrillaMixDoce({
       setDatos(d);
       const m: Celdas = {}, c: Celdas = {};
       for (const s of d.subcanales) {
-        m[s.code] = DOCE.map(i => (d.meses[i]?.filas[s.code]?.mix_pct ?? 0) * 100);
-        c[s.code] = DOCE.map(i => (d.meses[i]?.filas[s.code]?.comision_pct ?? 0) * 100);
+        // ⚠️ `pctDeFraccion` y no `* 100`: en punto flotante 0,55 × 100 da
+        // 55.00000000000001 y la casilla mostraba eso. Ver el comentario del
+        // ayudante en `lib/fmt.ts`.
+        m[s.code] = DOCE.map(i => pctDeFraccion(d.meses[i]?.filas[s.code]?.mix_pct));
+        c[s.code] = DOCE.map(i => pctDeFraccion(d.meses[i]?.filas[s.code]?.comision_pct));
       }
       setMix(m); setCom(c); setSucio(false); setError(null);
     } catch (e) {

@@ -1,4 +1,5 @@
 "use client";
+import { pctDeFraccion } from "@/lib/fmt";
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 // ⚠️ `numeroDePorcentaje` y no `numeroDeExcel`: `pct3` y `pct5` están en
 // 0..100, o sea `3%` es 3 y no 0,03. `numeroDeExcel` ve el `%` y divide
@@ -55,13 +56,15 @@ export default function ManagementFeesPage() {
     setRevByMonth(rev);
     const p3 = Array(12).fill(0), p5 = Array(12).fill(0), pr = Array(12).fill(0);
     for (const mi of manual) {
-      p3[mi.month - 1] = parseFloat(mi.mgmt_fee_pct_3 || "0") * 100;
-      p5[mi.month - 1] = parseFloat(mi.mgmt_fee_pct_5 || "0") * 100;
-      pr[mi.month - 1] = parseFloat(mi.capital_reserve_pct || "0") * 100;
+      // ⚠️ `pctDeFraccion`: `* 100` sobre 0,07 deja 7.000000000000001 en la casilla.
+      p3[mi.month - 1] = pctDeFraccion(mi.mgmt_fee_pct_3);
+      p5[mi.month - 1] = pctDeFraccion(mi.mgmt_fee_pct_5);
+      pr[mi.month - 1] = pctDeFraccion(mi.capital_reserve_pct);
     }
     setPct3(p3); setPct5(p5); setPctReserve(pr);
     // impuesto de renta: tasa única; tomar la primera fila o default 30%
-    setTaxRate(manual.length ? parseFloat(manual[0].income_tax_rate || "0.30") * 100 : 30);
+    setTaxRate(manual.length
+      ? pctDeFraccion(manual[0].income_tax_rate || "0.30") : 30);
   }, []);
 
   useEffect(() => {

@@ -54,3 +54,31 @@ export function fmtNum(v: number | string | null | undefined, decimals = 2): str
     minimumFractionDigits: decimals, maximumFractionDigits: decimals,
   });
 }
+
+/**
+ * Una fracción a su porcentaje, SIN la cola del punto flotante.
+ *
+ * Owner, 2026-10-13, sobre la grilla de canales: *«corrige esto»*, con las
+ * celdas editadas mostrando `55.0000` y desbordando la casilla mientras las
+ * demás decían `60` limpio.
+ *
+ * No era el guardado: era `fraccion * 100` en JavaScript. Las que se ven mal
+ * son exactamente las que no tienen representación binaria exacta —y eso
+ * explica celda por celda lo que él circuló:
+ *
+ *     0.55 * 100 = 55.00000000000001     0.28 * 100 = 28.000000000000004
+ *     0.07 * 100 =  7.000000000000001    0.60 * 100 = 60            (limpio)
+ *     0.26 * 100 = 26            (limpio)   0.05 * 100 = 5          (limpio)
+ *
+ * Se redondea a 4 decimales del PORCENTAJE y no a menos: la fracción se guarda
+ * como `Numeric(8, 6)`, así que cuatro es exactamente lo que cabe. Con menos se
+ * perdería una comisión real como 26,8300%; con más vuelve la cola.
+ *
+ * ⚠️ Devuelve un NÚMERO, no texto: estos valores siguen a una casilla de
+ * entrada y a sumas. Formatear acá obligaría a cada pantalla a desformatear.
+ */
+export function pctDeFraccion(v: number | string | null | undefined): number {
+  const n = typeof v === "number" ? v : parseFloat(String(v ?? 0));
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 1e6) / 1e4;
+}
