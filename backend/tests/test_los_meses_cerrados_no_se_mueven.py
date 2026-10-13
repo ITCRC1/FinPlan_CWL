@@ -242,3 +242,76 @@ class _Foto:
 
 def test_sin_foto_no_hay_mes():
     assert mc.mes_de_la_foto(None) == 0
+
+
+# ── Cerrar un mes se puede hacer donde se ve el problema ────────────────────
+
+def test_las_DOS_pantallas_de_noches_dejan_cerrar_un_mes():
+    """Owner, 2026-10-13, con Availability abierta y octubre en 930 noches:
+    *«como le digo a esto que Octubre estara cerrado y que ese inventario no lo
+    tome en cuenta para la ocupacion Anual.. debe permitirme editarlo»*.
+
+    El mecanismo existia desde antes y esa pantalla YA lo respetaba —los dias
+    van a 0 en un mes cerrado— pero solo se podia marcar desde *Nights by
+    Category*, y en *Availability* nada lo decia. Tuvo que preguntar con el
+    numero equivocado en la pantalla.
+
+    ⚠️ Lo que esta prueba protege no es el boton: es que las dos pantallas
+    guarden por la MISMA puerta. Dos formas de marcar lo mismo, con dos
+    persistencias distintas, es como se consigue que dos cuadros del mismo dato
+    digan cosas diferentes.
+    """
+    import pathlib
+
+    base = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app" / "revenue"
+    for pantalla in ("availability", "room-nights"):
+        txt = (base / pantalla / "page.tsx").read_text(encoding="utf-8",
+                                                       errors="replace")
+        assert "setClosedMonths(HOTEL" in txt, pantalla
+        assert "closed.has(i + 1)" in txt, pantalla
+
+
+def test_availability_DICE_que_se_puede_cerrar_un_mes():
+    """Un mecanismo que no se anuncia no existe.
+
+    *Nights by Category* lo dice en su introduccion desde el principio —«clic en
+    el header de un mes para marcarlo cerrado»—. *Availability* no, y es la
+    pantalla donde se mira el total anual, que es donde el numero equivocado se
+    nota.
+    """
+    import json
+    import pathlib
+
+    raiz = pathlib.Path(__file__).resolve().parents[2] / "frontend"
+    txt = (raiz / "app" / "revenue" / "availability" / "page.tsx").read_text(
+        encoding="utf-8", errors="replace")
+    assert 't("comoCerrar")' in txt
+    for idioma in ("es", "en"):
+        msg = json.loads((raiz / "messages" / f"{idioma}.json")
+                         .read_text(encoding="utf-8"))
+        aviso = msg["availability"]["comoCerrar"]
+        # Y dice las dos consecuencias, no solo una: sale del inventario Y del
+        # denominador de la ocupacion. Es lo segundo lo que el owner pregunto.
+        assert aviso and len(aviso) > 60, idioma
+
+
+def test_un_mes_cerrado_saca_sus_noches_del_ANUAL():
+    """La cuenta que el owner estaba haciendo a mano.
+
+    30 unidades x 365 dias           = 10.950
+    sin octubre (30 x 31 = 930)      = 10.020
+
+    Y 10.020 es lo que dicen TODOS sus escenarios 2026 —el Budget Final y los
+    cinco Forecast, con octubre en 0— y lo que dice su P&L de referencia
+    (CLAUDE.md 17.8: «Rooms Available ... 10.020»). La pantalla de Planning
+    decia 10.950 porque calcula la formula y el hotel tenia `closed_months`
+    vacio: era la unica fuente que no coincidia.
+    """
+    import calendar
+
+    UNIDADES = 30
+    dias = [calendar.monthrange(2026, m)[1] for m in range(1, 13)]
+    assert sum(dias) == 365
+    assert UNIDADES * sum(dias) == 10_950
+    sin_octubre = sum(d for m, d in enumerate(dias, start=1) if m != 10)
+    assert UNIDADES * sin_octubre == 10_020

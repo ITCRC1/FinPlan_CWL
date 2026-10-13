@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { getRoomTypes } from "@/lib/api";
+import { getRoomTypes, setClosedMonths } from "@/lib/api";
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros } from "@/lib/exportCuadro";
@@ -46,6 +46,35 @@ export default function AvailabilityPage() {
       }
     })();
   }, []);
+
+  /** Cerrar o abrir un mes, desde el encabezado.
+   *
+   *  Owner, 2026-10-13, mirando octubre en 930: *«como le digo a esto que
+   *  Octubre estara cerrado y que ese inventario no lo tome en cuenta para la
+   *  ocupacion Anual.. debe permitirme editarlo»*.
+   *
+   *  El mecanismo ya existia y la pantalla ya lo respetaba —los dias van a 0 en
+   *  un mes cerrado— pero solo se podia marcar desde *Nights by Category*, y
+   *  aca nada lo decia. Tuvo que preguntar.
+   *
+   *  ⚠️ Se guarda en el HOTEL, no en el escenario: es la estacionalidad de la
+   *  propiedad y la comparten todas las pantallas y todos los anos. Si un ano
+   *  abriera octubre, eso se corrige por escenario en *Revenue -> Master*.
+   */
+  async function alternarMes(m1: number) {
+    const antes = closed;
+    const next = new Set(closed);
+    if (next.has(m1)) next.delete(m1); else next.add(m1);
+    setClosed(next);
+    try {
+      await setClosedMonths(HOTEL, [...next].sort((a, b) => a - b));
+    } catch (e: unknown) {
+      // Se devuelve la pantalla a lo que estaba: dejarla mostrando un cambio
+      // que no se guardo es peor que el error.
+      setClosed(antes);
+      setError(e instanceof Error ? e.message : tc("error"));
+    }
+  }
 
   // Días = 0 en meses cerrados (mismo dato que alimenta el resto de pantallas).
   const days = useMemo(
@@ -95,6 +124,21 @@ export default function AvailabilityPage() {
         </select>
         <button onClick={bajarExcel} title={t("excelHint")} style={excelBtn}>⬇ Excel</button>
       </div>
+      {/* Que se puede cerrar un mes, dicho. El mecanismo existia desde antes
+          y nadie podia saberlo: el owner tuvo que preguntar con la pantalla
+          abierta y octubre en 930 noches. */}
+      <p style={{ fontSize: 12, color: "var(--text-secondary)", maxWidth: 820,
+                  lineHeight: 1.55, margin: "10px 0 0" }}>
+        {t("comoCerrar")}
+        {closed.size > 0 && (
+          <b style={{ color: "var(--text-primary)" }}>
+            {" "}{t("mesesCerrados", {
+              meses: [...closed].sort((a, b) => a - b)
+                .map(m => MONTHS[m - 1]).join(", "),
+            })}
+          </b>
+        )}
+      </p>
       <div style={{ marginTop: 16 }} />
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
@@ -107,15 +151,26 @@ export default function AvailabilityPage() {
             <thead>
               <tr>
                 <th style={{ textAlign: "left", minWidth: 170 }}></th>
-                {MONTHS.map((m, i) => (
-                  <th key={m} style={{
-                    textAlign: "right", minWidth: 64,
-                    // trimestre como línea inferior — el texto usa el color del tema (siempre visible)
-                    borderBottom: `3px solid ${Q_TINT[i] === "transparent" ? "var(--border-medium)" : Q_TINT[i]}`,
-                  }}>
-                    {m} {String(year).slice(2)}
-                  </th>
-                ))}
+                {MONTHS.map((m, i) => {
+                  const cerrado = closed.has(i + 1);
+                  return (
+                    <th key={m}
+                        onClick={() => void alternarMes(i + 1)}
+                        title={cerrado ? t("cerradoClicAbrir") : t("abiertoClicCerrar")}
+                        style={{
+                          textAlign: "right", minWidth: 64, cursor: "pointer",
+                          // El mismo azul que *Nights by Category*: es la misma
+                          // marca y tiene que verse igual en las dos pantallas.
+                          background: cerrado ? "#BFD4E8" : "transparent",
+                          color: cerrado ? "#1a3a5c" : "inherit",
+                          // trimestre como linea inferior
+                          borderBottom: "3px solid " + (Q_TINT[i] === "transparent"
+                            ? "var(--border-medium)" : Q_TINT[i]),
+                        }}>
+                      {m} {String(year).slice(2)}
+                    </th>
+                  );
+                })}
                 <th style={{ textAlign: "right", minWidth: 90, borderLeft: "1px solid var(--border)" }}>{tc("year")}</th>
               </tr>
             </thead>

@@ -3415,7 +3415,11 @@
     "sheet": "Availability",
     "title": "Availability — Total Nights Available",
     "xlsClosedMonths": " · closed months: {meses}",
-    "xlsSubtitle": "Nights = units × days in the month"
+    "xlsSubtitle": "Nights = units × days in the month",
+    "cerradoClicAbrir": "Closed — click to open",
+    "abiertoClicCerrar": "Open — click to close",
+    "comoCerrar": "Click a month to close it: its nights leave the inventory and the annual occupancy denominator. It is saved on the property, so every screen shares it.",
+    "mesesCerrados": "Closed months: {meses}"
   },
   "netRate": {
     "excelFailed": "The Excel file could not be generated",

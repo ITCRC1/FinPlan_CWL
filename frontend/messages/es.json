@@ -3415,7 +3415,11 @@
     "sheet": "Disponibilidad",
     "title": "Disponibilidad — Total Nights Available",
     "xlsClosedMonths": " · meses cerrados: {meses}",
-    "xlsSubtitle": "Noches = unidades × días del mes"
+    "xlsSubtitle": "Noches = unidades × días del mes",
+    "cerradoClicAbrir": "Cerrado — clic para abrir",
+    "abiertoClicCerrar": "Abierto — clic para cerrar",
+    "comoCerrar": "Clic en el mes para cerrarlo: sus noches salen del inventario y del denominador de la ocupación anual. Se guarda en la propiedad, así que lo comparten todas las pantallas.",
+    "mesesCerrados": "Meses cerrados: {meses}"
   },
   "netRate": {
     "excelFailed": "No se pudo generar el Excel",
