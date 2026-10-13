@@ -756,12 +756,31 @@ async def _room_stats_from_actuals(scenario_id: str, year: int, db: AsyncSession
     for s in stats:
         units_by_name[s.room_type_name] = max(units_by_name.get(s.room_type_name, 0), int(s.units or 0))
     names = list(units_by_name.keys())
+
+    # ⚠️ El cierre manda también al LEER, no sólo al guardar.
+    #
+    # Owner, 2026-10-13, tras traer los actuales al forecast: el YTD seguía en
+    # 10.950 porque octubre tenía 930 noches GUARDADAS, escritas antes de que
+    # existiera el cierre. Aplicar la regla acá hace que el número salga bien
+    # sin obligarlo a volver a grabar el mes; la fila se corrige sola la próxima
+    # vez que alguien lo guarde.
+    from app.models.scenario_master import ScenarioMaster
+    _hotel = await db.get(Hotel, scen.hotel_id if scen else "")
+    _sm = (await db.execute(select(ScenarioMaster).where(
+        ScenarioMaster.scenario_id == scenario_id))).scalar_one_or_none()
+    cerrados = set(meses_cerrados_resueltos(_hotel, _sm))
+
+    def _disp(rec, mes: int) -> float:
+        """Las noches disponibles de esa fila: cero si el mes no se opera."""
+        if mes in cerrados or rec is None:
+            return 0.0
+        return float(rec.nights_available or 0)
     months = []
     for m in range(1, 13):
         rows = []
         for nm in names:
             rec = next((s for s in stats if s.room_type_name == nm and s.month == m), None)
-            na = float(rec.nights_available) if rec else 0.0
+            na = _disp(rec, m)
             no = float(rec.nights_occupied) if rec else 0.0
             rev = float(rec.revenue) if rec else 0.0
             pax = float(rec.pax) if rec else 0.0
@@ -773,7 +792,7 @@ async def _room_stats_from_actuals(scenario_id: str, year: int, db: AsyncSession
     # anual
     annual = []
     for nm in names:
-        na = sum(float(s.nights_available) for s in stats if s.room_type_name == nm)
+        na = sum(_disp(s, s.month) for s in stats if s.room_type_name == nm)
         no = sum(float(s.nights_occupied) for s in stats if s.room_type_name == nm)
         rev = sum(float(s.revenue) for s in stats if s.room_type_name == nm)
         pax = sum(float(s.pax) for s in stats if s.room_type_name == nm)
@@ -807,10 +826,19 @@ async def get_revenue_by_room_type(scenario_id: str, db: AsyncSession = Depends(
     for ob in data["occupancies"]:
         occ_by_month.setdefault(ob.month, []).append(ob)
 
+    # El cierre, también por este camino: un escenario SIN estadísticas cargadas
+    # sale por los drivers, y ahí las noches se calculan igual que en el motor.
+    from app.models.scenario_master import ScenarioMaster
+    _hotel = await db.get(Hotel, scenario.hotel_id)
+    _sm = (await db.execute(select(ScenarioMaster).where(
+        ScenarioMaster.scenario_id == scenario_id))).scalar_one_or_none()
+    _cerrados = set(meses_cerrados_resueltos(_hotel, _sm))
+
     months = []
     for m in range(1, 13):
         rows = room_type_breakdown(
-            m, rates_by_month.get(m, []), occ_by_month.get(m, []), room_type_units)
+            m, rates_by_month.get(m, []), occ_by_month.get(m, []), room_type_units,
+            year=scenario.year, cerrado=m in _cerrados)
         for r in rows:
             r["room_type_name"] = names.get(r["room_type_id"], r["room_type_id"])
             r["room_type_code"] = codes.get(r["room_type_id"], "")
@@ -1178,6 +1206,29 @@ async def copiar_room_stats_de_actuales(
             "hasta_mes": hasta, "meses": meses, "filas": copiadas}
 
 
+async def _dias_vendibles(db: AsyncSession, scenario, month: int) -> int:
+    """Los días que ese mes se puede vender: cero si el hotel no opera.
+
+    Owner, 2026-10-13, por SEXTA vez sobre el mismo número: *«REVISA ESTO»*,
+    con el YTD en 10.950 después de traer los actuales. Octubre tenía 930
+    noches disponibles guardadas porque esta puerta calculaba
+    `calendar.monthrange()` sin mirar el cierre.
+
+    ⚠️ Es la MISMA regla que usa el motor —`meses_cerrados_resueltos`— y por eso
+    sale de ahí y no de una copia. Cada vez que este número se calculó por
+    separado, dos pantallas terminaron diciendo cosas distintas del mismo mes.
+    """
+    import calendar
+
+    from app.models.scenario_master import ScenarioMaster
+    hotel = await db.get(Hotel, scenario.hotel_id)
+    sm = (await db.execute(select(ScenarioMaster).where(
+        ScenarioMaster.scenario_id == scenario.id))).scalar_one_or_none()
+    if month in set(meses_cerrados_resueltos(hotel, sm)):
+        return 0
+    return calendar.monthrange(scenario.year, month)[1]
+
+
 @router.get("/scenarios/{scenario_id}/room-stats-entry/{month}/")
 async def get_room_stats_entry(scenario_id: str, month: int, db: AsyncSession = Depends(get_db)):
     """Filas editables para CARGA MANUAL de room stats reales de un mes:
@@ -1189,7 +1240,7 @@ async def get_room_stats_entry(scenario_id: str, month: int, db: AsyncSession = 
     scenario = await _get_scenario_or_404(scenario_id, db)
     existing = {s.room_type_name: s for s in (await db.execute(select(ActualRoomStat).where(
         ActualRoomStat.scenario_id == scenario_id, ActualRoomStat.month == month))).scalars().all()}
-    days = calendar.monthrange(scenario.year, month)[1]
+    days = await _dias_vendibles(db, scenario, month)
     rows = []
     for nm, units in await _canonical_room_types(db, scenario.year):
         ex = existing.get(nm)
@@ -1225,7 +1276,9 @@ async def put_room_stats_entry(
     if not 1 <= month <= 12:
         raise ErrorApi(422, "mes.fuera_de_rango")
     scenario = await _get_scenario_or_404(scenario_id, db)
-    days = calendar.monthrange(scenario.year, month)[1]
+    # Cero en un mes cerrado: si no, la noche disponible entra al denominador
+    # de un mes que el hotel no abrio.
+    days = await _dias_vendibles(db, scenario, month)
     await db.execute(delete(ActualRoomStat).where(
         ActualRoomStat.scenario_id == scenario_id, ActualRoomStat.month == month))
     # ⚠️ Una categoría SIN ventas igual se guarda. Sus habitaciones existieron

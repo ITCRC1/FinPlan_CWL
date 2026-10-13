@@ -91,3 +91,55 @@ def test_la_pantalla_pregunta_antes_y_no_lo_ofrece_en_el_actual():
     assert "copiarRoomStatsDeActuales" in txt
     assert "copiarConfirmar" in txt and "confirm(" in txt
     assert '?.type !== "ACTUAL"' in txt
+
+
+# ── Las noches de un mes cerrado no entran por NINGUNA puerta ───────────────
+
+def test_el_panel_de_carga_no_ofrece_noches_en_un_mes_cerrado():
+    """Owner, 2026-10-13, por SEXTA vez sobre el mismo número: *«REVISA ESTO»*.
+
+    Tras traer los actuales, el YTD seguía en 10.950. Octubre tenía 930 noches
+    GUARDADAS porque el panel de carga calculaba `calendar.monthrange()` sin
+    mirar el cierre: al grabar el mes, escribía la disponibilidad de un mes que
+    el hotel no abre.
+    """
+    fuente_get = inspect.getsource(revenue_api.get_room_stats_entry)
+    fuente_put = inspect.getsource(revenue_api.put_room_stats_entry)
+    for f in (fuente_get, fuente_put):
+        assert "_dias_vendibles" in f
+        assert "calendar.monthrange" not in f
+
+
+def test_la_regla_sale_de_UNA_sola_funcion():
+    """⚠️ Lo que hizo que esto tomara seis vueltas.
+
+    Cada lugar que calculaba las noches por su cuenta se olvidó del cierre en su
+    propio momento: el motor, la pantalla de Ocupación, el panel de carga, el
+    camino de drivers. Mientras la regla se repita, va a haber un séptimo.
+    """
+    fuente = inspect.getsource(revenue_api._dias_vendibles)
+    assert "meses_cerrados_resueltos" in fuente
+
+
+def test_el_cierre_manda_tambien_al_LEER():
+    """Las filas ya guardadas con el calendario viejo no obligan a volver a
+    grabar el mes: la regla se aplica al leer y la fila se corrige sola la
+    próxima vez que alguien la guarde."""
+    fuente = inspect.getsource(revenue_api._room_stats_from_actuals)
+    assert "meses_cerrados_resueltos" in fuente
+    assert "def _disp(" in fuente
+
+
+def test_el_camino_de_DRIVERS_tambien():
+    """Un escenario sin estadísticas cargadas sale por los drivers. Si sólo se
+    arreglara el camino de los actuales, la mitad de los forecast seguiría
+    contando octubre — que es exactamente lo que pasó con `Working`."""
+    fuente = inspect.getsource(revenue_api.get_revenue_by_room_type)
+    if "room_type_breakdown" in fuente:
+        assert "cerrado=" in fuente
+    else:
+        # Vive en el helper que arma la respuesta por drivers.
+        import app.api.revenue_api as m
+        todo = inspect.getsource(m)
+        i = todo.index("room_type_breakdown(")
+        assert "cerrado=" in todo[i:i + 400]
