@@ -409,8 +409,7 @@
     "clubTotalNote": "The year total is December's closing balance, not the sum of the twelve months: these are members, not revenue.",
     "clubNoData": "No members loaded in this scenario.",
     "concept": "Concept",
-    "breakdownChip": "breakdown — not summed",
-    "detalleNoCompara": "The comparison goes down to the <b>account</b>, not to the detail: this year's Budget and Forecast were built at account level. That is why the sub-line column is blank and not zero — a zero would say «budgeted nothing here», which is not what happened."
+    "breakdownChip": "breakdown — not summed"
   },
   "scenarios": {
     "title": "Scenarios — Budgets & Forecasts",
@@ -2890,7 +2889,8 @@
     "xlTitulo": "Month-End Close — {periodo} {year}",
     "xlVariacionEntre": "Variance: {escA} vs {escB}",
     "ytdA": "YTD to {mes} {year}",
-    "tab_integral": "Audit Integral"
+    "tab_integral": "Audit Integral",
+    "detalleNoCompara": "The comparison goes down to the <b>account</b>, not to the detail: this year's Budget and Forecast were built at account level. That is why the sub-line column is blank and not zero — a zero would say «budgeted nothing here», which is not what happened."
   },
   "otb": {
     "a851Nota1": "{metrica} by {unidad}:",

@@ -25,6 +25,18 @@ from app.models.revenue_other import OTHER_REVENUE_LINES, RevenueOther
 
 CALENDAR_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
+
+def dias_del_mes(year: int, month: int) -> int:
+    """Los días que tiene ESE mes de ESE año.
+
+    ⚠️ `CALENDAR_DAYS` deja febrero en 28 siempre, y el motor planifica hasta
+    2035: en 2028 y 2032 son 30 noches disponibles de menos. Las pantallas de
+    Planning ya usaban el calendario de verdad (`new Date(year, m, 0)`), así que
+    el motor y la pantalla decían cosas distintas sin que nada fallara.
+    """
+    import calendar
+    return calendar.monthrange(int(year), int(month))[1]
+
 # Línea de `RevenueOther` → campo de `RevenueResult`. Uno a uno en minúscula:
 # la línea del checkbook y el campo del resultado son el mismo nombre, y eso
 # es lo que permite que la lista se derive en vez de escribirse.
@@ -131,6 +143,7 @@ def calculate_revenue(
     pkg_configs: list[PackageConfig],     # all package configs for this scenario
     other_revenues: list[RevenueOther],   # filtered for this scenario+month
     room_type_units: dict[str, int],      # room_type_id → total_units
+    cerrado: bool = False,                # ¿el hotel NO opera este mes?
 ) -> RevenueResult:
     """
     Calculate all revenue lines for a single month.
@@ -140,6 +153,8 @@ def calculate_revenue(
     mezcla puede variar, así que se filtran adentro con `month`.
     other_revenues must be pre-filtered to the correct scenario and month.
     room_type_units maps room_type_id → number of physical rooms (for available rooms calc).
+    `cerrado` viene de los meses cerrados del hotel: un mes sin operación tiene
+    CERO noches disponibles, no las del calendario.
     """
     result = RevenueResult(month=month, year=year)
 
@@ -175,10 +190,19 @@ def calculate_revenue(
     result.rooms_occupied = total_rooms_occ
     result.guests = total_guests
 
-    # Available rooms = Σ(units × calendar_days_in_month)
-    cal_days = Decimal(str(CALENDAR_DAYS[month - 1]))
+    # Available rooms = Σ(units × días del mes), y CERO si el hotel no opera.
+    #
+    # ⚠️ Owner, 2026-10-13, tras cerrar octubre y apretar Recalcular: *«ya le di
+    # y no lo arregla»*. Tenía razón y el defecto estaba acá: el modelo nunca
+    # supo de los meses cerrados, así que escribía las 930 noches de octubre de
+    # vuelta en `scenario_stats` y las pantallas que LEEN las estadísticas —P&L,
+    # Revenue Checkbook, KPIs— seguían mostrando 10.950 al año. Solo las que
+    # calculan del lado del navegador respetaban el cierre, y por eso una decía
+    # 10.020 y la otra 10.950 sobre el mismo escenario.
+    dias = 0 if cerrado else dias_del_mes(year, month)
+    cal_days = Decimal(str(dias))
     result.rooms_available = int(
-        sum(units * CALENDAR_DAYS[month - 1] for units in room_type_units.values())
+        sum(units * dias for units in room_type_units.values())
     )
 
     # Package revenues (need total_rooms_occ and pax_per_room)
@@ -231,6 +255,8 @@ def room_type_breakdown(
     rate_cards: list[RateCard],          # filtered for this scenario+month
     occ_budgets: list[OccupancyBudget],  # filtered for this scenario+month
     room_type_units: dict[str, int],     # room_type_id → total_units
+    year: int = 0,                       # para los días reales del mes
+    cerrado: bool = False,               # ¿el hotel NO opera este mes?
 ) -> list[dict]:
     """Per-room-type revenue detail for one month (report "Ingresos por tipo").
 
@@ -239,7 +265,9 @@ def room_type_breakdown(
     Same per-type math the room-revenue loop uses, but kept per type instead of
     summed. Pure (no DB); rows ordered as room_type_units iterates.
     """
-    cal_days = CALENDAR_DAYS[month - 1]
+    # El mismo criterio que `calculate_revenue`: cero si no se opera.
+    cal_days = (0 if cerrado else
+                dias_del_mes(year, month) if year else CALENDAR_DAYS[month - 1])
     rates_by_type = {rc.room_type_id: rc for rc in rate_cards}
     occ_by_type = {ob.room_type_id: ob for ob in occ_budgets}
     rows = []

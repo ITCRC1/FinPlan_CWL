@@ -2481,9 +2481,12 @@ async def get_monthly_revenue_single(
     room_type_units = {rt.id: rt.units for rt in data["room_types"]}
 
     from app.engine.revenue_calculator import calculate_revenue
+    _hotel = await db.get(Hotel, scenario.hotel_id)
     result = calculate_revenue(
         month=month,
         year=scenario.year,
+        # Mismo criterio que el recálculo: un mes sin operación no tiene noches.
+        cerrado=month in set(_hotel.closed_months_list if _hotel else []),
         rate_cards=[rc for rc in data["rate_cards"] if rc.month == month],
         occ_budgets=[ob for ob in data["occupancies"] if ob.month == month],
         channels=[c for c in data["channels"] if getattr(c, "month", month) == month] or data["channels"],

@@ -409,8 +409,7 @@
     "clubTotalNote": "El total del año es el saldo de diciembre, no la suma de los doce meses: son socios, no ingresos.",
     "clubNoData": "Sin socios cargados en este escenario.",
     "concept": "Concepto",
-    "breakdownChip": "apertura — no suma aparte",
-    "detalleNoCompara": "La comparación llega hasta la <b>cuenta</b>, no hasta el detalle: el Budget y el Forecast de este año se presupuestaron al nivel de la cuenta. Por eso la columna de la sub-línea va vacía y no en cero — un cero diría «acá presupuestó nada», que no es lo que pasa."
+    "breakdownChip": "apertura — no suma aparte"
   },
   "scenarios": {
     "title": "Escenarios — Budgets & Forecasts",
@@ -2890,7 +2889,8 @@
     "xlTitulo": "Cierre de mes — {periodo} {year}",
     "xlVariacionEntre": "Variación: {escA} vs {escB}",
     "ytdA": "YTD a {mes} {year}",
-    "tab_integral": "Audit Integral"
+    "tab_integral": "Audit Integral",
+    "detalleNoCompara": "La comparación llega hasta la <b>cuenta</b>, no hasta el detalle: el Budget y el Forecast de este año se presupuestaron al nivel de la cuenta. Por eso la columna de la sub-línea va vacía y no en cero — un cero diría «acá presupuestó nada», que no es lo que pasa."
   },
   "otb": {
     "a851Nota1": "{metrica} por {unidad}:",

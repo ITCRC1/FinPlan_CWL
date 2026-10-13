@@ -159,11 +159,25 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
         except (ValueError, TypeError):
             pass
 
+    # Los meses que el hotel NO opera. Sin esto el modelo devolvía las noches
+    # del calendario y el recálculo las escribía de vuelta en `scenario_stats`:
+    # owner, 2026-10-13, después de cerrar octubre y apretar Recalcular, *«ya le
+    # di y no lo arregla»*.
+    from app.models.hotel import Hotel
+    _hotel = await session.get(Hotel, scenario.hotel_id)
+    cerrados_del_hotel = set(_hotel.closed_months_list) if _hotel else set()
+    if sm is not None and getattr(sm, "closed_months", None) is not None:
+        # El escenario manda sobre la propiedad: es como se abre un octubre
+        # para un año sin tocar los demás.
+        cerrados_del_hotel = {int(m) for m in str(sm.closed_months).split(",")
+                              if m.strip().isdigit()}
+
     results: dict[int, RevenueResult] = {}
     for month in range(1, 13):
         results[month] = calculate_revenue(
             month=month,
             year=scenario.year,
+            cerrado=month in cerrados_del_hotel,
             rate_cards=[rc for rc in rate_cards if rc.month == month],
             occ_budgets=[ob for ob in occupancies if ob.month == month],
             channels=[c for c in channels if getattr(c, "month", month) == month] or channels,
