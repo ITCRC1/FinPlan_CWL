@@ -2339,7 +2339,12 @@
     "uploading": "Subiendo…",
     "ytdThrough": "YTD hasta",
     "bajarPorMes": "Excel por mes",
-    "bajarPorMesTitle": "Todo el detalle mes a mes, de enero al corte: una hoja por métrica"
+    "bajarPorMesTitle": "Todo el detalle mes a mes, de enero al corte: una hoja por métrica",
+    "copiarBtn": "⤵ Traer actuales",
+    "copiando": "copiando…",
+    "copiarTitle": "Trae del Actual del mismo año los meses ya cerrados. Los meses posteriores —su proyección— no se tocan.",
+    "copiarConfirmar": "Traer del Actual los meses ya cerrados a «{scn}».\n\nReemplaza los meses cerrados que este escenario ya tenga. Los posteriores, que son su proyección, NO se tocan.\n\n¿Seguir?",
+    "copiarListo": "✓ Traídas {n} filas de «{desde}», de enero a {hasta}."
   },
   "bsProj": {
     "lastRealBalance": "último balance real subido",

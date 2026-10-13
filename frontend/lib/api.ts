@@ -3692,6 +3692,27 @@ export interface RoomStatsEntry {
 export async function getRoomStatsEntry(scenarioId: string, month: number): Promise<RoomStatsEntry> {
   return api.get<RoomStatsEntry>(`/scenarios/${scenarioId}/room-stats-entry/${month}/`);
 }
+/**
+ * Trae los room stats del ACTUAL del mismo año a este escenario.
+ *
+ * Owner, 2026-10-13: *«puedes copiar los actuales en forecast September»* ·
+ * *«de enero a setiembre»*. Un forecast nuevo arranca sin estadísticas y los
+ * meses cerrados hay que traerlos del Actual — a mano son seis categorías por
+ * nueve meses, y basta una fila en blanco para que se vayan sus noches
+ * disponibles y la ocupación salga más alta de lo real.
+ *
+ * ⚠️ Solo toca los meses 1..`hasta_mes`. Lo que el escenario tenga de ahí en
+ * adelante es SU proyección y no se pisa. Sin `hastaMes` llega hasta el último
+ * mes que el Actual tiene con noches ocupadas.
+ */
+export async function copiarRoomStatsDeActuales(
+  scenarioId: string, hastaMes?: number,
+): Promise<{ scenario_id: string; desde: string; hasta_mes: number;
+             meses: number[]; filas: number }> {
+  return api.post(`/scenarios/${scenarioId}/room-stats/copiar-actuales/`,
+                  { hasta_mes: hastaMes ?? null });
+}
+
 export async function saveRoomStatsEntry(scenarioId: string, month: number,
   rows: { room_type_name: string; units: number; nights_occupied: number; revenue: number; pax: number }[],
 ): Promise<{ saved: boolean; month: number; rows_saved: number;

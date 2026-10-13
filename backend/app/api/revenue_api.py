@@ -59,6 +59,7 @@ from app.models.scenario_master import ScenarioMaster
 from app.models.historical_kpi import HistoricalKpi
 from app.models.scenario_stat import ScenarioStat
 from app.models.actual_room_stat import ActualRoomStat
+from app.models.scenario import actual_de_verdad
 from app.models.on_the_books import OnTheBooksEntry
 from app.models.otb_daily_occ import OtbDailyOcc
 from app.models.otb_week_param import OtbWeekParam
@@ -1085,6 +1086,96 @@ async def _otb_units(db: AsyncSession, anio: int | None = None) -> int:
         .where(RoomTypeConfig.hotel_id == HOTEL_ID, aplica_en(anio))
     )).scalar_one()
     return int(total or 0)
+
+
+class CopiarActualesIn(BaseModel):
+    #: Hasta qué mes se copia. Vacío = hasta el último que el ACTUAL tiene con
+    #: noches ocupadas: es lo que uno quiere el 99% de las veces y evita copiar
+    #: los meses futuros que el ACTUAL trae en cero.
+    hasta_mes: int | None = None
+
+
+@router.post("/scenarios/{scenario_id}/room-stats/copiar-actuales/")
+async def copiar_room_stats_de_actuales(
+    scenario_id: str, body: CopiarActualesIn | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Trae los room stats del ACTUAL del mismo año a este escenario.
+
+    Owner, 2026-10-13, con el Forecast September abierto y el YTD en 2.760
+    noches: *«puedes copiar los actuales en forecast September»* · *«de enero a
+    setiembre»*.
+
+    Un forecast nuevo arranca sin room stats: los meses ya cerrados hay que
+    traerlos del ACTUAL. Se hacía a mano, mes por mes y categoría por categoría
+    —seis filas × nueve meses—, y basta que una fila quede en blanco para que se
+    vayan sus NOCHES DISPONIBLES y la ocupación salga más alta de lo real. Ese
+    error ya pasó una vez (ver `put_room_stats_entry`).
+
+    ## Qué copia y qué respeta
+
+    * Solo los meses 1..`hasta_mes`. Los posteriores son la proyección del
+      escenario y **no se tocan**: en el caso del owner, octubre, noviembre y
+      diciembre ya estaban cargados por él.
+    * Copia la fila COMPLETA, incluidas las categorías sin ventas. Una categoría
+      vacía igual tuvo sus habitaciones disponibles.
+    * No se copia sobre el propio ACTUAL ni sobre el espejo del Pre-Cierre: ahí
+      el dato ya es el bueno y sobrescribirlo con una copia no tiene sentido.
+
+    ⚠️ **No toca `actuals_through`.** Ese campo decide hasta dónde el P&L espeja
+    el ACTUAL, y moverlo cambia de dónde sale la plata de cada mes. Es una
+    decisión del cierre, no un efecto secundario de copiar estadísticas.
+    """
+    import uuid as _uuid
+
+    destino = await candado(db, scenario_id)
+    if (destino.type or "").upper() == "ACTUAL":
+        raise ErrorApi(422, "room_stats.destino_es_el_actual")
+
+    actual = (await db.execute(select(Scenario).where(
+        Scenario.hotel_id == destino.hotel_id,
+        Scenario.year == destino.year,
+        actual_de_verdad()))).scalars().first()
+    if actual is None:
+        raise ErrorApi(404, "room_stats.sin_actual_del_anio")
+
+    filas = (await db.execute(select(ActualRoomStat).where(
+        ActualRoomStat.scenario_id == actual.id))).scalars().all()
+    if not filas:
+        raise ErrorApi(404, "room_stats.el_actual_no_tiene_datos")
+
+    # Hasta dónde: lo pedido, o el último mes con noches ocupadas.
+    con_dato = sorted({f.month for f in filas
+                       if float(f.nights_occupied or 0) > 0})
+    hasta = (body.hasta_mes if body and body.hasta_mes
+             else (con_dato[-1] if con_dato else 0))
+    if not 1 <= int(hasta or 0) <= 12:
+        raise ErrorApi(422, "mes.fuera_de_rango")
+    hasta = int(hasta)
+
+    meses = sorted({f.month for f in filas if 1 <= f.month <= hasta})
+    if meses:
+        await db.execute(delete(ActualRoomStat).where(
+            ActualRoomStat.scenario_id == scenario_id,
+            ActualRoomStat.month.in_(meses)))
+
+    copiadas = 0
+    for f in filas:
+        if not 1 <= f.month <= hasta:
+            continue
+        db.add(ActualRoomStat(
+            id=str(_uuid.uuid4()), scenario_id=scenario_id, month=f.month,
+            room_type_name=f.room_type_name, units=f.units,
+            # ⚠️ Las NOCHES DISPONIBLES también se copian, no se recalculan.
+            # Es el dato que ya costó caro una vez: si se derivan de nuevo y
+            # una categoría quedó fuera, el denominador se achica y la
+            # ocupación sale MÁS ALTA de lo real.
+            nights_available=f.nights_available,
+            nights_occupied=f.nights_occupied, revenue=f.revenue, pax=f.pax))
+        copiadas += 1
+    await db.commit()
+    return {"scenario_id": scenario_id, "desde": actual.version,
+            "hasta_mes": hasta, "meses": meses, "filas": copiadas}
 
 
 @router.get("/scenarios/{scenario_id}/room-stats-entry/{month}/")

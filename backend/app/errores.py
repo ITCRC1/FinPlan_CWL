@@ -115,6 +115,16 @@ MENSAJES: dict[str, dict[str, str]] = {
     "rango.invalido": {
         "es": "El rango de meses no es válido: ambos entre 1 y 12, y el mes inicial no puede ser mayor que el final",
         "en": "Invalid month range: both between 1 and 12, and the first month cannot be later than the last"},
+    # Traer los actuales al forecast (room stats).
+    "room_stats.destino_es_el_actual": {
+        "es": "El destino es el propio Actual: no hay de dónde copiar",
+        "en": "The target is the Actual itself: there is nothing to copy from"},
+    "room_stats.sin_actual_del_anio": {
+        "es": "No hay un escenario Actual de ese año para copiar",
+        "en": "There is no Actual scenario for that year to copy from"},
+    "room_stats.el_actual_no_tiene_datos": {
+        "es": "El Actual de ese año todavía no tiene estadísticas de habitaciones",
+        "en": "That year's Actual has no room statistics loaded yet"},
     "mes.fuera_de_rango": {
         "es": "El mes debe estar entre 1 y 12",
         "en": "Month must be between 1 and 12"},

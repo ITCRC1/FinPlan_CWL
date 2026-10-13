@@ -6,6 +6,7 @@ import { HOTEL_ID } from "@/lib/hotel";
 import {
   getScenarios, getRevenueByRoomType, importRoomStats, getRoomStatsEntry, saveRoomStatsEntry, rtLabel,
   type Scenario, type RevenueByRoomType, type RoomTypeRow,
+  copiarRoomStatsDeActuales,
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
@@ -51,6 +52,36 @@ export default function OperationRoomStatsPage() {
   const [entryRows, setEntryRows] = useState<EntryRow[]>([]);
   const [entrySaving, setEntrySaving] = useState(false);
   const [entryMsg, setEntryMsg] = useState<string | null>(null);
+
+  /** Trae del ACTUAL los meses ya cerrados.
+   *
+   *  Owner, 2026-10-13, con el Forecast September en 2.760 noches de YTD:
+   *  *«puedes copiar los actuales en forecast September»* · *«de enero a
+   *  setiembre»*. Se hacía mes por mes y categoría por categoría —seis filas
+   *  por nueve meses— y basta una en blanco para que se vayan sus noches
+   *  disponibles y la ocupación salga más alta de lo real.
+   *
+   *  ⚠️ Se pregunta antes: reemplaza los meses cerrados que el escenario ya
+   *  tenga. Los posteriores —la proyección— no se tocan. */
+  const [copiando, setCopiando] = useState(false);
+
+  async function copiarActuales() {
+    if (!rsId) return;
+    const scn = scenarios.find(s => s.id === rsId);
+    if (!confirm(t("copiarConfirmar", { scn: scn ? scnLabel(scn) : "" }))) return;
+    setCopiando(true);
+    setEntryMsg(null);
+    try {
+      const r = await copiarRoomStatsDeActuales(rsId);
+      setEntryMsg(t("copiarListo", { n: r.filas, hasta: MONTHS[r.hasta_mes - 1],
+                                     desde: r.desde }));
+      setLoading(true);
+      const d = await getRevenueByRoomType(rsId);
+      setRs(d); setYear(d.year);
+    } catch (e) {
+      setEntryMsg(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setCopiando(false); setLoading(false); }
+  }
 
   async function openEntry() {
     if (!rsId) return;
@@ -328,6 +359,17 @@ export default function OperationRoomStatsPage() {
         </div>
         <div className="no-print" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
           <button onClick={openEntry} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "var(--positive)", color: "#fff", border: "none", alignSelf: "flex-end" }}>{t("cargarEditar", { mes: MONTHS[month-1] })}</button>
+          {/* Solo donde tiene sentido: en el ACTUAL el dato ya es el bueno. */}
+          {scenarios.find(s => s.id === rsId)?.type !== "ACTUAL" && (
+            <button onClick={() => void copiarActuales()} disabled={copiando}
+                    title={t("copiarTitle")}
+                    style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700,
+                             borderRadius: 5, cursor: copiando ? "default" : "pointer",
+                             background: "var(--bg-elevated)", color: "var(--brand)",
+                             border: "1px solid var(--brand)", alignSelf: "flex-end" }}>
+              {copiando ? t("copiando") : t("copiarBtn")}
+            </button>
+          )}
           <input ref={fileRef} type="file" accept=".xlsx" style={{ display: "none" }} onChange={handleUpload} />
           <button onClick={() => fileRef.current?.click()} disabled={uploading} title={t("subirExcelTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: uploading ? "default" : "pointer", background: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", alignSelf: "flex-end" }}>{uploading ? t("uploading") : "⬆ Excel"}</button>
           <button onClick={bajarExcel} title={t("bajarExcelTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "transparent", color: "var(--positive)", border: "1px solid var(--positive)", alignSelf: "flex-end" }}>⬇ Excel</button>

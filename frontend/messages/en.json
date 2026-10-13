@@ -2339,7 +2339,12 @@
     "uploading": "Uploading…",
     "ytdThrough": "YTD through",
     "bajarPorMes": "Excel by month",
-    "bajarPorMesTitle": "The full month-by-month detail, January to the cut-off: one sheet per metric"
+    "bajarPorMesTitle": "The full month-by-month detail, January to the cut-off: one sheet per metric",
+    "copiarBtn": "⤵ Pull actuals",
+    "copiando": "copying…",
+    "copiarTitle": "Pulls the closed months from this year's Actual. Later months —your projection— are left alone.",
+    "copiarConfirmar": "Pull the closed months from the Actual into «{scn}».\n\nIt replaces the closed months this scenario already has. Later months, which are your projection, are NOT touched.\n\nContinue?",
+    "copiarListo": "✓ Pulled {n} rows from «{desde}», January through {hasta}."
   },
   "bsProj": {
     "lastRealBalance": "last actual balance uploaded",
