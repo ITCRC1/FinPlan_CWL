@@ -121,3 +121,26 @@ async def rooms_pacing(year: int = Query(..., ge=2000, le=2100), db: AsyncSessio
         "meses": [{k: m.get(k) for k in campos} for m in t.get("meses", [])],
         "leido_por": quien,
     }
+
+
+@router.get("/consolidado/rooms/pickup/")
+async def rooms_pickup(year: int = Query(..., ge=2000, le=2100), db: AsyncSession = Depends(get_db),
+                       quien: str = Depends(lector_del_consolidado)):
+    """Pickup reciente y canales, los de «Pickup & channels» (Hotel Consolidation, 2026-10-14).
+
+    Solo totales: ventanas de 7/14/30/60/90 días contra el año anterior, el pickup
+    de los últimos 30 días por mes de estadía y RN/tarifa por canal. Sin reservas
+    ni huéspedes.
+    """
+    if not _tiene_pacing():
+        raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo="PACING", anio=year)
+    from app.api import pacing_api
+    a = await pacing_api.get_analisis(year=year, kind="rooms", escenario="avail", fuente="auto", db=db)
+    if not a or a.get("vacio") or a.get("anio") != year:
+        raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo="PACING", anio=year)
+    return {
+        "contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME,
+        "anio": a.get("anio"), "corte": a.get("corte"),
+        "pickup": a.get("pickup"), "canales": a.get("canales") or [],
+        "leido_por": quien,
+    }

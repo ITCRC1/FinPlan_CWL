@@ -13,7 +13,8 @@ def test_sin_llave_ni_sesion_no_entra():
     c = TestClient(app, raise_server_exceptions=False)
     for ruta in ("/api/consolidado/rooms/escenarios/",
                  "/api/consolidado/rooms/escenario/x/",
-                 "/api/consolidado/rooms/pacing/?year=2027"):
+                 "/api/consolidado/rooms/pacing/?year=2027",
+                 "/api/consolidado/rooms/pickup/?year=2027"):
         assert c.get(ruta).status_code == 401, ruta
 
 
@@ -32,3 +33,11 @@ def test_ninguna_ruta_escribe():
 
 def test_usa_get_db_y_no_get_session():
     assert "Depends(get_session)" not in FUENTE
+
+
+def test_pickup_solo_entrega_totales():
+    """Pickup y canales salen agregados: nada de reservas ni huéspedes."""
+    bloque = FUENTE.split('"/consolidado/rooms/pickup/"')[1]
+    assert '"pickup"' in bloque and '"canales"' in bloque
+    for prohibido in ('"reservas"', '"fotos"', '"posicion"'):
+        assert prohibido not in bloque
