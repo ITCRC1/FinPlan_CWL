@@ -109,6 +109,16 @@ async def consolidado_propia(
             },
             "moneda": "USD",
             "kpis": anual.get("kpis", {}),
+            # Noches de cada mes (Hotel Consolidation, 2026-10-14): con el
+            # anual solo, el ADR y la ocupación mensual de un Forecast que vive
+            # en el P&L —sin detalle por tipo— no se pueden reconstruir. Campo
+            # nuevo; no cambia ninguno de los que ya estaban.
+            "kpis_mes": [{
+                "month": m["month"],
+                "rooms_available": float((m["kpis"] or {}).get("rooms_available") or 0),
+                "rooms_occupied": float((m["kpis"] or {}).get("rooms_occupied") or 0),
+                "guests": float((m["kpis"] or {}).get("guests") or 0),
+            } for m in mensual],
             "lineas": lineas,
             "leido_por": quien,
         }

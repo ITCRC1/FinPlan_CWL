@@ -158,3 +158,12 @@ def test_hay_documentacion_de_como_conectar():
     txt = doc.read_text(encoding="utf-8")
     for clave in ("CONSOLIDADO_API_KEY", "QBO_REFRESH_TOKEN", "OPERA_BASE_URL"):
         assert clave in txt, f"la documentación no explica {clave}"
+
+
+def test_el_consolidado_trae_las_noches_de_cada_mes():
+    """Hotel Consolidation arma el Forecast desde el P&L: necesita RN y noches
+    disponibles por mes, no solo el anual."""
+    src = (BACK / "api" / "consolidado_api.py").read_text(encoding="utf-8")
+    assert '"kpis_mes"' in src
+    for campo in ("rooms_available", "rooms_occupied", "guests"):
+        assert f'"{campo}"' in src
