@@ -252,3 +252,22 @@ def test_el_detalle_se_muestra_aunque_haya_UNO_solo():
     txt = p.read_text(encoding="utf-8", errors="replace")
     assert "f.detalles.length > 0 && f.detalles.map" in txt
     assert "f.detalles.length > 1" not in txt
+
+
+def test_el_detalle_que_SOLO_esta_en_el_mes_base_tiene_nombre():
+    """⚠️ Buscado solo en el mes actual, el rotulo salia vacio justo en las
+    filas que importan: lo que se DEJO de gastar.
+
+    Medido contra produccion el 2026-10-16, antes del arreglo:
+
+        0190 7105  800  (sin nombre)  AGO 345,00  SET 0,00
+        0190 7105  804  (sin nombre)  AGO 517,50  SET 0,00
+
+    Dos filas con plata de agosto y sin decir de que eran. Ahora el nombre se
+    busca en los DOS meses: las dos resuelven a THE COSTA RICA COLLECTION.
+    """
+    fuente = inspect.getsource(api.audit_integral)
+    assert 'v["detalle_nombre"].get((dep, cta, d3), "")' in fuente
+    assert 'for v in con_det' in fuente
+    # Y el nombre viaja con la columna del mayor, o no habria donde buscarlo.
+    assert '"detalle_nombre": {k: v["nombre"]' in fuente

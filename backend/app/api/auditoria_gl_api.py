@@ -894,6 +894,8 @@ async def audit_integral(
                 "archivo": may["archivo"],
                 "por_cuenta": {k: v["monto"] for k, v in may["por_cuenta"].items()},
                 "por_detalle": {k: v["monto"] for k, v in may["por_detalle"].items()},
+                "detalle_nombre": {k: v["nombre"]
+                                   for k, v in may["por_detalle"].items()},
             })
             continue
 
@@ -946,9 +948,18 @@ async def audit_integral(
                     if dd == dep and cc == cta}
         detalles = sorted(
             ({"detalle": d3,
+              # ⚠️ El rotulo se busca en los DOS meses. Buscado solo en el
+              # actual, un detalle que existe unicamente en el mes base salia
+              # sin nombre —medido el 2026-10-16: «0190 7105 800, AGO 345,00,
+              # SET 0,00», una fila sin decir de que es—. Y son justo las que
+              # importan: lo que se dejo de gastar.
               "nombre": (nombres_det(dep, cta, d3)
                          or limpiar_nombre(
-                             (real.get((dep, cta, d3)) or {}).get("nombre", ""))),
+                             (real.get((dep, cta, d3)) or {}).get("nombre", ""))
+                         or next((limpiar_nombre(
+                             v["detalle_nombre"].get((dep, cta, d3), ""))
+                             for v in con_det
+                             if v["detalle_nombre"].get((dep, cta, d3))), "")),
               "actual": round((real.get((dep, cta, d3)) or {}).get("monto", 0.0), 2),
               "lineas": (real.get((dep, cta, d3)) or {}).get("lineas", 0),
               "versiones": {v["clave"]:
