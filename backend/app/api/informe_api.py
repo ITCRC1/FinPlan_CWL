@@ -23,6 +23,7 @@ entenderla. La especificacion completa esta en `informes/INFORME_OPERATIVO.md`.
 from __future__ import annotations
 
 import io
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,7 +85,7 @@ async def operativo(
     _=Depends(get_current_user),
 ):
     """El documento. Los cuadros siempre; el analisis si esta escrito."""
-    from app.informes.armador import armar, cuadre
+    from app.informes.armador import armar, cuadre, vigencia
     from app.informes.datos import Datos
     from app.informes.extraccion import FaltaDato, extraer
 
@@ -96,6 +97,11 @@ async def operativo(
     D = Datos(anio, mes, corte)
     doc, faltantes = armar(D)
     c = cuadre(D)
+    # ⚠️ Si el analisis escrito habla de OTRA subida, el documento sale igual
+    # —con el aviso en rojo en la portada— pero el boton tiene que decirlo
+    # antes de que nadie lo abra. Owner, 2026-10-15: *«me sigue mostrando una
+    # version antigua»*. Salia completo y cuadrado, citando una cifra muerta.
+    v = vigencia(D)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -112,7 +118,10 @@ async def operativo(
             "X-Informe-GOP-Reporte": str(c["gop_reporte"]),
             "X-Informe-GOP-Motor": str(c["gop_motor"]),
             "X-Informe-Con-Analisis": "si" if not faltantes else "no",
+            "X-Informe-Analisis-Vigente": "si" if v["vigente"] else "no",
+            "X-Informe-Vigencia": quote(v["aviso"] or v["estado"]),
             "Access-Control-Expose-Headers":
                 ("X-Informe-Cuadra, X-Informe-GOP-Reporte, X-Informe-GOP-Motor, "
-                 "X-Informe-Con-Analisis"),
+                 "X-Informe-Con-Analisis, X-Informe-Analisis-Vigente, "
+                 "X-Informe-Vigencia"),
         })

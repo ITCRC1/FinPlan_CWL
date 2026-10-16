@@ -2424,6 +2424,14 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     try {
       const r = await bajarInformeOperativo(year, mes);
       const avisos: string[] = [];
+      // ⚠️ Lo primero, porque es lo que no se ve al abrir el archivo: los
+      // cuadros se rehacen solos y el analisis NO —es texto a mano—. Owner,
+      // 2026-10-15: «me sigue mostrando una version antigua». Salia completo,
+      // cuadraba, y citaba cifras de otra subida.
+      if (!r.analisisVigente) {
+        avisos.push("⚠️ " + (r.vigencia
+          || "El analisis escrito describe otra subida del mes."));
+      }
       if (!r.conAnalisis) {
         avisos.push(
           "El documento trae los cuadros completos. El analisis de este mes "

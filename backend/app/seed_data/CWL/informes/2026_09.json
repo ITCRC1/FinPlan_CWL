@@ -1,409 +1,284 @@
 {
  "_nota": [
-  "EL ANALISIS del informe operativo de setiembre 2026. Es el unico que no se",
-  "puede generar: los 53 cuadros salen de la base igual todos los meses, pero",
-  "que hallazgo va primero, si una favorabilidad es ahorro o diferimiento y",
-  "que se le pregunta a que gerente es juicio de quien revisa.",
+  "EL ANALISIS del informe operativo de setiembre 2026. Es lo unico del",
+  "informe que no se calcula: los 53 cuadros salen del espejo de Pre-Cierre",
+  "en vivo, y esto es juicio escrito a mano.",
   "",
-  "Vive en seed_data/<HOTEL> y no en app/ porque es contenido DE ESTA",
-  "PROPIEDAD: un clon no hereda el analisis de Corcovado. Las reglas de",
-  "escritura estan en informes/INFORME_OPERATIVO.md, seccion 5."
+  "REESCRITO el 2026-10-15 contra la subida «saldo setiembre closing period",
+  "2026.xlsx» del 16-oct, TC 458,43, 261 lineas, estado BORRADOR.",
+  "",
+  "La version anterior describia la subida del 8-oct y quedo vencida sin que",
+  "nada avisara: el ingreso habia bajado $2.025, el costo de ventas $17.152 y",
+  "el resultado estaba $23.492 peor. El documento salia completo y cuadrado",
+  "citando cifras muertas. Por eso ahora existe `_contra`: si el mes se vuelve",
+  "a subir, la portada lo dice en rojo y el boton avisa antes de abrirlo.",
+  "",
+  "SI SE SUBE SETIEMBRE DE NUEVO: hay que reescribir esto. No es opcional."
  ],
+ "_contra": {
+  "checksum": "ca08582f3a88d5500285700d21574bdedda03a9fad690ef5dbae9d12395f72fd",
+  "archivo": "saldo setiembre closing period 2026.xlsx",
+  "fecha": "2026-10-16 03:22:49",
+  "tc": 458.43,
+  "estado": "borrador"
+ },
  "propiedad": "CORCOVADO WILDERNESS LODGE",
  "resumen": [
-  "Setiembre cerro con $42.203,46 de ingreso contra $86.101,21 presupuestados: −51,0%, $43.897,75 menos. El gasto operativo fue de $300.569,90 contra $251.113,98: 19,7% POR ENCIMA del presupuesto. El resultado es un GOP de −$258.366,44 contra −$165.012,77 presupuestados: $93.353,67 peor.",
-  "Ese es el hallazgo central y conviene decirlo sin rodeos: el mes perdio la mitad del ingreso y la estructura de costo no reacciono. Con 35 noches ocupadas de 900 disponibles —3,89% de ocupacion— la propiedad gasto mas de lo que tenia presupuestado para un mes que ya era de temporada baja. La planilla sola fue $181.681,69: 430,5% del ingreso del mes."
+  "Setiembre cerro con $40.178,28 de ingreso contra $86.101,21 presupuestados: −53,3%, $45.922,93 menos. El gasto operativo fue de $322.266,71 contra $251.113,98: 28,3% POR ENCIMA del presupuesto. El resultado es un GOP de −$282.088,43 contra −$165.012,77 presupuestados: $117.075,66 peor.",
+  "Dicho de la forma en que importa: la propiedad facturo $40.178 y gasto $322.267. Por cada dolar que entro salieron ocho. Con 35 noches ocupadas de 900 disponibles —3,89% de ocupacion— la estructura de costo no solo no reacciono, sino que crecio: la planilla subio 31,9% contra presupuesto y el opex 29,2%. La planilla sola fue $180.012,59, el 448% del ingreso del mes.",
+  "Y conviene separar dos cosas que el GOP mezcla. Alrededor de $45.000 del exceso es gasto real de operacion —combustible, horas extra, servicios contratados—. Otra parte importante son ajustes y reclasificaciones que cayeron en setiembre: la reclasificacion de gastos diferidos de julio a setiembre, el ajuste de disposicion de activos dentro de depreciacion y las cuentas casa. Esos ultimos no se corrigen pidiendole al gerente que gaste menos; se corrigen en el registro."
  ],
  "hallazgos": [
   [
-   "La planilla subio 33,1% en el mes de menor ocupacion del ano",
-   "+$45.178,54",
-   "Planilla real $181.681,69 contra $136.503,15 presupuestados, con 3,89% de ocupacion. Y el desvio no esta en el salario base: $9.797,01 de salarios, pero $7.920,77 de horas extra y $3.901,69 de dia libre laborado con presupuesto CERO en los dos conceptos, $9.450,42 de exceso en vacaciones disfrutadas y $4.465,04 en provision de vacaciones. Es el hallazgo numero uno y el que hay que llevar a los cuatro gerentes involucrados."
+   "La planilla subio 31,9% en el mes de menor ocupacion del ano",
+   "+$43.509,44",
+   "Planilla real $180.012,59 contra $136.503,15 presupuestados, con 3,89% de ocupacion. El desvio NO esta principalmente en el salario base: $9.069,51 de salarios, pero $7.857,17 de horas extra y $3.870,36 de dia libre laborado con presupuesto CERO en los dos conceptos, $9.348,99 de exceso en vacaciones disfrutadas y $4.428,62 en provision de vacaciones. Cinco conceptos explican $35.875,94 de los $43.509,44: el 82%."
   ],
   [
-   "El margen de A&B se destruyo: 4,3% real contra 72,8% presupuestado",
-   "−$12.589,29 de margen",
-   "Ingreso de A&B $10.642,21 con costo de venta $10.187,45. El costo de alimentos (5101) fue $9.460,83 contra un ingreso de comida de $7.388,97: el costo de alimentos fue 128% de su propio ingreso. El presupuesto preveia un costo de $3.745,98 sobre $17.927,21 de ingreso."
+   "Horas extra y dia libre laborado con 3,89% de ocupacion",
+   "$11.727,53",
+   "Es el hallazgo que no admite explicacion de volumen. Con 35 noches vendidas en todo el mes se pagaron $7.857,17 de horas extra y $3.870,36 de dia libre laborado, y el presupuesto de ambos conceptos es CERO. Pregunta directa a cada gerente: que se estaba haciendo, quien lo autorizo y por que no cupo en jornada ordinaria."
   ],
   [
-   "Combustible: $28.640,26 contra $16.225,00 presupuestados",
-   "+$12.415,26",
-   "Cuenta 7395 de Utilities, un solo proveedor —SERVICENTRO LA PALMA S.A.— con $28.826,33 en 20 asientos. Es la mayor variacion individual de opex y ocurrio en un mes con 35 noches vendidas."
+   "El costo de alimentos quedo NEGATIVO y el margen de A&B es un artificio",
+   "−$6.636,47",
+   "El costo de ventas de A&B cerro en −$6.636,47 y eso hace que el cuadro muestre un margen de 164,1% contra 72,8% presupuestado. No es un margen: es el efecto de «CUENTAS CASA SEPTIEMBRE» por −$14.843 contra la 5101. Hay que decidir si el consumo de casa se netea del costo o se lleva a gasto de mercadeo; mientras se netee, el margen de A&B no informa nada."
   ],
   [
-   "Tours vendio $3.150,17 y le costo $5.644,03",
-   "−$2.493,86 de margen",
-   "El costo de contratos de actividades (5351) fue $5.153,16 contra $889,06 presupuestados. El proveedor principal es SINAC con $3.232,68 de entradas a parque nacional. El margen presupuestado era 77,8%; el real es −79,2%."
+   "Depreciacion con un ajuste de disposicion de activos adentro",
+   "+$27.612",
+   "8040 cerro en $54.196 contra $26.583 presupuestados. De la diferencia, $25.248 son «AJUSTE PROFIT & LOSS ON ASSET DISPOSSAL»: una perdida por retiro de activo registrada dentro de depreciacion. Es otra cuenta —8045 u otros gastos— y mientras viva ahi la depreciacion deja de ser comparable mes a mes."
   ],
   [
-   "Gasto no presupuestado en Admin e IT",
-   "+$16.049,99",
-   "A&G Contract Services (0180/7105) $7.944,24 con presupuesto cero; IT System Expenses (0230/7625) $8.392,98 contra $583,33 presupuestados — de los cuales $5.254,22 son cargo de THE COSTA RICA COLLECTION, o sea intercompania. Hay que confirmar si estaban presupuestados en otra cuenta."
+   "Una reclasificacion de diferidos de julio a setiembre, repartida en cuatro cuentas",
+   "$10.776",
+   "«AJUSTE RECLASS GAST DIF JUL A SET 2026» aparece en 7120 comisiones de tarjeta ($4.065), 8010 impuestos y patentes ($2.704), 8015 seguros ($2.701) y 7000 agency fees ($1.306). Son gastos de julio que aterrizaron en setiembre. Explican parte del exceso del mes y hay que decirlo cuando se compare contra el presupuesto, porque el presupuesto los tenia en julio."
   ],
   [
-   "Baja de activo por $25.248,12 sin presupuesto",
-   "+$25.147,07",
-   "Cuenta 8045, un unico asiento: «Baja Activo Enertek». No es gasto operativo y no afecta el GOP, pero se lleva el resultado despues de propiedad. Hay que confirmar la autorizacion y el tratamiento."
+   "Tours vendio $4.728 y gasto $31.444",
+   "−$21.580 de variacion de resultado",
+   "El margen bruto de Tours quedo en −18,6% contra 77,8% presupuestado: el costo de actividad ($5.608,62) supero al ingreso ($4.728,16). La planilla del departamento fue $25.653,60 contra $14.605,33 presupuestados. Dentro del costo, $3.233 son SINAC —entradas a parque nacional—, que es costo variable por visitante y deberia moverse con el volumen."
+  ],
+  [
+   "Utilities combustible, el mayor exceso de opex operativo puro",
+   "+$12.185",
+   "7395 cerro en $28.410 contra $16.225 presupuestados, todo con un solo proveedor: SERVICENTRO LA PALMA por $28.826. Con el hotel practicamente vacio, este es consumo de planta y no de huespedes. Hay que medir litros y horas de planta, no dolares."
+  ],
+  [
+   "Ferias no gastadas: $12.580 que probablemente vuelven",
+   "−$12.580 favorable",
+   "7660 Trade Shows gasto $20 contra $12.600 presupuestados. Es la favorabilidad mas grande del mes y casi con seguridad es diferimiento, no ahorro. No se puede presentar como mejora sin decir en que mes reaparece."
   ]
  ],
  "contexto": [
-  "Setiembre es el mes mas bajo del ano en Corcovado y el presupuesto ya lo reconocia: 82 noches de 900, 9,15% de ocupacion. Lo que ocurrio fue menos de la mitad de eso."
+  "Setiembre es el mes mas bajo del ano en Corcovado y el presupuesto ya lo reconocia: 82,32 noches de 900, 9,15% de ocupacion. Lo que ocurrio fue menos de la mitad de eso: 35 noches, 3,89%. El hotel estuvo practicamente vacio durante treinta dias, en la antesala de octubre, que es mes cerrado."
  ],
  "contexto_kpi": [
-  "La lectura es importante para todo lo que sigue: LA TARIFA NO FUE EL PROBLEMA. El ADR real de $534,09 supero el presupuestado de $485,59 en 10,0%, y tambien el del Forecast ($454,55). Lo que falto fue volumen: 35 noches contra 82,3, −57,5%. Cualquier conversacion sobre el ingreso de setiembre es una conversacion sobre ocupacion y sobre el canal que la alimenta, no sobre precio."
+  "La lectura importa para todo lo que sigue: LA TARIFA NO FUE EL PROBLEMA. El ADR real de $534,09 supero el presupuestado de $485,59 en 10,0%, y el ingreso por habitacion disponible cayo a $20,77. Todo el deterioro de ingreso es volumen: se vendieron 35 noches de las 82,32 presupuestadas, con 68 huespedes. Quien pago, pago bien."
  ],
  "contexto_tipos": [
-  "Dos categorias quedaron en cero el mes completo: 5 Elements Treehouse (150 noches disponibles) y Sirena Suites (240 noches). Entre las dos son 390 de las 900 noches disponibles del mes, el 43% del inventario, sin una sola venta. El Treehouse estandar, en cambio, fue el que mas vendio —12 noches— y al ADR mas alto de la propiedad, $697,61."
+  "Dos categorias quedaron en cero el mes completo: 5 Elements Treehouse (150 noches disponibles) y Sirena Suites (240 noches). Entre las dos son 390 de las 900 noches del mes —el 43% del inventario— sin una sola venta. Las que si vendieron: Treehouse 12 noches a $697,61, Corcovado Deluxe 11 a $302,18, Carate 8 a $645,43 y Agujas 4 a $458,65. El Corcovado Deluxe es el unico con ADR por debajo de la categoria, y con once noches de base no da para concluir nada; vale mirarlo, no explicarlo."
  ],
  "contexto_secuencial": [
-  "El ingreso cayo 84,8% de un mes al otro —$235.653,46 menos— y la planilla SUBIO 3,6%. El costo de ventas bajo 33,8% y el opex solo 8,9%. En conjunto, el gasto operativo bajo apenas 6,2% frente a una caida de ingreso de 84,8%. Para un controller esa relacion es la definicion del problema: no hay ningun mecanismo que ajuste la estructura cuando el negocio desaparece."
+  "El ingreso cayo 85,5% de un mes al otro —$237.678,64 menos que agosto— y la planilla SUBIO 2,7%. El costo de ventas bajo 74,9%, que es lo que uno espera, pero el opex SUBIO 26,9%. En conjunto, el GOP paso de −$43.044,13 en agosto a −$282.088,43 en setiembre.",
+  "Esa es la foto de un mes de cierre sin ajuste de estructura: lo unico que se contrajo fue lo que se contrae solo —el costo de lo que se vende—. Todo lo demas se mantuvo o crecio."
  ],
  "contexto_nota": [
   "La pregunta de fondo para la gerencia general",
-  "Con 900 noches disponibles y 35 vendidas, la pregunta no es por que el GOP fue negativo —era inevitable— sino por que la estructura de costo de setiembre fue mayor a la presupuestada para setiembre. El presupuesto ya asumia un mes malo y preveia $251.113,98 de gasto operativo; se gastaron $300.569,90. Esos $49.455,92 de exceso son el objeto de este informe."
+  "Si en setiembre con 3,89% de ocupacion la planilla fue mayor que en agosto con 27,3%, entonces la dotacion no se esta planificando contra la demanda. Octubre es mes cerrado: la misma pregunta vuelve el mes que viene y con el ingreso en cero."
  ],
  "dept_resumen": [
-  "Tres departamentos explican casi todo el deterioro operativo: Alimentos y Bebidas (−$25.966 de variacion de resultado), Tours (−$23.443) y Rooms (−$33.316). Los tres tienen el mismo patron: el ingreso cayo a la mitad o menos y la planilla subio. Dos fueron favorables —Transportacion por $7.380 e Innoceana por $1.416— y en el caso de Transportacion la mejora tiene una explicacion que no es gestion: su costo se registro en Tours."
+  "Tres departamentos explican casi todo el deterioro operativo: Rooms (−$35.188 de variacion de resultado), Tours (−$21.580) y Alimentos y Bebidas (−$10.360). Entre los tres, −$67.128 de los −$66.510 de variacion de resultado operativo: el resto se compensa entre si, con Transportacion aportando +$7.111 a favor."
  ],
  "dept": {
   "Rooms": {
    "comentario": [
-    "El ingreso de habitaciones fue $20.100,28 contra $39.973,51 presupuestados, −49,7%. Y la causa es exclusivamente volumen: el ADR real de $534,09 supero el presupuestado en 10,0%. Se vendieron 35 noches de las 82,32 presupuestadas.",
-    "La planilla fue $36.054,55 contra $28.204,40 (+27,8%) en un mes en que vendio la mitad. Equivale a 179% del ingreso de habitaciones. Incluye $840,73 de horas extra y $703,31 de dia libre laborado, los dos con presupuesto cero, y $3.527,28 de vacaciones disfrutadas.",
-    "El opex se duplico: $11.111,05 contra $5.518,50, +101,3%. Lo explican Contract Services ($3.551,21 contra cero) y Comisiones de agente ($3.329,73 contra $500,00). Las comisiones merecen atencion: 16,6% del ingreso, cuando el presupuesto asumia 1,3%. El mix de canal de las pocas noches vendidas fue mucho mas caro."
-   ],
-   "cuentas": [
-    [
-     "0110",
-     "7080",
-     "Comisiones de agente"
-    ],
-    [
-     "0110",
-     "7105",
-     "Contract Services"
-    ],
-    [
-     "0110",
-     "7310",
-     "Lavanderia distribuida"
-    ],
-    [
-     "0110",
-     "4000",
-     "Ingreso de habitaciones"
-    ]
+    "El ingreso de habitaciones fue $19.105,22 contra $39.973,51 presupuestados, −52,2%. La causa es exclusivamente volumen: el ADR real de $534,09 supero el presupuestado en 10,0%. Se vendieron 35 noches de las 82,32 presupuestadas.",
+    "La planilla fue $35.707,57 contra $28.204,40 (+26,6%) en un mes en que vendio la mitad. Equivale al 187% del ingreso de habitaciones.",
+    "En opex aparecen dos partidas sin presupuesto: 7105 Contract Services $3.516,96 —con THE COSTA RICA COLLECTION por $2.418 y AIDA CRUZ por $1.140— y 7080 Agent Commissions $3.634 contra $500, con PREFERRED TRAVEL GROUP ($1.644), BOOKING.COM ($859) y SITEMINDER ($835). Las comisiones de canal con ingreso a la mitad merecen revision: o el mix cambio hacia canal pagado, o hay comision de reservas de otros meses."
    ],
    "preguntas": [
-    "Las comisiones fueron 16,6% del ingreso contra 1,3% presupuestado. ¿Que canales trajeron las 35 noches y a que comision? En el mayor aparecen Preferred Travel Group ($1.644,12), Booking.com ($859,02) y SiteMinder ($834,65).",
-    "¿Que son los $3.551,21 de Contract Services, sin presupuesto? El mayor muestra $2.418,21 de THE COSTA RICA COLLECTION —intercompania— y $1.140,00 de Aida Cruz Fernandez de Murga.",
-    "Housekeeping y Front Desk sumaron $36.054,55 con 35 noches ocupadas. ¿Que dotacion se mantuvo y por que? ¿Hubo posibilidad de vacaciones colectivas en lugar de planilla activa?",
-    "¿Por que 390 de las 900 noches disponibles —5 Elements y Sirena Suites— no registraron una sola venta? Si estaban fuera de inventario, la ocupacion real sobre inventario vendible fue 6,9% y no 3,89%.",
-    "El ingreso del P&L ($20.100,28) y el de la estadistica ($18.693,28) difieren en $1.407,00. ¿Que contiene esa diferencia?"
+    "Las comisiones de canal fueron $3.634 contra $500 presupuestados —19,0% del ingreso de habitaciones— con PREFERRED TRAVEL GROUP ($1.644), BOOKING.COM ($859) y SITEMINDER ($835). ¿El mix viro a canal pagado, o hay comision de reservas de otros meses?",
+    "¿Que son los $3.516,96 de Contract Services, sin presupuesto? El mayor muestra $2.418 de THE COSTA RICA COLLECTION —intercompania— y $1.140 de AIDA CRUZ FERNANDEZ DE MURGA.",
+    "La planilla fue $35.707,57 contra un ingreso de $19.105,22: 187%. Con 35 noches en el mes, ¿que dotacion se mantuvo y por que decision?"
    ]
   },
   "Alimentos y Bebidas": {
    "comentario": [
-    "Es el departamento con el deterioro mas grave del mes. El ingreso fue $10.968,83 contra $17.927,21 (−38,8%) y el costo de ventas $10.187,45 contra $4.883,16 (+108,6%). El margen bruto paso de 72,8% presupuestado a 4,3% real.",
-    "Abriendo el costo: el de alimentos (5101) fue $9.460,83 y el ingreso de comida —4110, Restaurant Vitrales— fue $7.388,97. EL COSTO DE ALIMENTOS FUE 128% DE SU PROPIO INGRESO. El de bebida, en cambio, se comporto: $726,62 sobre $3.253,24, 22,3%.",
-    "La planilla fue $31.953,32 contra $18.470,82 (+73,0%): la variacion de planilla mas grande de la propiedad en valor absoluto ($13.482,50). Incluye $1.695,71 de horas extra y $1.055,53 de dia libre sin presupuesto, mas $1.886,15 de vacaciones disfrutadas y $890,19 de provision contra $0 presupuestado.",
-    "El resultado departamental fue −$33.470,93 contra −$7.504,54 presupuestado. Con 68 huespedes, el costo de alimentos por huesped fue $139,13."
-   ],
-   "cuentas": [
-    [
-     "0120",
-     "5101",
-     "Costo de alimentos"
-    ],
-    [
-     "0120",
-     "5150",
-     "Costo de bebidas"
-    ],
-    [
-     "0120",
-     "4110",
-     "Ingreso de comida"
-    ]
+    "Ingreso $10.346,09 contra $17.927,21 (−42,3%) y resultado −$17.865 contra −$7.505 presupuestados.",
+    "El costo de ventas cerro NEGATIVO en −$6.636,47. Es el numero que hay que explicar antes que cualquier otro del departamento: «CUENTAS CASA SEPTIEMBRE» aporta −$14.843 contra la 5101, y contra eso se netean $4.144 de WALTER ALEXANDER ELIZONDO y las compras del mes. Mientras el consumo de casa se registre como menos costo, el margen de A&B no se puede leer ni comparar.",
+    "La planilla fue $31.671,69 contra $18.470,82: +$13.200,87, el mayor exceso de planilla de la propiedad. Con el restaurante practicamente sin cubiertos, esa dotacion es la pregunta central del departamento."
    ],
    "preguntas": [
-    "El costo de alimentos fue 128% del ingreso de comida. ¿Es compra para inventario, consumo de empleados mal clasificado, merma, o compra adelantada para la temporada que arranca en noviembre? Son 468 asientos, con Walter Alexander Elizondo Matamoros ($4.144,47) y Centro Internacional de Inversiones ($2.371,35) como principales.",
-    "¿Existe toma de inventario fisico al 30 de setiembre? Sin inventario final no se puede separar compra de consumo.",
-    "La cafeteria de empleados registro $10.764,88 de costo de comida aparte (5420). ¿Esta garantizado que no hay traslape? Los dos comparten proveedores.",
-    "$31.953,32 de planilla con 68 huespedes son $470 por huesped. ¿Cuanta dotacion de cocina y restaurante se mantuvo activa y con que criterio?",
-    "Private Bar (0121) registro $326,62 de ingreso sin presupuesto asignado. ¿Deberia tener presupuesto propio o consolidarse en 0120?"
+    "El costo de alimentos cerro NEGATIVO en −$5.459 por «CUENTAS CASA SEPTIEMBRE» de −$14.843. ¿Que se consumio como cuenta casa, para quien y con que autorizacion?",
+    "¿El consumo de casa debe netear el costo de ventas o ir a gasto de mercadeo? Es una decision de politica contable y sin ella el margen del departamento no se puede leer ni comparar.",
+    "La planilla fue $31.671,69 contra $18.470,82 presupuestados, el mayor exceso de la propiedad, con el restaurante casi sin cubiertos. ¿Cuantas personas estuvieron y en que se ocuparon?",
+    "El costo de bebidas tambien quedo negativo (−$1.178) por un ajuste de inventario de −$1.688. ¿Corresponde al mes o viene arrastrado?"
    ]
   },
   "Spa": {
    "comentario": [
-    "El Spa facturo $571,17 contra $5.625,00 presupuestados: −89,8%, la caida relativa mas pronunciada de la propiedad. Un unico renglon de ingreso —masajes, cuenta 4201—.",
-    "La planilla fue $2.368,13 contra $3.718,84 (−36,3%), coherente con el nivel de actividad. El opex, en cambio, fue $764,54 contra $334,48: mas del doble.",
-    "Hay una particularidad de registro que conviene corregir: el presupuesto carga todo el Spa en 0130 y el real todo en 0140. Eso hace que la comparacion solo funcione si se suman los dos, como se hace en este cuadro."
+    "Ingreso $566,59 contra $5.625,00: −89,9%. Es practicamente un mes sin operacion —el detalle del mayor muestra tres tratamientos—. La planilla de $2.345,01 contra $3.718,84 si acompano la caida, que es lo correcto.",
+    "El resultado pasa de +$1.572 presupuestado a −$2.537."
    ],
    "preguntas": [
-    "¿El Spa estuvo abierto todo el mes? Con $571,17 en 30 dias, la pregunta es si hubo servicio disponible o si la terapeuta estuvo asignada a otras funciones.",
-    "¿Por que el presupuesto carga el Spa en 0130 y el real en 0140? Mientras esten separados, ningun reporte departamental compara bien.",
-    "El opex duplico el presupuesto en un mes casi sin actividad. ¿Que se compro?"
+    "¿El Spa estuvo abierto todo el mes? Con $566,59 en treinta dias, la pregunta es si hubo servicio disponible o si la terapeuta estuvo asignada a otras funciones.",
+    "¿Por que el presupuesto carga el Spa en 0130 y el real en 0140? Mientras esten separados, ningun reporte departamental compara bien."
    ]
   },
   "Tours / Actividades": {
    "comentario": [
-    "Tours vendio $3.150,17 contra $12.511,39 (−74,8%) y le costo $5.644,03 contra $2.778,30 (+103,1%). El margen presupuestado era 77,8%; el real fue −79,2%: cada dolar vendido costo 1,79.",
-    "El costo esta concentrado en una cuenta: Activity Cost 2 — Contract Services (5351) con $5.153,16 contra $889,06. El principal proveedor es SINAC con $3.232,68, que son entradas a parque nacional. Es un costo por persona y deberia moverse con el volumen; no lo hizo.",
-    "La planilla fue $25.901,50 contra $14.605,33 (+77,3%). Con $3.150,17 de ingreso, la planilla de Tours fue 822% de su propio ingreso. Incluye $1.483,51 de horas extra sin presupuesto."
-   ],
-   "cuentas": [
-    [
-     "0150",
-     "5351",
-     "Contratos de actividades"
-    ],
-    [
-     "0150",
-     "5350",
-     "Insumos de actividades"
-    ],
-    [
-     "0150",
-     "4400",
-     "Ingreso de actividades"
-    ]
+    "Ingreso $4.728,16 contra $12.511,39 (−62,2%) y gasto $31.444 contra $17.648. El resultado se deteriora $21.580.",
+    "El margen bruto quedo en −18,6%: el costo de actividad ($5.608,62) supero al ingreso. Dentro de el, 5351 Contract Services $5.112 contra $889 presupuestados, con SINAC por $3.233. Las entradas a parque son costo por visitante: con 68 huespedes en el mes, $3.233 de entradas pide una conciliacion contra el numero de tours vendidos.",
+    "La planilla fue $25.653,60 contra $14.605,33: +$11.048,27, el segundo exceso mas grande de la propiedad."
    ],
    "preguntas": [
-    "SINAC $3.232,68 de entradas contra $3.150,17 de ingreso TOTAL de tours. ¿Cuantos pax de parque nacional y a que precio de venta? Si la entrada se cobra al huesped, este renglon no puede exceder su propio ingreso.",
-    "¿Las entradas a SINAC son de setiembre o es compra de bloque anticipada? Son 6 asientos.",
-    "$25.901,50 de planilla con 68 huespedes. ¿Cuantos guias y capitanes activos, y que hicieron en un mes con 3,89% de ocupacion?",
-    "Detoxigen SRL ($545,00), Franklin Araya ($540,00) y Juno R&M ($500,00) en costo de contratos. ¿A que servicios corresponden y contra que venta?"
+    "El costo de actividad ($5.608,62) supero al ingreso ($4.728,16): margen bruto de −18,6%. ¿Cuantos tours se vendieron y cuantos se operaron?",
+    "SINAC por $3.233 con 68 huespedes en todo el mes. ¿Son entradas de tours efectivamente vendidos o compra anticipada de cupos?",
+    "La planilla fue $25.653,60 contra $14.605,33. ¿Que dotacion se mantuvo y para que volumen esperado?",
+    "El costo de tours presupuestado en Transportacion (0152/5350, $3.900) se registro aca en 5351. ¿Donde debe quedar de aqui en adelante?"
    ]
   },
   "Gift Shop": {
    "comentario": [
-    "El unico departamento netamente favorable del mes: $945,93 contra $479,68 presupuestados (+97,2%) y sin costo de venta registrado.",
-    "Y ahi esta el problema: el costo SI estaba presupuestado, pero en otro departamento. El Budget carga $359,76 de Clothing Other Cost en el departamento 0151, mientras el ingreso vive en 0165. El resultado es 100% de margen aparente, que no es real."
+    "Ingreso $938,33 contra $479,68 —por encima del presupuesto— y costo negativo de −$372,21 por «CUENTAS CASA TIENDA SEPTIEMBRE». El resultado de +$1.311 contra +$90 es favorable, pero el margen de 139,7% es el mismo artificio de las cuentas casa, no una mejora."
    ],
    "preguntas": [
-    "¿Cual es el departamento correcto del Gift Shop, 0165 o 0151? Mientras el ingreso y el costo esten separados, el margen de la tienda no se puede medir.",
-    "Se vendieron $945,93 sin registrar costo de mercaderia. ¿Hay inventario y se esta descargando el costo contra la venta?"
+    "El costo quedo en −$372 por «CUENTAS CASA TIENDA SEPTIEMBRE». ¿Que mercaderia salio como cuenta casa?",
+    "El ingreso de $938 supero el presupuesto de $480 en un mes vacio. ¿Que se vendio y a quien?"
    ]
   },
   "Transportacion": {
    "comentario": [
-    "En la superficie fue el departamento mas favorable: resultado −$2.795,00 contra −$10.174,87 presupuestado, $7.379,87 mejor. Pero la mejora no es gestion.",
-    "El presupuesto cargaba $3.900,00 de Cost Tours 1 (5350) en el departamento 0152. El real registro cero ahi, y Tours (0150) gasto $5.153,16 en su propia 5351 contra $889,06 presupuestados. El costo de tours esta PRESUPUESTADO en Transportacion y EJECUTADO en Tours: las dos variaciones son en parte el mismo hecho contable visto desde dos departamentos.",
-    "La planilla cayo a $3.635,80 desde $9.166,06 (−60,3%), que si es una reduccion real. Y el opex subio a $2.151,04 por $1.935,90 de alquiler de equipo sin presupuesto."
+    "El unico departamento con variacion de resultado favorable de peso: −$3.064 contra −$10.175 presupuestados, +$7.111.",
+    "El ingreso cayo a $2.673,47 contra $4.335,63, pero el costo de tours presupuestado en 5350 ($3.900) se registro en Tours y la planilla fue $3.603,67 contra $9.166,06. Parte de la favorabilidad es real —menos dotacion— y parte es la clasificacion cruzada con Tours: hay que leerlos juntos, no por separado.",
+    "En opex, 7185 Equipment Rental $1.920,36 sin presupuesto (ANC RENTING)."
    ],
    "preguntas": [
-    "¿En que departamento corresponde el costo de tours: 0150 o 0152? Es la correccion de clasificacion mas clara del mes y afecta el margen de los dos.",
-    "¿Que es el alquiler de equipo de $1.935,90 (7185) sin presupuesto?",
-    "La planilla bajo 60%. ¿Reduccion de dotacion, vacaciones, o traslado de personal a otro departamento? Si fue traslado, parte del exceso de Tours y Mantenimiento podria explicarse aqui."
+    "Es el unico departamento con variacion favorable de peso (+$7.111), pero parte viene de que el costo de tours se registro en 0150. ¿Cuanto de la favorabilidad es dotacion real y cuanto clasificacion?",
+    "El ingreso presupuestado estaba en 4400 y el real entro por 4500. ¿Cual es la cuenta correcta?",
+    "7185 Equipment Rental $1.920,36 sin presupuesto, con ANC RENTING. El mismo proveedor aparece en 8000 Alquileres por $3.990. ¿Es el mismo contrato partido en dos cuentas?"
    ]
   },
   "Lavanderia": {
    "comentario": [
-    "Lavanderia es un departamento de allocation: su gasto se reparte via la cuenta 4999 a los departamentos que la consumen, y netea a cero. En este cuadro aparece en cero, como corresponde.",
-    "La venta externa fue $16,27 contra $900,00 presupuestados. El credito de reparto del mes fue $3.126,21, distribuido a los departamentos consumidores —Rooms recibio $1.304,49—."
+    "Ingreso $16,14 contra $900,00 presupuestados y $176,69 de costo. El departamento es de allocation: su gasto propio se reparte via el credito 4999 de −$3.098,18, y con eso netea. Los $900 de ingreso externo presupuestados no se dieron."
    ],
    "preguntas": [
-    "La venta externa presupuestada de $900 mensuales no se materializo ($16,27). ¿Sigue vigente ese supuesto? El Forecast de setiembre tambien lo mantiene en $900."
+    "El ingreso externo presupuestado ($900) no se dio. ¿Sigue habiendo servicio a terceros o se descontinuo?",
+    "El departamento netea con el credito 4999 de −$3.098,18, que es lo correcto. ¿La base de reparto por kilos esta actualizada?"
    ]
   },
   "Innoceana": {
    "comentario": [
-    "Innoceana facturo $1.616,25 contra $199,87 presupuestados (+708,7%), sin costo ni planilla asignados. Es favorable en valor absoluto pequeno, pero el supuesto presupuestario esta mal calibrado."
+    "Sin movimiento en el mes. El presupuesto tenia $199,87 de ingreso."
    ],
    "preguntas": [
-    "¿Cual es la base del presupuesto de Innoceana? Con $199,87 mensuales presupuestados y $1.616,25 reales, el supuesto esta errado en un factor de ocho.",
-    "¿Innoceana tiene costo directo y planilla propia? En setiembre no registro ninguno de los dos."
+    "Sin movimiento en el mes contra $199,87 de ingreso presupuestado. ¿Cual es la base de ese presupuesto y sigue vigente?",
+    "Innoceana aparece como PROVEEDOR en 7150 de Ventas y Mercadeo por $6.231. ¿Es cuota anual o mensual, y por que no esta presupuestada?"
    ]
   },
   "Sostenibilidad y otros": {
    "comentario": [
-    "La tarifa de sostenibilidad genero $1.805,07 contra $4.148,93 presupuestados. Como es un cargo por huesped, su caida es consistente con el volumen: 68 huespedes contra 148 presupuestados. $26,54 por huesped real contra $28,01 presupuestado — el supuesto unitario se sostuvo; lo que falto fue pax."
+    "La tarifa de sostenibilidad aporto $1.804,28 contra $4.148,93 presupuestados. Es ingreso por huesped y cayo en proporcion al volumen: no hay nada que explicar mas alla de la ocupacion."
    ],
    "preguntas": [
-    "¿El fee se cobra a todos los huespedes? $1.805,07 entre 68 pax da $26,54, cerca del supuesto, asi que la cobertura parece correcta. Confirmar que no haya exoneraciones no documentadas."
+    "$1.804,28 contra $4.148,93: la caida es proporcional al volumen de huespedes. ¿La tarifa por huesped sigue siendo la misma?"
    ]
   },
   "Cafeteria de empleados": {
    "comentario": [
-    "No es un departamento operativo: su gasto se reparte a los departamentos cuyo personal come en la propiedad, via la cuenta 4999, y netea a cero. En setiembre el gasto bruto fue $15.663,09 ($10.764,88 de comida, $4.685,83 de planilla, $212,38 de opex) y el credito de reparto fue exactamente −$15.663,09.",
-    "Hasta el 2026-10-09 este reporte mostraba el gasto y descartaba el credito, asi que la Cafeteria aparecia con −$15.663,09 de resultado y el GOP del mes salia $18.789,30 peor que el real. Ya esta corregido: los dos lados entran, el departamento netea y el GOP coincide con el del motor del P&L.",
-    "Sobre el fondo, que sigue en pie: el costo de comida de empleados fue $10.764,88 contra $6.800,00 presupuestados —el presupuesto lo registra en la cuenta 5700 y el real en la 5420—, o sea $3.964,88 de exceso real, 58,3%, con la dotacion de un mes de 3,89% de ocupacion."
-   ],
-   "cuentas": [
-    [
-     "0220",
-     "5420",
-     "Costo de comida de empleados"
-    ],
-    [
-     "0220",
-     "4999",
-     "Credito de reparto"
-    ]
+    "El departamento netea, que es lo que tiene que hacer: $4.648,22 de planilla y $10.678,46 de costo de comida (5420), contra el credito de distribucion 4999 de −$15.326,68.",
+    "Lo que no esta bien es el presupuesto: 0220 tiene CERO en planilla y cero en 5420, asi que cada mes genera una variacion desfavorable de $15.000 que no informa nada. Hay que presupuestarlo con base en el historico de agosto y setiembre, que ya esta en el mayor.",
+    "El costo de comida de empleados subio a $10.678,46 con la propiedad vacia. Con CENTRO INTERNACIONAL DE INVERSIONES por $3.738 y WALTER ALEXANDER ELIZONDO, vale confirmar cuantas raciones se sirvieron."
    ],
    "preguntas": [
-    "$10.764,88 de comida de empleados en el mes de menor ocupacion del ano, contra $6.800,00 presupuestados. ¿Cuantos empleados se alimentaron y cuantos dias? Son 327 asientos.",
-    "El presupuesto usa la cuenta 5700 y el real la 5420. Las dos van a la misma linea del P&L, pero cuenta contra cuenta nunca van a aparear. ¿Se corrige el presupuesto a la 5420?",
-    "Los proveedores de la cafeteria y los del restaurante se solapan —Centro Internacional de Inversiones, Walter Elizondo—. ¿Como se separa la compra de una y de otro al codificar?"
+    "El departamento netea a cero via el credito 4999 (−$15.326,68), pero el presupuesto tiene CERO en planilla y cero en 5420. ¿Se presupuesta para el Forecast o se espera al Budget 2027?",
+    "El costo de comida de empleados fue $10.678,46 con la propiedad vacia, con CENTRO INTERNACIONAL DE INVERSIONES ($3.738) y WALTER ALEXANDER ELIZONDO. ¿Cuantas raciones se sirvieron en el mes?",
+    "El presupuesto usa la cuenta 5700 y el real la 5420. ¿Cual queda?"
    ]
   },
   "Administracion": {
    "comentario": [
-    "Planilla $31.451,45 contra $28.241,22 (+11,4%) y opex $23.152,98 contra $19.052,43 (+21,5%). Es el departamento de overhead con mas gasto absoluto y el segundo en exceso.",
-    "En opex hay dos partidas que concentran el desvio. Procesamiento de planilla (7465) $10.995,05 contra $10.000,00 —razonable—, pero Contract Services (7105) $7.944,24 CONTRA CERO PRESUPUESTADO: Consultants Costa Rica $3.863,00, Veinticuatro Siete Medical Assistance $2.400,00 y Ronald David Fallas Bermudez $1.250,00. Tambien $1.995,21 de courier (7485, Aerocasillas) contra $100,00, en 175 asientos.",
-    "Y el presupuesto tenia $5.000,00 de Centralized Accounting Charges que no se ejecutaron. Es posible que parte del Contract Services real sea ese mismo concepto en otra cuenta."
-   ],
-   "cuentas": [
-    [
-     "0180",
-     "7465",
-     "Procesamiento de planilla"
-    ],
-    [
-     "0180",
-     "7105",
-     "Contract Services"
-    ],
-    [
-     "0180",
-     "7485",
-     "Courier y mensajeria"
-    ]
+    "El overhead mas desviado del mes: $77.453 contra $47.294, +63,8%.",
+    "Cuatro cuentas lo explican. 7270 Recursos Humanos $10.930 contra $150, todo «CUENTAS CASA BENEFICIO ANUAL» —un beneficio anual cargado completo a un mes—. 7120 comisiones de tarjeta $11.224 contra $1.500, de los cuales $4.065 son la reclasificacion de diferidos de julio. 7105 Contract Services $7.973,67 sin presupuesto, con Consultants Costa Rica ($3.863) y VEINTICUATRO SIETE MAS MEDICAL ($2.400). Y 7485 correo $1.979 contra $100.",
+    "A favor, 7050 Centralized Accounting no gasto los $5.000 presupuestados.",
+    "La planilla fue $31.168,22 contra $28.241,22: +$2.927, el unico overhead cuya planilla se mantuvo razonablemente en linea."
    ],
    "preguntas": [
-    "Contract Services $7.944,24 sin presupuesto. ¿Que contratos son y quien los autorizo? ¿Es el mismo concepto que los $5.000,00 de Centralized Accounting que quedaron sin usar?",
-    "$1.995,21 de courier en 175 asientos contra $100,00 presupuestados. ¿Que se esta enviando y por que tantos envios en temporada baja?",
-    "Veinticuatro Siete Medical Assistance $2.400,00: ¿poliza, retainer o servicio puntual? Si es recurrente, deberia estar presupuestado.",
-    "La planilla no bajo con la temporada. ¿Es estructura fija irreducible o hay margen en los meses de cierre?"
+    "7270 Recursos Humanos $10.930 contra $150, todo «CUENTAS CASA BENEFICIO ANUAL». ¿Corresponde diferirlo en doce meses?",
+    "7120 comisiones de tarjeta $11.224 contra $1.500, de los cuales $4.065 son «AJUSTE RECLASS GAST DIF JUL A SET 2026». ¿Por que los diferidos de julio aterrizaron en setiembre?",
+    "7105 Contract Services $7.973,67 sin presupuesto, con Consultants Costa Rica ($3.863) y VEINTICUATRO SIETE MAS MEDICAL ($2.400). ¿Son recurrentes? Si lo son, hay que presupuestarlos.",
+    "7050 Centralized Accounting no gasto los $5.000 presupuestados. ¿Se acumula para un cargo posterior?"
    ]
   },
   "Ventas y Mercadeo": {
    "comentario": [
-    "El unico bloque de overhead claramente favorable: $36.560,87 contra $52.820,12 presupuestados, $16.259,25 menos. Pero la composicion importa mas que el neto, porque casi todo el ahorro es DIFERIMIENTO.",
-    "Lo que no se gasto: Trade Shows $0,00 contra $12.600,00, Media $3.271,41 contra $9.086,67, y Travel Other $0,00 contra $3.655,29. El Forecast de setiembre, ademas, subia Trade Shows a $32.600,00 — ese gasto esta previsto, solo que mas adelante.",
-    "Lo que si se gasto por encima: Dues and Subscriptions $7.114,67 contra $4.101,92 (+73,4%), Travel Meals and Entertainment $4.937,26 contra $762,35 (+547,6%) y Agency Fees $5.325,43 contra $4.000,00 (+33,1%).",
-    "Un controller tiene que leer esto como senal de riesgo y no de ahorro: si los $12.600,00 de ferias se corren a noviembre y diciembre, el ahorro de setiembre reaparece como exceso en el ultimo trimestre."
-   ],
-   "cuentas": [
-    [
-     "0190",
-     "7150",
-     "Cuotas y suscripciones"
-    ],
-    [
-     "0190",
-     "7670",
-     "Viajes, comidas y representacion"
-    ],
-    [
-     "0190",
-     "7000",
-     "Honorarios de agencia"
-    ]
+    "El unico overhead por debajo del presupuesto: $50.656 contra $52.820, −4,1%. Pero el neto esconde movimientos grandes en los dos sentidos y ninguno es ahorro estructural.",
+    "A favor: 7660 Trade Shows $20 contra $12.600 y 7675 Travel Other cero contra $3.655. En contra: 7670 Travel-Meals $7.497 contra $762 —con ALICIA REPETO por $2.746 mas $1.317 de aplicacion de diferido—, 7150 Dues $7.259 contra $4.102 con INNOCEANA por $6.231, 7000 Agency Fees $6.601 contra $4.000 y 7500 Promotion $2.535 sin presupuesto.",
+    "Los $12.580 de ferias no gastadas son el numero que hay que vigilar: si vuelven en noviembre o diciembre, la favorabilidad de setiembre era prestada."
    ],
    "preguntas": [
-    "Trade Shows: $0 contra $12.600 presupuestados, y el Forecast los sube a $32.600. ¿Se cancelaron, se movieron de mes, o de ano? Esto define si el ahorro es real.",
-    "Travel Meals and Entertainment $4.937,26 contra $762,35 (+548%) en un mes sin operacion. ¿Que viajes y con que objetivo comercial?",
-    "Dues and Subscriptions $7.114,67: ¿cuales son anuales pagadas en setiembre? Si lo son, el presupuesto mensual esta mal distribuido.",
-    "Agency Fees $5.325,43 con 35 noches vendidas. ¿Fijo o variable? Si es fijo, ¿se renegocia para meses de cierre?"
+    "7660 Trade Shows gasto $20 de $12.600. ¿En que mes se ejecuta la feria, o se cancelo?",
+    "7670 Travel-Meals $7.497 contra $762, con ALICIA REPETO USD ($2.746) y $1.317 de aplicacion de diferido. ¿Cual es el alcance y la vigencia del contrato?",
+    "7150 Dues con INNOCEANA por $6.231. ¿Cuota anual o mensual?",
+    "7500 Promotion $2.535 sin presupuesto, con «CUENTAS CASA SEPTIEMBRE» por $1.619. ¿Cuentas casa de mercadeo o de operacion?"
    ]
   },
   "Mantenimiento": {
    "comentario": [
-    "El gasto total fue $35.211,59 contra $31.528,39 presupuestados (+11,7%), pero con la composicion invertida: planilla $28.926,34 contra $18.107,36 (+59,8%) y opex $6.285,25 contra $13.421,03 (−53,2%).",
-    "Se gasto mucho mas en gente y mucho menos en materiales. Lo que no se ejecuto: Vehicle Repair ($45,35 contra $2.800,00), Building ($0 contra $1.600,00), Grounds Maintenance ($50,86 contra $1.400,00) y Equipment ($665,59 contra $2.000,00).",
-    "La planilla contiene la mayor partida de horas extra de la propiedad —$1.802,53— y la mayor de vacaciones disfrutadas —$3.887,53—. La combinacion de las dos en el mismo departamento y el mismo mes merece explicacion: normalmente una sustituye a la otra."
+    "$35.758 contra $31.528, +13,4%. El exceso esta en planilla: $28.650,31 contra $18.107,36, +$10.542,95 —el tercer exceso de planilla de la propiedad—.",
+    "En opex el departamento estuvo por debajo: 7700 Vehicle Repair $45 contra $2.800 y 7030 Building cero contra $1.600. Es coherente con un mes de baja ocupacion, pero con una planilla 58% por encima la lectura es que la cuadrilla estuvo completa sin el gasto de materiales que normalmente la acompana. Vale preguntar en que se ocupo."
    ],
    "preguntas": [
-    "$28.926,34 de planilla contra $18.107,36 en un mes de cierre, y $1.802,53 de horas extra. ¿Que trabajo se hizo? Si fue mantenimiento mayor aprovechando la baja ocupacion, ¿estaba planificado y por que no esta en el presupuesto?",
-    "¿Por que horas extra y vacaciones disfrutadas al mismo tiempo en el mismo departamento? Si el personal estaba de vacaciones, ¿quien hizo las horas extra?",
-    "El opex de materiales quedo 53% por debajo. ¿Se postergo mantenimiento programado? Si se postergo, aparece en el ultimo trimestre.",
-    "Miscellaneous (7380) $1.385,70 sin presupuesto. ¿Que contiene? Una cuenta de varios con monto significativo es una cuenta que hay que abrir."
+    "La planilla fue $28.650,31 contra $18.107,36 (+58%) mientras el gasto de materiales quedo por debajo del presupuesto. ¿En que se ocupo la cuadrilla?",
+    "7700 Vehicle Repair gasto $45 de $2.800 y 7030 Building cero de $1.600. ¿Se pospuso mantenimiento, y para cuando?"
    ]
   },
   "Sistemas (IT)": {
    "comentario": [
-    "El gasto total fue $11.056,91 contra $5.659,32 presupuestados: 95,4% por encima. El desvio esta en una sola cuenta, IT System Expenses (7625), con $8.392,98 contra $583,33.",
-    "El mayor muestra que $5.254,22 son cargo de THE COSTA RICA COLLECTION —intercompania—, mas Oracle de Centro America $1.740,00, Fundacion Fernando Ortuno $500,00 y Hotel Competence LLC $485,00.",
-    "Hay tambien un desajuste de cuentas: el presupuesto registra el costo de internet y celulares en 5700, 5702 y 5704, y el real en 5400 y 5401. Son conceptos equivalentes en cuentas distintas."
-   ],
-   "cuentas": [
-    [
-     "0230",
-     "7625",
-     "Gastos de sistemas"
-    ],
-    [
-     "0230",
-     "5401",
-     "Costo de internet"
-    ],
-    [
-     "0230",
-     "5400",
-     "Costo de telefonia celular"
-    ]
+    "$11.600 contra $5.659: +105,0%, la mayor desviacion relativa del mes.",
+    "7625 System Expenses $8.787 contra $583, con THE COSTA RICA COLLECTION por $5.254 —cargo intercompania— y Oracle de Centro America por $1.740. El cargo intercompania o esta mal presupuestado o esta acumulando meses: hay que confirmar cual de las dos.",
+    "La planilla se mantuvo: $1.786,16 contra $1.925,23."
    ],
    "preguntas": [
-    "$5.254,22 de cargo intercompania en IT. ¿Esta en el presupuesto bajo otro nombre —Cluster Services, Corporate Office Reimbursement— o es un cargo nuevo?",
-    "Oracle $1.740,00: ¿licencia mensual, anual o puntual?",
-    "El presupuesto usa 5700/5702/5704 y el real 5400/5401 para el mismo concepto. ¿Se alinea el presupuesto al catalogo real?"
+    "7625 System Expenses $8.787 contra $583, con THE COSTA RICA COLLECTION por $5.254. ¿El cargo intercompania esta mal presupuestado o viene acumulando meses?",
+    "Oracle de Centro America por $1.740. ¿Es licencia mensual y esta presupuestada?",
+    "5401 Cost of Internet $784 sin presupuesto (STARLINK). El presupuesto usa la 5702. ¿Cual queda?"
    ]
   },
   "Utilities / Energia": {
    "comentario": [
-    "La variacion individual mas grande de opex del mes: $30.703,78 contra $18.056,25 presupuestados (+70,0%), $12.647,53 de exceso.",
-    "Y esta casi toda en combustible. La cuenta 7395 registro $28.640,26 contra $16.225,00. En el mayor es un solo proveedor, SERVICENTRO LA PALMA S.A., con $28.826,33 en 20 asientos. El resto es gas (TOMZA $1.667,56), electricidad/ICE $354,04 y agua $52,25.",
-    "El punto para la conversacion: la propiedad opera con generacion propia, asi que el combustible es en buena parte un costo de DISPONIBILIDAD y no de ocupacion —la planta corre aunque el hotel este vacio—. Pero $28.640 para 35 noches vendidas son $818 por noche ocupada, contra $197 presupuestados. Si el consumo es fijo, el presupuesto de temporada baja esta mal dimensionado; si es variable, hubo consumo que no corresponde a la operacion."
-   ],
-   "cuentas": [
-    [
-     "0210",
-     "7395",
-     "Combustible (diesel / planta)"
-    ],
-    [
-     "0210",
-     "7230",
-     "Gas"
-    ],
-    [
-     "0210",
-     "7160",
-     "Electricidad"
-    ],
-    [
-     "0210",
-     "7710",
-     "Agua y alcantarillado"
-    ]
+    "$30.457 contra $18.056: +68,7%, todo combustible.",
+    "7395 Utilities-Oil cerro en $28.410 contra $16.225, con SERVICENTRO LA PALMA por $28.826 como unico proveedor. Con 35 noches vendidas, este consumo no es de huespedes: es planta electrica y vehiculos.",
+    "Es el hallazgo de opex mas accionable del mes, porque se mide en litros y horas de planta y no admite la explicacion de ocupacion."
    ],
    "preguntas": [
-    "$28.640,26 de combustible con 35 noches vendidas, contra $16.225,00 presupuestados. ¿Cuantos litros y a que precio? Hay 20 asientos de un solo proveedor.",
-    "¿Hubo compra de inventario de combustible —llenado de tanque— o es consumo del mes? Si es inventario, no es gasto de setiembre.",
-    "¿Cuantas horas corrio la planta y cuanto consumo corresponde a areas cerradas? Con 43% del inventario de villas sin una sola venta, la pregunta es si esas areas se mantuvieron energizadas.",
-    "¿Existe medicion de consumo por area o es un unico medidor? Sin submedicion este gasto no se puede gestionar."
+    "7395 cerro en $28.410 contra $16.225, todo con SERVICENTRO LA PALMA ($28.826). Con 35 noches vendidas, ¿cuantos litros fueron a planta electrica y cuantos a vehiculos?",
+    "¿Existe una medicion de horas de planta por mes? Sin ella no se puede saber si el consumo es razonable.",
+    "¿Cuanto del combustible corresponde a Transportacion y se esta cargando aca?"
    ]
   }
  },
  "overhead_resumen": [
-  "El overhead total fue $168.137,57 contra $155.357,74 presupuestados: $12.779,83 de exceso, 8,2%. Pero el neto esconde movimientos grandes en los dos sentidos: Utilities +$12.647,53 e IT +$5.348,74 contra Ventas y Mercadeo −$16.259,25. Cada uno se analiza por separado."
+  "El overhead total fue $205.924 contra $155.357 presupuestados: $50.567 de exceso, 32,5%. Cuatro de los cinco departamentos gastaron de mas, y el unico que ahorro —Ventas y Mercadeo, −4,1%— lo hizo difiriendo ferias.",
+  "Administracion (+$30.159) y Utilities (+$12.401) son dos tercios del exceso. El de Administracion es mayormente registro —beneficio anual cargado a un mes, diferidos de julio, servicios sin presupuesto—; el de Utilities es consumo real."
  ],
  "payroll_conceptos": [
-  "De los $45.178,54 de exceso, cinco conceptos explican $40.654,13, el 90%. El unico que se puede llamar estructural —6000 Salarios, +$9.797,01— es el mas chico de los cinco.",
-  "6024 Vacaciones disfrutadas +$9.450,42 (+296,7%): $12.635,65 contra $3.185,23. Mantenimiento ($3.887,53) y Rooms ($3.527,28) concentran el 59%. 6001 Horas extra +$7.920,77 CONTRA PRESUPUESTO CERO, en seis departamentos. 6020 CCSS +$5.150,18 es consecuencia aritmetica de las anteriores: la carga se calcula sobre la base devengada. 6025 Cafeteria +$5.020,71. Y 6023 Provision de vacaciones +$4.465,04 contra $70,00 presupuestados para TODA la propiedad."
+  "De los $43.509,44 de exceso, cinco conceptos explican $35.875,94, el 82%. El unico que se puede llamar estructural —6000 Salarios, +$9.069,51— es el mas chico de los cinco. Los otros cuatro son 6024 Vacaciones disfrutadas (+$9.348,99), 6001 Horas extra (+$7.857,17), 6020 CCSS (+$4.915,97, que es consecuencia aritmetica de los anteriores) y 6025 Cafeteria (+$4.684,30).",
+  "Hay que separar el que no es un problema: 6024 Vacaciones disfrutadas por $12.534,22 contra $3.185,23 es, al contrario, buena gestion —mandar a vacaciones en el mes muerto es exactamente lo que hay que hacer—. Lo que falta es presupuestarlo asi, porque mientras el presupuesto reparta las vacaciones parejo todo el ano, el mes correcto se vera siempre como desvio. Lo mismo con 6023 Provision de vacaciones: $4.498,62 contra $70,00."
  ],
  "payroll_nota": [
   "Lo que un controller concluye de este cuadro",
-  "El presupuesto de planilla de Corcovado no contempla horas extra, ni dia libre laborado, ni provision de vacaciones realista. Tres conceptos que en setiembre sumaron $16.357,50 tienen presupuesto cero o simbolico. Mientras eso siga asi, TODA variacion de planilla va a salir desfavorable todos los meses, y la variacion dejara de senalar algo. La recomendacion es presupuestar esos conceptos con base historica —el propio mayor de agosto y setiembre la da— y reservar la discusion de variacion para los desvios reales."
+  "Que el problema no es «la planilla» en bloque sino dos cosas distintas con dueno distinto: $11.727,53 de horas extra y dia libre laborado, que son decisiones de cuatro gerentes en un mes sin operacion y no estan presupuestadas; y $13.777,61 de vacaciones —disfrutadas mas provision— que son buena gestion mal presupuestada. La primera se corrige en la operacion, la segunda en el presupuesto. Presentarlas juntas pierde las dos."
  ],
  "margenes": [
-  "Los dos margenes que hay que llevar a la reunion son A&B (4,3% contra 72,8%) y Tours (−79,2% contra 77,8%). Transportacion aparece con 100% de margen y Gift Shop tambien, pero en los dos casos es porque su costo quedo presupuestado en otro departamento — ver la seccion 10.2."
+  "Los margenes de este mes hay que leerlos con cuidado porque dos estan distorsionados por las cuentas casa. A&B muestra 164,1% contra 72,8% y Gift Shop 139,7% contra 25,0%: en ambos el costo de ventas quedo negativo por el consumo de casa neteado. Un margen mayor a 100% no es una mejora, es un aviso de que el costo no esta completo.",
+  "El margen que si informa, y mal, es Tours: −18,6% contra 77,8% presupuestado. Ahi el costo supero al ingreso de verdad."
  ],
  "margen_detalle": {
   "titulo": "El costo de alimentos, abierto",
-  "intro": "Merece su propio cuadro porque es el hallazgo de margen mas grave del mes.",
+  "intro": "Merece su propio cuadro porque es el hallazgo de margen del mes, y porque va en la direccion contraria a la del mes pasado.",
   "cabeceras": [
    "Concepto",
    "Actual",
@@ -413,98 +288,45 @@
   "filas": [
    [
     "Ingreso de comida (4110)",
-    "7,388.97",
+    "7,426.38",
     "13,378.51",
-    "Restaurant Vitrales"
+    "Vitrales mas Terra Kitchen y Sueno del Bosque"
    ],
    [
     "Ingreso de bebidas (4120+4125+4130+4131)",
-    "3,253.24",
-    "4,548.69",
+    "2,919.71",
+    "4,548.70",
     "NA, cerveza, licores, vino"
    ],
    [
-    [
-     "Ingreso de A&B",
-     "tot"
-    ],
-    [
-     "10,642.21",
-     "tot"
-    ],
-    [
-     "17,927.21",
-     "tot"
-    ],
-    [
-     "−40,6%",
-     "tot"
-    ]
+    "Ingreso de A&B",
+    "10,346.09",
+    "17,927.21",
+    "−42,3%"
    ],
    [
     "Costo de alimentos (5101)",
-    "9,460.83",
-    "3,745.98",
-    "468 asientos"
+    "−5,459.00",
+    "3,746.00",
+    "NEGATIVO: «CUENTAS CASA SEPTIEMBRE» −14,843"
    ],
    [
     "Costo de bebidas (5150)",
-    "726.62",
-    "1,137.17",
-    "77 asientos"
+    "−1,178.00",
+    "1,137.00",
+    "NEGATIVO: ajuste de inventario −1,688"
    ],
    [
-    [
-     "Costo de ventas de A&B",
-     "tot"
-    ],
-    [
-     "10,187.45",
-     "tot"
-    ],
-    [
-     "4,883.15",
-     "tot"
-    ],
-    [
-     "+108,6%",
-     "tot"
-    ]
-   ],
-   [
-    [
-     "Costo de alimentos / ingreso de comida",
-     "sec"
-    ],
-    [
-     "128,0%",
-     "sec"
-    ],
-    [
-     "28,0%",
-     "sec"
-    ],
-    [
-     "+100,0 pp",
-     "sec"
-    ]
-   ],
-   [
-    "Costo de bebidas / ingreso de bebidas",
-    "22,3%",
-    "25,0%",
-    "−2,7 pp"
-   ],
-   [
-    "Costo de alimentos por huesped (68 pax)",
-    "139.13",
-    "—",
-    "sobre 68 huespedes reales"
+    "Costo total de A&B",
+    "−6,636.47",
+    "4,883.16",
+    "Margen aparente 164,1%"
    ]
   ],
-  "nota": "El costo de bebidas se comporto segun lo previsto. El problema es exclusivamente el costo de alimentos.",
+  "nota": "Las dos lineas de costo quedaron negativas y por razones distintas: la de alimentos por cuentas casa, la de bebidas por un ajuste de inventario. Ninguna de las dos es eficiencia de cocina.",
   "cierre": [
-   "Un costo de alimentos de 128% de su propio ingreso no es un problema de eficiencia de cocina: es una de tres cosas —compra para inventario que no se consumio, consumo de empleados registrado en el restaurante, o merma—. Las tres son verificables con una toma de inventario al cierre y con el cruce de proveedores contra la cafeteria. Es la primera accion que este informe recomienda."
+   "Un costo de ventas negativo no se puede presentar como margen. Hay dos decisiones que tomar y las dos son de politica contable, no de operacion: si el consumo de casa se netea del costo o se lleva a gasto de mercadeo; y si el ajuste de inventario del mes se reconoce contra el costo del mes o se distribuye.",
+   "Mientras no se decidan, el margen de A&B de setiembre no se puede comparar con el de agosto ni con el presupuesto, y el cuadro de margenes del informe seguira mostrando un numero mayor a 100%."
   ]
  },
  "opex_favorables": {
@@ -517,74 +339,45 @@
   "filas": [
    [
     "S&M Trade Shows (0190/7660)",
-    "12,600.00",
+    "12,580.00",
     "Diferimiento",
-    "ALTO — el Forecast lo sube a $32.600"
-   ],
-   [
-    "S&M Media (0190/7370)",
-    "5,815.26",
-    "Diferimiento",
-    "ALTO"
+    "ALTO — es la favorabilidad mas grande y casi nada se ejecuto"
    ],
    [
     "Admin Centralized Accounting (0180/7050)",
     "5,000.00",
-    "Posible reclasificacion",
-    "MEDIO — ver Contract Services"
+    "Diferimiento",
+    "ALTO — cargo intercompania que suele acumularse"
    ],
    [
     "S&M Travel Other (0190/7675)",
-    "3,655.29",
+    "3,655.00",
     "Diferimiento",
     "MEDIO"
    ],
    [
-    "Mant. Vehicle Repair (0200/7700)",
-    "2,754.65",
-    "Postergacion",
-    "ALTO — mantenimiento diferido"
+    "Transportacion Cost Tours (0152/5350)",
+    "3,900.00",
+    "Clasificacion",
+    "NO reaparece: se registro en Tours (0150/5351)"
    ],
    [
-    "Mant. Building (0200/7030)",
+    "Mantenimiento Vehicle Repair (0200/7700)",
+    "2,755.00",
+    "Diferimiento",
+    "ALTO — el mantenimiento pospuesto vuelve"
+   ],
+   [
+    "Mantenimiento Building (0200/7030)",
     "1,600.00",
-    "Postergacion",
-    "ALTO"
-   ],
-   [
-    "Mant. Grounds (0200/7240)",
-    "1,349.14",
-    "Postergacion",
+    "Diferimiento",
     "MEDIO"
-   ],
-   [
-    "Mant. Equipment (0200/7180)",
-    "1,334.41",
-    "Postergacion",
-    "MEDIO"
-   ],
-   [
-    [
-     "TOTAL FAVORABLE IDENTIFICADO",
-     "tot"
-    ],
-    [
-     "34,108.75",
-     "tot"
-    ],
-    [
-     "Casi todo diferido",
-     "tot"
-    ],
-    [
-     "",
-     "tot"
-    ]
    ]
   ],
   "nota": "«No gastado» = Budget − Actual de la cuenta. El riesgo de reaparicion es el juicio del controller, no un dato del sistema.",
   "cierre": [
-   "De los $34.108,75 de favorabilidad identificada en opex, practicamente nada es ahorro estructural: son ferias, medios y mantenimiento que se corrieron de mes. Y el Forecast lo confirma al subir Trade Shows a $32.600,00. Para proyectar el cierre del ano, esta favorabilidad debe tratarse como una obligacion pendiente y no como una mejora."
+   "De los $29.490 de favorabilidad identificada en opex, practicamente nada es ahorro estructural: son ferias, cargos intercompania y mantenimiento que se corrieron de mes, mas $3.900 que no es favorabilidad sino una clasificacion cruzada con Tours.",
+   "Presentar esto como ahorro seria un error: hay que decir en que mes se espera que vuelva cada uno."
   ]
  },
  "opex_impactos": {
@@ -597,93 +390,70 @@
   "filas": [
    [
     "Utilities combustible (0210/7395)",
-    "12,415.26",
+    "12,185.00",
     "Operativo / consumo",
-    "Medir litros y horas de planta"
+    "Medir litros y horas de planta, no dolares"
+   ],
+   [
+    "Admin Recursos Humanos (0180/7270)",
+    "10,780.00",
+    "Beneficio anual en un mes",
+    "Confirmar si corresponde diferirlo en doce meses"
+   ],
+   [
+    "Admin comisiones de tarjeta (0180/7120)",
+    "9,724.00",
+    "4,065 son diferidos de julio",
+    "Separar la reclasificacion del cargo del mes"
    ],
    [
     "IT System Expenses (0230/7625)",
-    "7,809.65",
-    "Intercompania + licencias",
-    "Confirmar presupuesto en otra cuenta"
+    "8,204.00",
+    "Intercompania mas licencias",
+    "Confirmar presupuesto del cargo de CRC y de Oracle"
    ],
    [
     "Admin Contract Services (0180/7105)",
-    "7,944.24",
-    "Servicios externos",
-    "Identificar contratos y autorizacion"
+    "7,974.00",
+    "Sin presupuesto",
+    "Presupuestar: consultoria y asistencia medica"
    ],
    [
-    "S&M Travel Meals (0190/7670)",
-    "4,174.91",
-    "Representacion",
-    "Justificar objetivo comercial"
+    "S&M Travel-Meals (0190/7670)",
+    "6,734.00",
+    "Incluye aplicacion de diferido",
+    "Revisar contrato Alicia Repetto"
    ],
    [
     "Rooms Contract Services (0110/7105)",
-    "3,551.21",
-    "Servicios externos",
-    "Idem — hay intercompania"
+    "3,517.00",
+    "Sin presupuesto",
+    "Presupuestar"
    ],
    [
-    "S&M Dues & Subscriptions (0190/7150)",
-    "3,012.75",
-    "Posible anualidad",
-    "Redistribuir en el presupuesto"
+    "S&M Dues (0190/7150)",
+    "3,157.00",
+    "INNOCEANA 6,231",
+    "Confirmar si es cuota anual o mensual"
    ],
    [
-    "Rooms Comisiones (0110/7080)",
-    "2,829.73",
-    "Variable de canal",
-    "Revisar mix de canal"
-   ],
-   [
-    "Transporte Equipment Rental (0152/7185)",
-    "1,935.90",
-    "Alquiler",
-    "Confirmar necesidad"
-   ],
-   [
-    "Admin Courier (0180/7485)",
-    "1,895.21",
-    "Operativo",
-    "175 asientos: abrir el detalle"
-   ],
-   [
-    "Mant. Miscellaneous (0200/7380)",
-    "1,385.70",
-    "Sin clasificar",
-    "Reclasificar a su cuenta"
-   ],
-   [
-    [
-     "TOTAL IMPACTO IDENTIFICADO",
-     "tot"
-    ],
-    [
-     "46,954.56",
-     "tot"
-    ],
-    [
-     "",
-     "tot"
-    ],
-    [
-     "",
-     "tot"
-    ]
+    "Rooms Agent Commissions (0110/7080)",
+    "3,134.00",
+    "Comision de canal",
+    "Conciliar contra el mix de reservas del mes"
    ]
   ]
  },
  "propiedad_notas": [
-  "8060 Impuesto de renta: el presupuesto tiene −$62.625,67 —un credito— y el real cero. Un credito presupuestado en un mes de perdida es consistente con un calculo anual distribuido, pero hace que la columna de presupuesto de clase 8 salga negativa y que esa variacion no signifique nada operativo.",
-  "8045 Baja de activo: $25.147,07 contra cero presupuestado. Un unico asiento: «Baja Activo Enertek», $25.248,12. Es una decision de activo fijo, no un gasto de operacion.",
-  "8040 Depreciacion $29.487,02 contra $26.583,33 — 158 asientos de SAF por activo. Coherente.",
-  "8000 Renta $5.332,49 contra $1.754,00: el mayor muestra ANC Renting $3.990,00 como principal. Confirmar si es arrendamiento nuevo.",
-  "8025 $4.092,94 contra $1.200,00, y el mayor dice «Pago Propinas agosto» $2.556,76. Propinas de agosto pagadas en setiembre y registradas en clase 8 — hay que revisar la cuenta y el periodo."
+  "8040 Depreciacion: $54.196 contra $26.583 presupuestados. De los $27.612 de exceso, $25.248 son «AJUSTE PROFIT & LOSS ON ASSET DISPOSSAL». Una perdida por retiro de activo no es depreciacion: mientras viva en la 8040 la linea deja de ser comparable y el EBITDA despues de capital se lee mal.",
+  "8060 Impuesto de renta: −$10.906,79 de «REGISTRO DE PROVISION RENTA SET 2026», con presupuesto cero. Un credito de renta en un mes de perdida es consistente, pero el presupuesto no lo preveia y por eso aparece como variacion.",
+  "8010 Impuestos y patentes: $5.407,56 sin presupuesto, de los cuales $2.704 son la reclasificacion de diferidos de julio y $1.846 la porcion mensual de BIM y patentes. La porcion mensual deberia estar presupuestada.",
+  "8000 Alquileres: $5.290 contra $1.754, con ANC RENTING por $3.990. Es el mismo proveedor que aparece en 7185 de Transportacion por $1.920: vale revisar si los dos registros corresponden al mismo contrato.",
+  "8025 Multas y no deducibles: $4.366 contra $1.200, con «Pago Propinas agosto» por $2.557. Propinas de agosto pagadas en setiembre dentro de gastos no deducibles merece una confirmacion de criterio.",
+  "El total de clase 8 fue $71.278,23 contra −$19.118,28 presupuestados. El presupuesto tenia la clase en negativo por el credito de renta: compararlos de frente da $90.396,51 de variacion que no significa nada por si sola."
  ],
  "clasificacion": {
-  "intro": "Cinco casos. En todos el monto esta bien contabilizado pero en una cuenta o un departamento distinto al presupuestado, asi que la comparacion muestra dos variaciones falsas —una favorable y una desfavorable— donde hay un solo hecho.",
+  "intro": "Seis casos. En todos el monto esta bien contabilizado pero en una cuenta o un departamento distinto al presupuestado, asi que la comparacion muestra dos variaciones falsas —una favorable y una desfavorable— por el mismo movimiento.",
   "cabeceras": [
    "Concepto",
    "Presupuesto en",
@@ -694,47 +464,55 @@
   ],
   "filas": [
    [
-    "Costo de comida de empleados",
-    "0220 · 5700",
-    "0220 · 5420",
-    "6,800.00",
-    "10,764.88",
-    "Variacion de $10.764,88 en vez de $3.964,88"
-   ],
-   [
     "Costo de tours",
     "0152 · 5350",
     "0150 · 5351",
     "3,900.00",
-    "5,153.16",
-    "Transporte favorable $3.900 y Tours desfavorable $4.264"
+    "5,112.00",
+    "Transportacion sale favorable y Tours desfavorable"
    ],
    [
-    "Costo de internet y celular",
-    "0230 · 5700/5702/5704",
-    "0230 · 5400/5401",
-    "681.42",
-    "851.43",
-    "Cuatro variaciones donde hay una"
-   ],
-   [
-    "Costo de mercaderia Gift Shop",
-    "0151 · 5208",
-    "no registrado",
-    "359.76",
+    "Perdida por retiro de activo",
+    "— (8045)",
+    "0250 · 8040",
     "0.00",
-    "Gift Shop con 100% de margen aparente"
+    "25,248.00",
+    "Depreciacion deja de ser comparable"
    ],
    [
-    "Ingreso y gasto de Spa",
-    "0130",
-    "0140",
-    "—",
-    "—",
-    "Solo compara si se suman los dos departamentos"
+    "Gastos diferidos de julio",
+    "julio",
+    "setiembre (7120/8010/8015/7000)",
+    "0.00",
+    "10,776.00",
+    "Setiembre carga gasto de otro mes"
+   ],
+   [
+    "Consumo de casa A&B",
+    "— (mercadeo)",
+    "0120 · 5101",
+    "0.00",
+    "−14,843.00",
+    "Costo negativo y margen de 164%"
+   ],
+   [
+    "Consumo de casa tienda",
+    "— (mercadeo)",
+    "0165 · 5201",
+    "0.00",
+    "−372.00",
+    "Margen de Gift Shop de 139,7%"
+   ],
+   [
+    "Ingreso de transporte",
+    "0152 · 4400",
+    "0152 · 4500",
+    "4,336.00",
+    "2,673.00",
+    "Dos lineas de ingreso con variacion cruzada"
    ]
   ],
-  "nota": "Esta es la lista para la nota de reclasificacion. El Audit Integral del sistema permite copiar cada linea con su detalle."
+  "nota": "Esta es la lista para la nota de reclasificacion. El Audit Integral del sistema permite copiar cada linea con su detalle de asiento y proveedor."
  },
  "sin_presupuesto": {
   "intro": "No es un error de registro sino de presupuestacion, pero tiene el mismo efecto: genera variacion desfavorable todos los meses y por lo tanto deja de informar.",
@@ -747,141 +525,157 @@
   "filas": [
    [
     "6001 Horas extra",
-    "7,920.77",
+    "7,857.17",
     "0.00",
-    "Seis departamentos la usaron"
+    "Varios departamentos la usaron con 3,89% de ocupacion"
    ],
    [
     "6002 Dia libre laborado",
-    "3,901.69",
+    "3,870.36",
     "0.00",
-    "Seis departamentos"
+    "Mismo caso"
    ],
    [
     "6023 Provision de vacaciones",
-    "4,535.04",
+    "4,498.62",
     "70.00",
-    "$70 mensuales para toda la propiedad"
+    "La provision es mensual y obligatoria"
    ],
    [
-    [
-     "TOTAL",
-     "tot"
-    ],
-    [
-     "16,357.50",
-     "tot"
-    ],
-    [
-     "70.00",
-     "tot"
-    ],
-    [
-     "36% del desvio de planilla",
-     "tot"
-    ]
+    "0220 Cafeteria — planilla",
+    "4,648.22",
+    "0.00",
+    "El departamento existe y tiene personal"
+   ],
+   [
+    "0220 · 5420 Costo de comida de empleados",
+    "10,678.46",
+    "0.00",
+    "Presupuestado en 5700, que no se usa"
+   ],
+   [
+    "0180 · 7105 Contract Services",
+    "7,973.67",
+    "0.00",
+    "Consultoria y asistencia medica, recurrentes"
+   ],
+   [
+    "0110 · 7105 Contract Services",
+    "3,516.96",
+    "0.00",
+    "Recurrente"
+   ],
+   [
+    "0190 · 7500 Promotion",
+    "2,534.73",
+    "0.00",
+    "Recurrente"
+   ],
+   [
+    "0152 · 7185 Equipment Rental",
+    "1,920.36",
+    "0.00",
+    "ANC RENTING"
+   ],
+   [
+    "0250 · 8010 Impuestos y patentes",
+    "5,407.56",
+    "0.00",
+    "La porcion mensual de BIM y patentes es fija"
    ]
   ],
-  "nota": "Recomendacion: presupuestar los tres con base historica de agosto y setiembre, que ya estan en el mayor."
+  "nota": "Recomendacion: presupuestar los diez con base historica de agosto y setiembre, que ya estan en el mayor. Los de 0220 son los mas urgentes porque mueven $15.000 al mes."
  },
  "brechas": [
-  "El descuadre de GOP entre el reporte y el motor —$18.789,30 en setiembre, $35.763,30 en los dos meses— QUEDO CORREGIDO el 2026-10-09: el credito de reparto de la cuenta 4999 ya entra al reporte. Las cifras de este informe son las corregidas.",
-  "El Pre-Cierre no carga estadistica de habitaciones, asi que ocupacion, ADR y RevPAR del Actual salen de otra tabla. Mientras el indicador y la plata vengan de fuentes distintas, el RevPAR del cierre no es auditable.",
-  "No hay inventario fisico de alimentos al cierre del mes. Sin eso, el costo de alimentos de 128% no se puede descomponer en compra, consumo y merma.",
-  "No hay medicion de litros de combustible ni de horas de planta en el sistema. El mayor da el monto y el proveedor, no el consumo.",
-  "No hay reporte de FTE real del mes en el Pre-Cierre, asi que la planilla no se puede dividir entre efecto dotacion y efecto costo unitario.",
-  "El Pre-Cierre contiene solo dos meses, asi que no hay acumulado comparable desde esta fuente."
+  "El GOP del reporte y el del motor COINCIDEN al centavo en setiembre: −$282.088,43 por los dos caminos. El credito de reparto 4999 —$15.326,68 de cafeteria y $3.098,18 de lavanderia— ya entra al reporte desde el 2026-10-09.",
+  "El analisis de este informe se escribio contra la subida «saldo setiembre closing period 2026.xlsx» del 16-oct (TC 458,43, 261 lineas). Si el mes se vuelve a subir, la portada lo avisa en rojo y hay que reescribirlo: los cuadros se rehacen solos, el texto no.",
+  "El mes esta en BORRADOR: no se ha pasado a Final. Los numeros de este informe son los del Pre-Cierre en revision, no los del cierre definitivo.",
+  "⚠️ El tipo de cambio del Pre-Cierre de setiembre es 458,43 y el del escenario ACTUAL es 460,00. Los mismos colones dan distinto dolar segun cual se use, y nada avisa de la diferencia. Hay que decidir cual manda antes de pasar el mes a Final.",
+  "La estadistica de habitaciones NO viene en el espejo del Pre-Cierre: sale del escenario ACTUAL. Por eso el encabezado de la pantalla de Pre-Closing muestra «—» en ocupacion, ADR y RevPAR, y este informe si los trae.",
+  "Solo hay dos meses cargados en el espejo —agosto y setiembre—, asi que la comparacion secuencial no puede ir mas atras."
  ],
  "agenda": [
   [
    "Gerencia General",
-   "$49.455,92 de exceso de gasto operativo",
+   "$71.152,73 de exceso de gasto operativo",
    [
-    "El presupuesto de setiembre ya preveia un mes malo: $251.113,98 de gasto operativo. Se gastaron $300.569,90. ¿Que decisiones de estructura se tomaron y quien las aprobo?",
-    "El ingreso cayo 84,8% contra agosto y la planilla subio 3,6%. ¿Existe un protocolo de ajuste de dotacion para los meses de cierre, y se aplico?",
-    "390 de 900 noches disponibles no registraron una sola venta. ¿Estaban fuera de inventario? Si lo estaban, hay que decirlo en el reporte: cambia la ocupacion de 3,89% a 6,9%.",
-    "¿Se autorizo la baja de activo Enertek por $25.248,12?"
+    "El presupuesto de setiembre ya preveia un mes malo: $251.113,98 de gasto operativo. Se gastaron $322.266,71. ¿Que decisiones de estructura se tomaron y quien las aprobo?",
+    "El ingreso cayo 85,5% contra agosto y la planilla SUBIO 2,7%. ¿Existe un protocolo de ajuste de dotacion para los meses de cierre, y se aplico?",
+    "390 de 900 noches —5 Elements y Sirena Suites completas— sin una sola venta en el mes. ¿Se evaluo cerrar bloques y concentrar la operacion?",
+    "Octubre es mes cerrado y el ingreso sera cero. ¿Cual es el plan de dotacion y de gasto fijo para ese mes?"
    ]
   ],
   [
-   "Gerencia de Alimentos y Bebidas",
-   "Margen de 4,3% contra 72,8%",
+   "Gerencia de A&B",
+   "$13.200,87 de exceso de planilla y un costo negativo",
    [
-    "El costo de alimentos fue $9.460,83 sobre $7.388,97 de ingreso de comida: 128%. ¿Compra de inventario, consumo de empleados, o merma?",
-    "¿Hubo toma de inventario fisico al 30 de setiembre? Es la unica forma de cerrar la pregunta anterior.",
-    "Los proveedores del restaurante y los de la cafeteria se solapan. ¿Como se separa la codificacion en el momento de la compra?",
-    "$31.953,32 de planilla con 68 huespedes. ¿Que dotacion de cocina y restaurante se mantuvo y con que criterio?",
-    "$1.695,71 de horas extra y $1.055,53 de dia libre en un mes sin operacion. ¿En que se trabajaron?"
+    "La planilla fue $31.671,69 contra $18.470,82 con el restaurante practicamente sin cubiertos. ¿Cuanta gente estuvo y en que?",
+    "El costo de alimentos cerro en −$5.459 por «CUENTAS CASA SEPTIEMBRE» de −$14.843. ¿Que se consumio como cuenta casa y con que autorizacion?",
+    "¿El consumo de casa debe netear el costo o ir a gasto de mercadeo? Es una decision de politica y sin ella el margen de A&B no se puede leer."
    ]
   ],
   [
-   "Jefatura de Mantenimiento",
-   "Planilla +59,8% con opex −53,2%",
+   "Gerencia de Tours / Actividades",
+   "Margen bruto de −18,6%",
    [
-    "$28.926,34 de planilla contra $18.107,36, y $1.802,53 de horas extra. ¿Que trabajo se ejecuto? Si fue mantenimiento mayor aprovechando la baja ocupacion, ¿estaba planificado?",
-    "¿Por que horas extra ($1.802,53) y vacaciones disfrutadas ($3.887,53) en el mismo departamento y el mismo mes?",
-    "El opex de materiales quedo 53% por debajo. ¿Que se postergo y para cuando?",
-    "Miscellaneous (7380) $1.385,70 sin presupuesto: ¿que contiene?"
+    "El costo de actividad ($5.608,62) supero al ingreso ($4.728,16). ¿Cuantos tours se vendieron y cuantos se operaron?",
+    "SINAC por $3.233 con 68 huespedes en el mes. ¿Son entradas de tours vendidos o compra anticipada?",
+    "La planilla fue $25.653,60 contra $14.605,33. ¿Que dotacion se mantuvo y para que volumen?"
    ]
   ],
   [
-   "Jefatura de Mantenimiento / Operaciones — Energia",
-   "Combustible $28.640,26 contra $16.225,00",
+   "Gerencia de Mantenimiento / Utilities",
+   "$12.185 de combustible y $10.543 de planilla",
    [
-    "¿Cuantos litros se consumieron y a que precio? Son 20 asientos de SERVICENTRO LA PALMA.",
-    "¿Fue consumo del mes o llenado de tanque? Si es inventario, no es gasto de setiembre.",
-    "¿Cuantas horas corrio la planta, y cuanto consumo corresponde a las areas sin ocupacion?",
-    "¿Hay submedicion por area? Sin eso, este gasto no se gestiona."
+    "7395 cerro en $28.410 contra $16.225, todo con SERVICENTRO LA PALMA. Con 35 noches vendidas, ¿cuantos litros fueron a planta electrica y cuantos a vehiculos?",
+    "La planilla fue $28.650,31 contra $18.107,36 mientras el gasto de materiales quedo por debajo. ¿En que se ocupo la cuadrilla?",
+    "7700 Vehicle Repair gasto $45 de $2.800. ¿Se pospuso mantenimiento, y para cuando?"
    ]
   ],
   [
-   "Gerencia de Tours y Actividades",
-   "Margen de −79,2%",
+   "Gerencia de Rooms",
+   "Planilla al 187% del ingreso y comisiones de canal",
    [
-    "SINAC $3.232,68 de entradas contra $3.150,17 de ingreso total de tours. ¿Cuantos pax y a que precio de venta?",
-    "¿Las entradas son consumo de setiembre o compra de bloque anticipada?",
-    "$25.901,50 de planilla —822% del ingreso— con 68 huespedes. ¿Cuantos guias y capitanes activos?",
-    "Detoxigen, Franklin Araya y Juno R&M en costo de contratos: ¿contra que venta?"
+    "La planilla fue $35.707,57 contra un ingreso de habitaciones de $19.105,22. ¿Que dotacion se mantuvo con 35 noches?",
+    "7080 Agent Commissions $3.634 contra $500, con PREFERRED TRAVEL GROUP, BOOKING.COM y SITEMINDER. ¿El mix viro a canal pagado o hay comision de reservas de otros meses?",
+    "7105 Contract Services $3.516,96 sin presupuesto. ¿Que servicios son y son recurrentes?"
    ]
   ],
   [
-   "Gerencia de Habitaciones",
-   "Comisiones de 16,6% del ingreso",
+   "Ventas y Mercadeo",
+   "$12.580 de ferias sin ejecutar",
    [
-    "Las comisiones fueron $3.329,73 sobre $20.100,28, contra $500,00 presupuestados. ¿Que canales trajeron las 35 noches? El mayor muestra Preferred Travel Group, Booking.com y SiteMinder.",
-    "Contract Services $3.551,21 sin presupuesto, de los cuales $2.418,21 son intercompania. ¿Que servicio es?",
-    "$36.054,55 de planilla —179% del ingreso— con 35 noches. ¿Hubo opcion de vacaciones colectivas?",
-    "El ingreso del P&L y el de la estadistica difieren en $1.407,00. ¿Que es?"
+    "7660 Trade Shows gasto $20 de $12.600. ¿En que mes se ejecuta, o se cancelo?",
+    "7670 Travel-Meals $7.497 contra $762, con ALICIA REPETO por $2.746 mas $1.317 de diferido. ¿Cual es el alcance del contrato?",
+    "7150 Dues con INNOCEANA por $6.231. ¿Cuota anual o mensual?"
    ]
   ],
   [
-   "Gerencia de Ventas y Mercadeo",
-   "$16.259,25 favorable, casi todo diferido",
+   "Administracion / Contabilidad",
+   "Registro: lo que no se arregla gastando menos",
    [
-    "Trade Shows $0 contra $12.600 presupuestados, y el Forecast los sube a $32.600. ¿Se cancelaron, se movieron de mes o de ano?",
-    "Travel Meals and Entertainment $4.937,26 contra $762,35 en un mes sin operacion. ¿Que viajes y con que objetivo?",
-    "Dues and Subscriptions $7.114,67: ¿cuales son anualidades pagadas en setiembre?",
-    "Agency Fees $5.325,43 con 35 noches vendidas: ¿fijo o variable?"
+    "7270 RRHH $10.930 de «beneficio anual» cargado completo a setiembre. ¿Corresponde diferirlo en doce meses?",
+    "«AJUSTE RECLASS GAST DIF JUL A SET 2026» por $10.776 repartido en cuatro cuentas. ¿Por que aterrizo en setiembre y no en julio?",
+    "8040 Depreciacion con $25.248 de «PROFIT & LOSS ON ASSET DISPOSSAL» adentro. Hay que moverlo a su cuenta.",
+    "0220 Cafeteria: $4.648 de planilla y $10.678 de costo con presupuesto cero. Hay que presupuestarlo."
    ]
   ],
   [
-   "Administracion y Finanzas",
-   "Clasificacion y presupuestacion",
+   "Recursos Humanos",
+   "$11.727,53 de horas extra y dia libre laborado",
    [
-    "Contract Services $7.944,24 sin presupuesto, y $5.000,00 de Centralized Accounting sin usar. ¿Es el mismo concepto en otra cuenta?",
-    "$1.995,21 de courier en 175 asientos contra $100,00 presupuestados.",
-    "IT: $5.254,22 de cargo intercompania de The Costa Rica Collection. ¿Esta presupuestado bajo otro nombre?",
-    "Los cinco casos de la seccion 10.2 necesitan decision: se corrige el presupuesto o se corrige la codificacion.",
-    "Horas extra, dia libre y provision de vacaciones tienen presupuesto cero o simbolico. ¿Se presupuestan con base historica en el proximo Forecast?",
-    "8025 incluye «Pago Propinas agosto» $2.556,76 en clase 8. ¿Es la cuenta y el periodo correctos?"
+    "Con 3,89% de ocupacion se pagaron $7.857,17 de horas extra y $3.870,36 de dia libre laborado, y el presupuesto de ambos es CERO. ¿Quien autoriza y con que criterio?",
+    "$12.534,22 de vacaciones disfrutadas contra $3.185,23 presupuestados. Esto es lo correcto —vaciar el saldo en el mes muerto— pero el presupuesto lo reparte parejo todo el ano. ¿Se puede estacionalizar?",
+    "6025 Cafeteria $15.326,67 contra $10.642,37 con la propiedad vacia. ¿Cuantas raciones se sirvieron?"
    ]
   ],
   [
-   "Sistemas / FinPlan",
-   "Lo que quedo corregido y lo que falta",
+   "Direccion Financiera",
+   "Antes de pasar setiembre a Final",
    [
-    "El credito de allocation de la cuenta 4999 ya entra al reporte (2026-10-09): Cafeteria y Lavanderia netean a cero y el GOP coincide con el del motor. Antes el GOP salia $18.789,30 peor en setiembre y $35.763,30 en los dos meses cargados.",
-    "El Pre-Cierre sigue sin cargar estadistica de habitaciones, por eso el encabezado muestra «—» en ocupacion, ADR y RevPAR. Mientras el indicador y la plata vengan de tablas distintas, el RevPAR del cierre no es auditable."
+    "El Pre-Cierre esta a TC 458,43 y el escenario ACTUAL a 460,00. Los mismos colones dan distinto dolar. ¿Cual manda?",
+    "Setiembre lleva cuatro subidas. La que esta viva es la del 16-oct y sigue en BORRADOR. ¿Se da por cerrada?",
+    "0220 y las nueve cuentas sin presupuesto generan variacion todos los meses sin informar nada. ¿Se corrige en el Forecast o se espera al Budget 2027?"
    ]
   ]
  ]

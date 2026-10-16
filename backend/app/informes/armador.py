@@ -45,6 +45,65 @@ def cargar_narrativa(anio: int, mes: int, hotel: str | None = None) -> dict:
     return datos
 
 
+def vigencia(D: Datos, nar: dict | None = None) -> dict:
+    """Si el analisis escrito describe ESTE dato o uno anterior.
+
+    ⚠️ Owner, 2026-10-15: *«me sigue mostrando una version antigua»*. El
+    informe tiene dos mitades y solo una se rehace sola:
+
+    * los 53 CUADROS salen del espejo, en vivo — siempre estan al dia;
+    * el ANALISIS es texto a mano, con las cifras escritas adentro.
+
+    El de setiembre 2026 se redacto el 8-oct. Para cuando se pidio, el mes
+    llevaba dos subidas mas: el ingreso habia bajado $2.025, el costo de ventas
+    $17.152, y el resultado estaba $23.492 peor. El documento salia completo,
+    cuadraba, y su primer parrafo citaba una cifra que ya no existia.
+
+    **Lo unico que fallaba era el silencio.** `armar()` avisaba de las secciones
+    que FALTAN, no de las que estan y hablan de otro archivo. Un hueco se ve; una
+    cifra vieja bien formateada, no.
+
+    La narrativa declara contra que subida se escribio en `_contra.checksum`.
+    Son dos huellas del CONTENIDO: si el archivo se vuelve a subir renombrado,
+    el checksum es el mismo y el analisis sigue vigente, que es lo correcto.
+
+    Sin `_contra` el veredicto es `"sin_declarar"`: no se puede afirmar que este
+    vieja, y tampoco que este bien. Se dice eso y no se inventa ninguna de las
+    dos.
+    """
+    if nar is None:
+        nar = cargar_narrativa(D.anio, D.mes)
+    sub = D.subida or {}
+    contra = (nar or {}).get("_contra") or {}
+    if not nar:
+        return {"estado": "sin_analisis", "vigente": True, "aviso": "",
+                "subida": sub, "contra": contra}
+    if not contra.get("checksum"):
+        return {"estado": "sin_declarar", "vigente": True,
+                "aviso": ("El analisis escrito no declara contra que subida se "
+                          "redacto: no se puede verificar que describa este dato."),
+                "subida": sub, "contra": contra}
+    if not sub.get("checksum"):
+        return {"estado": "sin_subida", "vigente": True,
+                "aviso": ("No hay una subida viva de Pre-Cierre para el mes: no "
+                          "se puede verificar la vigencia del analisis."),
+                "subida": sub, "contra": contra}
+    if contra["checksum"] == sub["checksum"]:
+        return {"estado": "vigente", "vigente": True, "aviso": "",
+                "subida": sub, "contra": contra}
+    return {
+        "estado": "vencido", "vigente": False,
+        "aviso": (
+            f"El analisis escrito describe la subida «{contra.get('archivo') or '?'}» "
+            f"del {contra.get('fecha') or '?'}"
+            + (f" (TC {contra['tc']})" if contra.get("tc") else "")
+            + f", pero los cuadros salen de «{sub.get('archivo') or '?'}» del "
+            f"{sub.get('fecha') or '?'}"
+            + (f" (TC {sub['tc']})" if sub.get("tc") else "")
+            + ". Las cifras del texto son de otro archivo: hay que reescribirlo."),
+        "subida": sub, "contra": contra}
+
+
 def armar(D: Datos, nar: dict | None = None):
     """Devuelve `(documento, faltantes)`.
 
@@ -57,7 +116,7 @@ def armar(D: Datos, nar: dict | None = None):
     agg = D.mayor()
 
     d = doc_nuevo()
-    S1.portada(d, D, nar)
+    S1.portada(d, D, nar, vigencia(D, nar))
     S1.indice(d, D)
     d.add_page_break()
     S1.seccion1(d, D, nar)

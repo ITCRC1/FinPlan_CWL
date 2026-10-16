@@ -787,7 +787,7 @@ export async function correrConsulta(f: ConsultaFiltro): Promise<{
 export async function bajarInformeOperativo(
   anio: number, mes: number,
 ): Promise<{ cuadra: boolean; conAnalisis: boolean; gopReporte: string;
-             gopMotor: string }> {
+             gopMotor: string; analisisVigente: boolean; vigencia: string }> {
   const token = getToken();
   const res = await fetch(`${BASE}/informes/operativo/${anio}/${mes}/`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -814,6 +814,11 @@ export async function bajarInformeOperativo(
     conAnalisis: res.headers.get("X-Informe-Con-Analisis") === "si",
     gopReporte: res.headers.get("X-Informe-GOP-Reporte") || "",
     gopMotor: res.headers.get("X-Informe-GOP-Motor") || "",
+    // Los cuadros se rehacen solos; el analisis es texto a mano. Si describe
+    // otra subida, el documento sale igual y hay que decirlo ANTES de abrirlo.
+    analisisVigente: res.headers.get("X-Informe-Analisis-Vigente") !== "no",
+    vigencia: decodeURIComponent(
+      res.headers.get("X-Informe-Vigencia") || ""),
   };
 }
 

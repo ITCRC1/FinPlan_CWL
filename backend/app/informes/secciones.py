@@ -15,7 +15,7 @@ que desaparece sin avisar.
 from __future__ import annotations
 
 from app.informes.datos import OPERATIVOS, OVERHEAD
-from app.informes.formato import (AZUL, GRIS, NEGRO, Pt, bullet, h1, h2, h3, nota, par, pc,
+from app.informes.formato import (AZUL, GRIS, NEGRO, ROJO, Pt, bullet, h1, h2, h3, nota, par, pc,
                      pct_var, tabla, us, var, var_gasto)
 
 FALTANTES: list[str] = []
@@ -36,7 +36,7 @@ def textos(d, nar, clave):
 
 
 # ───────────────────────────────────────────────────────────── portada e indice
-def portada(d, D, nar):
+def portada(d, D, nar, vig=None):
     p = d.add_paragraph()
     p.paragraph_format.space_after = Pt(0)
     r = p.add_run(nar.get("propiedad", "CORCOVADO WILDERNESS LODGE"))
@@ -58,6 +58,46 @@ def portada(d, D, nar):
     r.font.size = Pt(9.5)
     r.italic = True
     r.font.color.rgb = GRIS
+
+    # ── De que subida salen los cuadros, y si el texto habla de ella ───────
+    #
+    # ⚠️ Owner, 2026-10-15: *«me sigue mostrando una version antigua»*. Los
+    # cuadros se rehacen solos; el analisis es texto a mano y no. El de
+    # setiembre 2026 describia la subida del 8-oct cuando ya iban dos mas, y el
+    # documento salia completo y cuadrado citando una cifra muerta.
+    #
+    # El sello va en la PORTADA y no en un anexo: quien abre el archivo tiene
+    # que ver de que dato habla antes de leer la primera conclusion.
+    sub = (vig or {}).get("subida") or D.subida or {}
+    if sub.get("archivo"):
+        p = d.add_paragraph()
+        p.paragraph_format.space_after = Pt(2)
+        r = p.add_run(
+            f"Cuadros tomados de: {sub['archivo']}"
+            + (f"  ·  {sub['fecha']}" if sub.get("fecha") else "")
+            + (f"  ·  TC {sub['tc']}" if sub.get("tc") else "")
+            + (f"  ·  {sub['estado']}" if sub.get("estado") else ""))
+        r.font.size = Pt(8.5)
+        r.font.color.rgb = GRIS
+
+    if vig and not vig.get("vigente", True):
+        p = d.add_paragraph()
+        p.paragraph_format.space_after = Pt(10)
+        r = p.add_run("ATENCION — EL ANALISIS ESCRITO NO CORRESPONDE A ESTOS "
+                      "CUADROS\n")
+        r.bold = True
+        r.font.size = Pt(10.5)
+        r.font.color.rgb = ROJO
+        r = p.add_run(vig.get("aviso", ""))
+        r.font.size = Pt(9)
+        r.font.color.rgb = ROJO
+    elif vig and vig.get("aviso"):
+        p = d.add_paragraph()
+        p.paragraph_format.space_after = Pt(10)
+        r = p.add_run(vig["aviso"])
+        r.font.size = Pt(8.5)
+        r.italic = True
+        r.font.color.rgb = GRIS
 
 
 SECCIONES = [

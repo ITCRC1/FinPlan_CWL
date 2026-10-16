@@ -91,6 +91,9 @@ class Datos:
         self.escs = [k for k in ("ACT", "BUD", "FCT") if k in self.d["meses"]]
         self.avisos = self.d.get("avisos", [])
         self.archivo_mayor = (self.d["mayor"][0]["archivo"] if self.d["mayor"] else None)
+        #: De que subida de Pre-Cierre vienen los cuadros. Es lo que permite
+        #: decir si el analisis escrito describe ESTE dato o uno anterior.
+        self.subida = self.d.get("subida")
 
     # ── nombres ────────────────────────────────────────────────────────────
     def nom(self, dept: str) -> str:

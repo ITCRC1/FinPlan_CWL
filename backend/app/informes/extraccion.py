@@ -224,6 +224,39 @@ async def extraer(db, anio: int, mes: int, hotel: str | None = None) -> dict:
         out["stats"][k] = {kk: float(vv) if vv is not None else None
                            for kk, vv in dict(r).items()} if r else None
 
+    # ── DE QUE SUBIDA VIENE ESTE DATO ─────────────────────────────────────
+    #
+    # ⚠️ Owner, 2026-10-15, con el informe de setiembre en la mano: *«me sigue
+    # mostrando una version antigua»*. Tenia razon a medias, y la mitad que
+    # tenia es la peligrosa.
+    #
+    # Los 53 cuadros SI se rehacen: salen del espejo, en vivo. El ANALISIS no:
+    # es texto escrito a mano, con las cifras adentro. El de setiembre se
+    # redacto el 8-oct contra la subida de ese dia, y para cuando el owner lo
+    # pidio ya habia DOS subidas mas: el ingreso habia bajado $2.025, el costo
+    # de ventas $17.152, y el neto estaba $23.492 peor.
+    #
+    # El documento salia entero, cuadraba, y abria diciendo una cifra que ya no
+    # existia. Nada fallaba. Por eso hay que guardar de que subida viene el
+    # dato: sin esto no hay forma de comparar contra lo que el texto dice que
+    # describe.
+    sub = (await db.execute(text("""
+        SELECT checksum, archivo_nombre, tc, estado, creado_en, subido_por
+          FROM precierre
+         WHERE hotel_id=:h AND anio=:a AND mes=:m AND estado <> 'descartado'
+         ORDER BY creado_en DESC LIMIT 1"""),
+        {"h": hotel, "a": anio, "m": mes})).mappings().first()
+    out["subida"] = ({"checksum": sub["checksum"],
+                      "archivo": sub["archivo_nombre"],
+                      "tc": float(sub["tc"]) if sub["tc"] is not None else None,
+                      "estado": sub["estado"],
+                      "fecha": str(sub["creado_en"])[:19],
+                      "por": sub["subido_por"]} if sub else None)
+    if sub is None:
+        out["avisos"].append(
+            f"No hay una subida viva de Pre-Cierre para el mes {mes}: no se "
+            "puede verificar que el analisis escrito describa este dato.")
+
     return out
 
 
