@@ -91,6 +91,23 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
     "pre-cierre/integral:budget", escenarios, "budget");
   const [forecast, setForecast] = useEscenarioDe(
     "pre-cierre/integral:forecast", escenarios, "forecast");
+  /** La tercera ranura: la BASE de validacion. Owner, 2026-10-16: *«me
+   *  gustaria tener la oportunidad de poder revisar contra el mes anterior
+   *  para usarlo como base de validacion... jalo precierre agosto y precierre
+   *  setiembre y despues compara contra forecast y budget»*.
+   *
+   *  Nace vacia: quien no la use no ve ningun cambio. */
+  const [base, setBase] = useEscenarioDe(
+    "pre-cierre/integral:base", escenarios, "actual");
+  /** El mes de cada ranura. 0 = el mes de la pantalla, que es como se
+   *  comportaba antes y sigue siendo el default de las dos primeras.
+   *
+   *  La de BASE arranca en el mes anterior, porque es para lo que existe. */
+  const [mesesCol, setMesesCol] = useState<[number, number, number]>(
+    [0, 0, 0]);
+  useEffect(() => {
+    setMesesCol(m => (m[2] === 0 && mes > 1 ? [m[0], m[1], mes - 1] : m));
+  }, [mes]);
   const [datos, setDatos] = useState<Integral | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -171,8 +188,16 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
     getScenarios(HOTEL_ID).then(setEscenarios).catch(() => {});
   }, []);
 
+  // ⚠️ `id@mes` solo cuando el mes NO es el de la pantalla: sin sufijo el
+  // backend se comporta igual que antes y los enlaces viejos siguen sirviendo.
   const ids = useMemo(
-    () => [budget, forecast].filter(Boolean), [budget, forecast]);
+    () => [base, budget, forecast]
+      .map((id, i) => {
+        const m = [mesesCol[2], mesesCol[0], mesesCol[1]][i];
+        return id ? (m && m !== mes ? `${id}@${m}` : id) : "";
+      })
+      .filter(Boolean),
+    [base, budget, forecast, mesesCol, mes]);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError("");
@@ -319,14 +344,47 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap",
                     alignItems: "center", marginBottom: 12 }}>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Comparar contra</span>
-        {([[budget, setBudget], [forecast, setForecast]] as const).map(([val, set], i) => (
-          <select key={i} value={val} onChange={e => set(e.target.value)}
-                  style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5 }}>
-            <option value="">— sin comparar —</option>
-            {escenarios.map(s => (
-              <option key={s.id} value={s.id}>{rot(s)}</option>
-            ))}
-          </select>
+        {/* Tres ranuras, cada una con su MES. Owner, 2026-10-16: *«solo ocupo
+            poder jalar mes anterior y escoger mes anterior..en precierre»*.
+
+            La primera nace como BASE en el mes anterior —es para lo que la
+            pidio— y las otras dos siguen en «mismo mes», que es como se
+            comportaban. El mes solo se puede elegir cuando hay escenario:
+            un selector de mes sobre «sin comparar» no hace nada y confunde. */}
+        {([[base, setBase, 2, "base de validacion"],
+           [budget, setBudget, 0, "budget"],
+           [forecast, setForecast, 1, "forecast"]] as const)
+          .map(([val, set, iMes, cual]) => (
+          <span key={cual} style={{ display: "inline-flex", gap: 4,
+                                    alignItems: "center" }}>
+            <select value={val} onChange={e => set(e.target.value)}
+                    title={`Columna de ${cual}`}
+                    style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5 }}>
+              <option value="">— sin comparar —</option>
+              {escenarios.map(s => (
+                <option key={s.id} value={s.id}>{rot(s)}</option>
+              ))}
+            </select>
+            {val && (
+              <select value={mesesCol[iMes]}
+                      onChange={e => setMesesCol(m => {
+                        const c = [...m] as [number, number, number];
+                        c[iMes] = Number(e.target.value);
+                        return c;
+                      })}
+                      title="De que mes de ese escenario"
+                      style={{ fontSize: 12, padding: "4px 6px", borderRadius: 5,
+                               background: mesesCol[iMes] && mesesCol[iMes] !== mes
+                                 ? "var(--bg-elevated)" : undefined,
+                               fontWeight: mesesCol[iMes] && mesesCol[iMes] !== mes
+                                 ? 600 : 400 }}>
+                <option value={0}>mismo mes</option>
+                {MESES.map((nm, i) => (
+                  <option key={nm} value={i + 1}>{nm}</option>
+                ))}
+              </select>
+            )}
+          </span>
         ))}
         <label style={{ fontSize: 12, display: "flex", gap: 5, alignItems: "center",
                         cursor: "pointer" }}>

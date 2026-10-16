@@ -794,16 +794,44 @@ async def audit_integral(
         c["lineas"] += 1
 
     # ── Las versiones contra las que se compara ─────────────────────────────
-    ids = [x for x in (scenarios or "").split(",") if x.strip()]
+    #
+    # Cada entrada es `id` o `id@mes`. Owner, 2026-10-16: *«me gustaria tener
+    # la oportunidad de poder revisar contra el mes anterior para usarlo como
+    # base de validacion... jalo precierre agosto y precierre setiembre y
+    # despues compara contra forecast y budget»*.
+    #
+    # Sin el `@mes`, una columna solo podia apuntar al MISMO mes de la pantalla,
+    # asi que el espejo de Pre-Cierre —que tiene agosto Y setiembre— solo podia
+    # mostrar el mes que ya estaba en la columna del actual. Con el `@mes` la
+    # misma fuente sirve de base: agosto al lado de setiembre, y los dos contra
+    # Budget y Forecast.
+    #
+    # ⚠️ Sin `@mes` se comporta EXACTAMENTE como antes. Los enlaces guardados y
+    # el Excel que ya exporta la pantalla no cambian.
+    ids = [x.strip() for x in (scenarios or "").split(",") if x.strip()]
     versiones = []
-    for sid in ids:
+    for crudo in ids:
+        sid, _, m_txt = crudo.partition("@")
+        try:
+            m = int(m_txt) if m_txt else mes
+        except ValueError:
+            m = mes
+        if not 1 <= m <= 12:
+            m = mes
         esc = await db.get(Scenario, sid.strip())
         if esc is None:
             continue
+        rotulo = f"{esc.type} {esc.version} {esc.year}"
         versiones.append({
+            # ⚠️ La llave lleva el mes. Comparar el MISMO escenario en dos meses
+            # —que es justo lo que pidio el owner— con la llave pelada dejaria
+            # una sola columna: la segunda pisaria a la primera y el cuadro se
+            # veria bien mostrando un solo mes.
+            "clave": f"{esc.id}@{m}" if m != mes else esc.id,
             "scenario_id": esc.id,
-            "escenario": f"{esc.type} {esc.version} {esc.year}",
-            "por_cuenta": await _por_cuenta_del_escenario(db, esc, mes),
+            "mes": m,
+            "escenario": rotulo if m == mes else f"{rotulo} · {MESES_ES[m - 1]}",
+            "por_cuenta": await _por_cuenta_del_escenario(db, esc, m),
         })
 
     # ── El cuadro ───────────────────────────────────────────────────────────
@@ -821,7 +849,7 @@ async def audit_integral(
     cuadro = []
     for dep, cta in llaves_cta:
         r = por_cta.get((dep, cta))
-        montos = {v["scenario_id"]: v["por_cuenta"].get((dep, cta), 0.0)
+        montos = {v["clave"]: v["por_cuenta"].get((dep, cta), 0.0)
                   for v in versiones}
         if not r and not any(abs(x) > 0.005 for x in montos.values()):
             continue
@@ -850,8 +878,8 @@ async def audit_integral(
         "archivo": cabeza.archivo, "moneda": cabeza.moneda_archivo,
         "subido_en": cabeza.subido_en.isoformat() if cabeza.subido_en else None,
         "orden_grupos": list(ORDEN_INTEGRAL),
-        "versiones": [{"scenario_id": v["scenario_id"], "escenario": v["escenario"]}
-                      for v in versiones],
+        "versiones": [{"scenario_id": v["clave"], "escenario": v["escenario"],
+                       "mes": v["mes"]} for v in versiones],
         "filas": cuadro,
     }
 
