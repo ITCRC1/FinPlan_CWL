@@ -206,3 +206,49 @@ def test_la_base_sale_PRIMERO_en_la_pantalla():
     assert "return [...base, undefined, ...resto];" in txt
     # Y el detalle solo compara contra las columnas que TIENEN detalle.
     assert "v?.con_detalle" in txt
+
+
+def test_la_fila_de_DETALLE_usa_las_mismas_columnas_que_el_encabezado():
+    """⚠️ El defecto que el owner encontro mirando la pantalla: *«yo quiero
+    detalle para eso lo puse»*.
+
+    El encabezado dibujaba `colsMonto` = [Agosto, Actual, Budget, Forecast],
+    pero la fila de detalle dibujaba el actual APARTE, antes del recorrido, y
+    despues las versiones. Resultado: el numero de agosto caia bajo el rotulo
+    «Actual» y el de setiembre bajo «Agosto».
+
+    No fallaba nada. El cuadro se veia perfecto y decia otra cosa -- que es la
+    forma de fallar que mas caro sale en este proyecto.
+
+    La unica defensa posible es que las TRES filas —encabezado, cuenta y
+    detalle— recorran la misma lista.
+    """
+    import pathlib
+    import re
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+         / "pre-cierre" / "AuditIntegral.tsx")
+    txt = p.read_text(encoding="utf-8", errors="replace")
+
+    # Tres recorridos de `colsMonto` como minimo: encabezado, banda, cuenta y
+    # detalle. Si alguno dibujara el actual por su cuenta, sobraria una celda.
+    assert len(re.findall(r"colsMonto\.map\(", txt)) >= 4
+
+    # Y NINGUNA celda de monto suelta con `x.actual` fuera del recorrido: eso
+    # es exactamente lo que corria las columnas.
+    suelta = re.search(r"<td[^>]*>\s*\{usd\(x\.actual\)\}", txt)
+    assert suelta is None, "el actual del detalle volvio a dibujarse aparte"
+
+
+def test_el_detalle_se_muestra_aunque_haya_UNO_solo():
+    """Antes se escondia con `length > 1` —«un detalle es el total de la cuenta
+    otra vez»—. Dejo de ser cierto cuando entro la base: la cuenta puede traer
+    un detalle en setiembre y otro distinto en agosto, y esconderlos tapa justo
+    el cambio que se fue a buscar."""
+    import pathlib
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+         / "pre-cierre" / "AuditIntegral.tsx")
+    txt = p.read_text(encoding="utf-8", errors="replace")
+    assert "f.detalles.length > 0 && f.detalles.map" in txt
+    assert "f.detalles.length > 1" not in txt

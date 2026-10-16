@@ -713,9 +713,15 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           </td>
                         </tr>
                       )}
-                      {/* El DETALLE de la cuenta — el tercer segmento. Sin
-                          comparacion a proposito: ver el tipo `Detalle`. */}
-                      {f.detalles.length > 1 && f.detalles.map(x => (
+                      {/* El DETALLE de la cuenta — el tercer segmento, y desde
+                          el 2026-10-16 CON el mes base al lado.
+
+                          ⚠️ Se muestra aunque haya UNO solo. Antes se escondia
+                          —«un detalle es el total de la cuenta otra vez»— y eso
+                          dejo de ser cierto cuando entro la base: la cuenta
+                          puede traer un detalle en setiembre y otro distinto en
+                          agosto, y esconderlos es tapar justo el cambio. */}
+                      {f.detalles.length > 0 && f.detalles.map(x => (
                         <tr key={f.cuenta + "d" + x.detalle}>
                           <td style={{ ...td, paddingLeft: 46, whiteSpace: "nowrap",
                                        color: "var(--text-secondary)" }}>
@@ -723,25 +729,29 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           </td>
                           <td style={{ ...td, color: "var(--text-secondary)" }}>{x.nombre}</td>
                           <td style={{ ...num, color: "var(--text-secondary)" }}>{x.lineas}</td>
-                          <td style={{ ...num, color: "var(--text-secondary)" }}>
-                            {usd(x.actual)}
-                          </td>
-                          {/* ⚠️ Solo las columnas del MAYOR traen detalle.
-                              Contra Budget y Forecast queda en blanco a
+                          {/* ⚠️ El MISMO `colsMonto` que el encabezado y que la
+                              fila de cuenta. Dibujar el actual aparte, ANTES
+                              del recorrido, corria las columnas una posicion:
+                              el numero de agosto caia bajo el rotulo «Actual»
+                              y el de setiembre bajo «Agosto». Se veia perfecto
+                              y decia otra cosa.
+
+                              Contra Budget y Forecast la celda va VACIA a
                               proposito: el presupuesto numera sus detalles por
-                              su cuenta, y aparearlos inventaria una
+                              su cuenta y aparearlos inventaria una
                               correspondencia. Entre dos meses REALES no: los
                               dos salen de Integrity con el mismo tercer
                               segmento. */}
                           {colsMonto.map((sid, n) => {
-                            if (sid === undefined) return null;
-                            const v = vers.find(z => z.scenario_id === sid);
+                            const v = sid === undefined ? null
+                              : vers.find(z => z.scenario_id === sid);
+                            const puede = sid === undefined || !!v?.con_detalle;
                             return (
                               <td key={"dm" + n}
                                   style={{ ...num,
                                            color: "var(--text-secondary)" }}>
-                                {v?.con_detalle
-                                  ? usd(x.versiones?.[sid] ?? 0) : ""}
+                                {!puede ? "" : usd(sid === undefined
+                                  ? x.actual : (x.versiones?.[sid] ?? 0))}
                               </td>
                             );
                           })}
