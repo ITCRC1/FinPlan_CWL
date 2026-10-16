@@ -78,10 +78,44 @@ def test_la_pantalla_ofrece_la_tercera_ranura_y_el_mes():
     p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
          / "pre-cierre" / "AuditIntegral.tsx")
     txt = p.read_text(encoding="utf-8", errors="replace")
-    assert "pre-cierre/integral:base" in txt          # la ranura de base
+    assert "pre-cierre/integral:base2" in txt         # la ranura de base
     assert "mesesCol" in txt                          # el mes por columna
     assert "mismo mes" in txt                         # el default de siempre
     # El sufijo solo se manda cuando el mes es OTRO.
     assert "m && m !== mes ? `${id}@${m}` : id" in txt
     # Y la base arranca en el mes anterior, que es para lo que se pidio.
     assert "mes > 1 ? [m[0], m[1], mes - 1] : m" in txt
+
+
+def test_cada_ranura_dice_CUAL_es():
+    """Owner, 2026-10-16: *«estoy enredado»*.
+
+    La primera version puso tres selectores IDENTICOS en fila, sin rotulo. Los
+    dejo armados al reves —la base en «ACTUAL actual 2025» y el Budget en
+    agosto— y la pantalla no daba ninguna pista de que eso estuviera mal.
+
+    Tres controles que se ven iguales y hacen cosas distintas necesitan decir
+    cual es cual: el rotulo no es decoracion.
+    """
+    import pathlib
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+         / "pre-cierre" / "AuditIntegral.tsx")
+    txt = p.read_text(encoding="utf-8", errors="replace")
+    for rotulo in ("Base de validacion", "Budget", "Forecast"):
+        assert f'"{rotulo}"' in txt, rotulo
+    # Y cuando una columna mira OTRO mes, el rotulo lo dice y se resalta: es la
+    # unica senal de que el cuadro no esta comparando mes contra mes.
+    assert "otroMes && ` · ${MESES[mesesCol[iMes] - 1]}`" in txt
+    assert '"1px solid var(--brand)"' in txt
+
+
+def test_la_base_arranca_en_el_espejo_de_PRE_CIERRE():
+    """⚠️ La regla general de «actual» elegia el ACTUAL 2025, que no sirve de
+    base: no tiene los meses del ano que se esta cerrando."""
+    import pathlib
+
+    p = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
+         / "pre-cierre" / "AuditIntegral.tsx")
+    txt = p.read_text(encoding="utf-8", errors="replace")
+    assert "s.es_precierre && s.year === anio" in txt

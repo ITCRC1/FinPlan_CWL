@@ -98,7 +98,13 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *
    *  Nace vacia: quien no la use no ve ningun cambio. */
   const [base, setBase] = useEscenarioDe(
-    "pre-cierre/integral:base", escenarios, "actual");
+    "pre-cierre/integral:base2", escenarios, "actual",
+    // El espejo de Pre-Cierre del MISMO ano: es el unico que tiene los meses
+    // ya cerrados con el mismo criterio que la columna del actual. La regla
+    // general de «actual» elegia el ACTUAL 2025, que no sirve de base.
+    useCallback((ss: Scenario[]) =>
+      ss.find(s => s.es_precierre && s.year === anio)
+      ?? ss.find(s => s.es_precierre), [anio]));
   /** El mes de cada ranura. 0 = el mes de la pantalla, que es como se
    *  comportaba antes y sigue siendo el default de las dos primeras.
    *
@@ -344,48 +350,68 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap",
                     alignItems: "center", marginBottom: 12 }}>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Comparar contra</span>
-        {/* Tres ranuras, cada una con su MES. Owner, 2026-10-16: *«solo ocupo
-            poder jalar mes anterior y escoger mes anterior..en precierre»*.
+        {/* Tres ranuras ROTULADAS. Owner, 2026-10-16: *«estoy enredado»*, y
+            tenia razon: la primera version puso tres selectores identicos en
+            fila, sin decir cual era cual. Quedo armado al reves —la base en
+            «ACTUAL actual 2025» y el Budget en agosto— y la pantalla no daba
+            ninguna pista de que eso estuviera mal.
 
-            La primera nace como BASE en el mes anterior —es para lo que la
-            pidio— y las otras dos siguen en «mismo mes», que es como se
-            comportaban. El mes solo se puede elegir cuando hay escenario:
-            un selector de mes sobre «sin comparar» no hace nada y confunde. */}
-        {([[base, setBase, 2, "base de validacion"],
-           [budget, setBudget, 0, "budget"],
-           [forecast, setForecast, 1, "forecast"]] as const)
-          .map(([val, set, iMes, cual]) => (
-          <span key={cual} style={{ display: "inline-flex", gap: 4,
-                                    alignItems: "center" }}>
-            <select value={val} onChange={e => set(e.target.value)}
-                    title={`Columna de ${cual}`}
-                    style={{ fontSize: 12, padding: "4px 8px", borderRadius: 5 }}>
-              <option value="">— sin comparar —</option>
-              {escenarios.map(s => (
-                <option key={s.id} value={s.id}>{rot(s)}</option>
-              ))}
-            </select>
-            {val && (
-              <select value={mesesCol[iMes]}
-                      onChange={e => setMesesCol(m => {
-                        const c = [...m] as [number, number, number];
-                        c[iMes] = Number(e.target.value);
-                        return c;
-                      })}
-                      title="De que mes de ese escenario"
-                      style={{ fontSize: 12, padding: "4px 6px", borderRadius: 5,
-                               background: mesesCol[iMes] && mesesCol[iMes] !== mes
-                                 ? "var(--bg-elevated)" : undefined,
-                               fontWeight: mesesCol[iMes] && mesesCol[iMes] !== mes
-                                 ? 600 : 400 }}>
-                <option value={0}>mismo mes</option>
-                {MESES.map((nm, i) => (
-                  <option key={nm} value={i + 1}>{nm}</option>
-                ))}
-              </select>
-            )}
-          </span>
-        ))}
+            El rotulo no es decoracion: es lo unico que distingue tres
+            controles que se ven iguales. */}
+        {([[base, setBase, 2, "Base de validacion",
+            "El mismo mes anterior, para comparar contra algo real"],
+           [budget, setBudget, 0, "Budget", "Contra la meta del ano"],
+           [forecast, setForecast, 1, "Forecast",
+            "Contra la ultima proyeccion"]] as const)
+          .map(([val, set, iMes, titulo, ayuda]) => {
+            const otroMes = !!(mesesCol[iMes] && mesesCol[iMes] !== mes);
+            return (
+              <span key={titulo} style={{ display: "inline-flex",
+                                          flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: .3,
+                               color: otroMes ? "var(--brand)"
+                                              : "var(--text-secondary)",
+                               textTransform: "uppercase" }}
+                      title={ayuda}>
+                  {titulo}
+                  {otroMes && ` · ${MESES[mesesCol[iMes] - 1]}`}
+                </span>
+                <span style={{ display: "inline-flex", gap: 4,
+                               alignItems: "center" }}>
+                  <select value={val} onChange={e => set(e.target.value)}
+                          title={ayuda}
+                          style={{ fontSize: 12, padding: "4px 8px",
+                                   borderRadius: 5,
+                                   border: otroMes
+                                     ? "1px solid var(--brand)" : undefined }}>
+                    <option value="">— sin comparar —</option>
+                    {escenarios.map(s => (
+                      <option key={s.id} value={s.id}>{rot(s)}</option>
+                    ))}
+                  </select>
+                  {val && (
+                    <select value={mesesCol[iMes]}
+                            onChange={e => setMesesCol(m => {
+                              const c = [...m] as [number, number, number];
+                              c[iMes] = Number(e.target.value);
+                              return c;
+                            })}
+                            title="De que mes de ese escenario"
+                            style={{ fontSize: 12, padding: "4px 6px",
+                                     borderRadius: 5,
+                                     fontWeight: otroMes ? 600 : 400,
+                                     border: otroMes
+                                       ? "1px solid var(--brand)" : undefined }}>
+                      <option value={0}>mismo mes</option>
+                      {MESES.map((nm, i) => (
+                        <option key={nm} value={i + 1}>{nm}</option>
+                      ))}
+                    </select>
+                  )}
+                </span>
+              </span>
+            );
+          })}
         <label style={{ fontSize: 12, display: "flex", gap: 5, alignItems: "center",
                         cursor: "pointer" }}>
           <input type="checkbox" checked={soloDiferencias}
