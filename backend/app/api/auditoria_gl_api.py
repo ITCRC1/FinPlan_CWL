@@ -694,6 +694,58 @@ async def _nombres_del_detalle(db, scenario_ids):
     return nombre
 
 
+def _depurar_el_mayor(filas, puente):
+    """`(por_detalle, por_cuenta)` del mayor, con las reglas del cierre.
+
+    ⚠️ **Una sola funcion para el actual Y para la base.** Owner, 2026-10-16:
+    *«quiero mismo detalle de agosto y de setiembre y que me sirva de primera
+    base comparativa»*. Si cada columna depurara por su cuenta, agosto y
+    setiembre podrian diferir por el codigo y no por la operacion — y el cuadro
+    se veria perfecto mintiendo.
+
+    El grano es (departamento, cuenta, DETALLE). El «detalle» es el tercer
+    segmento: en las 6 el puesto, en las 7 el detalle del gasto.
+
+    Las dos reglas que hacen que los numeros coincidan con el cierre:
+
+    * **El signo** (`signo_de`): en el mayor un ingreso es un credito, o sea
+      negativo. La `4999` es la excepcion y ya viene bien.
+    * **El puente de departamentos**: el mayor trae el de Integrity y el
+      presupuesto el de FinPlan.
+    """
+    from app.importers.integrity_final import signo_de
+
+    por_det: dict[tuple, dict] = {}
+    por_cta: dict[tuple, dict] = {}
+    for f in filas:
+        if (f.seg1 or "")[:1] not in "45678":
+            continue
+        dep = pl_engine.consolidate_dept(puente.get(f.seg2, f.seg2))
+        monto = signo_de(f.seg1) * _usd(f)
+        d = por_det.setdefault((dep, f.seg1, f.seg3 or ""),
+                               {"monto": 0.0, "lineas": 0,
+                                "nombre": f.descripcion or ""})
+        d["monto"] += monto
+        d["lineas"] += 1
+        c = por_cta.setdefault((dep, f.seg1), {"monto": 0.0, "lineas": 0,
+                                               "nombre": f.descripcion or ""})
+        c["monto"] += monto
+        c["lineas"] += 1
+    return por_det, por_cta
+
+
+async def _mayor_de(db, anio: int, mes: int, puente):
+    """El mayor guardado de un mes, ya depurado. `None` si no esta subido."""
+    filas = (await db.execute(select(MayorMovimiento).where(
+        MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+        MayorMovimiento.mes == mes))).scalars().all()
+    if not filas:
+        return None
+    por_det, por_cta = _depurar_el_mayor(filas, puente)
+    return {"por_detalle": por_det, "por_cuenta": por_cta,
+            "archivo": filas[0].archivo, "lineas": len(filas)}
+
+
 @router.get("/mayor/{anio}/{mes}/integral/")
 async def audit_integral(
     anio: int,
@@ -753,6 +805,7 @@ async def audit_integral(
     if not filas:
         return {"anio": anio, "mes": mes, "hay": False, "motivo": "mes_no_subido"}
 
+    avisos: list[str] = []
     puente = _puente_de_departamentos()
     deptos = {d.dept_code: d.dept_name
               for d in (await db.execute(select(DepartmentCatalog))).scalars().all()}
@@ -775,23 +828,7 @@ async def audit_integral(
     #
     # El «detalle» es el tercer segmento de la cuenta, que en las 6 es el puesto
     # y en las 7 el detalle del gasto — el mismo eje que abre `Opex by Detail`.
-    real: dict[tuple, dict] = {}
-    por_cta: dict[tuple, dict] = {}
-    for f in filas:
-        if (f.seg1 or "")[:1] not in "45678":
-            continue
-        dep = pl_engine.consolidate_dept(puente.get(f.seg2, f.seg2))
-        monto = signo_de(f.seg1) * _usd(f)
-        k = (dep, f.seg1, f.seg3 or "")
-        d = real.setdefault(k, {"monto": 0.0, "lineas": 0,
-                                "nombre": f.descripcion or ""})
-        d["monto"] += monto
-        d["lineas"] += 1
-        # El total por CUENTA, que es el nivel donde SÍ se compara.
-        c = por_cta.setdefault((dep, f.seg1), {"monto": 0.0, "lineas": 0,
-                                               "nombre": f.descripcion or ""})
-        c["monto"] += monto
-        c["lineas"] += 1
+    real, por_cta = _depurar_el_mayor(filas, puente)
 
     # ── Las versiones contra las que se compara ─────────────────────────────
     #
@@ -818,6 +855,48 @@ async def audit_integral(
             m = mes
         if not 1 <= m <= 12:
             m = mes
+
+        # ── `MAYOR@mes`: el mes anterior A MAXIMO DETALLE ──────────────────
+        #
+        # Owner, 2026-10-16: *«quiero mismo detalle de agosto y de setiembre y
+        # que me sirva de primera base comparativa»*.
+        #
+        # ⚠️ **Esta es la unica columna que puede bajar al detalle, y hay una
+        # razon.** Contra Budget y Forecast la comparacion se queda en la
+        # cuenta a proposito: el presupuesto numera sus detalles por su cuenta,
+        # asi que aparearlos inventaria una correspondencia. Entre DOS MESES
+        # REALES no: los dos salen de Integrity con el mismo tercer segmento,
+        # asi que detalle contra detalle compara lo mismo con lo mismo.
+        if sid.strip().upper() == "MAYOR":
+            # ⚠️ El mayor del MISMO mes es la columna del Actual otra vez: dos
+            # columnas identicas, con variaciones de cero que se leen como
+            # «cuadra». Pasa en enero, donde el mes anterior es de OTRO ano y
+            # esta puerta solo sirve el ano de la pantalla. Se dice y se salta.
+            if m == mes:
+                avisos.append(
+                    "La base pedia el mayor del mismo mes, que es la columna "
+                    "del Actual. Para comparar contra el mes anterior de otro "
+                    "ano, abri ese ano en la pantalla.")
+                continue
+            may = await _mayor_de(db, anio, m, puente)
+            if may is None:
+                # No esta subido. Se dice y se sigue: el resto del cuadro sirve.
+                avisos.append(
+                    f"El mayor de {MESES_ES[m - 1].lower()} no esta subido: la "
+                    "columna de base queda vacia. Subilo en «Auditoria del "
+                    "mayor».")
+                continue
+            versiones.append({
+                "clave": f"MAYOR@{m}",
+                "scenario_id": "",          # no es un escenario
+                "mes": m,
+                "escenario": f"Mayor · {MESES_ES[m - 1]}",
+                "archivo": may["archivo"],
+                "por_cuenta": {k: v["monto"] for k, v in may["por_cuenta"].items()},
+                "por_detalle": {k: v["monto"] for k, v in may["por_detalle"].items()},
+            })
+            continue
+
         esc = await db.get(Scenario, sid.strip())
         if esc is None:
             continue
@@ -853,11 +932,29 @@ async def audit_integral(
                   for v in versiones}
         if not r and not any(abs(x) > 0.005 for x in montos.values()):
             continue
+        # ── El detalle, con la base al lado ────────────────────────────
+        #
+        # ⚠️ Las llaves son la UNION: un detalle que existe en agosto y no en
+        # setiembre tiene que aparecer igual, con el actual en cero. Si solo se
+        # recorriera el mes actual, una partida que DEJO de gastarse
+        # desapareceria del cuadro — y «no esta» se lee como «no cambio», que
+        # es el error de lectura mas caro que puede tener una base comparativa.
+        con_det = [v for v in versiones if "por_detalle" in v]
+        d3s = {d3 for (dd, cc, d3) in real if dd == dep and cc == cta}
+        for v in con_det:
+            d3s |= {d3 for (dd, cc, d3) in v["por_detalle"]
+                    if dd == dep and cc == cta}
         detalles = sorted(
             ({"detalle": d3,
-              "nombre": nombres_det(dep, cta, d3) or limpiar_nombre(v["nombre"]),
-              "actual": round(v["monto"], 2), "lineas": v["lineas"]}
-             for (dd, cc, d3), v in real.items() if dd == dep and cc == cta),
+              "nombre": (nombres_det(dep, cta, d3)
+                         or limpiar_nombre(
+                             (real.get((dep, cta, d3)) or {}).get("nombre", ""))),
+              "actual": round((real.get((dep, cta, d3)) or {}).get("monto", 0.0), 2),
+              "lineas": (real.get((dep, cta, d3)) or {}).get("lineas", 0),
+              "versiones": {v["clave"]:
+                            round(v["por_detalle"].get((dep, cta, d3), 0.0), 2)
+                            for v in con_det}}
+             for d3 in d3s),
             key=lambda x: x["detalle"])
         cuadro.append({
             "grupo": auditoria_gl.grupo_de(cta),
@@ -878,8 +975,12 @@ async def audit_integral(
         "archivo": cabeza.archivo, "moneda": cabeza.moneda_archivo,
         "subido_en": cabeza.subido_en.isoformat() if cabeza.subido_en else None,
         "orden_grupos": list(ORDEN_INTEGRAL),
+        "avisos": avisos,
         "versiones": [{"scenario_id": v["clave"], "escenario": v["escenario"],
-                       "mes": v["mes"]} for v in versiones],
+                       "mes": v["mes"], "archivo": v.get("archivo"),
+                       # Solo las columnas del MAYOR traen detalle; la pantalla
+                       # usa esto para saber en cuales puede bajar.
+                       "con_detalle": "por_detalle" in v} for v in versiones],
         "filas": cuadro,
     }
 

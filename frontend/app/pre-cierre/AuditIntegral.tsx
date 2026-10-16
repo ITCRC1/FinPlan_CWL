@@ -37,6 +37,10 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 
 interface Detalle {
   detalle: string; nombre: string; actual: number; lineas: number;
+  /** Solo las columnas que salen del MAYOR traen detalle. Contra Budget y
+   *  Forecast va vacio a proposito: el presupuesto numera sus detalles por su
+   *  cuenta, asi que aparearlos inventaria una correspondencia. */
+  versiones?: Record<string, number>;
 }
 
 interface FilaIntegral {
@@ -70,7 +74,9 @@ interface Integral {
   anio: number; mes: number; hay: boolean; motivo?: string;
   archivo?: string; moneda?: string; subido_en?: string | null;
   orden_grupos?: string[];
-  versiones?: { scenario_id: string; escenario: string }[];
+  versiones?: { scenario_id: string; escenario: string; mes?: number;
+                archivo?: string | null; con_detalle?: boolean }[];
+  avisos?: string[];
   filas?: FilaIntegral[];
 }
 
@@ -97,14 +103,16 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
    *  setiembre y despues compara contra forecast y budget»*.
    *
    *  Nace vacia: quien no la use no ve ningun cambio. */
-  const [base, setBase] = useEscenarioDe(
-    "pre-cierre/integral:base2", escenarios, "actual",
-    // El espejo de Pre-Cierre del MISMO ano: es el unico que tiene los meses
-    // ya cerrados con el mismo criterio que la columna del actual. La regla
-    // general de «actual» elegia el ACTUAL 2025, que no sirve de base.
-    useCallback((ss: Scenario[]) =>
-      ss.find(s => s.es_precierre && s.year === anio)
-      ?? ss.find(s => s.es_precierre), [anio]));
+  /** La BASE: el MAYOR del mes anterior, el mismo archivo del que sale la
+   *  columna del Actual. Owner, 2026-10-16: *«quiero mismo detalle de agosto y
+   *  de setiembre y que me sirva de primera base comparativa»*.
+   *
+   *  ⚠️ Tiene que ser el MAYOR y no el espejo de Pre-Cierre: el Pre-Cierre
+   *  llega a la cuenta y se acaba —«totals only, no detail»—, asi que no podria
+   *  dar el detalle que se pidio. El mayor si, y por el mismo camino que el
+   *  Actual: si usaran codigo distinto, agosto y setiembre podrian diferir por
+   *  el codigo y no por la operacion. */
+  const [base, setBase] = useState<string>("MAYOR");
   /** El mes de cada ranura. 0 = el mes de la pantalla, que es como se
    *  comportaba antes y sigue siendo el default de las dos primeras.
    *
@@ -246,7 +254,25 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
     ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
   };
 
-  const vers = datos?.versiones ?? [];
+  // ⚠️ La BASE va primero. Owner, 2026-10-16: *«quiero que salga primero
+  // Agosto, como base comparativa y precierre Setiembre contra forecast o
+  // budget»*. Se lee de izquierda a derecha: de donde venia, donde esta, con
+  // que se compara.
+  const vers = useMemo(() => {
+    const vs = datos?.versiones ?? [];
+    return [...vs.filter(v => v.con_detalle), ...vs.filter(v => !v.con_detalle)];
+  }, [datos]);
+  /** El orden de las columnas de MONTO. `undefined` = la del Actual. */
+  const colsMonto = useMemo<(string | undefined)[]>(() => {
+    const base = vers.filter(v => v.con_detalle).map(v => v.scenario_id);
+    const resto = vers.filter(v => !v.con_detalle).map(v => v.scenario_id);
+    return [...base, undefined, ...resto];
+  }, [vers]);
+  const rotuloCol = useCallback(
+    (sid?: string) => sid
+      ? (vers.find(v => v.scenario_id === sid)?.escenario ?? sid)
+      : `Actual · ${MESES[mes - 1]}`,
+    [vers, mes]);
   const descuadra = (f: FilaIntegral) =>
     vers.some(v => Math.abs(f.actual - (f.versiones[v.scenario_id] ?? 0)) > 0.005);
   const visibles = (datos?.filas ?? []).filter(
@@ -385,6 +411,9 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                                    border: otroMes
                                      ? "1px solid var(--brand)" : undefined }}>
                     <option value="">— sin comparar —</option>
+                    {/* El mayor del mes que se elija al lado. Es la unica
+                        opcion que baja al DETALLE. */}
+                    <option value="MAYOR">Mayor (detalle) — mes anterior</option>
                     {escenarios.map(s => (
                       <option key={s.id} value={s.id}>{rot(s)}</option>
                     ))}
@@ -526,10 +555,11 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
             <th style={th}>Cuenta · Detalle</th>
             <th style={th}>Nombre</th>
             <th style={{ ...th, textAlign: "right" }}>Asientos</th>
-            <th style={{ ...th, textAlign: "right" }}>Actual</th>
-            {vers.map(v => (
-              <th key={v.scenario_id} style={{ ...th, textAlign: "right" }}>
-                {v.escenario}
+            {colsMonto.map((sid, n) => (
+              <th key={"h" + n} style={{ ...th, textAlign: "right",
+                                         color: sid === undefined
+                                           ? "var(--text-primary)" : undefined }}>
+                {rotuloCol(sid)}
               </th>
             ))}
             {vers.map(v => (
@@ -556,7 +586,7 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                                borderTop: "2px solid var(--brand)" }}>
                     {rotuloDept(d.code, d.name)}
                   </td>
-                  {[undefined, ...vers.map(v => v.scenario_id)].map((sid, n) => (
+                  {colsMonto.map((sid, n) => (
                     <td key={"t" + n}
                         style={{ ...num, fontWeight: 800,
                                  background: "var(--bg-elevated)",
@@ -587,7 +617,7 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                                                background: "var(--bg-surface)" }}>
                         {g.grupo}
                       </td>
-                      {[undefined, ...vers.map(v => v.scenario_id)].map((sid, n) => (
+                      {colsMonto.map((sid, n) => (
                         <td key={"t" + n}
                             style={{ ...num, fontWeight: 700,
                                      background: "var(--bg-surface)" }}>
@@ -641,10 +671,12 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                             </button>
                           ) : "\u2014"}
                         </td>
-                        <td style={{ ...num, fontWeight: 600 }}>{usd(f.actual)}</td>
-                        {vers.map(v => (
-                          <td key={v.scenario_id} style={num}>
-                            {usd(f.versiones[v.scenario_id] ?? 0)}
+                        {colsMonto.map((sid, n) => (
+                          <td key={"m" + n}
+                              style={{ ...num,
+                                       fontWeight: sid === undefined ? 600 : 400 }}>
+                            {usd(sid === undefined
+                              ? f.actual : (f.versiones[sid] ?? 0))}
                           </td>
                         ))}
                         {vers.map(v => {
@@ -694,8 +726,41 @@ export default function AuditIntegral({ anio, mes }: { anio: number; mes: number
                           <td style={{ ...num, color: "var(--text-secondary)" }}>
                             {usd(x.actual)}
                           </td>
-                          {vers.map(v => <td key={v.scenario_id} style={num} />)}
-                          {vers.map(v => <td key={"d" + v.scenario_id} style={num} />)}
+                          {/* ⚠️ Solo las columnas del MAYOR traen detalle.
+                              Contra Budget y Forecast queda en blanco a
+                              proposito: el presupuesto numera sus detalles por
+                              su cuenta, y aparearlos inventaria una
+                              correspondencia. Entre dos meses REALES no: los
+                              dos salen de Integrity con el mismo tercer
+                              segmento. */}
+                          {colsMonto.map((sid, n) => {
+                            if (sid === undefined) return null;
+                            const v = vers.find(z => z.scenario_id === sid);
+                            return (
+                              <td key={"dm" + n}
+                                  style={{ ...num,
+                                           color: "var(--text-secondary)" }}>
+                                {v?.con_detalle
+                                  ? usd(x.versiones?.[sid] ?? 0) : ""}
+                              </td>
+                            );
+                          })}
+                          {vers.map(v => {
+                            if (!v.con_detalle) {
+                              return <td key={"d" + v.scenario_id} style={num} />;
+                            }
+                            const dif = x.actual - (x.versiones?.[v.scenario_id] ?? 0);
+                            return (
+                              <td key={"d" + v.scenario_id}
+                                  style={{ ...num, fontSize: 11,
+                                           color: Math.abs(dif) <= 0.005
+                                             ? "var(--text-secondary)"
+                                             : dif < 0 ? "var(--negative)"
+                                                       : "var(--positive)" }}>
+                                {Math.abs(dif) <= 0.005 ? "" : usd(dif)}
+                              </td>
+                            );
+                          })}
                           <td style={td} />
                         </tr>
                       ))}
