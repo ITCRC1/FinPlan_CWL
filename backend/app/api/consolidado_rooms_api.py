@@ -144,3 +144,31 @@ async def rooms_pickup(year: int = Query(..., ge=2000, le=2100), db: AsyncSessio
         "pickup": a.get("pickup"), "canales": a.get("canales") or [],
         "leido_por": quien,
     }
+
+
+@router.get("/consolidado/rooms/rack-rooms/{scenario_id}/")
+async def rooms_rack_rooms(scenario_id: str, db: AsyncSession = Depends(get_db),
+                           quien: str = Depends(lector_del_consolidado)):
+    """Rack contra neto y ventas por segmento («Rack Rooms»), para Hotel Consolidation (2026-10-16).
+
+    El mismo cuadro de la pantalla Rack Rooms: RAC ponderado, ingreso a precio
+    rack y neto, comisión/descuento, % del rack retenido y noches/ingreso por
+    segmento de venta. Solo totales por mes y segmento; sin reservas ni
+    huéspedes. 404 en las propiedades que no tienen ese modelo.
+    """
+    await _escenario_propio(db, scenario_id)
+    try:
+        from app.api import rack_rooms_api
+    except Exception:
+        raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo="RACK_ROOMS", anio="")
+    d = await rack_rooms_api._ver(db, scenario_id)
+    if not d.get("hay_tarifario") and not d.get("entradas"):
+        raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo="RACK_ROOMS", anio=d.get("year") or "")
+    return {
+        "contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME,
+        "year": d.get("year"), "conectado": d.get("conectado"), "hay_tarifario": d.get("hay_tarifario"),
+        "villas": d.get("villas") or [], "temporadas": d.get("temporadas") or [],
+        "segmentos": d.get("segmentos") or [], "comisiones": d.get("comisiones") or [],
+        "meses": d.get("meses") or [], "total": d.get("total") or {}, "controles": d.get("controles") or {},
+        "leido_por": quien,
+    }

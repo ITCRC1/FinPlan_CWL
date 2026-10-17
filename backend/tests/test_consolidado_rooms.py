@@ -14,7 +14,8 @@ def test_sin_llave_ni_sesion_no_entra():
     for ruta in ("/api/consolidado/rooms/escenarios/",
                  "/api/consolidado/rooms/escenario/x/",
                  "/api/consolidado/rooms/pacing/?year=2027",
-                 "/api/consolidado/rooms/pickup/?year=2027"):
+                 "/api/consolidado/rooms/pickup/?year=2027",
+                 "/api/consolidado/rooms/rack-rooms/x/"):
         assert c.get(ruta).status_code == 401, ruta
 
 
@@ -41,3 +42,10 @@ def test_pickup_solo_entrega_totales():
     assert '"pickup"' in bloque and '"canales"' in bloque
     for prohibido in ('"reservas"', '"fotos"', '"posicion"'):
         assert prohibido not in bloque
+
+
+def test_rack_rooms_solo_entrega_totales():
+    """Rack Rooms sale agregado por mes y segmento: sin reservas ni huéspedes."""
+    bloque = FUENTE.split('"/consolidado/rooms/rack-rooms/{scenario_id}/"')[1]
+    assert "_escenario_propio" in bloque and "rack_rooms_api._ver" in bloque
+    assert '"entradas"' not in bloque.split("return {")[1]
