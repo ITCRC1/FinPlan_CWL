@@ -64,9 +64,39 @@ ESCRITURA = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #: que es justo el caso peligroso —copiar encima de un escenario cerrado—.
 LLAVES = ("scenario_id", "target_id")
 
-#: La única excepción: el interruptor que abre el candado. Sin esto, enllavar
-#: sería irreversible desde la app.
+#: La única excepción al candado: el interruptor que lo abre. Sin esto,
+#: enllavar sería irreversible desde la app.
+#:
+#: ⚠️ **Esta lista no crece.** Una excepción más es una puerta más, y una
+#: puerta abierta de más no avisa. Lo que NO es presupuesto va en la constante
+#: de abajo, que responde otra pregunta.
 PERMITIDAS = ("/status/",)
+
+#: Rutas que cuelgan de `/scenarios/{id}/` y **no escriben presupuesto**.
+#:
+#: El candado mira la URL, no lo que se escribe. Una ruta puede colgar de un
+#: escenario sin tocar su plata, y frenarla no protege nada: solo bloquea
+#: trabajo.
+#:
+#: Las cinco son **On the Books**: las reservas en firme que salen de Opera.
+#: Datos de operación, un hecho observado — no una cifra que alguien
+#: presupuestó. Viven colgadas del Budget porque el Budget es su línea de
+#: comparación, no porque sean parte de él. La regla es del owner
+#: (2026-08-18): *«el escenario es solo una referencia comparativa, pero no
+#: tiene nada que ver con las subidas»*.
+#:
+#: ⚠️ Las cinco rutas YA decían «SIN candado, a propósito» en su propio código
+#: —se les había quitado la llamada explícita a `candado()`— pero el guardia es
+#: GLOBAL (`main.py`) y seguía disparando. El comentario era sincero y falso a
+#: la vez. La prueba que lo cuidaba verificaba la CREENCIA (que ninguna llamara
+#: a `candado()`) y no el COMPORTAMIENTO, así que pasaba desde agosto mientras
+#: el XML seguía sin poder subirse. Owner, 2026-10-17: *«REVISA ESTO POR MI»*.
+#:
+#: ⚠️ Son CINCO, y dos no llevan «otb» en la URL: `onthebooks-entry` y
+#: `daily-occ-entry` se quedan afuera facilísimo de una lista escrita a mano.
+#: La prueba las busca por el ROUTER, no por esta lista.
+FUERA_DEL_PRESUPUESTO = ("/import-otb-xml/", "/otb-params/", "/otb/",
+                         "/onthebooks-entry/", "/daily-occ-entry/")
 
 
 async def candado_del_escenario(request: Request, db=Depends(get_db)) -> None:
@@ -76,7 +106,8 @@ async def candado_del_escenario(request: Request, db=Depends(get_db)) -> None:
 
     ruta = request.scope.get("route")
     plantilla = getattr(ruta, "path", "") or request.url.path
-    if any(plantilla.rstrip("/").endswith(p.rstrip("/")) for p in PERMITIDAS):
+    if any(plantilla.rstrip("/").endswith(p.rstrip("/"))
+           for p in PERMITIDAS + FUERA_DEL_PRESUPUESTO):
         return
 
     sid = next((request.path_params.get(k) for k in LLAVES
