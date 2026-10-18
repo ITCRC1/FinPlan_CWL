@@ -53,10 +53,27 @@ NUEVA = {"checksum": "bbb222", "archivo": "saldo setiembre closing period 2026.x
 
 
 def test_el_analisis_de_otra_subida_se_marca_vencido():
-    """El caso del owner, exactamente."""
-    v = vigencia(_datos(NUEVA), {"resumen": "...", "_contra": VIEJA})
+    """El caso del owner, exactamente.
+
+    ⚠️ Esta prueba exigia «vencido» a secas hasta el 2026-10-17. Desde que el
+    texto lleva marcas `{{...}}`, el veredicto depende de si quedan cifras
+    ESCRITAS A MANO: con cifras sueltas el texto miente y es «vencido»; sin
+    ellas las cifras se recalcularon solas y lo que toca revisar es el juicio.
+
+    Seguir gritando «vencido» por algo que ya se arreglo solo convierte el
+    aviso en ruido, y un aviso que suena siempre deja de leerse.
+    """
+    con_cifra = {"resumen": "El GOP fue de -$282.088,43.", "_contra": VIEJA}
+    v = vigencia(_datos(NUEVA), con_cifra)
     assert v["estado"] == "vencido"
     assert v["vigente"] is False
+    assert v["cifras_a_mano"] >= 1
+
+    # Sin cifras sueltas: blando, y NO bloquea.
+    v2 = vigencia(_datos(NUEVA),
+                  {"resumen": "El GOP fue de {{gop ACT}}.", "_contra": VIEJA})
+    assert v2["estado"] == "revisar_juicio"
+    assert v2["vigente"] is True
     # Y el aviso NOMBRA los dos archivos: sin eso no se sabe qué reescribir.
     assert "upload PL Setiembre 2026 v1.xlsx" in v["aviso"]
     assert "saldo setiembre closing period 2026.xlsx" in v["aviso"]
