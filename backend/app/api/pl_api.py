@@ -732,6 +732,11 @@ async def get_pl_ytd(scenario_id: str, month: int):
         }
 
 
+#: Para rotular una columna que mira OTRO mes que el de la pantalla.
+MESES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+            "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"]
+
+
 @router.get("/pl/compare/")
 async def get_pl_compare(scenarios: str, month: int = 12):
     """Comparar varias versiones en una sola llamada (generaliza el Command Center).
@@ -742,12 +747,32 @@ async def get_pl_compare(scenarios: str, month: int = 12):
     """
     if not 1 <= month <= 12:
         raise ErrorApi(422, "mes.fuera_de_rango")
+    # ── `id` o `id@mes` ─────────────────────────────────────────────────────
+    #
+    # Owner, 2026-10-17, por tercera vez y senalando esta pantalla: *«quiero
+    # que salga primero Agosto, como base comparativa y precierre Setiembre
+    # contra forecast o budget»*.
+    #
+    # El espejo de Pre-Cierre tiene agosto Y setiembre, pero las cuatro ranuras
+    # elegian ESCENARIO y el mes salia de la pantalla: poner el espejo dos veces
+    # daba la misma columna dos veces, con Var $0,00 — que se lee como «no
+    # cambio nada» y es lo que el owner estaba viendo.
+    #
+    # ⚠️ Sin `@mes` se comporta EXACTAMENTE como antes.
     ids = [s.strip() for s in scenarios.split(",") if s.strip()]
     if not ids:
         raise ErrorApi(422, "escenarios.requerido")
     versions = []
     async with get_session() as session:
-        for sid in ids:
+        for crudo in ids:
+            sid, _, m_txt = crudo.partition("@")
+            try:
+                m_col = int(m_txt) if m_txt else month
+            except ValueError:
+                m_col = month
+            if not 1 <= m_col <= 12:
+                m_col = month
+            sid = sid.strip()
             scenario = await session.get(Scenario, sid)
             if not scenario:
                 continue  # skip ids that no longer exist; caller compares the rest
@@ -759,12 +784,19 @@ async def get_pl_compare(scenarios: str, month: int = 12):
             def _col(sel):
                 return _aggregate_selected(sel, lo_subido_manda=subido,
                                            ebt_anual=anual)
-            one = _col([m for m in monthly if m["month"] == month])
-            ytd = _col([m for m in monthly if m["month"] <= month])
+            # El mes y el acumulado de ESTA columna, que puede no ser el de
+            # la pantalla.
+            one = _col([m for m in monthly if m["month"] == m_col])
+            ytd = _col([m for m in monthly if m["month"] <= m_col])
             full = _col(monthly)
             versions.append({
-                "scenario_id": sid,
-                "label": _scenario_label(scenario),
+                # ⚠️ La llave lleva el mes. Con el id pelado, el MISMO escenario
+                # en dos meses daba UNA columna: la segunda pisaba a la primera
+                # y el cuadro se veia bien mostrando un solo mes dos veces.
+                "scenario_id": f"{sid}@{m_col}" if m_col != month else sid,
+                "mes": m_col,
+                "label": (_scenario_label(scenario) if m_col == month else
+                          f"{_scenario_label(scenario)} · {MESES_ES[m_col - 1]}"),
                 "type": scenario.type,
                 "year": scenario.year,
                 "version": scenario.version,

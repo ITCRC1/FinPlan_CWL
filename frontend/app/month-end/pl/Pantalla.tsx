@@ -429,6 +429,28 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   const [horizonte, setHorizonte] = useState<"month" | "ytd" | "full">("month");
   const [escenarios, setEscenarios] = useState<Scenario[]>([]);
   const [ranuras, setRanuras] = useState<string[]>(Array(RANURAS).fill(""));
+  /** El MES de cada ranura. 0 = el mes de la pantalla, que es como se
+   *  comportaba antes y sigue siendo el default de las cuatro.
+   *
+   *  Owner, 2026-10-17, por tercera vez y senalando esta pantalla: *«quiero
+   *  que salga primero Agosto, como base comparativa y precierre Setiembre
+   *  contra forecast o budget»*. El espejo de Pre-Cierre tiene agosto Y
+   *  setiembre, pero las ranuras elegian ESCENARIO y el mes salia de arriba:
+   *  ponerlo dos veces daba la misma columna dos veces, con Var $0,00 — que se
+   *  lee como «no cambio nada». */
+  const [mesRanura, setMesRanura] = useState<number[]>(Array(RANURAS).fill(0));
+  /** La llave con la que viaja y vuelve una ranura. Sin `@mes` cuando mira el
+   *  mes de la pantalla: asi el backend se comporta igual que siempre. */
+  const claveRanura = useCallback(
+    (i: number) => {
+      const id = ranuras[i];
+      if (!id) return "";
+      const m = mesRanura[i];
+      return m && m !== mes ? `${id}@${m}` : id;
+    }, [ranuras, mesRanura, mes]);
+  /** El mes que mira una ranura, resuelto. */
+  const mesDeRanura = useCallback(
+    (i: number) => mesRanura[i] || mes, [mesRanura, mes]);
   const [varA, setVarA] = useState(0);
   const [varB, setVarB] = useState(1);
   const [datos, setDatos] = useState<PLCompareVersion[]>([]);
@@ -744,7 +766,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
       // Un cuadro completo en cero se lee como «el mes no tuvo movimiento», que
       // es una afirmacion, no un error. Ahora el P&L manda y el pie del cuadro
       // avisa aparte si no pudo cargar.
-      const r = await getPLCompare(ids, mes);
+      // ⚠️ Con el mes de cada ranura pegado al id. `getGastoPorClase` NO lo
+      // lleva: ese devuelve los doce meses por escenario y la pantalla elige
+      // cual mirar en `clase()`.
+      const r = await getPLCompare(
+        ranuras.map((_, i) => claveRanura(i)).filter(Boolean), mes);
       setDatos(r.versions);
       setAvisoGasto(null);
       try {
@@ -760,7 +786,10 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     } finally {
       setCargando(false);
     }
-  }, [ranuras, mes, t]);
+    // ⚠️ `claveRanura` entra en las dependencias: sin el, cambiar el mes de
+    // una ranura no volvia a pedir nada y la columna seguia mostrando el mes
+    // viejo con el rotulo nuevo.
+  }, [ranuras, mes, t, claveRanura]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -904,8 +933,10 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   }
 
   const cols = useMemo(
-    () => ranuras.map(id => id ? datos.find(d => d.scenario_id === id)?.[horizonte] : undefined),
-    [ranuras, datos, horizonte]);
+    () => ranuras.map((id, i) => id
+      ? datos.find(d => d.scenario_id === claveRanura(i))?.[horizonte]
+      : undefined),
+    [ranuras, datos, horizonte, claveRanura]);
 
   const usadas = ranuras.map((id, i) => ({ id, i })).filter(x => x.id);
 
@@ -994,8 +1025,12 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   const gastoClase = useCallback((idx: number, clave: typeof CLASES[number]["key"]) => {
     const g = gastos.find(x => x.scenario_id === ranuras[idx]);
     if (!g) return 0;
-    const hasta = horizonte === "month" ? [mes] : horizonte === "ytd"
-      ? Array.from({ length: mes }, (_, i) => i + 1)
+    // ⚠️ El mes de ESTA ranura, no el de la pantalla: si la columna mira
+    // agosto, su gasto tiene que ser el de agosto o el cuadro mezcla dos meses
+    // en una misma columna sin decirlo.
+    const mCol = mesDeRanura(idx);
+    const hasta = horizonte === "month" ? [mCol] : horizonte === "ytd"
+      ? Array.from({ length: mCol }, (_, i) => i + 1)
       : Array.from({ length: 12 }, (_, i) => i + 1);
     return g.meses.filter(m => hasta.includes(m.month))
       .reduce((s, m) => s + Number(m[clave]), 0);
@@ -1033,8 +1068,11 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   // que ven los duenos. Se sube al componente: la vista y el documento leen
   // el mismo calculo.
   const idA = ranuras[varA], idB = ranuras[varB];
-  const vA = datos.find(d => d.scenario_id === idA);
-  const vB = datos.find(d => d.scenario_id === idB);
+  // ⚠️ `datos` viene de /pl/compare/ y su llave LLEVA el mes; `gastos` trae los
+  // doce meses por escenario y su llave es el id pelado. Buscarlos con la misma
+  // llave dejaba una de las dos columnas vacia.
+  const vA = datos.find(d => d.scenario_id === claveRanura(varA));
+  const vB = datos.find(d => d.scenario_id === claveRanura(varB));
   const gA = gastos.find(g => g.scenario_id === idA);
   const gB = gastos.find(g => g.scenario_id === idB);
 
@@ -1081,14 +1119,15 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     ];
   }, [esPre, vA, vB]);
 
-  const mesesDe = (h: "month" | "ytd") =>
-    h === "month" ? [mes] : Array.from({ length: mes }, (_, i) => i + 1);
+  const mesesDe = (h: "month" | "ytd", mCol = mes) =>
+    h === "month" ? [mCol] : Array.from({ length: mCol }, (_, i) => i + 1);
 
   /** El gasto de una clase, para un escenario y horizonte. */
   const clase = (g: GastoEscenario | null | undefined,
-                 k: typeof CLASES[number]["key"], h: "month" | "ytd") => {
+                 k: typeof CLASES[number]["key"], h: "month" | "ytd",
+                 mCol = mes) => {
     if (!g) return null;
-    const ms = mesesDe(h);
+    const ms = mesesDe(h, mCol);
     return g.meses.filter(m => ms.includes(m.month))
       .reduce((s, m) => s + Number(m[k]), 0);
   };
@@ -1096,13 +1135,18 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
   /** El valor de una línea. Los subtotales se DERIVAN — ver `ESTADO`. */
   const dato = (v: PLCompareVersion | null | undefined,
                 g: GastoEscenario | null | undefined,
-                code: string, h: "month" | "ytd"): number | null => {
+                code: string, h: "month" | "ytd",
+                // ⚠️ El mes de la COLUMNA. `v` ya viene calculado para su mes
+                // —lo hace /pl/compare/—, pero `g` trae los doce y hay que
+                // decirle cual. Sin esto, una columna de agosto mostraba su
+                // ingreso de agosto contra su gasto de setiembre.
+                mCol = mes): number | null => {
     const c = v?.[h];
     const rev = c ? valor(c, "TOTAL_REVENUES") : null;
     const fb = c ? LINEAS_FB.reduce((s, l) => s + valor(c, l), 0) : null;
     const rooms = c ? LINEAS_ROOMS.reduce((s, l) => s + valor(c, l), 0) : null;
-    const pay = clase(g, "payroll", h), cos = clase(g, "cost", h);
-    const ope = clase(g, "opex", h), pro = clase(g, "property", h);
+    const pay = clase(g, "payroll", h, mCol), cos = clase(g, "cost", h, mCol);
+    const ope = clase(g, "opex", h, mCol), pro = clase(g, "property", h, mCol);
     const totExp = pay === null || cos === null || ope === null
       ? null : pay + cos + ope;
     switch (code) {
@@ -1274,8 +1318,8 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
     label: f.label, es_total: !!f.fuerte,
     valores: [
       ...bloques.flatMap(bl => {
-        const a = dato(vA, gA, f.code, bl.h);
-        const b = dato(vB, gB, f.code, bl.h);
+        const a = dato(vA, gA, f.code, bl.h, mesDeRanura(varA));
+        const b = dato(vB, gB, f.code, bl.h, mesDeRanura(varB));
         const d = a === null || b === null ? null : a - b;
         const p = d === null || !b ? null : d / Math.abs(b);
         const deRanura = (u: { id: string }) => dato(
@@ -2738,9 +2782,47 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                   {marcar(s, `${s.year} · ${s.type} ${s.version}`)}</option>
               ))}
             </select>
+            {/* El MES de esta ranura. Owner, 2026-10-17: *«quiero que salga
+                primero Agosto, como base comparativa y precierre Setiembre
+                contra forecast o budget»*.
+
+                ⚠️ Solo aparece cuando hay escenario: un selector de mes sobre
+                una ranura vacia no hace nada y confunde. Y cuando mira OTRO
+                mes se resalta, porque es la unica senal de que esa columna
+                dejo de ser el mes de la pantalla. */}
+            {id && (
+              <select value={mesRanura[i]} style={{
+                        ...SEL,
+                        fontWeight: mesRanura[i] && mesRanura[i] !== mes ? 700 : 400,
+                        border: mesRanura[i] && mesRanura[i] !== mes
+                          ? "1px solid var(--brand)" : SEL.border,
+                      }}
+                      title="De que mes de ese escenario"
+                      onChange={e => setMesRanura(prev => prev.map(
+                        (v, j) => j === i ? Number(e.target.value) : v))}>
+                <option value={0}>{MESES[mes - 1]}</option>
+                {MESES.map((nm, k) => (
+                  <option key={nm} value={k + 1}>{nm}</option>
+                ))}
+              </select>
+            )}
           </label>
         ))}
       </div>
+      {/* ⚠️ El mes por ranura vale en el P&L Statement. Los demas sub-tabs
+          leen el mes de la pantalla, y un cuadro que muestra otro mes sin
+          decirlo es exactamente la forma de fallar mas cara de este sistema. */}
+      {ranuras.some((id, i) => id && mesRanura[i] && mesRanura[i] !== mes)
+        && vista !== "estado" && (
+        <div style={{ fontSize: 12, padding: "6px 10px", marginBottom: 10,
+                      borderRadius: 5, background: "var(--bg-elevated)",
+                      border: "1px solid var(--negative)",
+                      color: "var(--text-primary)" }}>
+          ⚠️ Hay columnas apuntando a otro mes, pero <b>este cuadro muestra
+          {" "}{MESES[mes - 1]}</b> en todas. El mes por columna aplica por
+          ahora solo en <b>P&amp;L Statement</b>.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 14, fontSize: 12, flexWrap: "wrap" }}>
         <span style={{ color: "var(--text-secondary)" }}>{t("variacionLabel")}</span>
@@ -3265,7 +3347,7 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
          * TIENEN que dar lo mismo; si se separan, hay gasto que un camino ve y
          * el otro no. Es exactamente el tipo de diferencia que no avisa sola. */
         const gopMotor = vA?.ytd ? valor(vA.ytd, "TOTAL_GOP") : null;
-        const gopDerivado = dato(vA, gA, "X_GOP", "ytd");
+        const gopDerivado = dato(vA, gA, "X_GOP", "ytd", mesDeRanura(varA));
         const brecha = gopMotor !== null && gopDerivado !== null
           ? gopDerivado - gopMotor : null;
         const hayBrecha = brecha !== null && Math.abs(brecha) > 1;
@@ -3443,8 +3525,8 @@ export default function MonthEndPLPage({ modo = "cierre" }: { modo?: ModoPL }) {
                       {f.label}
                     </td>
                     {bloques.map(bl => {
-                      const a = dato(vA, gA, f.code, bl.h);
-                      const b = dato(vB, gB, f.code, bl.h);
+                      const a = dato(vA, gA, f.code, bl.h, mesDeRanura(varA));
+                      const b = dato(vB, gB, f.code, bl.h, mesDeRanura(varB));
                       const d = a === null || b === null ? null : a - b;
                       // ⚠️ Se divide por el VALOR ABSOLUTO de la base. Dividir
                       // por el valor con signo invierte la lectura cuando la
