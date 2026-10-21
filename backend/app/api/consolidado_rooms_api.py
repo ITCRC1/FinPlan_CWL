@@ -172,3 +172,32 @@ async def rooms_rack_rooms(scenario_id: str, db: AsyncSession = Depends(get_db),
         "meses": d.get("meses") or [], "total": d.get("total") or {}, "controles": d.get("controles") or {},
         "leido_por": quien,
     }
+
+
+@router.get("/consolidado/country-mix/")
+async def country_mix(year: int = Query(..., ge=2000, le=2100), metric: str = Query("rooms"),
+                      db: AsyncSession = Depends(get_db), quien: str = Depends(lector_del_consolidado)):
+    """Country mix mes a mes de los escenarios del año que tengan datos (para el Owner Dashboard).
+
+    Mismo dato que la pantalla Marketing → Country Mix, sin calcular nada nuevo: el que consume
+    arma el Mes y el YTD. Solo lectura; solo escenarios de ESTA propiedad.
+    """
+    from app.models.country_mix import COUNTRY_METRICS, CountryMixEntry
+    metric = (metric or "rooms").lower()
+    if metric not in COUNTRY_METRICS:
+        metric = "rooms"
+    q = select(Scenario).where(Scenario.hotel_id == HOTEL_ID, Scenario.year == year, Scenario.type.in_(TIPOS))
+    if hasattr(Scenario, "es_precierre"):
+        q = q.where(Scenario.es_precierre.is_(False))
+    salida = []
+    for e in (await db.execute(q.order_by(Scenario.created_at.desc()))).scalars().all():
+        filas = (await db.execute(select(CountryMixEntry).where(
+            CountryMixEntry.scenario_id == e.id, CountryMixEntry.metric == metric))).scalars().all()
+        if not filas:
+            continue
+        salida.append({
+            "scenario": {"id": e.id, "year": e.year, "type": e.type, "version": e.version},
+            "entries": [{"month": f.month, "country": f.country, "value": float(f.value)} for f in filas],
+        })
+    return {"contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME, "year": year,
+            "metric": metric, "scenarios": salida, "leido_por": quien}

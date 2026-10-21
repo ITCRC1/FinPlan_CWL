@@ -15,7 +15,8 @@ def test_sin_llave_ni_sesion_no_entra():
                  "/api/consolidado/rooms/escenario/x/",
                  "/api/consolidado/rooms/pacing/?year=2027",
                  "/api/consolidado/rooms/pickup/?year=2027",
-                 "/api/consolidado/rooms/rack-rooms/x/"):
+                 "/api/consolidado/rooms/rack-rooms/x/",
+                 "/api/consolidado/country-mix/?year=2026"):
         assert c.get(ruta).status_code == 401, ruta
 
 
@@ -49,3 +50,11 @@ def test_rack_rooms_solo_entrega_totales():
     bloque = FUENTE.split('"/consolidado/rooms/rack-rooms/{scenario_id}/"')[1]
     assert "_escenario_propio" in bloque and "rack_rooms_api._ver" in bloque
     assert '"entradas"' not in bloque.split("return {")[1]
+
+
+def test_country_mix_solo_entrega_conteos_por_pais():
+    """Country mix para el Owner Dashboard: conteo por país y mes; sin reservas ni huéspedes."""
+    bloque = FUENTE.split('"/consolidado/country-mix/"')[1]
+    assert "lector_del_consolidado" in bloque and "Scenario.hotel_id == HOTEL_ID" in bloque
+    for prohibido in ('"reservas"', '"huespedes"', '"guests"'):
+        assert prohibido not in bloque
