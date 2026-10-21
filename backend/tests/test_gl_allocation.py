@@ -163,7 +163,17 @@ def test_el_gasto_por_clase_tambien_ve_el_allocation_en_precierre():
     assert _excluidos(_Esc(False)) == EXCLUIR_DE_GASTO
     assert _excluidos(None) == EXCLUIR_DE_GASTO     # sin escenario, la regla de siempre
     # Y la regla de siempre sigue siendo la de siempre.
-    assert EXCLUIR_DE_GASTO == {"0220", "0161", "0162"}
+    #
+    # ⚠️ Hasta el 2026-10-21 esta linea exigia tambien el «0162», y ahi estaba
+    # el problema: el 0162 «Laundry Revenue» es la lavanderia que se VENDE
+    # AFUERA —operativa— y su costo de venta tiene que contar. La regla oficial
+    # `ALLOCATION_EXCLUDE` nunca lo tuvo; esta copia se lo habia agregado por su
+    # cuenta y separaba los dos caminos del GOP en $283 todos los meses.
+    #
+    # Por eso ahora se compara contra la regla OFICIAL y no contra un literal:
+    # un literal se actualiza sin pensar, y fue justo lo que dejo pasar esto.
+    from app.importers.gl_detail_importer import ALLOCATION_EXCLUDE
+    assert EXCLUIR_DE_GASTO == set(ALLOCATION_EXCLUDE) == {"0220", "0161"}
 
 
 # ── El crédito del reparto, cuando YA está posteado ──────────────────────────

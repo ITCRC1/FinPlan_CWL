@@ -81,14 +81,36 @@ FUSION_INGRESO = {"0161": "0162"}
 #
 #   0220  Cafeteria  — viaja en la planilla de cada depto por el concepto 6025
 #   0161  Lavanderia (operacion) — se reparte por la 4900
-#   0162  Lavanderia (ingreso)   — es la cara de venta del mismo servicio
 #
-# Los tres SOLO se excluyen del gasto. En INGRESO la lavanderia si sale, en una
+# Los dos SOLO se excluyen del gasto. En INGRESO la lavanderia si sale, en una
 # sola linea: el 0161 se fusiona en el 0162 (ver FUSION_INGRESO).
 #
 # Es la misma razon por la que el motor excluye el 0220 del P&L de actuales
 # (`pl_engine.ACTUAL_EXCLUDED_DEPTS`).
-EXCLUIR_DE_GASTO = {"0220", "0161", "0162"}
+#
+# ⚠️ **El 0162 NO va aca, y estuvo hasta el 2026-10-21.** Owner, mirando el
+# aviso de la pantalla de cierre: *«como resuelvo esto»*.
+#
+# El 0162 «Laundry Revenue» es la lavanderia que se VENDE AFUERA, y es
+# OPERATIVA. CLAUDE.md lo dice textual: *«el Laundry Services que vende afuera
+# es OPERATIVO → su ingreso(4) y costo de venta(5) SE QUEDAN»*, y la regla
+# oficial `ALLOCATION_EXCLUDE` nunca lo tuvo: solo 0220 y 0161.
+#
+# Medido antes de tocarlo, los dos departamentos no se solapan ni en una clase:
+#
+#     0161  clase 4 (el credito de reparto) · 6 · 7   -> allocation
+#     0162  clase 4 (ingreso) · 5 (costo de venta)    -> operativo
+#
+# Excluirlo escondia el COSTO DE VENTA de lo que se factura afuera, y como el
+# motor si lo contaba, los dos caminos al GOP se separaban: Budget 2026
+# $3.262,98 al ano (~$283 todos los meses) y ACTUAL $505,06 al 30 de setiembre.
+# Ese es exactamente el monto del 0162 clase 5 en cada escenario — la brecha
+# ERA el 0162, entero.
+#
+# La regla se habia copiado aca con su propia justificacion —«es la cara de
+# venta del mismo servicio»—, que vale para el INGRESO (por eso existe
+# FUSION_INGRESO) y no para el costo.
+EXCLUIR_DE_GASTO = {"0220", "0161"}
 
 
 def _excluidos(escenario) -> set[str]:

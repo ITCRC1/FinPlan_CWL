@@ -108,10 +108,24 @@ def test_la_lavanderia_se_fusiona_solo_en_ingreso():
 
 
 def test_los_pozos_de_reparto_no_salen_en_el_gasto():
-    """0220, 0161 y 0162 no son departamentos que el dueño mire por separado:
-    su costo ya viaja dentro de los que los consumen."""
+    """0220 y 0161 no son departamentos que el dueño mire por separado: su
+    costo ya viaja dentro de los que los consumen.
+
+    ⚠️ Hasta el 2026-10-21 este docstring decía «0220, 0161 y 0162», y del 0162
+    no era cierto. El 0162 «Laundry Revenue» es la lavandería que se VENDE
+    AFUERA: su costo de venta NO viaja dentro de nadie, es el costo de lo que se
+    factura. CLAUDE.md §1: *«el Laundry Services que vende afuera es OPERATIVO →
+    su ingreso(4) y costo de venta(5) SE QUEDAN»*.
+
+    La creencia estaba fijada en DOS pruebas —ésta y
+    `test_gl_allocation.test_el_gasto_por_clase_tambien_ve_el_allocation_en_precierre`—
+    y por eso sobrevivió: las dos confirmaban lo mismo y ninguna lo medía contra
+    la regla oficial. El efecto era $283 todos los meses de descuadre entre los
+    dos caminos del GOP.
+    """
+    from app.importers.gl_detail_importer import ALLOCATION_EXCLUDE
     from app.api.gasto_por_clase_api import EXCLUIR_DE_GASTO
-    assert EXCLUIR_DE_GASTO == {"0220", "0161", "0162"}
+    assert EXCLUIR_DE_GASTO == set(ALLOCATION_EXCLUDE) == {"0220", "0161"}
 
 
 def test_la_exclusion_es_solo_del_gasto_no_del_ingreso():
