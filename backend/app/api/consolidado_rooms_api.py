@@ -201,3 +201,32 @@ async def country_mix(year: int = Query(..., ge=2000, le=2100), metric: str = Qu
         })
     return {"contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME, "year": year,
             "metric": metric, "scenarios": salida, "leido_por": quien}
+
+
+@router.get("/consolidado/channel-mix/")
+async def channel_mix(year: int = Query(..., ge=2000, le=2100), metric: str = Query("rooms"),
+                      db: AsyncSession = Depends(get_db), quien: str = Depends(lector_del_consolidado)):
+    """Channel mix mes a mes de los escenarios del año que tengan datos (sección 2.5 del Owner Dashboard).
+
+    Mismo dato que Marketing → Channel Mix (`channel_mix_entries`), sin calcular nada nuevo: el que consume
+    arma el Mes y el YTD (Σ meses ÷ total, igual que la pantalla). Solo lectura; solo escenarios de ESTA propiedad.
+    """
+    from app.models.channel_mix import CHANNEL_METRICS, ChannelMixEntry
+    metric = (metric or "rooms").lower()
+    if metric not in CHANNEL_METRICS:
+        metric = "rooms"
+    q = select(Scenario).where(Scenario.hotel_id == HOTEL_ID, Scenario.year == year, Scenario.type.in_(TIPOS))
+    if hasattr(Scenario, "es_precierre"):
+        q = q.where(Scenario.es_precierre.is_(False))
+    salida = []
+    for e in (await db.execute(q.order_by(Scenario.created_at.desc()))).scalars().all():
+        filas = (await db.execute(select(ChannelMixEntry).where(
+            ChannelMixEntry.scenario_id == e.id, ChannelMixEntry.metric == metric))).scalars().all()
+        if not filas:
+            continue
+        salida.append({
+            "scenario": {"id": e.id, "year": e.year, "type": e.type, "version": e.version},
+            "entries": [{"month": f.month, "channel": f.channel, "value": float(f.value)} for f in filas],
+        })
+    return {"contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME, "year": year,
+            "metric": metric, "scenarios": salida, "leido_por": quien}

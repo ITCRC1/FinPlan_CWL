@@ -16,7 +16,8 @@ def test_sin_llave_ni_sesion_no_entra():
                  "/api/consolidado/rooms/pacing/?year=2027",
                  "/api/consolidado/rooms/pickup/?year=2027",
                  "/api/consolidado/rooms/rack-rooms/x/",
-                 "/api/consolidado/country-mix/?year=2026"):
+                 "/api/consolidado/country-mix/?year=2026",
+                 "/api/consolidado/channel-mix/?year=2026"):
         assert c.get(ruta).status_code == 401, ruta
 
 
@@ -57,4 +58,13 @@ def test_country_mix_solo_entrega_conteos_por_pais():
     bloque = FUENTE.split('"/consolidado/country-mix/"')[1]
     assert "lector_del_consolidado" in bloque and "Scenario.hotel_id == HOTEL_ID" in bloque
     for prohibido in ('"reservas"', '"huespedes"', '"guests"'):
+        assert prohibido not in bloque
+
+
+def test_channel_mix_solo_entrega_conteos_por_canal():
+    """Channel mix para el Owner Dashboard (2.5): conteo por canal y mes; sin reservas ni huéspedes."""
+    bloque = FUENTE.split('"/consolidado/channel-mix/"')[1]
+    assert "lector_del_consolidado" in bloque and "Scenario.hotel_id == HOTEL_ID" in bloque
+    assert "ChannelMixEntry" in bloque
+    for prohibido in ('"reservas"', '"huespedes"', '"guests"', "ChannelMixDetail"):
         assert prohibido not in bloque
