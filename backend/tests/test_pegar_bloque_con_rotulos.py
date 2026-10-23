@@ -216,7 +216,12 @@ def test_la_grilla_de_pax_puede_llenarse_de_una():
     assert "function aplicarATodo" in t, (
         "sin un «aplicar a todo», poner el mismo pax en las 96 celdas obliga a "
         "teclearlas una por una: pegar no reemplaza a llenar")
-    assert "Poner en toda la grilla" in t, "y tiene que estar a la vista"
+    # El rótulo cambió al agregar el llenado por mes («Poner [x] en toda la
+    # grilla · o en un mes»). Lo que importa no es el texto exacto sino que las
+    # dos salidas estén a la vista: si sólo se ve la de toda la grilla, el
+    # camino cómodo vuelve a ser el que pisa los doce meses.
+    assert "toda la grilla" in t, "la salida de llenar todo tiene que verse"
+    assert "o en un mes" in t, "y la de llenar un mes también"
 
 
 def test_el_llenado_respeta_las_celdas_sin_tarifa():
@@ -244,3 +249,61 @@ def test_el_llenado_exige_un_numero():
     cuerpo = GRILLA_PAX.read_text(encoding="utf-8")
     cuerpo = cuerpo[cuerpo.index("function aplicarATodo"):][:900]
     assert "Number.isFinite(numeroDeExcel(v))" in cuerpo
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# El pax cambia por TEMPORADA.
+#
+# Owner, 2026-10-22: *«necesito 1.85 en estos meses… lo hago y me mueve todo»*.
+#
+# Mi «aplicar a toda la grilla» era demasiado grueso: enero a marzo es alta y
+# lleva más gente por villa, así que llenar los doce meses con un número es lo
+# que él NO quiere. Y el checkbook calculaba con UN pax para los doce meses.
+# ═══════════════════════════════════════════════════════════════════════════
+CHECKBOOK = FRONT / "app" / "revenue" / "checkbook" / "page.tsx"
+
+
+def test_se_puede_llenar_UN_mes():
+    """Llenar un mes tiene que ser tan fácil como llenar todo; si no, el único
+    camino cómodo es el equivocado."""
+    t = GRILLA_PAX.read_text(encoding="utf-8")
+    assert "function aplicarAMes" in t
+    assert "aplicarAMes(mi + 1)" in t, (
+        "el encabezado de cada mes tiene que llenar SU columna")
+
+
+def test_llenar_un_mes_NO_toca_los_otros():
+    cuerpo = GRILLA_PAX.read_text(encoding="utf-8")
+    cuerpo = cuerpo[cuerpo.index("function aplicarAMes"):][:900]
+    assert "${f.room_type_id}:${mes}" in cuerpo, (
+        "la clave tiene que fijar el mes recibido, no recorrer los doce")
+    assert "for (const c of f.meses)" not in cuerpo
+
+
+def test_el_checkbook_usa_el_pax_de_CADA_mes():
+    """⚠️ El defecto que aparece recién cuando el pax deja de ser uniforme.
+
+    El motor suma `rooms_occupied × rc.pax_per_room` villa por villa y mes por
+    mes. La pantalla multiplicaba las noches por UN `pax_per_night` del
+    escenario. Mientras todas las tarjetas decían 1,80 las dos cuentas daban
+    igual y la diferencia no existía; con 1,85 sólo en enero-marzo, el «Total
+    Pax» de la pantalla dejó de coincidir con el ingreso que ella misma
+    mostraba.
+    """
+    t = CHECKBOOK.read_text(encoding="utf-8")
+    assert "paxPerNight" not in t, (
+        "un pax escalar no puede representar un pax por temporada")
+    assert "paxNights: number[]" in t
+    assert "getPaxGrid" in t, "el pax por villa × mes sale de la grilla de pax"
+
+
+def test_el_checkbook_calcula_el_paquete_sobre_pax_noche():
+    """Food, Tours, Transporte y Sustainability salen todos de la misma
+    cantidad. Si una se quedara multiplicando noches por un escalar, esa línea
+    sola se desviaría y el total seguiría pareciendo razonable."""
+    t = CHECKBOOK.read_text(encoding="utf-8")
+    for linea in ("const food = paxNights.map(",
+                  "ACTIVITIES: paxNights.map(",
+                  "TRANSPORT: paxNights.map(",
+                  "SUSTAINABILITY: paxNights.map("):
+        assert linea in t, f"falta: {linea}"

@@ -14,7 +14,7 @@ import { bajarCuadros, type Cuadro, type ColumnaCuadro, type FilaCuadro } from "
 import {
   getScenarios, getRevenueCheckbook, saveRevenueCheckbook, setRevenueSource,
   getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
-  getDriverRatesSeed, getPackageDriverRates,
+  getDriverRatesSeed, getPackageDriverRates, getPaxGrid,
   type Scenario, type RevenueCheckbookRow, type RevenueSource,
   type PackageDriverRates,
   type RevenueBulkRow, type MonthKey,
@@ -32,7 +32,17 @@ function daysInMonth(year: number, month1: number): number {
 interface RoomStats {
   available: number[]; occupied: number[]; roomRev: number[];
   netFactor: number[];     // factor neto de canales por mes
-  paxPerNight: number;     // pax por noche ocupada
+  /** Pax-noche de CADA mes = Σ por villa (noches ocupadas × su pax de ese mes).
+   *
+   *  ⚠️ Antes esto era UN número (`pax_per_night` del escenario) y se
+   *  multiplicaba por las noches. El motor nunca hizo eso: suma
+   *  `rooms_occupied × rc.pax_per_room` villa por villa y mes por mes. Mientras
+   *  el pax fue 1,80 en todas las tarjetas las dos cuentas daban igual y la
+   *  diferencia no existía. El día que el owner puso 1,85 sólo en enero,
+   *  febrero y marzo —el pax cambia por temporada— la pantalla siguió
+   *  calculando con 1,80 los doce meses y el ingreso del P&L dejó de coincidir
+   *  con el «Total Pax» que ella misma mostraba. */
+  paxNights: number[];
 }
 
 // Tarifas del paquete Classic (rack, se les aplica el net factor de canales).
@@ -169,6 +179,10 @@ export default function RevenueCheckbookPage() {
         getRevenueCheckbook(sid), getRoomTypes(HOTEL_ID, sid),
         getOccupancyPct(sid), getRackRates(sid), getChannelsConfig(sid),
       ]);
+      // El pax por villa × mes, que es lo que multiplica el motor. Si no viene,
+      // se cae al del escenario — pero se cae a un número que al menos existe,
+      // no a un 1,8 escrito acá.
+      const paxGrid = await getPaxGrid(sid).catch(() => null);
       setRows(cb.lines.map(l => ({ ...l, ...Object.fromEntries(MONTH_KEYS.map(mk => [mk, money2(l[mk])])) })));
       setSource(cb.source);
 
@@ -194,7 +208,18 @@ export default function RevenueCheckbookPage() {
           const rk = (rackById[r.room_type_id]?.[mi]) || 0;
           return s + nights * rk * (nf[mi] || 0);
         }, 0));
-      setStats({ available, occupied, roomRev, netFactor: nf, paxPerNight: parseFloat(rt.pax_per_night) || 1.8 });
+      const paxFallback = parseFloat(rt.pax_per_night) || 1.8;
+      const paxById: Record<string, number[]> = Object.fromEntries(
+        (paxGrid?.filas ?? []).map(f => [f.room_type_id,
+          f.meses.map(c => parseFloat(c.pax) || paxFallback)]));
+      const paxNights = MONTHS.map((_m, mi) =>
+        occ.rooms.reduce((s, r) => {
+          if (closed.has(mi + 1)) return s;
+          const u = unitsById[r.room_type_id] ?? 0;
+          const nights = (parseFloat(r[MONTH_KEYS[mi]]) || 0) * u * daysInMonth(year, mi + 1);
+          return s + nights * (paxById[r.room_type_id]?.[mi] ?? paxFallback);
+        }, 0));
+      setStats({ available, occupied, roomRev, netFactor: nf, paxNights });
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : tc("error"));
@@ -291,14 +316,14 @@ export default function RevenueCheckbookPage() {
       setError(t("noRatesToFill"));
       return;
     }
-    const { occupied, roomRev, netFactor, paxPerNight } = stats;
+    const { occupied, roomRev, netFactor, paxNights } = stats;
     const np = rates.nightsPerStay || 1;
-    const food = occupied.map((occ, i) => occ * paxPerNight * rates.food * (netFactor[i] || 0));
+    const food = paxNights.map((pn, i) => pn * rates.food * (netFactor[i] || 0));
     const vals: Record<string, number[]> = {
       ROOMS: roomRev.slice(),
       FOOD: food,
-      ACTIVITIES: occupied.map((occ, i) => (occ * paxPerNight / np) * rates.tours * (netFactor[i] || 0)),
-      TRANSPORT: occupied.map((occ, i) => (occ * paxPerNight / np) * rates.transport * (netFactor[i] || 0)),
+      ACTIVITIES: paxNights.map((pn, i) => (pn / np) * rates.tours * (netFactor[i] || 0)),
+      TRANSPORT: paxNights.map((pn, i) => (pn / np) * rates.transport * (netFactor[i] || 0)),
       BEVERAGE: food.map(f => f * rates.bevRatio / 100),
       RETAIL: roomRev.map(r => r * rates.retailPct / 100),
       INNOCEANA: roomRev.map(r => r * rates.innoceanaPct / 100),
@@ -319,8 +344,8 @@ export default function RevenueCheckbookPage() {
       // eso era 1,8 veces menos. El motor del P&L siempre lo calculó por
       // pax-noche, así que las dos pantallas decían cosas distintas sobre el
       // mismo escenario y ninguna lo avisaba.
-      SUSTAINABILITY: occupied.map(occ =>
-        occ * paxPerNight * rates.sustRate * (1 - rates.sustNonPay / 100)),
+      SUSTAINABILITY: paxNights.map(pn =>
+        pn * rates.sustRate * (1 - rates.sustNonPay / 100)),
     };
     setRows(prev => prev.map(r => {
       const v = vals[r.line];
@@ -359,7 +384,7 @@ export default function RevenueCheckbookPage() {
         filas: [
           { label: "Total Rooms Available", valores: [...stats.available, tAvail] },
           { label: "Total Rooms Occupied", valores: [...stats.occupied, tOcc] },
-          { label: "Total Pax", valores: [...stats.occupied.map(v => v * stats.paxPerNight), tOcc * stats.paxPerNight] },
+          { label: "Total Pax", valores: [...stats.paxNights, stats.paxNights.reduce((a, b) => a + b, 0)] },
           {
             label: "Occupancy %", formato: "pct",
             // Fracción, no 12.5: el % en Excel se guarda como 0.125.
@@ -580,8 +605,8 @@ export default function RevenueCheckbookPage() {
                   </tr>
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: 500 }}>Total Pax</td>
-                    {stats.occupied.map((v, i) => <td key={i} className="mono" style={td}>{numCell(v * stats.paxPerNight)}</td>)}
-                    <td className="mono" style={yr}>{numCell(tOcc * stats.paxPerNight)}</td>
+                    {stats.paxNights.map((v, i) => <td key={i} className="mono" style={td}>{numCell(v)}</td>)}
+                    <td className="mono" style={yr}>{numCell(stats.paxNights.reduce((a, b) => a + b, 0))}</td>
                   </tr>
                   <tr>
                     <td style={{ textAlign: "left", fontWeight: 500 }}>Occupancy %</td>

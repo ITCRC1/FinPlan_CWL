@@ -160,6 +160,39 @@ export default function GrillaPax({
    * ⚠️ Respeta las celdas sin tarifa, igual que el pegado: esa categoría no
    * está en el presupuesto de ese mes y el guardado la rechaza.
    */
+  /** Pone el valor en TODAS las filas de UN mes.
+   *
+   * Owner, 2026-10-22: *«necesito 1.85 en estos meses... lo hago y me mueve
+   * todo»*. El «aplicar a toda la grilla» que puse antes era demasiado grueso:
+   * el pax cambia por TEMPORADA —enero a marzo es alta y lleva más gente por
+   * villa— así que llenar los doce meses con un número es justo lo que él no
+   * quiere.
+   *
+   * Un mes por vez se compone: tres clics para enero, febrero y marzo, y los
+   * otros nueve quedan donde estaban.
+   */
+  function aplicarAMes(mes: number) {
+    if (!grid || bloqueado) return;
+    const v = aTodo.trim();
+    if (!v || !Number.isFinite(numeroDeExcel(v))) {
+      setError("Escriba el valor que quiere poner en ese mes");
+      return;
+    }
+    const nuevos: Record<string, string> = {};
+    const nuevasSucias = new Set(sucias);
+    for (const f of grid.filas) {
+      const k = `${f.room_type_id}:${mes}`;
+      if (!conTarifa.has(k)) continue;
+      nuevos[k] = v;
+      nuevasSucias.add(k);
+    }
+    setBorr(b => ({ ...b, ...nuevos }));
+    setSucias(nuevasSucias);
+    setAviso(`${MESES[mes - 1]}: ${Object.keys(nuevos).length} celdas en ${v}. `
+             + `Todavía hay que guardar.`);
+    setError(null);
+  }
+
   function aplicarATodo() {
     if (!grid || bloqueado) return;
     const v = aTodo.trim();
@@ -236,19 +269,23 @@ export default function GrillaPax({
         </button>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6,
                        fontSize: 12, color: "var(--text-secondary)" }}>
-          Poner en toda la grilla:
+          Poner
           <input className="fin-input mono" type="text" inputMode="decimal"
             value={aTodo} onChange={e => setATodo(e.target.value)}
             placeholder="1,85" disabled={bloqueado}
             onKeyDown={e => { if (e.key === "Enter") aplicarATodo(); }}
             style={{ width: 64, textAlign: "right", padding: "3px 5px" }} />
+          en
           <button onClick={aplicarATodo} disabled={bloqueado || !aTodo.trim()}
             style={{ padding: "4px 10px", fontSize: 12, borderRadius: 4,
                      border: "1px solid var(--border-medium)",
                      cursor: (bloqueado || !aTodo.trim()) ? "not-allowed" : "pointer",
                      background: "var(--bg-surface)", color: "var(--text-primary)" }}>
-            Aplicar
+            toda la grilla
           </button>
+          <span style={{ color: "var(--text-disabled)" }}>
+            o en un mes: clic en su encabezado
+          </span>
         </span>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           Pegue un bloque desde Excel sobre la primera celda que quiera llenar:
@@ -268,7 +305,25 @@ export default function GrillaPax({
           <thead>
             <tr>
               <th style={{ textAlign: "left", minWidth: 220 }}>#</th>
-              {MESES.map(m => <th key={m} style={{ textAlign: "right", minWidth: 72 }}>{m}</th>)}
+              {/* El encabezado llena SU columna. El pax cambia por temporada,
+                  así que llenar un mes tiene que ser tan fácil como llenar
+                  todo — si no, el único camino cómodo es el equivocado. */}
+              {MESES.map((m, mi) => (
+                <th key={m} style={{ textAlign: "right", minWidth: 72 }}>
+                  <button
+                    onClick={() => aplicarAMes(mi + 1)}
+                    disabled={bloqueado || !aTodo.trim()}
+                    title={aTodo.trim()
+                      ? `Poner ${aTodo.trim()} en todo ${m}`
+                      : "Escriba primero el valor en «Poner en»"}
+                    style={{ background: "none", border: "none", padding: 0,
+                             font: "inherit", color: "inherit",
+                             cursor: (bloqueado || !aTodo.trim()) ? "default" : "pointer",
+                             textDecoration: aTodo.trim() ? "underline dotted" : "none" }}>
+                    {m}
+                  </button>
+                </th>
+              ))}
               <th style={{ textAlign: "right", minWidth: 80,
                            borderLeft: "1px solid var(--border-medium)" }}>Prom.</th>
             </tr>
