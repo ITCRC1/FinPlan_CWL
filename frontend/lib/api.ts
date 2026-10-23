@@ -1218,6 +1218,9 @@ export interface PkgItem {
   qty_mult_single: string;
   qty_mult_double: string;
   info: string;
+  /** ¿El canal le cobra comisión? El Sustainability Fee NO: lo paga el huésped
+   *  en el hotel. Lo decide el backend para que la regla viva en un solo lugar. */
+  comisiona?: boolean;
 }
 export interface PkgExperienceCfg {
   name: string;
@@ -1240,6 +1243,24 @@ export interface PkgItemIn {
 
 export async function getPackageComponents(scenarioId: string): Promise<PackageComponentsConfig> {
   return api.get<PackageComponentsConfig>(`/scenarios/${scenarioId}/packages/components/config/`);
+}
+
+/** Las tarifas del Revenue Checkbook sacadas del paquete DE ESTE escenario. */
+export interface PackageDriverRates {
+  disponible: boolean;
+  experiencia: string | null;
+  nights: number; days: number; factor_neto: number;
+  /** RACK — es lo que va al recuadro, porque la fórmula aplica el factor del mes. */
+  tarifas: Partial<Record<"food" | "tours" | "transport" | "sust_rate" | "nights_per_stay", number>>;
+  /** Lo que se muestra debajo del recuadro. El Sustainability no comisiona: su neto es su rack. */
+  neto: Partial<Record<"food" | "tours" | "transport" | "sust_rate", number>>;
+  detalle: { caja: string; inclusiones: string[]; rack: number; neto: number }[];
+  /** Inclusiones con precio que no encontraron recuadro — un renombre se ve acá. */
+  sin_casa: string[];
+  unidad_rara: { inclusion: string; unidad: string; esperada: string; caja: string }[];
+}
+export async function getPackageDriverRates(scenarioId: string): Promise<PackageDriverRates> {
+  return api.get<PackageDriverRates>(`/scenarios/${scenarioId}/packages/driver-rates/`);
 }
 
 export async function savePackageComponents(

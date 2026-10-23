@@ -3302,13 +3302,37 @@ async def bulk_packages(
 # ─── Package Components (menú + experiencias que eligen del menú) ──────────────
 
 def _pkg_item_to_dict(it) -> dict:
-    return {
+    return _con_comision({
         "inclusion": it.inclusion, "unit": it.unit,
         "unit_price": (str(it.unit_price) if it.unit_price is not None else None),
         "enabled": it.enabled, "notes": it.notes, "category": it.category,
         "qty_mult_single": str(it.qty_mult_single), "qty_mult_double": str(it.qty_mult_double),
         "info": it.info,
-    }
+    })
+
+
+def _con_comision(d: dict) -> dict:
+    """Agrega `comisiona`: ¿el canal le cobra comisión a esta inclusión?
+
+    ⚠️ Owner, 2026-10-22: *«al sustainability fee no se le aplica descuento ya
+    que no paga comisión, se cobra en el hotel»*.
+
+    La pantalla aplicaba el factor neto a TODAS las filas por igual, así que
+    mostraba el Sustainability en $24,68 cuando son $30,97 — y el total neto del
+    paquete salía $6,29 por pax-noche bajo. El motor ya lo tenía bien
+    (`is_commissionable=False` en `package_configs`): la pantalla era la que no
+    lo sabía.
+
+    Viaja en la respuesta —y no se recalcula en el navegador— para que la regla
+    viva en UN solo lugar (`CAJAS`, en `app.engine.tarifas_del_paquete`). Que la
+    pantalla lo dedujera por su cuenta es exactamente cómo se separaron las dos
+    versiones la primera vez.
+    """
+    from app.engine.tarifas_del_paquete import SIN_COMISION, _caja_de
+
+    casa = _caja_de(d.get("inclusion", ""))
+    d["comisiona"] = not (casa and casa[0] in SIN_COMISION)
+    return d
 
 
 @router.get("/scenarios/{scenario_id}/packages/components/config/")
@@ -3338,8 +3362,9 @@ async def get_package_components(scenario_id: str, db: AsyncSession = Depends(ge
                     "name": e["name"], "nights": e["nights"], "days": e["days"],
                     "es_base": bool(e.get("es_base")),
                     "items": [
-                        {**it, "unit_price": (str(it["unit_price"]) if it["unit_price"] is not None else None),
-                         "qty_mult_single": str(it["qty_mult_single"]), "qty_mult_double": str(it["qty_mult_double"])}
+                        _con_comision(
+                            {**it, "unit_price": (str(it["unit_price"]) if it["unit_price"] is not None else None),
+                             "qty_mult_single": str(it["qty_mult_single"]), "qty_mult_double": str(it["qty_mult_double"])})
                         for it in e["items"]
                     ],
                 }
@@ -3364,6 +3389,43 @@ async def get_package_components(scenario_id: str, db: AsyncSession = Depends(ge
             for i, e in enumerate(exps)
         ],
     }
+
+
+@router.get("/scenarios/{scenario_id}/packages/driver-rates/")
+async def get_package_driver_rates(
+    scenario_id: str, db: AsyncSession = Depends(get_db),
+):
+    """Las tarifas del Revenue Checkbook, sacadas del paquete DE ESTE escenario.
+
+    Owner, 2026-10-22: *«llena esto en forma automática de la vista anterior al
+    precio neto»*.
+
+    Los recuadros cargaban de `seed_data/<HOTEL>/driver_rates.json` — un archivo
+    fijo por hotel, que no sabe de escenarios. Las inclusiones del paquete viven
+    por escenario. En el `BUDGET Working 2027` la semilla decía Tours 342 y la
+    pantalla mostraba 0: dos fuentes para el mismo precio y la que mandaba no
+    podía guardar un cambio de escenario.
+
+    Devuelve `tarifas` (RACK, que es lo que el recuadro guarda porque
+    `fillFromDrivers` multiplica por el factor del mes) y `neto` (lo que la
+    pantalla muestra debajo). El Sustainability no comisiona: su neto es su rack.
+
+    ⚠️ Esto NO mueve el P&L. Con `revenue_source = 'drivers'` el motor calcula
+    con `package_configs`; esto alinea la calculadora de la pantalla.
+    """
+    from app.engine.tarifas_del_paquete import tarifas_del_paquete
+    from app.models.sales_channel_config import compute_net_factor
+
+    cfg = await get_package_components(scenario_id, db)
+    canales = (await db.execute(
+        select(SalesChannelConfig).where(
+            SalesChannelConfig.scenario_id == scenario_id)
+    )).scalars().all()
+    # El mismo factor que muestra la pantalla de paquetes: el de enero. Los
+    # montos del checkbook sí usan el factor de CADA mes (`fillFromDrivers`);
+    # este es solo para enseñar el neto al lado del recuadro.
+    nf = compute_net_factor([c for c in canales if c.month == 1])
+    return tarifas_del_paquete(cfg.get("experiences") or [], nf)
 
 
 class PkgItemIn(BaseModel):
@@ -3433,9 +3495,91 @@ async def bulk_package_components(
                 enabled=it.enabled, notes=it.notes[:200], category=it.category[:20],
                 qty_mult_single=it.qty_mult_single, qty_mult_double=it.qty_mult_double,
                 info=it.info[:120]))
+    await db.flush()
+
+    movidas = await sincronizar_tarifas_del_motor(db, scenario_id, scenario.hotel_id)
     await db.commit()
     return {"saved_experiences": len(payload.experiences), "saved_items": total_items,
-            "base": base_idx}
+            "base": base_idx, "tarifas_del_motor": movidas}
+
+
+async def sincronizar_tarifas_del_motor(
+    db: AsyncSession, scenario_id: str, hotel_id: str,
+) -> list[dict]:
+    """Baja las tarifas del paquete a `package_configs`, que es lo que calcula.
+
+    ## El desfase que esto cierra
+
+    Owner, 2026-10-22: *«asegúrate que el checkbook calcule en función de estos
+    rates»*.
+
+    Había **tres** lugares con la tarifa del mismo tour y ninguno hablaba con
+    los otros:
+
+        pkg_experience_items   San Pedrillo 168 + Caño 174 = 342 / estadía
+        driver_rates.json      tours 342  (semilla FIJA POR HOTEL)
+        package_configs        ACTIVITIES 101 / pax-noche   <- el único que calcula
+
+    El 101 venía del `Budget2026_Revenue_CORCO.xlsx` (Snorkeling $48 + PN Walk
+    $53) y los seis presupuestos 2027 lo heredaron sin que nadie lo revisara,
+    mientras las tarifas de habitación subían 20,9 %. El paquete se quedó en el
+    precio del año pasado y nada lo señalaba: el P&L cuadraba, la pantalla de
+    paquetes mostraba 342, y las dos cosas eran ciertas en su propio archivo.
+
+    ## Por qué va en el guardado y no en un botón
+
+    Un botón depende de que alguien se acuerde — y es justo lo que falló con
+    «pasar al checkbook», que dejó el sub-mayor congelado meses. Acá, editar el
+    paquete y que el motor quede distinto deja de ser posible.
+
+    Devuelve qué cambió, para que la pantalla pueda decirlo: una tarifa que se
+    mueve sola y en silencio es el modo de falla más caro que tiene el sistema.
+
+    ⚠️ Si el paquete no da una tarifa (experiencia vacía, inclusión renombrada
+    que cayó en `sin_casa`), **esa línea NO se toca**. Escribir cero la borraría
+    del presupuesto y el total seguiría viéndose plausible.
+    """
+    from app.engine.tarifas_del_paquete import (a_tarifas_del_motor,
+                                                tarifas_del_paquete)
+    from app.models.package_config import PackageConfig
+    from app.seed_data import semilla
+
+    cfg = await get_package_components(scenario_id, db)
+    derivado = tarifas_del_paquete(cfg.get("experiences") or [])
+    if not derivado.get("disponible"):
+        return []
+    # El «% que no paga» vive en la semilla del hotel, que es donde el checkbook
+    # ya lo tenía. Si no hay semilla, manda el respaldo del módulo.
+    no_paga = ((semilla("driver_rates") or {}).get("tarifas") or {}).get("sust_non_pay")
+    nuevas = a_tarifas_del_motor(derivado, no_paga)
+    if not nuevas:
+        return []
+
+    filas = {r.component: r for r in (await db.execute(
+        select(PackageConfig).where(PackageConfig.scenario_id == scenario_id)
+    )).scalars().all()}
+
+    movidas: list[dict] = []
+    for comp, tarifa in nuevas.items():
+        fila = filas.get(comp)
+        if fila is None:
+            import uuid as _uuid
+            fila = PackageConfig(
+                id=str(_uuid.uuid4()), scenario_id=scenario_id, hotel_id=hotel_id,
+                component=comp, rate_per_pax_night=tarifa,
+                # El Sustainability no comisiona: lo paga el huésped en el hotel.
+                is_commissionable=(comp != "SUSTAINABILITY"))
+            db.add(fila)
+            movidas.append({"componente": comp, "antes": None,
+                            "despues": float(tarifa)})
+            continue
+        antes = Decimal(str(fila.rate_per_pax_night or 0))
+        if antes != tarifa:
+            fila.rate_per_pax_night = tarifa
+            movidas.append({"componente": comp, "antes": float(antes),
+                            "despues": float(tarifa)})
+    await db.flush()
+    return movidas
 
 
 class RateCardUpdate(BaseModel):

@@ -13,9 +13,28 @@ import {
   type Scenario, type PkgItem,
 } from "@/lib/api";
 
+/** El neto de una inclusión.
+ *
+ * ⚠️ NO es siempre «rack × factor». Owner, 2026-10-22: *«al sustainability fee
+ * no se le aplica descuento ya que no paga comisión, se cobra en el hotel»*.
+ * Esta pantalla multiplicaba TODAS las filas por el factor, así que mostraba el
+ * Sustainability en $24,68 cuando son $30,97 y el total neto del paquete salía
+ * $6,29 por pax-noche bajo. El motor ya lo tenía bien
+ * (`is_commissionable=False`); la pantalla era la que no lo sabía.
+ *
+ * `comisiona` viene del backend para que la regla no viva en dos lados.
+ */
+function netoDe(rack: number, comisiona: boolean, netFactor: number): number {
+  return comisiona ? rack * netFactor : rack;
+}
+
 interface ItemRow {
   inclusion: string; unit: string; unitPrice: string; enabled: boolean;
   notes: string; category: string; qms: string; qmd: string; info: string;
+  /** ¿El canal le cobra comisión? El Sustainability Fee NO: lo paga el huésped
+   *  en recepción, así que su neto es su rack. Viene del backend —no se deduce
+   *  acá— para que la regla viva en un solo lugar. */
+  comisiona: boolean;
 }
 interface Exp {
   name: string; nights: string; days: string;
@@ -43,7 +62,7 @@ const FULL_BOARD_PLANS = [
 const mealBase = (name: string) => FULL_BOARD_MEALS.find(m => m.meal === name)?.base ?? 0;
 
 function emptyItem(): ItemRow {
-  return { inclusion: "", unit: "per pax/night", unitPrice: "", enabled: true, notes: "", category: "Basic", qms: "1", qmd: "1", info: "" };
+  return { inclusion: "", unit: "per pax/night", unitPrice: "", enabled: true, notes: "", category: "Basic", qms: "1", qmd: "1", info: "", comisiona: true };
 }
 
 export default function PackageComponentsPage() {
@@ -91,7 +110,7 @@ export default function PackageComponentsPage() {
           unitPrice: it.unit_price === null ? "" : String(parseFloat(it.unit_price)),
           enabled: it.enabled, notes: it.notes, category: it.category,
           qms: String(parseFloat(it.qty_mult_single)), qmd: String(parseFloat(it.qty_mult_double)),
-          info: it.info,
+          info: it.info, comisiona: it.comisiona !== false,
         })),
       })));
       const nfs = ch.net_factor.map(v => parseFloat(v) || 0);
@@ -221,10 +240,14 @@ export default function PackageComponentsPage() {
         const rack = it.unitPrice.trim() === "" ? null : num(it.unitPrice);
         return {
           label: it.unit ? `${it.inclusion} · ${it.unit}` : it.inclusion,
-          valores: [rack, rack === null ? null : rack * netFactor],
+          valores: [rack, rack === null ? null : netoDe(rack, it.comisiona, netFactor)],
         };
       });
-      filas.push({ label: tc("total"), es_total: true, valores: [rackTotal, rackTotal * netFactor] });
+      filas.push({
+        label: tc("total"), es_total: true,
+        valores: [rackTotal, base.items.reduce((s2, it) => s2 + (it.unitPrice.trim() === "" ? 0
+          : netoDe(num(it.unitPrice), it.comisiona, netFactor)), 0)],
+      });
       cuadros.push({
         titulo: "Package Component — Rack and Net Rate",
         subtitulo: [escenario, `Net Factor ${netFactor.toFixed(4)} (${(netFactor * 100).toFixed(1)}%) · Net = Rack × Factor`]
@@ -379,6 +402,11 @@ export default function PackageComponentsPage() {
 
           {active === -1 && base && (() => {
             const rackTotal = base.items.reduce((s, it) => s + (it.unitPrice.trim() === "" ? 0 : num(it.unitPrice)), 0);
+            // El total neto se suma fila a fila, NO es «rackTotal × factor»:
+            // el Sustainability no comisiona y multiplicar el total lo
+            // descontaba junto con el resto.
+            const netoTotal = base.items.reduce((s, it) => s + (it.unitPrice.trim() === "" ? 0
+              : netoDe(num(it.unitPrice), it.comisiona, netFactor)), 0);
             const renderTable = (mode: "rack" | "net") => (
               <table className="fin-table" style={{ width: "100%", maxWidth: 560 }}>
                 <thead>
@@ -405,7 +433,7 @@ export default function PackageComponentsPage() {
                             </div>
                           </td>
                         ) : (
-                          <td className="mono" style={{ textAlign: "right", color: "var(--brand)" }}>{rack === null ? "—" : fmtUsd(rack * netFactor)}</td>
+                          <td className="mono" style={{ textAlign: "right", color: "var(--brand)" }}>{rack === null ? "—" : fmtUsd(netoDe(rack, it.comisiona, netFactor))}</td>
                         )}
                       </tr>
                     );
@@ -414,7 +442,7 @@ export default function PackageComponentsPage() {
                 <tfoot>
                   <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)" }}>
                     <td style={{ textAlign: "left" }} colSpan={2}>{tc("total")}</td>
-                    <td className="mono" style={{ textAlign: "right", color: mode === "net" ? "var(--brand)" : "var(--text-primary)" }}>{fmtUsd(mode === "rack" ? rackTotal : rackTotal * netFactor)}</td>
+                    <td className="mono" style={{ textAlign: "right", color: mode === "net" ? "var(--brand)" : "var(--text-primary)" }}>{fmtUsd(mode === "rack" ? rackTotal : netoTotal)}</td>
                   </tr>
                 </tfoot>
               </table>

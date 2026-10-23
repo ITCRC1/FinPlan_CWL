@@ -14,8 +14,9 @@ import { bajarCuadros, type Cuadro, type ColumnaCuadro, type FilaCuadro } from "
 import {
   getScenarios, getRevenueCheckbook, saveRevenueCheckbook, setRevenueSource,
   getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
-  getDriverRatesSeed,
+  getDriverRatesSeed, getPackageDriverRates,
   type Scenario, type RevenueCheckbookRow, type RevenueSource,
+  type PackageDriverRates,
   type RevenueBulkRow, type MonthKey,
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
@@ -87,8 +88,18 @@ export default function RevenueCheckbookPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rates, setRates] = useState<DriverRatesUI>(SIN_TARIFAS);
+  // De dónde salieron las tarifas de arriba, para poder decirlo en pantalla.
+  // Sin esto, un recuadro en cero se ve igual venga del paquete o de la nada.
+  const [pkgRates, setPkgRates] = useState<PackageDriverRates | null>(null);
 
   // Las tarifas de ESTA propiedad. Si no trae, el botón queda apagado.
+  //
+  // ⚠️ La semilla es FIJA POR HOTEL y las inclusiones del paquete viven por
+  // ESCENARIO. Owner, 2026-10-22: *«llena esto en forma automática de la vista
+  // anterior»*. En el BUDGET Working 2027 la semilla decía Tours 342 y la
+  // pantalla mostraba 0, porque alguien lo había editado a mano y la semilla no
+  // tiene dónde guardar eso. Por eso la semilla es el PISO y el paquete del
+  // escenario la pisa (efecto de abajo).
   useEffect(() => {
     (async () => {
       try {
@@ -104,6 +115,32 @@ export default function RevenueCheckbookPage() {
       } catch { /* sin semilla: el botón queda apagado y la pantalla lo dice */ }
     })();
   }, []);
+
+  // El paquete DEL ESCENARIO manda sobre la semilla del hotel.
+  //
+  // Solo pisa las cuatro que el paquete sabe (Food, Tours, Transporte,
+  // Sustainability) y las noches por estadía. Bebidas, Retail, Innoceana y el
+  // «% que no paga» no son inclusiones: no tienen de dónde salir acá y se
+  // quedan como estaban. Pisarlas con cero sería peor que no tocarlas.
+  useEffect(() => {
+    if (!scenarioId) return;
+    (async () => {
+      try {
+        const p = await getPackageDriverRates(scenarioId);
+        setPkgRates(p);
+        if (!p.disponible) return;
+        const tr = p.tarifas;
+        setRates(r => ({
+          ...r,
+          food: tr.food ?? r.food,
+          tours: tr.tours ?? r.tours,
+          transport: tr.transport ?? r.transport,
+          sustRate: tr.sust_rate ?? r.sustRate,
+          nightsPerStay: tr.nights_per_stay || r.nightsPerStay,
+        }));
+      } catch { setPkgRates(null); }
+    })();
+  }, [scenarioId]);
 
   useEffect(() => {
     (async () => {
@@ -263,8 +300,25 @@ export default function RevenueCheckbookPage() {
       BEVERAGE: food.map(f => f * rates.bevRatio / 100),
       RETAIL: roomRev.map(r => r * rates.retailPct / 100),
       INNOCEANA: roomRev.map(r => r * rates.innoceanaPct / 100),
-      // Sustainability: fee por noche ocupada, sin net factor; descuenta el % que no paga.
-      SUSTAINABILITY: occupied.map(occ => occ * rates.sustRate * (1 - rates.sustNonPay / 100)),
+      // Sustainability: **por PAX-noche**, sin net factor, menos el % que no paga.
+      //
+      // ⚠️ Dos reglas distintas que se confundían en una sola línea:
+      //
+      //  · **No comisiona.** Owner, 2026-10-22: *«no paga comisión, se cobra en
+      //    el hotel»*. Lo paga el huésped en recepción y la agencia no toca esa
+      //    plata, así que el net factor NO le aplica. Esto ya estaba bien.
+      //  · **Se cobra al 90 %.** Owner, mismo día: *«algunas personas no pagan
+      //    entonces le hago un descuento»*. Ese es el recuadro «% que no paga»,
+      //    y es un supuesto de cobro, no un precio: por eso vive acá y no en la
+      //    tarifa del paquete.
+      //
+      // Lo que estaba MAL era la cantidad: el paquete lo define «per pax/night»
+      // y acá se multiplicaba por noches de HABITACIÓN. Con 1,8 pax por noche
+      // eso era 1,8 veces menos. El motor del P&L siempre lo calculó por
+      // pax-noche, así que las dos pantallas decían cosas distintas sobre el
+      // mismo escenario y ninguna lo avisaba.
+      SUSTAINABILITY: occupied.map(occ =>
+        occ * paxPerNight * rates.sustRate * (1 - rates.sustNonPay / 100)),
     };
     setRows(prev => prev.map(r => {
       const v = vals[r.line];
@@ -440,6 +494,44 @@ export default function RevenueCheckbookPage() {
         <span style={{ fontSize: 11, color: "var(--text-disabled)", maxWidth: 320 }}>
           {t("fillHint")}
         </span>
+
+        {/* De dónde salieron las tarifas, y el neto que producen.
+          *
+          * Las dos mitades importan. El origen, porque un recuadro en cero se ve
+          * idéntico venga del paquete o de la nada. Y el neto, porque el recuadro
+          * guarda el RACK —la fórmula multiplica por el factor del mes— y el
+          * precio que se cobra es el otro: sin esto hay que hacer la cuenta de
+          * cabeza para saber si la tarifa es la correcta.
+          *
+          * ⚠️ `sin_casa` es la red de seguridad del reconocimiento por nombre:
+          * una inclusión renombrada deja su recuadro vacío, y si eso no se dijera
+          * el checkbook se llenaría con menos ingreso sin que nada chillara. */}
+        {pkgRates?.disponible && (
+          <div style={{ flexBasis: "100%", fontSize: 11, lineHeight: 1.6,
+                        color: "var(--text-secondary)", marginTop: 2 }}>
+            <span>
+              {t("pkgOrigen", { experiencia: pkgRates.experiencia ?? "", noches: pkgRates.nights })}
+            </span>
+            {pkgRates.detalle.map(d => (
+              <span key={d.caja} style={{ marginLeft: 10 }}>
+                <b>{d.caja}</b> {fmtUsd(d.rack)} → <span className="mono"
+                  style={{ color: "var(--brand)" }}>{fmtUsd(d.neto)}</span>
+              </span>
+            ))}
+            {pkgRates.sin_casa.length > 0 && (
+              <div style={{ color: "var(--accent-red, #C0392B)", marginTop: 3 }}>
+                ⚠ {t("pkgSinCasa", { lista: pkgRates.sin_casa.join(", ") })}
+              </div>
+            )}
+            {pkgRates.unidad_rara.length > 0 && (
+              <div style={{ color: "var(--accent-red, #C0392B)", marginTop: 3 }}>
+                ⚠ {pkgRates.unidad_rara.map(u =>
+                  t("pkgUnidadRara", { inclusion: u.inclusion, unidad: u.unidad, esperada: u.esperada })
+                ).join(" · ")}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {msg && <div style={{ color: "var(--accent-green, #1A7F4B)", fontSize: 13, marginBottom: 8 }}>{msg}</div>}
