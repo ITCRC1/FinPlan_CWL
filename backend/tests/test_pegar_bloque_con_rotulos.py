@@ -195,3 +195,52 @@ def test_la_tabla_de_INCLUSIONES_no_pega_con_recorte():
     assert "onPaste={e => pegarRack(i, e)}" in t
     assert 'items[f].unitPrice = valor.trim()' in t, (
         "el pegado escribe el precio, no la inclusión ni la unidad")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Llenar NO es pegar.
+#
+# Owner, 2026-10-22: *«pon esto a 1.85 .. nunca se pudo copiar y paste»*.
+#
+# Tenía razón en las dos partes, y el diagnóstico obvio era el equivocado. El
+# pegado funcionaba; lo que no existía era **llenar**. En Excel se copia una
+# celda y se pega sobre un rango seleccionado; en una grilla web el foco es UNA
+# celda, así que pegar un valor único llena una sola. Poner las 96 celdas de
+# pax en 1,85 exigía teclearlas una por una — y el pax es casi siempre el mismo
+# número para todas las villas y todos los meses.
+#
+# Arreglar sólo el pegado no habría resuelto nada de lo que él pedía.
+# ═══════════════════════════════════════════════════════════════════════════
+def test_la_grilla_de_pax_puede_llenarse_de_una():
+    t = GRILLA_PAX.read_text(encoding="utf-8")
+    assert "function aplicarATodo" in t, (
+        "sin un «aplicar a todo», poner el mismo pax en las 96 celdas obliga a "
+        "teclearlas una por una: pegar no reemplaza a llenar")
+    assert "Poner en toda la grilla" in t, "y tiene que estar a la vista"
+
+
+def test_el_llenado_respeta_las_celdas_sin_tarifa():
+    """Igual que el pegado. Esa categoría no está en el presupuesto de ese mes
+    y el guardado la rechaza: escribirle un pax no sirve de nada."""
+    t = GRILLA_PAX.read_text(encoding="utf-8")
+    cuerpo = t[t.index("function aplicarATodo"):]
+    assert "conTarifa.has(k)" in cuerpo[:1200]
+
+
+def test_el_llenado_NO_trae_un_valor_por_defecto():
+    """⚠️ Pisa 96 celdas de un golpe.
+
+    Un número ya escrito en la caja invita a apretar «Aplicar» sin leerlo, y
+    deshacerlo es volver a teclear la grilla entera.
+    """
+    t = GRILLA_PAX.read_text(encoding="utf-8")
+    assert 'useState("")' in t[t.index("const [aTodo"):][:60], (
+        "la caja arranca vacía; el 1,85 va en el placeholder, no en el valor")
+    assert 'placeholder="1,85"' in t
+
+
+def test_el_llenado_exige_un_numero():
+    """Un «Aplicar» con texto basura pondría ceros en toda la grilla."""
+    cuerpo = GRILLA_PAX.read_text(encoding="utf-8")
+    cuerpo = cuerpo[cuerpo.index("function aplicarATodo"):][:900]
+    assert "Number.isFinite(numeroDeExcel(v))" in cuerpo

@@ -68,6 +68,9 @@ export default function GrillaPax({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** El valor del «aplicar a todo». Arranca vacío a propósito: un default
+   *  escrito invita a apretar el botón sin mirar, y esto pisa 96 celdas. */
+  const [aTodo, setATodo] = useState("");
 
   useEffect(() => {
     if (!scenarioId) return;
@@ -143,6 +146,43 @@ export default function GrillaPax({
     setError(null);
   }
 
+  /** Pone un mismo valor en TODA la grilla.
+   *
+   * Owner, 2026-10-22: *«pon esto a 1.85 .. nunca se pudo copiar y paste»*.
+   *
+   * Y tenía razón en las dos partes. El pegado funcionaba, pero lo que él
+   * necesitaba no era pegar: era **llenar**. En Excel se copia una celda y se
+   * pega sobre un rango seleccionado; en una grilla web el foco es UNA celda,
+   * así que pegar un valor único llena una sola. No había forma de poner las
+   * 96 en 1,85 sin teclearlas una por una — y el pax es casi siempre el mismo
+   * número para todas las villas y todos los meses.
+   *
+   * ⚠️ Respeta las celdas sin tarifa, igual que el pegado: esa categoría no
+   * está en el presupuesto de ese mes y el guardado la rechaza.
+   */
+  function aplicarATodo() {
+    if (!grid || bloqueado) return;
+    const v = aTodo.trim();
+    if (!v || !Number.isFinite(numeroDeExcel(v))) {
+      setError("Escriba el valor que quiere poner en toda la grilla");
+      return;
+    }
+    const nuevos: Record<string, string> = {};
+    const nuevasSucias = new Set(sucias);
+    for (const f of grid.filas) {
+      for (const c of f.meses) {
+        const k = `${f.room_type_id}:${c.month}`;
+        if (!conTarifa.has(k)) continue;
+        nuevos[k] = v;
+        nuevasSucias.add(k);
+      }
+    }
+    setBorr(b => ({ ...b, ...nuevos }));
+    setSucias(nuevasSucias);
+    setAviso(`${Object.keys(nuevos).length} celdas en ${v}. Todavía hay que guardar.`);
+    setError(null);
+  }
+
   async function guardar() {
     if (!grid) return;
     setGuardando(true); setError(null); setAviso(null);
@@ -194,6 +234,22 @@ export default function GrillaPax({
                    color: sucias.size && !bloqueado ? "#fff" : "var(--text-disabled)" }}>
           {guardando ? "Guardando…" : sucias.size ? `Guardar ${sucias.size}` : "Guardado"}
         </button>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6,
+                       fontSize: 12, color: "var(--text-secondary)" }}>
+          Poner en toda la grilla:
+          <input className="fin-input mono" type="text" inputMode="decimal"
+            value={aTodo} onChange={e => setATodo(e.target.value)}
+            placeholder="1,85" disabled={bloqueado}
+            onKeyDown={e => { if (e.key === "Enter") aplicarATodo(); }}
+            style={{ width: 64, textAlign: "right", padding: "3px 5px" }} />
+          <button onClick={aplicarATodo} disabled={bloqueado || !aTodo.trim()}
+            style={{ padding: "4px 10px", fontSize: 12, borderRadius: 4,
+                     border: "1px solid var(--border-medium)",
+                     cursor: (bloqueado || !aTodo.trim()) ? "not-allowed" : "pointer",
+                     background: "var(--bg-surface)", color: "var(--text-primary)" }}>
+            Aplicar
+          </button>
+        </span>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           Pegue un bloque desde Excel sobre la primera celda que quiera llenar:
           se reparte solo. Puede traer los nombres y la fila de meses — se
