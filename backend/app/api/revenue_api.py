@@ -642,7 +642,6 @@ async def get_monthly_revenue(scenario_id: str, db: AsyncSession = Depends(get_d
         pkg_configs=data["pkg_configs"],
         other_by_month=other_by_month,
         room_type_units=room_type_units,
-        retail_pct=getattr(scenario, "retail_pct", None),
     )
 
     annual_total = sum(r.total_revenue for r in results)
@@ -2666,7 +2665,6 @@ async def get_monthly_revenue_single(
         pkg_configs=data["pkg_configs"],
         other_revenues=[ot for ot in data["other_revenues"] if ot.month == month],
         room_type_units=room_type_units,
-        retail_pct=getattr(scenario, "retail_pct", None),
     )
     return _revenue_result_to_dict(result)
 

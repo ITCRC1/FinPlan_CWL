@@ -144,7 +144,6 @@ def calculate_revenue(
     other_revenues: list[RevenueOther],   # filtered for this scenario+month
     room_type_units: dict[str, int],      # room_type_id → total_units
     cerrado: bool = False,                # ¿el hotel NO opera este mes?
-    retail_pct: Optional[Decimal] = None, # Retail = % × Rooms (None = monto fijo)
 ) -> RevenueResult:
     """
     Calculate all revenue lines for a single month.
@@ -248,13 +247,6 @@ def calculate_revenue(
         if campo is not None:
             setattr(result, campo, oth.amount_usd)
 
-    # Retail (Gift Shop) por fórmula: % × Rooms del mes. Pisa el monto fijo de
-    # `revenue_other`, que era el Retail del Budget 2026 copiado a cada
-    # escenario (owner, 2026-10-22: *«debe leer desde las fórmulas»*).
-    if retail_pct is not None:
-        result.retail = (result.rooms * Decimal(str(retail_pct)) / Decimal("100")
-                         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
     return result
 
 
@@ -308,7 +300,6 @@ def calculate_annual_revenue(
     pkg_configs: list[PackageConfig],
     other_by_month: dict[int, list[RevenueOther]],
     room_type_units: dict[str, int],
-    retail_pct: Optional[Decimal] = None,
 ) -> list[RevenueResult]:
     """Compute revenue for all 12 months."""
     return [
@@ -322,7 +313,6 @@ def calculate_annual_revenue(
             pkg_configs=pkg_configs,
             other_revenues=other_by_month.get(m, []),
             room_type_units=room_type_units,
-            retail_pct=retail_pct,
         )
         for m in range(1, 13)
     ]

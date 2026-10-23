@@ -65,9 +65,6 @@ MENSAJES: dict[str, dict[str, str]] = {
     "escenario.no_encontrado": {
         "es": "Escenario no encontrado",
         "en": "Scenario not found"},
-    "escenario.retail_pct_invalido": {
-        "es": "El % de Retail tiene que estar entre 0 y 100",
-        "en": "The Retail % must be between 0 and 100"},
     "horizonte.invalido": {
         "es": "El ámbito tiene que ser month, ytd o full",
         "en": "Scope must be month, ytd or full"},

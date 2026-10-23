@@ -998,7 +998,6 @@ async def snapshot_forecast_month(
         version=version, status="draft", actuals_through=source.actuals_through,
         source_mode=getattr(source, "source_mode", "imported"),
         revenue_source=getattr(source, "revenue_source", "drivers"),
-        retail_pct=getattr(source, "retail_pct", None) or Decimal("1.2"),
         is_current_forecast=False, created_by="snapshot",
     )
     db.add(new)
@@ -1029,7 +1028,6 @@ async def budget_to_forecast_current(budget_id: str, db: AsyncSession = Depends(
         version="Current", status="draft", actuals_through=0,
         source_mode=getattr(budget, "source_mode", "imported"),
         revenue_source=getattr(budget, "revenue_source", "drivers"),
-        retail_pct=getattr(budget, "retail_pct", None) or Decimal("1.2"),
         is_current_forecast=True, created_by="rollover",
     )
     db.add(new)
@@ -1310,33 +1308,6 @@ async def update_source_mode(
     return {"id": scenario_id, "source_mode": scenario.source_mode}
 
 
-class RetailPctUpdate(BaseModel):
-    retail_pct: float
-
-
-@router.patch("/scenarios/{scenario_id}/retail-pct/")
-async def update_retail_pct(
-    scenario_id: str,
-    payload: RetailPctUpdate,
-    db: AsyncSession = Depends(get_db),
-):
-    """Retail (Gift Shop) = este % × Rooms del mes, por escenario.
-
-    El motor lo aplica en cada mes que calcula; los meses reales y los
-    escenarios subidos no pasan por el motor y no cambian (migración 156).
-    """
-    if not 0 <= payload.retail_pct <= 100:
-        raise ErrorApi(422, "escenario.retail_pct_invalido")
-    scenario = await db.get(Scenario, scenario_id)
-    if not scenario:
-        raise ErrorApi(404, "escenario.no_encontrado")
-    scenario.assert_editable()
-    from decimal import Decimal as _D
-    scenario.retail_pct = _D(str(round(payload.retail_pct, 3)))
-    await db.commit()
-    return {"id": scenario_id, "retail_pct": float(scenario.retail_pct)}
-
-
 class UsarDetalleUpdate(BaseModel):
     usar_detalle: bool
 
@@ -1378,7 +1349,6 @@ def _scenario_summary(s: Scenario) -> dict:
         "version": s.version,
         "status": s.status,
         "is_locked": s.is_locked,
-        "retail_pct": float(getattr(s, "retail_pct", 1.2) or 0),
         "actuals_through": s.actuals_through,
         "is_current_forecast": getattr(s, "is_current_forecast", False),
         "source_mode": getattr(s, "source_mode", "imported"),

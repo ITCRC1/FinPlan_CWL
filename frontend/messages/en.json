@@ -1901,12 +1901,6 @@
     "yes": "Yes"
   },
   "totalRev": {
-    "retailPctLabel": "Retail (Gift Shop) =",
-    "retailPctBase": "P&L Rooms revenue",
-    "retailPctSave": "Save",
-    "retailPctSaved": "Saved. The P&L now computes Retail with this %.",
-    "retailPctInvalid": "The % must be between 0 and 100",
-    "retailPctHint": "Applied to every month the engine computes; actual months do not change.",
     "title": "Total Revenue by Room Type",
     "nightsOccupied": "Occupied nights",
     "nightsAvailable": "Available nights",

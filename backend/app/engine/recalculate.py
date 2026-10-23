@@ -182,7 +182,6 @@ async def load_revenue_results(session, scenario: Scenario) -> dict[int, Revenue
             pkg_configs=pkg_configs,
             other_revenues=[ot for ot in other_revenues if ot.month == month],
             room_type_units=room_type_units,
-            retail_pct=getattr(scenario, "retail_pct", None),
         )
     return results
 

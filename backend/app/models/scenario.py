@@ -1,7 +1,6 @@
-from decimal import Decimal
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, or_, Numeric
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, or_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
@@ -51,9 +50,6 @@ class Scenario(Base):
     # (the revenue engine); 'checkbook' = read direct USD amounts from RevenueEntry
     # (KPIs come from ScenarioStat). Default keeps existing scenarios on drivers.
     revenue_source: Mapped[str] = mapped_column(String(12), default="drivers")
-    #: Retail (Gift Shop) = este % × Rooms del mes. Lo calcula el motor; ya no
-    #: se lee el monto fijo de `revenue_other`. Ver migración 156.
-    retail_pct: Mapped[Decimal] = mapped_column(Numeric(6, 3), default=Decimal("1.2"))
     #: Espejo del borrador de Pre-Cierre — ver migración 140.
     #:
     #: ⚠️ **No aparece en ningún selector de escenario.** `/api/scenarios/` lo

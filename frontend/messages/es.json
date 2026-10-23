@@ -1901,12 +1901,6 @@
     "yes": "Sí"
   },
   "totalRev": {
-    "retailPctLabel": "Retail (Gift Shop) =",
-    "retailPctBase": "Rooms del P&L",
-    "retailPctSave": "Guardar",
-    "retailPctSaved": "Guardado. El P&L ya calcula Retail con este %.",
-    "retailPctInvalid": "El % tiene que estar entre 0 y 100",
-    "retailPctHint": "Se aplica a cada mes que calcula el motor; los meses reales no cambian.",
     "title": "Total Revenue por Tipo de Habitación",
     "nightsOccupied": "Noches ocupadas",
     "nightsAvailable": "Noches disponibles",

@@ -12,7 +12,6 @@ import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import BloqueRevenue from "./BloqueRevenue";
-import RetailPct from "./RetailPct";
 
 // Mismo estilo que el "⬇ Excel" de Planning · Big Picture.
 const excelBtn: React.CSSProperties = {
@@ -239,8 +238,6 @@ export default function TotalRevenuePage() {
       <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6, marginBottom: 12 }}>
         {t.rich("intro", { b: (c: React.ReactNode) => <b>{c}</b> })}
       </p>
-      <RetailPct scenario={scenarios.find(s => s.id === scenarioId)}
-        onSaved={pct => setScenarios(all => all.map(s => s.id === scenarioId ? { ...s, retail_pct: pct } : s))} />
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
