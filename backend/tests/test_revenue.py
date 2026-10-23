@@ -408,3 +408,44 @@ def test_importer_jan_total_revenue():
     # Allow ±$500 tolerance (net_factor discrepancy between Excel formula and channel mix)
     assert abs(result.total_revenue - expected) < Decimal("3000"), \
         f"Total revenue: {result.total_revenue}, expected ~{expected}"
+
+
+def test_retail_por_formula_pisa_el_monto_fijo():
+    """Retail = retail_pct % × Rooms del mes; el monto fijo de revenue_other ya no manda."""
+    retail_fijo = RevenueOther()
+    retail_fijo.line = "RETAIL"
+    retail_fijo.month = 1
+    retail_fijo.amount_usd = Decimal("4982.42")
+
+    result = calculate_revenue(
+        month=1, year=2026,
+        rate_cards=_make_jan_rate_cards(),
+        occ_budgets=_make_jan_occupancies(),
+        channels=_make_channels(),
+        pkg_configs=_make_pkg_configs(),
+        other_revenues=[retail_fijo],
+        room_type_units=UNITS,
+        retail_pct=Decimal("1.5"),
+    )
+    # El monto del Excel (4982.42) era justo el 1,2 % del Rooms de enero:
+    # con otro % se ve que manda la fórmula y no el monto guardado.
+    esperado = (result.rooms * Decimal("1.5") / 100).quantize(Decimal("0.01"))
+    assert result.retail == esperado == Decimal("6228.03")
+
+
+def test_retail_sin_pct_sigue_leyendo_el_monto():
+    """Sin retail_pct (None) el motor conserva el comportamiento anterior."""
+    retail_fijo = RevenueOther()
+    retail_fijo.line = "RETAIL"
+    retail_fijo.month = 1
+    retail_fijo.amount_usd = Decimal("4982.42")
+    result = calculate_revenue(
+        month=1, year=2026,
+        rate_cards=_make_jan_rate_cards(),
+        occ_budgets=_make_jan_occupancies(),
+        channels=_make_channels(),
+        pkg_configs=_make_pkg_configs(),
+        other_revenues=[retail_fijo],
+        room_type_units=UNITS,
+    )
+    assert result.retail == Decimal("4982.42")

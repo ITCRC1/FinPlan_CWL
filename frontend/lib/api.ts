@@ -355,9 +355,16 @@ export interface Scenario {
    *  regex de subcadena, y por eso un `Working-VIEJO` quedaba imborrable. */
   protected?: boolean;
   es_precierre?: boolean;
+  /** Retail (Gift Shop) = este % × Rooms del P&L (migración 156). */
+  retail_pct?: number;
 }
 
 // ── Scenario data operations (planning) ───────────────────────────────────────
+
+export async function setRetailPct(scenarioId: string, retailPct: number) {
+  return api.patch<{ id: string; retail_pct: number }>(
+    `/scenarios/${scenarioId}/retail-pct/`, { retail_pct: retailPct });
+}
 
 export async function setSourceMode(scenarioId: string, mode: "imported" | "checkbook") {
   return api.patch<{ id: string; source_mode: string }>(
