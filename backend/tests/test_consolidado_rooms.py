@@ -68,3 +68,8 @@ def test_channel_mix_solo_entrega_conteos_por_canal():
     assert "ChannelMixEntry" in bloque
     for prohibido in ('"reservas"', '"huespedes"', '"guests"', "ChannelMixDetail"):
         assert prohibido not in bloque
+
+
+def test_el_checkbook_de_ingresos_pide_llave():
+    c = TestClient(app, raise_server_exceptions=False)
+    assert c.get("/api/consolidado/revenue-checkbook/x/").status_code == 401

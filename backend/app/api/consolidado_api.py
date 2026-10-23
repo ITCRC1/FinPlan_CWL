@@ -140,3 +140,41 @@ async def consolidado_escenarios(quien: str = Depends(lector_del_consolidado)):
             "year": e.year, "tipo": e.type, "version": e.version, "status": e.status,
         } for e in filas],
     }
+
+
+@router.get("/consolidado/revenue-checkbook/{scenario_id}/")
+async def consolidado_revenue_checkbook(
+    scenario_id: str,
+    quien: str = Depends(lector_del_consolidado),
+):
+    """El Revenue Checkbook del escenario: cada línea con sus 12 meses, en USD.
+
+    Hotel Consolidation, 2026-10-23: el owner carga los ingresos del Budget en
+    el Checkbook (Laundry, Retail % of Room net, Beverage % of Food…) y quiere
+    ver ESE dato aunque el escenario siga en fuente Drivers. Solo lectura,
+    totales por línea; `source` dice qué fuente usa hoy el P&L del escenario.
+    """
+    from app.models.revenue_entry import RevenueEntry, REVENUE_LINES, REVENUE_LINE_LABELS
+    async with get_session() as session:
+        escenario = await session.get(Scenario, scenario_id)
+        if escenario is None or escenario.hotel_id != HOTEL_ID:
+            raise ErrorApi(404, "escenario.no_encontrado")
+        entradas = (await session.execute(
+            select(RevenueEntry).where(RevenueEntry.scenario_id == scenario_id)
+        )).scalars().all()
+    por_linea = {e.line.upper(): e for e in entradas}
+    return {
+        "contrato": CONTRATO,
+        "hotel_id": HOTEL_ID,
+        "escenario": {"id": escenario.id, "year": escenario.year, "tipo": escenario.type,
+                      "version": escenario.version},
+        "source": getattr(escenario, "revenue_source", "drivers"),
+        "moneda": "USD",
+        "lineas": [{
+            "line": ln,
+            "label": REVENUE_LINE_LABELS.get(ln, ln.title()),
+            "meses": [float(por_linea[ln].get_month(m)) if ln in por_linea else 0.0
+                      for m in range(1, 13)],
+        } for ln in REVENUE_LINES],
+        "leido_por": quien,
+    }
