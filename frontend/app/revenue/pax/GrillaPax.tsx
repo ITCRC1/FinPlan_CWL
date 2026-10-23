@@ -117,6 +117,9 @@ export default function GrillaPax({
    */
   function pegar(fi: number, mi: number, bloque: string[][]) {
     if (!grid || bloqueado) return;
+    // El bloque llega SIN los rótulos: `manejarPegado` ya los recortó, porque
+    // nadie copia el rectángulo exacto —se arrastra sobre la tabla de Excel y
+    // viene la columna de nombres y la fila de meses—. Ver `recortarRotulos`.
     const nuevos: Record<string, string> = {};
     const nuevasSucias = new Set(sucias);
     let saltadas = 0;
@@ -181,7 +184,7 @@ export default function GrillaPax({
                     marginBottom: 8 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
           Huéspedes por habitación ocupada <span style={{ fontWeight: 400,
-            color: "var(--text-secondary)" }}>(digitar)</span>
+            color: "var(--text-secondary)" }}>(digitar o pegar desde Excel)</span>
         </h2>
         <button onClick={guardar} disabled={guardando || bloqueado || !sucias.size}
           style={{ padding: "5px 14px", fontSize: 12.5, borderRadius: 4, fontWeight: 600,
@@ -192,8 +195,10 @@ export default function GrillaPax({
           {guardando ? "Guardando…" : sucias.size ? `Guardar ${sucias.size}` : "Guardado"}
         </button>
         <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          Acepta decimales con coma o con punto · se escribe en la tarifa del
-          escenario, que es lo que el motor multiplica
+          Pegue un bloque desde Excel sobre la primera celda que quiera llenar:
+          se reparte solo. Puede traer los nombres y la fila de meses — se
+          descartan. Acepta decimales con coma o con punto · se escribe en la
+          tarifa del escenario, que es lo que el motor multiplica
         </span>
       </div>
 

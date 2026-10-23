@@ -118,9 +118,16 @@ export function manejarPegado(
   e: { clipboardData: { getData: (t: string) => string }; preventDefault: () => void },
   alPegar: (bloque: string[][]) => void,
 ): void {
-  const bloque = celdasPegadas(e.clipboardData.getData("text"));
-  if (!bloque) return;
+  const crudo = celdasPegadas(e.clipboardData.getData("text"));
+  if (!crudo) return;
   e.preventDefault();
+  // El recorte va ACA y no en cada pantalla: son ocho grillas y todas se pegan
+  // desde la misma tabla de Excel, con los mismos nombres de fila y la misma
+  // fila de meses adelante. Resolverlo una vez es lo que ya decía el
+  // encabezado de este archivo — «toda grilla de la app debería pegarse
+  // igual»— y evita que la novena nazca sin el arreglo.
+  const bloque = recortarRotulos(crudo);
+  if (!bloque.length || !bloque[0].length) return;
   alPegar(bloque);
 }
 
@@ -173,4 +180,53 @@ export function numeroDePorcentaje(v: string | number | null | undefined): numbe
   const s = String(v ?? "").trim();
   // El `%` acá es la UNIDAD de la celda, no una instrucción de dividir.
   return numeroDeExcel(s.endsWith("%") ? s.slice(0, -1) : s);
+}
+
+/**
+ * Quita los rótulos que vienen pegados con el bloque.
+ *
+ * Owner, 2026-10-22, sobre la grilla de pax: *«que se pueda hacer copy paste
+ * fácilmente»*.
+ *
+ * Pegar ya funcionaba — si uno seleccionaba EXACTAMENTE el rectángulo de
+ * números. Pero nadie copia así desde Excel: se arrastra sobre la tabla y se
+ * lleva la columna de nombres y la fila de meses. Eso entraba como dato:
+ * «Treehouse king bed» no parsea, así que la primera columna se llenaba de
+ * ceros y las doce de números quedaban corridas un lugar. El resultado se ve
+ * plausible —son pax, todos parecidos— y nada avisa.
+ *
+ * La regla, a propósito conservadora: se descarta una fila o una columna sólo
+ * si **ninguna** de sus celdas es un número y **alguna** tiene texto. Una fila
+ * de puros números nunca se pierde, que es el error que no se puede cometer.
+ */
+export function recortarRotulos(bloque: string[][]): string[][] {
+  // ⚠️ NO sirve `Number.isFinite(numeroDeExcel(t))`: `numeroDeExcel` devuelve
+  // **0** para lo que no entiende, no `NaN`. Con esa prueba «Enero» pasaba por
+  // número, la fila de encabezado nunca se descartaba y el bloque entero
+  // entraba corrido una columna. Lo encontró la prueba del caso real.
+  //
+  // Acá se mira la FORMA: signo, dígitos, separadores y los adornos que trae
+  // Excel ($ ₡ € £ % y el paréntesis del negativo contable). Tiene que haber
+  // al menos un dígito, así que «—», «n/a» o una celda vacía no son números.
+  const esNumero = (s: string) => {
+    const t = (s ?? "").trim();
+    return t !== "" && /\d/.test(t) && /^[$₡€£(\s]*-?[\d.,\s]+[)%\s]*$/.test(t);
+  };
+  const soloRotulos = (celdas: string[]) =>
+    celdas.length > 0
+    && !celdas.some(esNumero)
+    && celdas.some(c => (c ?? "").trim() !== "");
+
+  let b = bloque.map(f => [...f]);
+  // La fila de encabezado (Enero, Febrero…). Se mira sólo la primera: dos
+  // filas de puro texto seguidas ya no son un encabezado sino otra cosa, y
+  // adivinar de más es peor que pegar de menos.
+  if (b.length > 1 && soloRotulos(b[0])) b = b.slice(1);
+  // La columna de nombres. Puede haber más de una —código y descripción— así
+  // que se recorta mientras quede al menos una columna viva.
+  while (b.length && b[0].length > 1
+         && soloRotulos(b.map(f => f[0] ?? ""))) {
+    b = b.map(f => f.slice(1));
+  }
+  return b;
 }
