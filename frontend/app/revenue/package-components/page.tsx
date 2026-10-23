@@ -12,6 +12,7 @@ import {
   getScenarios, getPackageComponents, savePackageComponents, getChannelsConfig,
   type Scenario, type PkgItem,
 } from "@/lib/api";
+import { manejarPegado, repartirPegado } from "@/lib/pegarGrilla";
 
 /** El neto de una inclusión.
  *
@@ -133,6 +134,34 @@ export default function PackageComponentsPage() {
   // borrarla— hacía que este tab pasara a otra experiencia sin avisar, y lo que
   // se digitaba acá terminaba guardado contra la que quedara primera. Ahora la
   // base es una marca explícita y el nombre vuelve a ser solo una etiqueta.
+  /** Pegar una columna de precios desde Excel sobre la tabla de Rack Rate.
+   *
+   * Owner, 2026-10-22. Esta pantalla no tenía pegado y es donde se cargan las
+   * tarifas del paquete — las mismas que desde hoy bajan al motor del P&L.
+   *
+   * ⚠️ **Solo la columna de precios.** La tabla de edición de abajo tiene la
+   * inclusión y la unidad como TEXTO, y ahí el texto es dato de verdad: el
+   * recorte de rótulos de `manejarPegado` —que existe para tirar los nombres
+   * de fila— borraría justo lo que se quiso pegar. Acá se pega una sola
+   * columna, así que si el bloque trae los nombres al lado, se descartan y los
+   * precios caen donde van.
+   */
+  function pegarRack(ri: number, e: React.ClipboardEvent) {
+    if (sel?.is_locked) return;
+    manejarPegado(e, bloque => {
+      const ci = exps.findIndex(x => x.esBase);
+      const idx = ci >= 0 ? ci : 0;
+      setExps(prev => prev.map((x, i) => {
+        if (i !== idx) return x;
+        const items = x.items.map(it => ({ ...it }));
+        repartirPegado(bloque, ri, 0, items.length, 1,
+          (f, _c, valor) => { items[f].unitPrice = valor.trim(); });
+        return { ...x, items };
+      }));
+      setDirty(true);
+    });
+  }
+
   function setBaseRack(ri: number, v: string) {
     const ci = exps.findIndex(e => e.esBase);
     const idx = ci >= 0 ? ci : 0;
@@ -428,7 +457,8 @@ export default function PackageComponentsPage() {
                             <div style={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end" }}>
                               <span style={{ color: "var(--text-disabled)", fontSize: 11 }}>$</span>
                               <input className="fin-input mono" value={it.unitPrice} placeholder="—" disabled={sel?.is_locked}
-                                onChange={e => setBaseRack(i, e.target.value)} onFocus={e => e.target.select()}
+                                onChange={e => setBaseRack(i, e.target.value)}
+                                onPaste={e => pegarRack(i, e)} onFocus={e => e.target.select()}
                                 style={{ width: "100%", textAlign: "right", padding: "3px 4px" }} />
                             </div>
                           </td>

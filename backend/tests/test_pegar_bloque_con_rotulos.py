@@ -136,3 +136,62 @@ def test_las_ocho_grillas_siguen_usando_el_enganche_comun():
                   if "manejarPegado" in p.read_text(encoding="utf-8"))
     assert len(usan) >= 8, f"se esperaban al menos 8 grillas, hay {len(usan)}: {usan}"
     assert "app/revenue/pax/GrillaPax.tsx" in usan
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Owner, 2026-10-22: «y esta» · «ya pudiste o no».
+#
+# Cuatro pantallas de Revenue pegaban por su cuenta —o no pegaban— y por eso no
+# heredaban el recorte de rótulos. Son justo donde se carga el presupuesto.
+# ═══════════════════════════════════════════════════════════════════════════
+PANTALLAS_DE_CARGA = [
+    "app/revenue/rack-rates/page.tsx",
+    "app/revenue/occupancy/page.tsx",
+    "app/revenue/checkbook/page.tsx",
+    "app/revenue/package-components/page.tsx",
+    "app/revenue/pax/GrillaPax.tsx",
+    "app/revenue/spa/page.tsx",
+    "app/revenue/club/page.tsx",
+]
+
+
+@pytest.mark.parametrize("rel", PANTALLAS_DE_CARGA)
+def test_las_pantallas_de_carga_usan_el_enganche_comun(rel):
+    """Una copia local del pegado no hereda los arreglos del común.
+
+    Las tres primeras tenían su propio `handlePaste` con el mismo bucle
+    copiado, así que el recorte de rótulos las dejaba fuera: arrastrar sobre la
+    tabla de Excel les metía los valores corridos una columna igual que a pax.
+    """
+    f = FRONT / rel
+    assert f.exists(), f"no está {rel}"
+    t = f.read_text(encoding="utf-8")
+    assert "manejarPegado" in t, f"{rel} no usa el enganche común"
+
+
+@pytest.mark.parametrize("rel", PANTALLAS_DE_CARGA)
+def test_ninguna_se_quedo_con_el_bucle_propio(rel):
+    """`celdasPegadas` suelto es la firma de la copia local: significa que esa
+    pantalla parsea el portapapeles por su cuenta y se salta el recorte."""
+    t = (FRONT / rel).read_text(encoding="utf-8")
+    assert "celdasPegadas" not in t, (
+        f"{rel} todavía llama a `celdasPegadas` directo; el recorte de rótulos "
+        f"vive en `manejarPegado` y así no lo ve")
+
+
+def test_la_tabla_de_INCLUSIONES_no_pega_con_recorte():
+    """⚠️ El contrapeso, y la razón de no poner pegado en todas las grillas.
+
+    En la tabla de edición de `package-components` la inclusión y la unidad son
+    TEXTO y son dato de verdad. El recorte existe para tirar los nombres de
+    fila: aplicado ahí, borraría justo lo que se quiso pegar.
+
+    Por eso el pegado de esa pantalla va SOLO en la columna de precios, y esta
+    prueba lo fija para que nadie lo «complete» después.
+    """
+    t = (FRONT / "app/revenue/package-components/page.tsx").read_text(encoding="utf-8")
+    assert t.count("onPaste") == 1, (
+        "solo la columna de Rack Rate pega; la tabla de inclusiones NO")
+    assert "onPaste={e => pegarRack(i, e)}" in t
+    assert 'items[f].unitPrice = valor.trim()' in t, (
+        "el pegado escribe el precio, no la inclusión ni la unidad")

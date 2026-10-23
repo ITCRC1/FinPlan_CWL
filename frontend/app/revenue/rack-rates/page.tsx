@@ -6,7 +6,7 @@ import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScena
 // POSICIÓN de la coma para saber si es decimal o separador de miles, y es el
 // mismo que usan las demás grillas — con uno por pantalla, el mismo número
 // entra distinto en cada una.
-import { celdasPegadas, numeroDeExcel } from "@/lib/pegarGrilla";
+import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
@@ -93,24 +93,26 @@ export default function RackRatesPage() {
   }
 
   // Pegar un bloque desde Excel desde la celda (ri, mi).
+  /** Pegar un bloque de Excel.
+   *
+   * Usa el enganche COMUN (`manejarPegado` + `repartirPegado`) y no una copia
+   * local. Owner, 2026-10-22: pegar ya funcionaba, pero solo si uno
+   * seleccionaba el rectangulo EXACTO de numeros. Nadie copia asi: se arrastra
+   * sobre la tabla de Excel y viene la columna de nombres y la fila de meses.
+   * Eso entraba como dato y los valores quedaban corridos una columna — con un
+   * resultado que se ve plausible y nada que avise. El recorte de rotulos vive
+   * en `manejarPegado`, asi que esta pantalla lo hereda.
+   */
   function handlePaste(ri: number, mi: number, e: React.ClipboardEvent) {
-    const grid = celdasPegadas(e.clipboardData.getData("text"));
-    if (!grid) return;          // una celda sola: la escribe el navegador
-    e.preventDefault();
-    setRows(prev => {
-      const next = prev.map(r => ({ ...r }));
-      grid.forEach((cells, dr) => {
-        const r = ri + dr;
-        if (r >= next.length) return;
-        cells.forEach((cell, dc) => {
-          const m = mi + dc;
-          if (m >= MONTH_KEYS.length) return;
-          next[r][MONTH_KEYS[m]] = fmt2(cell);
-        });
+    manejarPegado(e, bloque => {
+      setRows(prev => {
+        const next = prev.map(r => ({ ...r }));
+        repartirPegado(bloque, ri, mi, next.length, MONTH_KEYS.length,
+          (f, c, valor) => { next[f][MONTH_KEYS[c]] = fmt2(valor); });
+        return next;
       });
-      return next;
+      setDirty(true);
     });
-    setDirty(true);
   }
 
   async function handleSave() {

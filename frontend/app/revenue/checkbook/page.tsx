@@ -3,7 +3,7 @@ import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from
 // ⚠️ El parser COMPARTIDO: `numeroDeExcel` mira la POSICIÓN de la coma para
 // saber si es decimal o separador de miles. El que vivía acá la borraba
 // siempre, así que un número en formato español entraba multiplicado.
-import { celdasPegadas, numeroDeExcel } from "@/lib/pegarGrilla";
+import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
 import { useTranslations } from "next-intl";
@@ -211,24 +211,26 @@ export default function RevenueCheckbookPage() {
   }
 
   // Excel-style paste: distribute a tab/newline block starting at (rowIdx, monthIdx).
+  /** Pegar un bloque de Excel.
+   *
+   * Usa el enganche COMUN (`manejarPegado` + `repartirPegado`) y no una copia
+   * local. Owner, 2026-10-22: pegar ya funcionaba, pero solo si uno
+   * seleccionaba el rectangulo EXACTO de numeros. Nadie copia asi: se arrastra
+   * sobre la tabla de Excel y viene la columna de nombres y la fila de meses.
+   * Eso entraba como dato y los valores quedaban corridos una columna — con un
+   * resultado que se ve plausible y nada que avise. El recorte de rotulos vive
+   * en `manejarPegado`, asi que esta pantalla lo hereda.
+   */
   function handlePaste(rowIdx: number, monthIdx: number, e: React.ClipboardEvent) {
-    const grid = celdasPegadas(e.clipboardData.getData("text"));
-    if (!grid) return;          // una celda sola: la escribe el navegador
-    e.preventDefault();
-    setRows(prev => {
-      const next = prev.map(r => ({ ...r }));
-      grid.forEach((cells, dr) => {
-        const ri = rowIdx + dr;
-        if (ri >= next.length) return;
-        cells.forEach((cell, dc) => {
-          const mi = monthIdx + dc;
-          if (mi >= MONTH_KEYS.length) return;
-          next[ri][MONTH_KEYS[mi]] = money2(cell);
-        });
+    manejarPegado(e, bloque => {
+      setRows(prev => {
+        const next = prev.map(r => ({ ...r }));
+        repartirPegado(bloque, rowIdx, monthIdx, next.length, MONTH_KEYS.length,
+          (f, c, valor) => { next[f][MONTH_KEYS[c]] = money2(valor); });
+        return next;
       });
-      return next;
+      setDirty(true);
     });
-    setDirty(true);
   }
 
   async function handleSave() {
