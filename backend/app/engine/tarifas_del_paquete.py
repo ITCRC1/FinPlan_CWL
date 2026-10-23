@@ -168,6 +168,133 @@ def a_tarifas_del_motor(
     return fuera
 
 
+async def experiencias_del_escenario(session, scenario_id: str) -> list[dict]:
+    """Las experiencias guardadas, en la forma que `tarifas_del_paquete` espera.
+
+    Lee la BD directamente y **no cae a la semilla** si no hay ninguna. El
+    endpoint sí sugiere una plantilla para que la pantalla no salga en blanco;
+    acá una sugerencia sería una tarifa inventada escribiéndose sola en el
+    motor.
+    """
+    from sqlalchemy import select
+
+    from app.models.package_menu import PkgExperience, PkgExperienceItem
+
+    exps = (await session.execute(
+        select(PkgExperience).where(PkgExperience.scenario_id == scenario_id)
+        .order_by(PkgExperience.sort_order))).scalars().all()
+    if not exps:
+        return []
+    items = (await session.execute(
+        select(PkgExperienceItem).where(
+            PkgExperienceItem.experience_id.in_([e.id for e in exps]))
+        .order_by(PkgExperienceItem.sort_order))).scalars().all()
+    por_exp: dict[str, list] = {}
+    for it in items:
+        por_exp.setdefault(it.experience_id, []).append(it)
+    # Si ninguna trae la marca (dato anterior a `es_base`), vale la primera —
+    # el mismo criterio del endpoint, para que no muestren cosas distintas.
+    hay_base = any(getattr(e, "es_base", False) for e in exps)
+    return [
+        {"name": e.name, "nights": e.nights, "days": e.days,
+         "es_base": bool(getattr(e, "es_base", False)) if hay_base else (i == 0),
+         "items": [{"inclusion": it.inclusion, "unit": it.unit,
+                    "unit_price": it.unit_price, "enabled": it.enabled}
+                   for it in por_exp.get(e.id, [])]}
+        for i, e in enumerate(exps)
+    ]
+
+
+async def sincronizar_tarifas_del_motor(session, scenario) -> list[dict]:
+    """Baja las tarifas del paquete a `package_configs`, que es lo que calcula.
+
+    ## El desfase que esto cierra
+
+    Owner, 2026-10-22: *«asegúrate que el checkbook calcule en función de estos
+    rates»*.
+
+    Había **tres** lugares con la tarifa del mismo tour y ninguno hablaba con
+    los otros:
+
+        pkg_experience_items   San Pedrillo 168 + Caño 174 = 342 / estadía
+        driver_rates.json      tours 342   (semilla FIJA POR HOTEL)
+        package_configs        ACTIVITIES 101 / pax-noche   <- el único que calcula
+
+    El 101 venía del `Budget2026_Revenue_CORCO.xlsx` (Snorkeling $48 + PN Walk
+    $53) y los seis presupuestos 2027 lo heredaron sin que nadie lo revisara,
+    mientras las tarifas de habitación subían 20,9 %. Nada lo señalaba: el P&L
+    cuadraba, la pantalla mostraba 342, y las dos cosas eran ciertas en su
+    propio archivo.
+
+    ## Por qué corre en el RECÁLCULO y no solo al guardar
+
+    Primero lo puse solo en el guardado del paquete. Owner, el mismo día,
+    mirando la pantalla: *«no hay donde guardar acá»* — y tenía razón: el
+    guardado es automático y el botón queda apagado cuando nada cambió. Un
+    escenario cuyo paquete ya estaba escrito no tenía forma de llegar al motor
+    sin hacerle una edición falsa.
+
+    Acá corre en las dos partes, que es la misma regla que ya sigue
+    `sincronizar_ingreso_al_checkbook`: el sub-mayor y el motor quedan iguales
+    al modelo cada vez que el escenario se recalcula, sin depender de que
+    alguien se acuerde de apretar algo.
+
+    ⚠️ **Solo donde el paquete es el insumo.** Un ACTUAL trae su número de un
+    archivo; reescribirle las tarifas no cambia su P&L pero le ensucia los
+    auxiliares, que es exactamente el destrozo invisible que el recálculo ya
+    evita preguntando por el ORIGEN y no por el tipo.
+
+    ⚠️ **Una línea sin tarifa NO se pone en cero.** Si una inclusión se renombra
+    y cae en `sin_casa`, su componente queda intacto. Escribir cero la borraría
+    del presupuesto y el total seguiría viéndose plausible.
+
+    Devuelve qué cambió, para que el recálculo pueda avisarlo: una tarifa que se
+    mueve sola y en silencio es el modo de falla más caro que tiene el sistema.
+    """
+    import uuid as _uuid
+
+    from sqlalchemy import select
+
+    from app.models.package_config import PackageConfig
+    from app.seed_data import semilla
+
+    exps = await experiencias_del_escenario(session, scenario.id)
+    derivado = tarifas_del_paquete(exps)
+    if not derivado.get("disponible"):
+        return []
+    # El «% que no paga» vive en la semilla del hotel, que es donde el checkbook
+    # ya lo tenía. Sin semilla manda el respaldo del módulo.
+    no_paga = ((semilla("driver_rates") or {}).get("tarifas") or {}).get("sust_non_pay")
+    nuevas = a_tarifas_del_motor(derivado, no_paga)
+    if not nuevas:
+        return []
+
+    filas = {r.component: r for r in (await session.execute(
+        select(PackageConfig).where(PackageConfig.scenario_id == scenario.id)
+    )).scalars().all()}
+
+    movidas: list[dict] = []
+    for comp, tarifa in nuevas.items():
+        fila = filas.get(comp)
+        if fila is None:
+            session.add(PackageConfig(
+                id=str(_uuid.uuid4()), scenario_id=scenario.id,
+                hotel_id=scenario.hotel_id, component=comp,
+                rate_per_pax_night=tarifa,
+                # El Sustainability no comisiona: lo paga el huésped en el hotel.
+                is_commissionable=(comp != "SUSTAINABILITY")))
+            movidas.append({"componente": comp, "antes": None,
+                            "despues": float(tarifa)})
+            continue
+        antes = Decimal(str(fila.rate_per_pax_night or 0))
+        if antes != tarifa:
+            fila.rate_per_pax_night = tarifa
+            movidas.append({"componente": comp, "antes": float(antes),
+                            "despues": float(tarifa)})
+    await session.flush()
+    return movidas
+
+
 def tarifas_del_paquete(
     experiencias: list[dict], factor_neto: Decimal | float | None = None,
 ) -> dict:

@@ -3506,81 +3506,19 @@ async def bulk_package_components(
 async def sincronizar_tarifas_del_motor(
     db: AsyncSession, scenario_id: str, hotel_id: str,
 ) -> list[dict]:
-    """Baja las tarifas del paquete a `package_configs`, que es lo que calcula.
+    """Delegada: la regla vive en `app.engine.tarifas_del_paquete`.
 
-    ## El desfase que esto cierra
-
-    Owner, 2026-10-22: *«asegúrate que el checkbook calcule en función de estos
-    rates»*.
-
-    Había **tres** lugares con la tarifa del mismo tour y ninguno hablaba con
-    los otros:
-
-        pkg_experience_items   San Pedrillo 168 + Caño 174 = 342 / estadía
-        driver_rates.json      tours 342  (semilla FIJA POR HOTEL)
-        package_configs        ACTIVITIES 101 / pax-noche   <- el único que calcula
-
-    El 101 venía del `Budget2026_Revenue_CORCO.xlsx` (Snorkeling $48 + PN Walk
-    $53) y los seis presupuestos 2027 lo heredaron sin que nadie lo revisara,
-    mientras las tarifas de habitación subían 20,9 %. El paquete se quedó en el
-    precio del año pasado y nada lo señalaba: el P&L cuadraba, la pantalla de
-    paquetes mostraba 342, y las dos cosas eran ciertas en su propio archivo.
-
-    ## Por qué va en el guardado y no en un botón
-
-    Un botón depende de que alguien se acuerde — y es justo lo que falló con
-    «pasar al checkbook», que dejó el sub-mayor congelado meses. Acá, editar el
-    paquete y que el motor quede distinto deja de ser posible.
-
-    Devuelve qué cambió, para que la pantalla pueda decirlo: una tarifa que se
-    mueve sola y en silencio es el modo de falla más caro que tiene el sistema.
-
-    ⚠️ Si el paquete no da una tarifa (experiencia vacía, inclusión renombrada
-    que cayó en `sin_casa`), **esa línea NO se toca**. Escribir cero la borraría
-    del presupuesto y el total seguiría viéndose plausible.
+    Se quedó acá solo como puerta de entrada del guardado del paquete. El mismo
+    sincronizador corre en el recálculo, porque el guardado de esa pantalla es
+    automático y el botón queda apagado cuando nada cambió — un escenario con
+    el paquete ya escrito no tenía forma de llegar al motor.
     """
-    from app.engine.tarifas_del_paquete import (a_tarifas_del_motor,
-                                                tarifas_del_paquete)
-    from app.models.package_config import PackageConfig
-    from app.seed_data import semilla
+    from types import SimpleNamespace
 
-    cfg = await get_package_components(scenario_id, db)
-    derivado = tarifas_del_paquete(cfg.get("experiences") or [])
-    if not derivado.get("disponible"):
-        return []
-    # El «% que no paga» vive en la semilla del hotel, que es donde el checkbook
-    # ya lo tenía. Si no hay semilla, manda el respaldo del módulo.
-    no_paga = ((semilla("driver_rates") or {}).get("tarifas") or {}).get("sust_non_pay")
-    nuevas = a_tarifas_del_motor(derivado, no_paga)
-    if not nuevas:
-        return []
+    from app.engine.tarifas_del_paquete import (
+        sincronizar_tarifas_del_motor as _sync)
 
-    filas = {r.component: r for r in (await db.execute(
-        select(PackageConfig).where(PackageConfig.scenario_id == scenario_id)
-    )).scalars().all()}
-
-    movidas: list[dict] = []
-    for comp, tarifa in nuevas.items():
-        fila = filas.get(comp)
-        if fila is None:
-            import uuid as _uuid
-            fila = PackageConfig(
-                id=str(_uuid.uuid4()), scenario_id=scenario_id, hotel_id=hotel_id,
-                component=comp, rate_per_pax_night=tarifa,
-                # El Sustainability no comisiona: lo paga el huésped en el hotel.
-                is_commissionable=(comp != "SUSTAINABILITY"))
-            db.add(fila)
-            movidas.append({"componente": comp, "antes": None,
-                            "despues": float(tarifa)})
-            continue
-        antes = Decimal(str(fila.rate_per_pax_night or 0))
-        if antes != tarifa:
-            fila.rate_per_pax_night = tarifa
-            movidas.append({"componente": comp, "antes": float(antes),
-                            "despues": float(tarifa)})
-    await db.flush()
-    return movidas
-
+    return await _sync(db, SimpleNamespace(id=scenario_id, hotel_id=hotel_id))
 
 class RateCardUpdate(BaseModel):
     rack_rate: Decimal

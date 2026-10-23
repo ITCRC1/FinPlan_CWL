@@ -53,6 +53,7 @@ from app.engine.revenue_calculator import calculate_revenue, RevenueResult
 from app.engine.payroll_calculator import (
     recalculate_entry, total_entry, repartir_beneficio,
 )
+from app.engine.tarifas_del_paquete import sincronizar_tarifas_del_motor
 from app.engine.allocation_calculator import (
     calculate_cafeteria_distribution,
     calculate_laundry_distribution,
@@ -1732,6 +1733,17 @@ async def sincronizar_noches(session, scenario, revenue_results,
     return escritos
 
 
+def _describir_tarifa(m: dict) -> str:
+    """«ACTIVITIES 101,00 → 114,00», para el aviso del recálculo.
+
+    El antes y el después van los dos a propósito: una tarifa que se mueve sola
+    y en silencio es el modo de falla más caro que tiene el sistema, porque el
+    total sigue cuadrando y la plata cambia de línea sin que nada chille.
+    """
+    antes = "—" if m["antes"] is None else f"{m['antes']:,.2f}"
+    return f"{m['componente']} {antes} → {m['despues']:,.2f}"
+
+
 async def recalculate_scenario(session, scenario_id: str) -> dict:
     """Recompute payroll → allocations → P&L for a scenario and persist results."""
     scenario = await session.get(Scenario, scenario_id)
@@ -1801,6 +1813,21 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     await session.flush()
 
     alloc_entries = await _recalc_allocations(session, scenario, avisos, cerrados)
+    await session.flush()
+
+    # Las tarifas del paquete bajan al motor ANTES de calcular el ingreso: es lo
+    # que `calculate_revenue` lee de `package_configs`.
+    #
+    # Corre acá y no solo al guardar el paquete. Owner, 2026-10-22, mirando esa
+    # pantalla: *«no hay dónde guardar acá»* — el guardado es automático y el
+    # botón queda apagado cuando nada cambió, así que un escenario con el
+    # paquete ya escrito no tenía forma de llegar al motor sin hacerle una
+    # edición falsa. Misma regla que `sincronizar_ingreso_al_checkbook`.
+    tarifas_movidas = await sincronizar_tarifas_del_motor(session, scenario)
+    if tarifas_movidas:
+        avisos.append(
+            "Tarifas del paquete bajadas al motor: "
+            + ", ".join(_describir_tarifa(m) for m in tarifas_movidas) + ".")
     await session.flush()
 
     revenue_results = await load_revenue_results(session, scenario)

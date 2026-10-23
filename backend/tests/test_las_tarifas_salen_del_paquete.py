@@ -284,3 +284,63 @@ def test_las_noches_de_la_experiencia_mandan_la_conversion():
     vip = {**CLASSIC, "name": "VIP", "nights": 4, "days": 5}
     m = a_tarifas_del_motor(tarifas_del_paquete([vip], NF), 10)
     assert m["ACTIVITIES"] == Decimal("85.5000")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# El sincronizador corre en el RECÁLCULO, no solo al guardar el paquete.
+#
+# Owner, 2026-10-22, mirando la pantalla de Package Components: *«no hay dónde
+# guardar acá»*. Y tenía razón: el guardado es automático y el botón queda
+# apagado cuando nada cambió. Puesto solo en el guardado, un escenario cuyo
+# paquete YA estaba escrito —los seis presupuestos 2027— no tenía forma de
+# llegar al motor sin hacerle una edición falsa.
+# ═══════════════════════════════════════════════════════════════════════════
+import inspect  # noqa: E402
+
+from app.engine import recalculate as _rec  # noqa: E402
+from app.engine.tarifas_del_paquete import (  # noqa: E402
+    sincronizar_tarifas_del_motor)
+
+
+def test_el_RECALCULO_baja_las_tarifas_al_motor():
+    """Sin esto, el paquete y el motor solo coinciden si alguien edita algo."""
+    fuente = inspect.getsource(_rec.recalculate_scenario)
+    assert "sincronizar_tarifas_del_motor" in fuente, (
+        "el recálculo tiene que bajar las tarifas del paquete al motor; "
+        "dejarlo solo en el guardado deja fuera a todo escenario ya escrito")
+
+
+def test_baja_las_tarifas_ANTES_de_calcular_el_ingreso():
+    """El orden es la mitad del arreglo.
+
+    `calculate_revenue` lee `package_configs`. Si la sincronización corriera
+    después, el recálculo calcularía con las tarifas VIEJAS y escribiría las
+    nuevas: la pantalla mostraría las nuevas y el P&L el número de las
+    anteriores, y haría falta recalcular dos veces para que cuadraran — sin que
+    nada dijera por qué.
+    """
+    fuente = inspect.getsource(_rec.recalculate_scenario)
+    assert (fuente.index("sincronizar_tarifas_del_motor")
+            < fuente.index("load_revenue_results")), (
+        "la sincronización va ANTES de leer el ingreso")
+
+
+def test_el_aviso_dice_el_ANTES_y_el_DESPUES():
+    """Una tarifa que se mueve sola y en silencio es el modo de falla más caro
+    que tiene el sistema: el total sigue cuadrando y la plata cambia de línea."""
+    texto = _rec._describir_tarifa(
+        {"componente": "ACTIVITIES", "antes": 101.0, "despues": 114.0})
+    assert "101" in texto and "114" in texto and "ACTIVITIES" in texto
+    nueva = _rec._describir_tarifa(
+        {"componente": "FOOD", "antes": None, "despues": 126.0})
+    assert "—" in nueva and "126" in nueva
+
+
+def test_un_escenario_SIN_paquete_no_escribe_nada():
+    """⚠️ El endpoint sugiere una plantilla para que la pantalla no salga en
+    blanco. Si el sincronizador cayera a esa misma semilla, una SUGERENCIA se
+    escribiría sola en el motor de un escenario que nunca la pidió."""
+    fuente = inspect.getsource(sincronizar_tarifas_del_motor)
+    assert "experiencias_del_escenario" in fuente, (
+        "tiene que leer la BD, no el endpoint que cae a la semilla")
+    assert 'if not derivado.get("disponible"):' in fuente
