@@ -2152,7 +2152,6 @@
     "subtitulo": "{hotel} · Monthly owners report · USD"
   },
   "users": {
-    "resetPass": "Reset password",
     "minChars": "at least 8 characters",
     "actions": "Actions",
     "activate": "Activate",
@@ -2167,18 +2166,21 @@
     "done": "Done",
     "emailPlaceholder": "name@cwl.com",
     "forbidden": "Only an administrator can view/create users.",
-    "handoffNote": "Send it through a private channel and ask them to change it when they log in. <b>It cannot be seen again</b> — the server only stores the hash. If it gets lost, generate another one from 🔑.",
     "inactive": "Inactive",
     "intro": "The team that builds the budget. <b>Admin</b> coordinates and approves; <b>collaborator</b> fills in their sections.",
     "namePlaceholder": "Name",
     "newUser": "+ New user",
-    "passwordFor": "✓ Password for {email}",
-    "passwordNote": "The password is generated automatically and shown once, so you can hand it over.",
-    "resetConfirm": "Generate a new password for {email}?\n\nThe previous one stops working immediately. The new one is shown only once.",
+    "passwordNote": "No password needed: they will get a link to set their own.",
     "role": "Role",
     "title": "Users",
     "updated": "✓ User updated",
-    "you": " (you)"
+    "you": " (you)",
+    "invite": "Invite",
+    "invited": "Invited",
+    "inviteConfirm": "Send {email} a new invitation? They will set their own password. The one they use today keeps working until they do.",
+    "inviteFor": "✓ Invitation for {email}",
+    "inviteNote": "Send it through a private channel. The link <b>expires in {dias} days</b> and works <b>only once</b>. The person types their own password: the server never sees it. If it gets lost, generate another from “Invite”.",
+    "inviteReemplazo": "The invitation they had pending was cancelled."
   },
   "board": {
     "title": "Budget Board",
@@ -5284,5 +5286,21 @@
       "limites": "Limits of the analysis"
     }
   },
-  "planningReport": "Planning Report (12 months · year)"
+  "planningReport": "Planning Report (12 months · year)",
+  "invitacion": {
+    "appName": "FinPlan {hotel}",
+    "introAlta": "You have been given access. Set the password you will log in with:",
+    "introCambio": "Set a new password for your account:",
+    "clave": "Password",
+    "repetir": "Repeat it",
+    "verClave": "Show what I type",
+    "minimo": "At least {n} characters.",
+    "noCoinciden": "They do not match.",
+    "corta": "The password must be at least {n} characters.",
+    "guardar": "Save and sign in",
+    "invalidaTitulo": "This link no longer works.",
+    "invalidaDetalle": "It may already have been used, it may have expired, or a newer one may have been sent. Ask whoever gave you access for another.",
+    "irALogin": "Go to sign in",
+    "privacidad": "Your password does not leave this browser until you submit it, and the system stores only a fingerprint of it — not even the administrator can see it."
+  }
 }

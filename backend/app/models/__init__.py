@@ -1,4 +1,5 @@
 from app.models.account import Account
+from app.models.invitacion import InvitacionUsuario
 from app.models.user import User
 from app.models.section_assignment import SectionAssignment
 from app.models.annotation import Annotation
@@ -78,7 +79,7 @@ from app.models.department_catalog import DepartmentCatalog
 
 __all__ = [
     "DepartmentCatalog",
-    "Account", "PayrollAccount", "User", "SectionAssignment", "Annotation",
+    "Account", "PayrollAccount", "User", "InvitacionUsuario", "SectionAssignment", "Annotation",
     "Hotel", "Scenario", "ScenarioLockedError",
     "ExchangeRate", "get_tc_for_month",
     "RoomTypeConfig", "CWL_ROOM_TYPES",

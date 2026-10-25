@@ -425,6 +425,15 @@ MENSAJES: dict[str, dict[str, str]] = {
     "usuario.email_duplicado": {
         "es": "Ya existe un usuario con ese email",
         "en": "A user with that email already exists"},
+    "usuario.inactivo": {
+        "es": "Esa cuenta está desactivada: actívela antes de invitarla",
+        "en": "That account is deactivated: reactivate it before inviting"},
+    # ⚠️ UN solo mensaje para «no existe», «ya se usó» y «venció». Distinguirlos
+    # le diría a quien prueba tokens al azar cuál acertó a medias. Quien tiene
+    # el enlace de verdad no necesita el detalle: necesita otro enlace.
+    "invitacion.no_valida": {
+        "es": "Este enlace ya no sirve. Pídale otro a quien le dio el acceso",
+        "en": "This link no longer works. Ask whoever gave you access for another"},
     "usuario.rol_invalido": {
         "es": "role debe ser uno de {roles}",
         "en": "role must be one of {roles}"},

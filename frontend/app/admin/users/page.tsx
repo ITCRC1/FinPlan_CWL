@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { listUsers, createUser, updateUser, getStoredUser, type AuthUser } from "@/lib/api";
+import { listUsers, createUser, updateUser, invitarDeNuevo, getStoredUser,
+         type AuthUser, type Invitacion } from "@/lib/api";
 
 const btn = (enabled: boolean): React.CSSProperties => ({
   padding: "8px 16px", fontSize: 13, borderRadius: 5, fontWeight: 600, border: "none",
@@ -11,20 +12,30 @@ const btn = (enabled: boolean): React.CSSProperties => ({
 });
 
 /**
- * Contraseña inicial, generada acá y no digitada por nadie.
+ * ⚠️ **Acá ya no se genera ninguna contraseña.**
  *
- * Antes el admin la escribía en un campo `type="text"`: quedaba a la vista de
- * quien estuviera al lado y terminaba siendo la misma para todo el equipo.
+ * Owner, 2026-10-25: *«yo mando la invitación y ellos generan sus claves»*.
  *
- * Sin `I`/`l`/`1`/`O`/`0` — esta clave se dicta o se copia a mano, y esos
- * caracteres se confunden entre sí. `crypto.getRandomValues` y no `Math.random`,
- * que es predecible.
+ * Antes esta pantalla generaba la clave, la mostraba una vez y el admin la
+ * mandaba «por un canal privado». Funcionaba, pero la contraseña quedaba FUERA
+ * de la cabeza de su dueño: en el portapapeles, en el chat del que la mandó y
+ * en el del que la recibió, y nadie la borra. El propio texto lo delataba —
+ * *«pídale que la cambie cuando entre»*: un paso que depende de que la persona
+ * se acuerde.
+ *
+ * Ahora lo que se entrega es un enlace de un solo uso que vence a los 7 días.
+ * La clave la escribe su dueño y el servidor nunca la ve.
  */
-function generarClave(largo = 14): string {
-  const abc = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const bytes = new Uint32Array(largo);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => abc[b % abc.length]).join("");
+
+/** El enlace listo para mandar.
+ *
+ * El backend devuelve la URL absoluta si tiene `APP_URL`; si no, devuelve sólo
+ * la ruta. ⚠️ Completarla acá con `window.location.origin` y no inventar un
+ * dominio: adivinarlo sería mandarle a la gente un enlace que no abre.
+ */
+function enlaceCompleto(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return typeof window === "undefined" ? url : window.location.origin + url;
 }
 
 export default function UsersPage() {
@@ -41,9 +52,9 @@ export default function UsersPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("collaborator");
   const [busy, setBusy] = useState(false);
-  // Contraseña recién generada, para entregársela a la persona. Se muestra UNA
-  // vez y no se puede volver a ver: en el servidor solo queda el hash.
-  const [entrega, setEntrega] = useState<{ email: string; pw: string } | null>(null);
+  // La invitación recién emitida, para que el admin la copie y la mande. El
+  // token viaja una sola vez: en el servidor queda su hash.
+  const [entrega, setEntrega] = useState<{ email: string; inv: Invitacion } | null>(null);
   const [copiado, setCopiado] = useState(false);
 
   const load = useCallback(async () => {
@@ -62,9 +73,8 @@ export default function UsersPage() {
     const correo = email.trim().toLowerCase();
     setBusy(true); setError(null); setMsg(null); setEntrega(null); setCopiado(false);
     try {
-      const pw = generarClave();
-      await createUser(correo, pw, name, role);
-      setEntrega({ email: correo, pw });
+      const r = await createUser(correo, name, role);
+      setEntrega({ email: correo, inv: r.invitacion });
       setName(""); setEmail(""); setRole("collaborator");
       setShowForm(false);
       await load();
@@ -78,13 +88,19 @@ export default function UsersPage() {
     try { await updateUser(id, p); await load(); setMsg(t("updated")); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : tc("error")); }
   }
-  async function resetPass(u: AuthUser) {
-    if (!window.confirm(t("resetConfirm", { email: u.email }))) return;
-    const pw = generarClave();
+  /** Emite una invitación nueva.
+   *
+   * ⚠️ **No le quita la clave que ya usa.** Owner, 2026-10-25, sobre Blake:
+   * *«deja que entre con ambos métodos… acaba de enviar la clave»*. La persona
+   * sigue entrando con la que tiene hasta que canjee el enlace — invitar no
+   * puede dejar afuera a alguien que ya estaba adentro.
+   */
+  async function reinvitar(u: AuthUser) {
+    if (!window.confirm(t("inviteConfirm", { email: u.email }))) return;
     setError(null); setMsg(null); setEntrega(null); setCopiado(false);
     try {
-      await updateUser(u.id, { password: pw });
-      setEntrega({ email: u.email, pw });
+      const r = await invitarDeNuevo(u.id);
+      setEntrega({ email: u.email, inv: r.invitacion });
       await load();
     } catch (e: unknown) { setError(e instanceof Error ? e.message : tc("error")); }
   }
@@ -145,18 +161,21 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Entrega de la contraseña. Se ve una sola vez: en el servidor solo queda
-          el hash, así que no hay forma de volver a mostrarla — solo generar otra. */}
+      {/* El enlace que el admin copia y manda.
+        *
+        * ⚠️ Se ve UNA vez: el servidor guarda el hash del token, igual que con
+        * las contraseñas. Si se pierde, se emite otro — y emitirlo anula el
+        * anterior, que sigue vivo en algún chat. */}
       {entrega && (
         <div style={{ border: "1px solid var(--positive)", borderRadius: 8, padding: 16, marginBottom: 20, background: "rgba(26,127,75,0.08)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--positive)", marginBottom: 8 }}>
-            {t("passwordFor", { email: entrega.email })}
+            {t("inviteFor", { email: entrega.email })}
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <code className="mono" style={{ fontSize: 18, letterSpacing: 1.5, padding: "8px 14px", borderRadius: 6, background: "var(--bg-input)", border: "1px solid var(--border-medium)", color: "var(--text-primary)", userSelect: "all" }}>
-              {entrega.pw}
+            <code className="mono" style={{ fontSize: 12.5, padding: "9px 12px", borderRadius: 6, background: "var(--bg-input)", border: "1px solid var(--border-medium)", color: "var(--text-primary)", userSelect: "all", wordBreak: "break-all", flex: 1, minWidth: 320 }}>
+              {enlaceCompleto(entrega.inv.url)}
             </code>
-            <button onClick={() => { navigator.clipboard?.writeText(entrega.pw); setCopiado(true); }}
+            <button onClick={() => { navigator.clipboard?.writeText(enlaceCompleto(entrega.inv.url)); setCopiado(true); }}
               style={{ ...btn(true), background: "transparent", color: "var(--positive)", border: "1px solid var(--positive)" }}>
               {copiado ? t("copied") : t("copy")}
             </button>
@@ -166,7 +185,11 @@ export default function UsersPage() {
             </button>
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 10, lineHeight: 1.5 }}>
-            {t.rich("handoffNote", { b: (c: React.ReactNode) => <b>{c}</b> })}
+            {t.rich("inviteNote", { dias: entrega.inv.dias,
+                                    b: (c: React.ReactNode) => <b>{c}</b> })}
+            {entrega.inv.reemplazo > 0 && (
+              <> {t("inviteReemplazo", { n: entrega.inv.reemplazo })}</>
+            )}
           </div>
         </div>
       )}
@@ -203,7 +226,7 @@ export default function UsersPage() {
                       </select>
                       <button onClick={() => patch(u.id, { active: !u.active })} disabled={self}
                         style={{ ...editBtn, opacity: self ? 0.4 : 1 }}>{u.active ? t("deactivate") : t("activate")}</button>
-                      <button onClick={() => resetPass(u)} style={editBtn}>{t("resetPass")}</button>
+                      <button onClick={() => reinvitar(u)} style={editBtn}>{t("invite")}</button>
                     </div>
                   </td>
                 )}

@@ -320,10 +320,52 @@ export async function setHotelIdentidad(
 export async function listUsers(): Promise<AuthUser[]> {
   return api.get<AuthUser[]>(`/auth/users`);
 }
+/** El enlace de un solo uso con el que la persona se pone SU clave. */
+export interface Invitacion {
+  /** Lo que el admin copia y manda. Puede venir relativo si el backend no
+   *  tiene `APP_URL`; la pantalla lo completa con su propio origen. */
+  url: string;
+  vence: string;
+  dias: number;
+  /** Cuántas invitaciones anteriores quedaron anuladas al emitir ésta. */
+  reemplazo: number;
+}
+export type UsuarioConInvitacion = AuthUser & { invitacion: Invitacion };
+
+/** Crea el usuario SIN contraseña y devuelve su invitación.
+ *
+ * Owner, 2026-10-25: *«yo mando la invitación y ellos generan sus claves»*.
+ * La cuenta nace sin clave utilizable: no se puede entrar con ella hasta que
+ * su dueño canjee el enlace. */
 export async function createUser(
-  email: string, password: string, name: string, role: string,
+  email: string, name: string, role: string,
+): Promise<UsuarioConInvitacion> {
+  return api.post<UsuarioConInvitacion>(`/auth/users`, { email, name, role });
+}
+
+/** Emite una invitación nueva para alguien que ya existe.
+ *
+ * ⚠️ **No le quita la clave que ya usa.** Owner, sobre Blake: *«deja que entre
+ * con ambos métodos»*. Sólo canjear el enlace la reemplaza. */
+export async function invitarDeNuevo(userId: string): Promise<UsuarioConInvitacion> {
+  return api.post<UsuarioConInvitacion>(`/auth/users/${userId}/invitacion`, {});
+}
+
+/** ¿Sirve este enlace? Público: lo usa quien todavía no tiene sesión. */
+export interface InvitacionAbierta {
+  email: string; name: string; es_alta: boolean; largo_minimo: number;
+}
+export async function verInvitacion(token: string): Promise<InvitacionAbierta> {
+  return api.get<InvitacionAbierta>(`/auth/invitacion/${token}`);
+}
+
+/** La persona pone su clave y queda adentro. */
+export async function canjearInvitacion(
+  token: string, password: string,
 ): Promise<AuthUser> {
-  return api.post<AuthUser>(`/auth/users`, { email, password, name, role });
+  const r = await api.post<SessionResponse>(`/auth/invitacion/${token}`, { password });
+  persistSession(r.token, r.user, r.locale, r.tema);
+  return r.user;
 }
 export async function updateUser(
   userId: string,
