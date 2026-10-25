@@ -2344,7 +2344,10 @@
     "copiando": "copying…",
     "copiarTitle": "Pulls the closed months from this year's Actual. Later months —your projection— are left alone.",
     "copiarConfirmar": "Pull the closed months from the Actual into «{scn}».\n\nIt replaces the closed months this scenario already has. Later months, which are your projection, are NOT touched.\n\nContinue?",
-    "copiarListo": "✓ Pulled {n} rows from «{desde}», January through {hasta}."
+    "copiarListo": "✓ Pulled {n} rows from «{desde}», January through {hasta}.",
+    "reportePdf": "PDF Report",
+    "reportePdfTitle": "Opens the two-page report (dashboard + monthly detail with months in columns) for the selected month and sends it to print. Save it as PDF from the browser dialog.",
+    "popupBloqueado": "The browser blocked the report window. Allow pop-ups for this site and try again."
   },
   "bsProj": {
     "lastRealBalance": "last actual balance uploaded",

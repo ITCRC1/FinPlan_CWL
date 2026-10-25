@@ -11,6 +11,7 @@ import {
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
+import { htmlReporteRoomStats } from "@/lib/reporteRoomStats";
 
 type EntryRow = { room_type_name: string; units: number; nights_available: number; no: string; pax: string; rev: string };
 const ENTRY_COLS: ("no"|"pax"|"rev")[] = ["no", "pax", "rev"];
@@ -30,6 +31,35 @@ const int = (v: number) => Math.round(v).toLocaleString("en-US");
 // Paleta navy/gold (como la referencia ejecutiva)
 const PALETTE = ["#C8A24A", "#1F3A6E", "#6E86B8", "#34508A", "#9FB2D0", "#E7DBBE", "#4A6298", "#B9863A"];
 
+/**
+ * El último mes que tiene estadística cargada.
+ *
+ * **El pedido (owner, 2026-10-25):** *«deja esto para que siempre esté el mes
+ * último que tiene actuales»*.
+ *
+ * El corte arrancaba en un `useState(5)` — mayo, escrito a mano. Nunca se
+ * movió: en octubre, con actuales hasta setiembre, la pantalla abría mostrando
+ * el YTD a mayo y el reporte salía con cuatro meses de menos. Y no se ve: el
+ * cuadro es correcto, sólo que de otro corte, así que hay que mirar el rótulo
+ * para darse cuenta.
+ *
+ * ⚠️ **Cuenta como «con dato» el ingreso o las noches ocupadas, no las
+ * disponibles.** Las disponibles existen los doce meses aunque no se haya
+ * cargado nada —son unidades × días—, así que mirarlas devolvería diciembre
+ * siempre.
+ *
+ * Si no hay ningún mes con movimiento (escenario recién creado) vale enero:
+ * una pantalla vacía es la verdad, y es mejor que inventar un corte.
+ */
+function ultimoMesConDato(d: RevenueByRoomType): number {
+  let ult = 1;
+  for (const mo of d.months) {
+    const vivo = mo.rows.some(r => r.revenue !== 0 || r.nights_occupied !== 0);
+    if (vivo && mo.month > ult) ult = mo.month;
+  }
+  return ult;
+}
+
 export default function OperationRoomStatsPage() {
   const tc = useTranslations("common");
   const t = useTranslations("roomStats");
@@ -40,7 +70,9 @@ export default function OperationRoomStatsPage() {
   // la pantalla se acuerda de cual se estaba trabajando.
   const [rsId, setRsId] = useEscenarioDe("operation-insight/room-stats:budget", scenarios, "budget", undefined, true);
   const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(5);
+  // El corte YTD. Arranca en el ÚLTIMO mes que tiene dato cargado — ver
+  // `ultimoMesConDato`, donde está el porqué.
+  const [month, setMonth] = useState(1);
   const [rs, setRs] = useState<RevenueByRoomType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +200,10 @@ export default function OperationRoomStatsPage() {
   useEffect(() => {
     if (!rsId) { setRs(null); return; }
     setLoading(true);
-    getRevenueByRoomType(rsId).then(d => { setRs(d); setYear(d.year); }).catch(e => setError(e instanceof Error ? e.message : "Error")).finally(() => setLoading(false));
+    getRevenueByRoomType(rsId)
+      .then(d => { setRs(d); setYear(d.year); setMonth(ultimoMesConDato(d)); })
+      .catch(e => setError(e instanceof Error ? e.message : "Error"))
+      .finally(() => setLoading(false));
   }, [rsId]);
 
   // `acc` incluye "Other Rooms Revenue" (units=0, ingreso sin tipo asociado —
@@ -216,6 +251,41 @@ export default function OperationRoomStatsPage() {
           : t("insightOtro", { name: topRev.room_type_name, pct: (topRev.pct_of_total*100).toFixed(1) }))
       + t("insightOcc", { name: topOcc.room_type_name, occ: (topOcc.occupancy_pct*100).toFixed(1), total: (occTotal*100).toFixed(1) });
   }, [rows, occTotal, t]);
+
+  // ── El reporte en PDF, dos páginas ────────────────────────────────────────
+  //
+  // Owner, 2026-10-25: *«mete este reporte como un reporte frecuente… para que
+  // el reporte se genere según lo que diga el mes escogido… que sea en PDF y
+  // en 2 páginas»*.
+  //
+  // Se abre en una ventana aparte y se manda a imprimir: el PDF lo hace el
+  // navegador, que es el mismo motor que dibuja esta pantalla. Sin librerías
+  // nuevas y sin un renderizador en el servidor que habría que mantener al
+  // día con el diseño.
+  //
+  // ⚠️ Se le pasan los totales YA CALCULADOS (`tot`, `occTotal`, `adrTotal`,
+  // `insight`, `otherRevenue`). Si el reporte los rehiciera, sería una segunda
+  // fuente del mismo número y el día que una de las dos cambie nadie se entera
+  // hasta que alguien compare el PDF con la pantalla.
+  function abrirReportePdf() {
+    setUploadMsg(null);
+    if (!rs || !rows.length) { setUploadMsg(`Error: ${t("noRowsExport")}`); return; }
+    const esc = scenarios.find(x => x.id === rsId);
+    const html = htmlReporteRoomStats({
+      filas: rows, meses: rs.months, mes: month, year,
+      escenario: esc ? scnLabel(esc) : "",
+      total: tot, occTotal, adrTotal, insight, otherRevenue,
+    });
+    // `noopener` deja la ventana sin `window.opener`: si algún día un nombre de
+    // categoría trajera algo raro, no tiene desde dónde tocar esta pestaña.
+    const w = window.open("", "_blank", "noopener,width=1100,height=800");
+    if (!w) { setUploadMsg(`Error: ${t("popupBloqueado")}`); return; }
+    w.document.write(html);
+    w.document.close();
+    // El print va cuando el documento terminó de armarse; dispararlo antes
+    // imprime una hoja a medio dibujar.
+    w.onload = () => { w.focus(); w.print(); };
+  }
 
   // ── Bajar a Excel ──────────────────────────────────────────────────────────
   // El mismo cuadro que está en pantalla, con el escenario y el corte YTD que el
@@ -376,6 +446,12 @@ export default function OperationRoomStatsPage() {
           {/* El detalle mes a mes, una hoja por métrica. El de al lado baja el
               YTD acumulado; éste, de enero al corte. */}
           <button onClick={bajarExcelPorMes} title={t("bajarPorMesTitle")} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "var(--positive)", color: "#fff", border: "1px solid var(--positive)", alignSelf: "flex-end" }}>⬇ {t("bajarPorMes")}</button>
+          <button onClick={abrirReportePdf} title={t("reportePdfTitle")}
+                  style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5,
+                           cursor: "pointer", background: "#8B2E5F", color: "#fff",
+                           border: "1px solid #8B2E5F", alignSelf: "flex-end" }}>
+            📄 {t("reportePdf")}
+          </button>
           <button onClick={() => window.print()} style={{ padding: "7px 14px", fontSize: 12, fontWeight: 700, borderRadius: 5, cursor: "pointer", background: "var(--brand)", color: "#fff", border: "1px solid var(--brand)", alignSelf: "flex-end" }}>{tc("print")}</button>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase" }}>{tc("scenario")}</span>

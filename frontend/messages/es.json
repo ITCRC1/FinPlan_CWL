@@ -2344,7 +2344,10 @@
     "copiando": "copiando…",
     "copiarTitle": "Trae del Actual del mismo año los meses ya cerrados. Los meses posteriores —su proyección— no se tocan.",
     "copiarConfirmar": "Traer del Actual los meses ya cerrados a «{scn}».\n\nReemplaza los meses cerrados que este escenario ya tenga. Los posteriores, que son su proyección, NO se tocan.\n\n¿Seguir?",
-    "copiarListo": "✓ Traídas {n} filas de «{desde}», de enero a {hasta}."
+    "copiarListo": "✓ Traídas {n} filas de «{desde}», de enero a {hasta}.",
+    "reportePdf": "Reporte PDF",
+    "reportePdfTitle": "Abre el reporte de dos páginas (tablero + detalle mensual con los meses en columnas) para el mes elegido, y lo manda a imprimir. Guárdelo como PDF desde el diálogo del navegador.",
+    "popupBloqueado": "El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes de este sitio y vuelva a intentar."
   },
   "bsProj": {
     "lastRealBalance": "último balance real subido",
