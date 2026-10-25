@@ -276,15 +276,38 @@ export default function OperationRoomStatsPage() {
       escenario: esc ? scnLabel(esc) : "",
       total: tot, occTotal, adrTotal, insight, otherRevenue,
     });
-    // `noopener` deja la ventana sin `window.opener`: si algún día un nombre de
-    // categoría trajera algo raro, no tiene desde dónde tocar esta pestaña.
-    const w = window.open("", "_blank", "noopener,width=1100,height=800");
-    if (!w) { setUploadMsg(`Error: ${t("popupBloqueado")}`); return; }
-    w.document.write(html);
-    w.document.close();
-    // El print va cuando el documento terminó de armarse; dispararlo antes
-    // imprime una hoja a medio dibujar.
-    w.onload = () => { w.focus(); w.print(); };
+    // ⚠️ **Un iframe oculto, no una ventana nueva.**
+    //
+    // La primera versión usaba `window.open`. Owner, 2026-10-25, con el aviso
+    // rojo en pantalla: *«no está bajando»* — el navegador bloqueó la ventana.
+    // Y el aviso que yo había puesto («permita las ventanas emergentes»)
+    // resolvía el síntoma pidiéndole al usuario que bajara una defensa del
+    // navegador para usar un botón de su propio sistema. El enfoque era el
+    // malo, no el mensaje.
+    //
+    // Un iframe mismo-origen no se bloquea, y `contentWindow.print()` imprime
+    // SÓLO su contenido — que es justo lo que se quiere: el reporte, no la
+    // pantalla que está detrás.
+    const marco = document.createElement("iframe");
+    marco.setAttribute("aria-hidden", "true");
+    marco.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    // `srcdoc` mantiene el documento en el mismo origen; sin eso
+    // `contentWindow` no se deja tocar.
+    marco.srcdoc = html;
+    marco.onload = () => {
+      const v = marco.contentWindow;
+      if (!v) { setUploadMsg(`Error: ${t("reporteFallo")}`); marco.remove(); return; }
+      v.focus();
+      v.print();
+      // Se saca después de imprimir. `afterprint` no llega en todos los
+      // navegadores —y si no llega, el iframe queda vivo para siempre— así que
+      // el temporizador es la red, no el camino principal.
+      const limpiar = () => { if (marco.parentNode) marco.remove(); };
+      v.addEventListener("afterprint", limpiar);
+      window.setTimeout(limpiar, 60_000);
+    };
+    document.body.appendChild(marco);
   }
 
   // ── Bajar a Excel ──────────────────────────────────────────────────────────

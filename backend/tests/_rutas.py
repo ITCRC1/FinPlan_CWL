@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Dónde está cada cosa, calculado desde el repo.
+r"""Dónde está cada cosa, calculado desde el repo.
 
 **Por qué existe (2026-08-14).** Once archivos de prueba tenían la ruta
 `C:\FinPlan_CWL` escrita a mano. En esta máquina funcionan; en cualquier otra

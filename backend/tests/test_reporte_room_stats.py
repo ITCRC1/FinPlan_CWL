@@ -122,23 +122,49 @@ def test_lo_que_viene_del_DATO_se_escapa(rep):
             f"{campo} sale sin escapar")
 
 
-def test_la_ventana_del_reporte_va_sin_opener(pag):
-    """`noopener`: la ventana nueva no puede tocar esta pestaña."""
-    cuerpo = pag[pag.index("function abrirReportePdf"):][:1800]
-    assert "noopener" in cuerpo
+def test_el_reporte_NO_usa_una_ventana_emergente(pag):
+    """⚠️ El defecto que esto cierra, y por qué el primer arreglo era peor.
+
+    La primera versión usaba `window.open`. El navegador la bloqueó y el botón
+    no hizo nada. Yo había puesto un aviso —«permita las ventanas emergentes»—
+    y eso es resolver el síntoma pidiéndole al usuario que baje una defensa del
+    navegador para usar un botón de su propio sistema. El enfoque era el malo,
+    no el mensaje.
+    """
+    codigo = sin_comentarios(pag)
+    assert "window.open" not in codigo, (
+        "una ventana emergente la bloquea el navegador; el reporte va en un "
+        "iframe mismo-origen, que no se bloquea")
 
 
-def test_el_print_espera_a_que_el_documento_este(pag):
+def test_imprime_SOLO_el_reporte(pag):
+    """`contentWindow.print()` imprime el contenido del iframe, no la pantalla
+    que está detrás. Llamar a `window.print()` a secas sacaría el tablero de la
+    app con su menú y sus botones."""
+    codigo = sin_comentarios(pag)
+    cuerpo = codigo[codigo.index("function abrirReportePdf"):][:2200]
+    assert "marco.srcdoc = html" in cuerpo, (
+        "`srcdoc` deja el documento en el mismo origen; sin eso "
+        "`contentWindow` no se deja tocar")
+    assert "v.print()" in cuerpo
+    assert "window.print()" not in cuerpo
+
+
+def test_el_print_espera_a_que_el_documento_cargue(pag):
     """Dispararlo antes imprime una hoja a medio dibujar."""
-    cuerpo = pag[pag.index("function abrirReportePdf"):][:1800]
-    assert "w.onload" in cuerpo
-    assert cuerpo.index("w.document.close()") < cuerpo.index("w.print()")
+    cuerpo = sin_comentarios(pag)
+    cuerpo = cuerpo[cuerpo.index("function abrirReportePdf"):][:2200]
+    assert "marco.onload" in cuerpo
+    assert cuerpo.index("marco.onload") < cuerpo.index("v.print()")
 
 
-def test_avisa_si_el_navegador_bloquea_la_ventana(pag):
-    """Sin esto el botón no hace nada visible y parece roto."""
-    cuerpo = pag[pag.index("function abrirReportePdf"):][:1800]
-    assert "popupBloqueado" in cuerpo
+def test_el_iframe_se_retira(pag):
+    """Uno por reporte, y se quedan. ⚠️ `afterprint` no llega en todos los
+    navegadores, así que el temporizador es la red — no el camino principal."""
+    cuerpo = sin_comentarios(pag)
+    cuerpo = cuerpo[cuerpo.index("function abrirReportePdf"):][:2200]
+    assert "afterprint" in cuerpo
+    assert "setTimeout(limpiar" in cuerpo
 
 
 @pytest.mark.parametrize("archivo", ["es.json", "en.json"])
@@ -146,6 +172,6 @@ def test_los_rotulos_estan_en_los_dos_idiomas(archivo):
     import json
     d = json.loads((FRONT / "messages" / archivo).read_text(encoding="utf-8"))
     rs = d["roomStats"]
-    for k in ("reportePdf", "reportePdfTitle", "popupBloqueado"):
+    for k in ("reportePdf", "reportePdfTitle", "reporteFallo"):
         assert k in rs, f"{archivo}: falta roomStats.{k}"
         assert rs[k].strip(), f"{archivo}: roomStats.{k} vacío"

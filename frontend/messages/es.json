@@ -2347,7 +2347,7 @@
     "copiarListo": "✓ Traídas {n} filas de «{desde}», de enero a {hasta}.",
     "reportePdf": "Reporte PDF",
     "reportePdfTitle": "Abre el reporte de dos páginas (tablero + detalle mensual con los meses en columnas) para el mes elegido, y lo manda a imprimir. Guárdelo como PDF desde el diálogo del navegador.",
-    "popupBloqueado": "El navegador bloqueó la ventana del reporte. Permita las ventanas emergentes de este sitio y vuelva a intentar."
+    "reporteFallo": "No se pudo preparar el reporte. Vuelva a intentar; si sigue, use el botón Imprimir."
   },
   "bsProj": {
     "lastRealBalance": "último balance real subido",

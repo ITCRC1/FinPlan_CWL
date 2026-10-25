@@ -2347,7 +2347,7 @@
     "copiarListo": "✓ Pulled {n} rows from «{desde}», January through {hasta}.",
     "reportePdf": "PDF Report",
     "reportePdfTitle": "Opens the two-page report (dashboard + monthly detail with months in columns) for the selected month and sends it to print. Save it as PDF from the browser dialog.",
-    "popupBloqueado": "The browser blocked the report window. Allow pop-ups for this site and try again."
+    "reporteFallo": "Could not prepare the report. Try again; if it persists, use the Print button."
   },
   "bsProj": {
     "lastRealBalance": "last actual balance uploaded",
