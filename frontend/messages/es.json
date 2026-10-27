@@ -2349,7 +2349,9 @@
     "copiarListo": "✓ Traídas {n} filas de «{desde}», de enero a {hasta}.",
     "reportePdf": "Reporte PDF",
     "reportePdfTitle": "Abre el reporte de dos páginas (tablero + detalle mensual con los meses en columnas) para el mes elegido, y lo manda a imprimir. Guárdelo como PDF desde el diálogo del navegador.",
-    "reporteFallo": "No se pudo preparar el reporte. Vuelva a intentar; si sigue, use el botón Imprimir."
+    "reporteFallo": "No se pudo preparar el reporte. Vuelva a intentar; si sigue, use el botón Imprimir.",
+    "acumTitulo": "Acumulado YTD mes a mes",
+    "acumNota": "Cada columna es el acumulado desde enero hasta ese mes. La ocupación y el ADR NO son el promedio de los meses: son las noches acumuladas sobre las disponibles acumuladas, y el ingreso acumulado sobre las noches acumuladas."
   },
   "bsProj": {
     "lastRealBalance": "último balance real subido",

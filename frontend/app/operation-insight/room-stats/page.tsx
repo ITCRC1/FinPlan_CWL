@@ -239,6 +239,39 @@ export default function OperationRoomStatsPage() {
   const occTotal = tot.na ? tot.no / tot.na : 0;
   const adrTotal = tot.no ? tot.rev / tot.no : 0;
 
+  // ── El acumulado YTD, mes a mes ───────────────────────────────────────────
+  //
+  // Owner, 2026-10-26. La pantalla ya daba el YTD del mes elegido —un solo
+  // número—, así que para ver cómo venía cayendo la ocupación y la tarifa el
+  // owner rehacía la serie a mano en Excel, arrastrando la fórmula. En esa
+  // hoja el ADR acumulado quedó corrido una columna: agosto mostraba el de
+  // setiembre, y setiembre un número que no era de ningún mes.
+  //
+  // ⚠️ El ADR acumulado NO es el promedio de los ADR de cada mes: es el
+  // ingreso acumulado entre las noches acumuladas. Un mes flojo con pocas
+  // noches casi no mueve la tarifa del año, y promediando sí la movería.
+  //
+  // ⚠️ Las tres primeras líneas se suman igual que `tot`, a propósito: noches
+  // y pax solo de las categorías con unidades, ingreso de TODAS (ahí vive
+  // "Other Rooms Revenue"). Si acá se sumara distinto, el último punto de la
+  // serie no daría el KPI de arriba y nadie sabría cuál de los dos creer.
+  const acumulado = useMemo(() => {
+    if (!rs) return [] as { m: number; na: number; no: number; pax: number; rev: number; occ: number; adr: number }[];
+    const conUnidades = new Set(rs.room_types.filter(rt => rt.units > 0).map(rt => rt.id));
+    let na = 0, no = 0, pax = 0, rev = 0;
+    const serie = [];
+    for (let m = 1; m <= month; m++) {
+      const mo = rs.months.find(x => x.month === m);
+      for (const r of mo?.rows ?? []) {
+        rev += r.revenue;
+        if (!conUnidades.has(r.room_type_id)) continue;
+        na += r.nights_available; no += r.nights_occupied; pax += r.pax;
+      }
+      serie.push({ m, na, no, pax, rev, occ: na ? no / na : 0, adr: no ? rev / no : 0 });
+    }
+    return serie;
+  }, [rs, month]);
+
   // Executive Insight
   const insight = useMemo(() => {
     if (!rows.length) return "";
@@ -422,6 +455,36 @@ export default function OperationRoomStatsPage() {
       };
     });
 
+    // Y la hoja del acumulado: la misma serie que se ve en pantalla. Se arma
+    // desde `acumulado`, no de nuevo desde `rs.months` — es la pantalla la que
+    // manda, y rehacerla acá sería la segunda fuente del mismo número.
+    const ACUM: { rot: string; fmt: "num" | "num1" | "pct" | "usd2";
+                  v: (a: typeof acumulado[number]) => number }[] = [
+      { rot: "Total available Rooms", fmt: "num",  v: a => a.na },
+      { rot: "Total Rooms Occupied",  fmt: "num1", v: a => a.no },
+      { rot: "Total Guests",          fmt: "num",  v: a => a.pax },
+      { rot: "% Occupancy",           fmt: "pct",  v: a => a.occ },
+      { rot: "Average Daily Rate",    fmt: "usd2", v: a => a.adr },
+      { rot: "Rooms Revenue",         fmt: "usd2", v: a => a.rev },
+    ];
+    cuadros.push({
+      titulo: `${t("acumTitulo")} · ${MONTHS_EN[0]}–${MONTHS_EN[month - 1]} ${year}`,
+      subtitulo: t("excelSubtitulo", { scn: scn ? scnLabel(scn) : "", mes: MONTHS[month - 1] }),
+      descripcion: t("acumNota"),
+      hoja: "YTD",
+      columnas: [
+        { label: "", ancho: 30, formato: "texto" as const },
+        ...meses.map(m => ({ label: `YTD ${MONTHS[m - 1]}`, ancho: 14,
+                             formato: "num" as const,
+                             abre_grupo: m === month })),
+      ],
+      filas: ACUM.map(f => ({
+        label: f.rot, formato: f.fmt,
+        es_total: f.rot === "% Occupancy" || f.rot === "Average Daily Rate",
+        valores: acumulado.map(a => f.v(a)),
+      })),
+    });
+
     try {
       await bajarCuadros(`Room_Stats_por_mes_${year}`, cuadros);
     } catch (e) { setUploadMsg(`Error: ${e instanceof Error ? e.message : String(e)}`); }
@@ -430,6 +493,17 @@ export default function OperationRoomStatsPage() {
   const sel: React.CSSProperties = { background: "var(--bg-input)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: 5, padding: "6px 10px", fontSize: 13, fontWeight: 600, cursor: "pointer" };
   const th: React.CSSProperties = { textAlign: "right", padding: "5px 10px", fontSize: 10.5, color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { textAlign: "right", padding: "3px 8px", fontSize: 12.5 };
+
+  // Las filas del acumulado, con su formato. Mismo orden que la hoja «YTD» del
+  // Excel, para que quien compare archivo y pantalla no tenga que buscar.
+  const ACUM_FILAS: { rot: string; fuerte?: boolean; txt: (a: typeof acumulado[number]) => string }[] = [
+    { rot: t("nochesDisp"), txt: a => int(a.na) },
+    { rot: t("nochesOcup"), txt: a => int(a.no) },
+    { rot: "Pax", txt: a => int(a.pax) },
+    { rot: "Occupancy", fuerte: true, txt: a => (a.occ * 100).toFixed(2) + "%" },
+    { rot: "ADR", fuerte: true, txt: a => money(a.adr) },
+    { rot: "Revenue", txt: a => money(a.rev) },
+  ];
 
   const KPI = ({ label, value }: { label: string; value: string }) => (
     <div style={{ flex: "1 1 0", minWidth: 110, background: "var(--bg-elevated)", border: "1px solid var(--border-medium)", borderRadius: 8, padding: "14px 12px", textAlign: "center" }}>
@@ -646,6 +720,40 @@ export default function OperationRoomStatsPage() {
             <div style={{ fontSize: 12.5, color: "var(--text-primary)", lineHeight: 1.65 }}>{insight}</div>
           </div>
         </div>
+
+        {/* Acumulado YTD mes a mes (owner, 2026-10-26) */}
+        {acumulado.length > 1 && (
+          <div style={{ marginTop: 16, background: "var(--bg-elevated)", border: "1px solid var(--border-medium)", borderRadius: 8, overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", background: "var(--bg-header)", borderBottom: "1px solid var(--border-medium)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" }}>{t("acumTitulo")}</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>
+                    <th style={{ textAlign: "left", padding: "6px 12px", fontSize: 10.5, color: "var(--text-secondary)", fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }} />
+                    {acumulado.map(a => (
+                      <th key={a.m} style={{ ...th, padding: "6px 12px", color: a.m === month ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                        YTD {MONTHS[a.m - 1]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ACUM_FILAS.map(f => (
+                    <tr key={f.rot} style={{ borderBottom: "1px solid var(--border-subtle)", background: f.fuerte ? "rgba(255,255,255,0.03)" : undefined }}>
+                      <td style={{ padding: "6px 12px", fontSize: 12.5, color: "var(--text-primary)", fontWeight: f.fuerte ? 700 : 400, whiteSpace: "nowrap" }}>{f.rot}</td>
+                      {acumulado.map(a => (
+                        <td key={a.m} className="mono" style={{ textAlign: "right", padding: "6px 12px", fontSize: 12.5, fontWeight: f.fuerte ? 700 : 400, color: a.m === month ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                          {f.txt(a)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "8px 16px", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{t("acumNota")}</div>
+          </div>
+        )}
       </>}
     </div>
   );
