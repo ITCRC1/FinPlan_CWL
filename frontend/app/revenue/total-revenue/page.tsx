@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState, useCallback } from "react";
 import {
   getScenarios, getRackRates, getChannelsConfig, getOccupancyPct, getRoomTypes, rtLabel, pushRevenueToCheckbook,
+  getNetRates,
   type Scenario,
 } from "@/lib/api";
+import { hacerTarifaNeta } from "@/lib/tarifaNeta";
 import { fmtUsd } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
@@ -67,8 +69,11 @@ export default function TotalRevenuePage() {
   const load = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const [rack, ch, occ, rt] = await Promise.all([
+      const [rack, ch, occ, rt, nr] = await Promise.all([
         getRackRates(sid), getChannelsConfig(sid), getOccupancyPct(sid), getRoomTypes(HOTEL_ID, sid),
+        // Tolera el fallo a proposito: sin esto una tabla auxiliar caida se
+        // lleva puesta la pantalla entera.
+        getNetRates(sid).catch(() => null),
       ]);
       const year = occ.year;
       const nf = ch.net_factor.map(v => parseFloat(v) || 0);
@@ -76,6 +81,7 @@ export default function TotalRevenuePage() {
       const codeById: Record<string, string> = Object.fromEntries(rt.room_types.map(r => [r.id, r.code]));
       const closed = new Set(rt.closed_months);
       const rackById = Object.fromEntries(rack.rooms.map(r => [r.room_type_id, MONTH_KEYS.map(mk => parseFloat(r[mk]) || 0)]));
+      const neto = hacerTarifaNeta(nr, rackById, nf);
 
       // Revenue = (rack × net factor) × (% ocupación × unidades × días, 0 si cerrado)
       const computed: Row[] = occ.rooms.map(r => {
@@ -91,7 +97,13 @@ export default function TotalRevenuePage() {
         // poder ver total revenue tarifa rack, y después total revenue por tipo
         // de habitación net rate»*.
         const rack = MONTHS.map((_m, mi) => nights[mi] * rack12[mi]);
-        const revenue = MONTHS.map((_m, mi) => rack[mi] * (nf[mi] || 0));
+        // (!) El NETO no sale de la columna de rack de al lado: sale de la
+        // tarifa GUARDADA (`lib/tarifaNeta`). Una categoria vendida a neta
+        // negociada --las villas, $1.700-- no tiene rack publicado, asi que
+        // su fila muestra rack $0 y neto $1.700. No es un error: no hay
+        // tarifa publicada de la cual descontar comision. Inventarle un rack
+        // igual al neto seria peor, porque afirmaria que no comisiona.
+        const revenue = MONTHS.map((_m, mi) => nights[mi] * neto(r.room_type_id, mi));
         return { id: r.room_type_id, code: codeById[r.room_type_id] ?? "", name: r.name,
                  rack, revenue, nights, available };
       });

@@ -2569,6 +2569,7 @@
     "excelHint": "Downloads the Rooms KPIs and the full checkbook, with whatever you have typed in",
     "fillFromDrivers": "Fill from drivers",
     "fillHint": "Fills Room/Food/Tours/Transport with the rate × the month's net factor. Food per pax-night; Tours and Transport per stay (pax-nights ÷ nights/stay). Sustainability per pax-night, with NO net factor and less the % not paying.",
+    "setsVsDrivers": "The breakdown comes from the drivers and adds up to {drivers}; the line above says {linea} \u2014 {dif} apart. \u00abFill from drivers\u00bb brings them back together.",
     "filledFromDrivers": "Filled from drivers: Room, Food, Beverage, Tours, Transport, Retail, Innoceana, Sustainability. Spa, FNB misc and Laundry go separately. Review and Save.",
     "intro": "Type the revenue in USD per line and month. You can paste a block from Excel. When the source is <b>Checkbook</b>, the P&L uses these amounts directly (the Rooms KPIs come from the scenario Statistics).",
     "noRatesToFill": "There are no rates to fill with. This property ships no seed (seed_data/HOTEL_ID/driver_rates.json): enter the rates above. Filling twelve months with zeros looks exactly the same as filling them properly.",

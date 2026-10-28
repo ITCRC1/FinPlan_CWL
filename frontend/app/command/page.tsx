@@ -4,9 +4,10 @@ import { useTranslations } from "next-intl";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
   getScenarios, getPLMonthly, getAssignments, getExpenseTotals,
-  getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
+  getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig, getNetRates,
   type Scenario, type SectionRow,
 } from "@/lib/api";
+import { hacerTarifaNeta } from "@/lib/tarifaNeta";
 import { bajarCuadros, type FilaCuadro, type FormatoCol } from "@/lib/exportCuadro";
 import { elegir, useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
@@ -28,8 +29,9 @@ function kpisFromPL(v: Vals): RoomKpis {
   return { avail, occ, pax, occPct: avail ? occ / avail * 100 : 0, adr: occ ? rr / occ : 0, revpar: avail ? rr / avail : 0 };
 }
 async function fetchRoomKpis(sid: string): Promise<RoomKpis> {
-  const [rt, occ, rack, ch] = await Promise.all([
+  const [rt, occ, rack, ch, nr] = await Promise.all([
     getRoomTypes(HOTEL_ID, sid), getOccupancyPct(sid), getRackRates(sid), getChannelsConfig(sid),
+    getNetRates(sid).catch(() => null),
   ]);
   const year = occ.year;
   const closed = new Set(rt.closed_months);
@@ -37,6 +39,8 @@ async function fetchRoomKpis(sid: string): Promise<RoomKpis> {
   const ppn = parseFloat(rt.pax_per_night) || 1.8;
   const nf = ch.net_factor.map(v => parseFloat(v) || 0);
   const rackById = Object.fromEntries(rack.rooms.map(r => [r.room_type_id, MK.map(k => parseFloat(r[k]) || 0)]));
+  // La neta GUARDADA, no `rack x factor`: ver `lib/tarifaNeta`.
+  const neto = hacerTarifaNeta(nr, rackById, nf);
   let avail = 0, occN = 0, roomRev = 0;
   MK.forEach((_k, mi) => {
     if (closed.has(mi + 1)) return;
@@ -44,7 +48,7 @@ async function fetchRoomKpis(sid: string): Promise<RoomKpis> {
     occ.rooms.forEach(r => {
       const u = units[r.room_type_id] ?? 0; avail += u * days;
       const nights = (parseFloat(r[MK[mi]]) || 0) * u * days; occN += nights;
-      roomRev += nights * ((rackById[r.room_type_id]?.[mi]) || 0) * (nf[mi] || 0);
+      roomRev += nights * neto(r.room_type_id, mi);
     });
   });
   return { avail, occ: occN, pax: occN * ppn, occPct: avail ? occN / avail * 100 : 0, adr: occN ? roomRev / occN : 0, revpar: avail ? roomRev / avail : 0 };

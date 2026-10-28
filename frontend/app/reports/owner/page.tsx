@@ -7,10 +7,11 @@ import { useHotel } from "@/lib/useHotel";
 import IrA from "@/components/IrA";
 import {
   getScenarios, getPLMonthly, getExpenseTotals, getAnnotations,
-  getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
+  getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig, getNetRates,
   downloadOwnerReportExcel,
   type Scenario, type Annotation,
 } from "@/lib/api";
+import { hacerTarifaNeta } from "@/lib/tarifaNeta";
 
 const MK = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"] as const;
 // Con hueco en 0: los meses acá se indexan 1..12.
@@ -53,10 +54,11 @@ export default function OwnerReportPage() {
   const load = useCallback(async (sid: string) => {
     setLoading(true); setError(null);
     try {
-      const [pl, et, an, rt, occ, rack, ch] = await Promise.all([
+      const [pl, et, an, rt, occ, rack, ch, nr] = await Promise.all([
         getPLMonthly(sid), getExpenseTotals(sid).catch(() => null),
         getAnnotations(sid, { kind: "comment" }),
         getRoomTypes(HOTEL_ID, sid), getOccupancyPct(sid), getRackRates(sid), getChannelsConfig(sid),
+        getNetRates(sid).catch(() => null),
       ]);
       setAnnual(pl.annual); setExp(et); setNotes(an.annotations);
       // KPIs desde drivers
@@ -65,13 +67,15 @@ export default function OwnerReportPage() {
       const ppn = parseFloat(rt.pax_per_night) || 1.8;
       const nf = ch.net_factor.map(v => parseFloat(v) || 0);
       const rackById = Object.fromEntries(rack.rooms.map(r => [r.room_type_id, MK.map(k => parseFloat(r[k]) || 0)]));
+      // La neta GUARDADA, no `rack x factor`: ver `lib/tarifaNeta`.
+      const neto = hacerTarifaNeta(nr, rackById, nf);
       let avail = 0, occN = 0, rev = 0;
       MK.forEach((_k, mi) => {
         if (closed.has(mi + 1)) return; const d = daysIn(year, mi + 1);
         occ.rooms.forEach(r => {
           const u = units[r.room_type_id] ?? 0; avail += u * d;
           const nights = (parseFloat(r[MK[mi]]) || 0) * u * d; occN += nights;
-          rev += nights * ((rackById[r.room_type_id]?.[mi]) || 0) * (nf[mi] || 0);
+          rev += nights * neto(r.room_type_id, mi);
         });
       });
       setKpi({ occPct: avail ? occN / avail * 100 : 0, adr: occN ? rev / occN : 0, revpar: avail ? rev / avail : 0, pax: occN * ppn });

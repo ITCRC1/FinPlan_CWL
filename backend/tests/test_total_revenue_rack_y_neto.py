@@ -37,15 +37,31 @@ BLOQUE = FRONT / "app/revenue/total-revenue/BloqueRevenue.tsx"
 def test_se_calculan_LOS_DOS_ingresos():
     """⚠️ El de rack NO es el neto con un ajuste al final.
 
-    Son dos series desde el principio: `rack × noches` y `rack × factor × noches`.
-    Derivar uno del otro al dibujar deja la comision escrita en la pantalla y no
-    en el calculo, y el dia que el factor neto cambie de forma —por mes, por
-    canal, por categoria— la resta deja de valer sin que nada avise.
+    Son dos series desde el principio: las noches por la tarifa RACK, y las
+    noches por la tarifa NETA. Derivar una de la otra al dibujar deja la
+    comision escrita en la pantalla y no en el calculo, y el dia que el factor
+    neto cambie de forma —por mes, por canal, por categoria— la resta deja de
+    valer sin que nada avise.
+
+    ⚠️ **El neto ya no se saca del arreglo `rack`.** Hasta 2026-10-27 la linea
+    era `rack[mi] * (nf[mi] || 0)`, que es exactamente el caso que el parrafo de
+    arriba advierte: una tarifa que NO deriva de un rack quedaba en cero. Las
+    villas se negocian a $1.700 netos y su rack esta vacio, asi que la pantalla
+    las valuaba en $0 mientras el motor del P&L cobraba $1.700 la noche. Ahora
+    el neto sale de la tarifa GUARDADA (`lib/tarifaNeta`), que es la misma que
+    lee el motor — la independencia entre las dos series es mayor, no menor.
+
+    Ver `test_tarifa_neta_en_el_front.py`.
     """
     s = PAGINA.read_text(encoding="utf-8")
     assert "rack: number[];" in s and "revenue: number[];" in s
     assert "const rack = MONTHS.map((_m, mi) => nights[mi] * rack12[mi]);" in s
-    assert "const revenue = MONTHS.map((_m, mi) => rack[mi] * (nf[mi] || 0));" in s
+    assert ("const revenue = MONTHS.map((_m, mi) => nights[mi] * neto(r.room_type_id, mi));"
+            in s), "el neto dejo de salir de las noches por la tarifa guardada"
+    assert "rack[mi] *" not in s, (
+        "el ingreso neto se esta derivando del arreglo de rack otra vez: una "
+        "tarifa negociada sin rack publicado vuelve a valer $0"
+    )
 
 
 def test_los_dos_bloques_usan_EL_MISMO_renderizador():

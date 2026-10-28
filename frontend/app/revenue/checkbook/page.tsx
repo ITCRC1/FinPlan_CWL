@@ -5,17 +5,19 @@ import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from
 // siempre, así que un número en formato español entraba multiplicado.
 import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
+import { SET_VILLAS, SET_RESIDENCIAS } from "@/lib/roomSet";
+import { hacerTarifaNeta } from "@/lib/tarifaNeta";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
 import { useTranslations } from "next-intl";
 import { money2 } from "@/lib/fmt";
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type Cuadro, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import {
   getScenarios, getRevenueCheckbook, saveRevenueCheckbook, setRevenueSource,
   getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
-  getDriverRatesSeed, getPackageDriverRates, getPaxGrid,
-  type Scenario, type RevenueCheckbookRow, type RevenueSource,
+  getDriverRatesSeed, getPackageDriverRates, getPaxGrid, getNetRates,
+  type Scenario, type RevenueCheckbookRow, type RevenueSource, type RoomType,
   type PackageDriverRates,
   type RevenueBulkRow, type MonthKey,
 } from "@/lib/api";
@@ -29,20 +31,41 @@ function daysInMonth(year: number, month1: number): number {
   return new Date(year, month1, 0).getDate();
 }
 
-interface RoomStats {
+/** La clave sintetica de la familia Rooms: no es un departamento. */
+const STANDARD = "STANDARD";
+
+/** Lo que se puede medir de un conjunto de categorias. */
+interface Medible {
   available: number[]; occupied: number[]; roomRev: number[];
-  netFactor: number[];     // factor neto de canales por mes
-  /** Pax-noche de CADA mes = Σ por villa (noches ocupadas × su pax de ese mes).
+  /** Pax-noche de CADA mes = suma por villa (noches ocupadas x su pax del mes).
    *
-   *  ⚠️ Antes esto era UN número (`pax_per_night` del escenario) y se
+   *  (!) Antes esto era UN numero (`pax_per_night` del escenario) y se
    *  multiplicaba por las noches. El motor nunca hizo eso: suma
-   *  `rooms_occupied × rc.pax_per_room` villa por villa y mes por mes. Mientras
+   *  `rooms_occupied x rc.pax_per_room` villa por villa y mes por mes. Mientras
    *  el pax fue 1,80 en todas las tarjetas las dos cuentas daban igual y la
-   *  diferencia no existía. El día que el owner puso 1,85 sólo en enero,
-   *  febrero y marzo —el pax cambia por temporada— la pantalla siguió
-   *  calculando con 1,80 los doce meses y el ingreso del P&L dejó de coincidir
-   *  con el «Total Pax» que ella misma mostraba. */
+   *  diferencia no existia. El dia que el owner puso 1,85 solo en enero,
+   *  febrero y marzo --el pax cambia por temporada-- la pantalla siguio
+   *  calculando con 1,80 los doce meses y el ingreso del P&L dejo de coincidir
+   *  con el "Total Pax" que ella misma mostraba. */
   paxNights: number[];
+}
+
+/** Un SET medido aparte: Standard, Villas, Residencias.
+ *
+ *  Owner, 2026-10-27: *"necesito ver esto rooms estandar y villas separado..
+ *  estadisticas separadas e ingreso separado"* y *"la ocupacion tambien que
+ *  este separado"*.
+ *
+ *  (!) Es una APERTURA, no una suma: las filas del set parten la misma plata y
+ *  las mismas noches de la fila de arriba. Por eso van indentadas y en gris --
+ *  sumarlas con el total daria el doble. El P&L sigue viendo UNA linea de
+ *  Rooms, porque 0115 y 0116 cuelgan de 0110. */
+interface SetRooms extends Medible { key: string; nombre: string; }
+
+interface RoomStats extends Medible {
+  netFactor: number[];     // factor neto de canales por mes
+  /** Vacio cuando hay un solo set: repetir la fila entera no abre nada. */
+  sets: SetRooms[];
 }
 
 // Tarifas del paquete Classic (rack, se les aplica el net factor de canales).
@@ -183,43 +206,76 @@ export default function RevenueCheckbookPage() {
       // se cae al del escenario — pero se cae a un número que al menos existe,
       // no a un 1,8 escrito acá.
       const paxGrid = await getPaxGrid(sid).catch(() => null);
+      // La NETA guardada. Se pide aparte y tolerando el fallo a proposito: si
+      // el endpoint cae, la pantalla sigue viva con la formula de siempre en
+      // vez de quedarse en blanco.
+      const netRates = await getNetRates(sid).catch(() => null);
       setRows(cb.lines.map(l => ({ ...l, ...Object.fromEntries(MONTH_KEYS.map(mk => [mk, money2(l[mk])])) })));
       setSource(cb.source);
 
-      // KPIs de Rooms desde los drivers (mismo cálculo que Total Revenue)
+      // KPIs de Rooms desde los drivers (mismo calculo que Total Revenue)
       const year = occ.year;
       const closed = new Set(rt.closed_months);
       const unitsById = Object.fromEntries(rt.room_types.map(r => [r.id, r.units]));
       const nf = ch.net_factor.map(v => parseFloat(v) || 0);
       const rackById = Object.fromEntries(rack.rooms.map(r => [r.room_type_id, MONTH_KEYS.map(mk => parseFloat(r[mk]) || 0)]));
-      const available = MONTHS.map((_m, mi) =>
-        rt.room_types.reduce((s, r) => s + (closed.has(mi + 1) ? 0 : r.units * daysInMonth(year, mi + 1)), 0));
-      const occupied = MONTHS.map((_m, mi) =>
-        occ.rooms.reduce((s, r) => {
-          if (closed.has(mi + 1)) return s;
-          const u = unitsById[r.room_type_id] ?? 0;
-          return s + (parseFloat(r[MONTH_KEYS[mi]]) || 0) * u * daysInMonth(year, mi + 1);
-        }, 0));
-      const roomRev = MONTHS.map((_m, mi) =>
-        occ.rooms.reduce((s, r) => {
-          if (closed.has(mi + 1)) return s;
-          const u = unitsById[r.room_type_id] ?? 0;
-          const nights = (parseFloat(r[MONTH_KEYS[mi]]) || 0) * u * daysInMonth(year, mi + 1);
-          const rk = (rackById[r.room_type_id]?.[mi]) || 0;
-          return s + nights * rk * (nf[mi] || 0);
-        }, 0));
+
+      // La tarifa que DE VERDAD usa el motor. Ver `lib/tarifaNeta`: con la
+      // formula `rack x factor` las villas valian $0 aca y $1.700 la noche en
+      // el P&L, y "Fill from drivers" escribia Room Revenue sin ellas.
+      const tarifaNeta = hacerTarifaNeta(netRates, rackById, nf);
+
       const paxFallback = parseFloat(rt.pax_per_night) || 1.8;
       const paxById: Record<string, number[]> = Object.fromEntries(
         (paxGrid?.filas ?? []).map(f => [f.room_type_id,
           f.meses.map(c => parseFloat(c.pax) || paxFallback)]));
-      const paxNights = MONTHS.map((_m, mi) =>
-        occ.rooms.reduce((s, r) => {
-          if (closed.has(mi + 1)) return s;
+
+      /** Mide un conjunto de categorias. `ids = null` es el hotel entero.
+       *
+       *  Una sola cuenta para las cinco metricas y para los tres sets: si cada
+       *  bloque se calculara por su lado, la suma de los sets podria dejar de
+       *  dar el total sin que nada lo avise. */
+      const medir = (ids: Set<string> | null): Medible => {
+        const mia = (id: string) => ids === null || ids.has(id);
+        const noches = (mi: number) => occ.rooms.map(r => {
+          if (closed.has(mi + 1) || !mia(r.room_type_id)) return { id: r.room_type_id, n: 0 };
           const u = unitsById[r.room_type_id] ?? 0;
-          const nights = (parseFloat(r[MONTH_KEYS[mi]]) || 0) * u * daysInMonth(year, mi + 1);
-          return s + nights * (paxById[r.room_type_id]?.[mi] ?? paxFallback);
-        }, 0));
-      setStats({ available, occupied, roomRev, netFactor: nf, paxNights });
+          return { id: r.room_type_id, n: (parseFloat(r[MONTH_KEYS[mi]]) || 0) * u * daysInMonth(year, mi + 1) };
+        });
+        return {
+          available: MONTHS.map((_m, mi) => rt.room_types.reduce((acc, r) =>
+            acc + (closed.has(mi + 1) || !mia(r.id) ? 0 : r.units * daysInMonth(year, mi + 1)), 0)),
+          occupied: MONTHS.map((_m, mi) => noches(mi).reduce((acc, x) => acc + x.n, 0)),
+          roomRev: MONTHS.map((_m, mi) => noches(mi).reduce((acc, x) => acc + x.n * tarifaNeta(x.id, mi), 0)),
+          paxNights: MONTHS.map((_m, mi) => noches(mi).reduce((acc, x) =>
+            acc + x.n * (paxById[x.id]?.[mi] ?? paxFallback), 0)),
+        };
+      };
+
+      // Los SET. Una categoria sin `dept_code` se queda en Standard, que es la
+      // familia Rooms: lo que NO fue asignado a un set no desaparece de la
+      // vista, se ve donde se nota que falta asignarlo.
+      const NOMBRE_SET: Record<string, string> = {
+        [SET_VILLAS]: "Villas", [SET_RESIDENCIAS]: "Residencias",
+      };
+      const ORDEN = [STANDARD, SET_VILLAS, SET_RESIDENCIAS];
+      const porSet = new Map<string, RoomType[]>();
+      for (const r of rt.room_types) {
+        const dc = (r.dept_code || "").trim();
+        const k = dc === SET_VILLAS || dc === SET_RESIDENCIAS ? dc : STANDARD;
+        porSet.set(k, [...(porSet.get(k) ?? []), r]);
+      }
+      const sets: SetRooms[] = [...porSet.entries()]
+        // Un set sin unidades solo agregaria una fila de ceros.
+        .filter(([, tipos]) => tipos.reduce((acc, t) => acc + (t.units || 0), 0) > 0)
+        .sort((a, b) => ORDEN.indexOf(a[0]) - ORDEN.indexOf(b[0]))
+        .map(([k, tipos]) => ({
+          key: k,
+          nombre: k === STANDARD ? "Standard" : (NOMBRE_SET[k] ?? k),
+          ...medir(new Set(tipos.map(t => t.id))),
+        }));
+
+      setStats({ ...medir(null), netFactor: nf, sets: sets.length > 1 ? sets : [] });
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : tc("error"));
@@ -373,30 +429,37 @@ export default function RevenueCheckbookPage() {
     const cuadros: Cuadro[] = [];
 
     if (stats) {
-      const tAvail = stats.available.reduce((s, v) => s + v, 0);
-      const tOcc = stats.occupied.reduce((s, v) => s + v, 0);
-      const tRev = stats.roomRev.reduce((s, v) => s + v, 0);
+      const sum = (a: number[]) => a.reduce((x, v) => x + v, 0);
+      // Las mismas cinco metricas de la pantalla, con su apertura por set: el
+      // Excel baja LO QUE SE ESTA VIENDO, y eso incluye el corte por set.
+      const METRICAS: { label: string; formato?: ColumnaCuadro["formato"]; val: (b: Medible) => (number | null)[] }[] = [
+        { label: "Total Rooms Available", val: b => [...b.available, sum(b.available)] },
+        { label: "Total Rooms Occupied", val: b => [...b.occupied, sum(b.occupied)] },
+        { label: "Total Pax", val: b => [...b.paxNights, sum(b.paxNights)] },
+        {
+          label: "Occupancy %", formato: "pct",
+          // Fraccion, no 12.5: el % en Excel se guarda como 0.125.
+          val: b => [...b.occupied.map((v, i) => b.available[i] ? v / b.available[i] : null),
+            sum(b.available) ? sum(b.occupied) / sum(b.available) : null],
+        },
+        {
+          label: "ADR", formato: "usd2",
+          val: b => [...b.roomRev.map((v, i) => b.occupied[i] ? v / b.occupied[i] : null),
+            sum(b.occupied) ? sum(b.roomRev) / sum(b.occupied) : null],
+        },
+      ];
+      const filasKpi: FilaCuadro[] = [];
+      for (const met of METRICAS) {
+        filasKpi.push({ label: met.label, formato: met.formato, valores: met.val(stats) });
+        for (const sr of stats.sets)
+          filasKpi.push({ label: "    " + sr.nombre, formato: met.formato, valores: met.val(sr) });
+      }
       cuadros.push({
         titulo: t("xlsRoomsTitle"),
         subtitulo: escenario || undefined,
         hoja: "Rooms KPIs",
         columnas: [{ label: "Rooms", ancho: 30, formato: "texto" }, ...colsMes("num", "Full Year")],
-        filas: [
-          { label: "Total Rooms Available", valores: [...stats.available, tAvail] },
-          { label: "Total Rooms Occupied", valores: [...stats.occupied, tOcc] },
-          { label: "Total Pax", valores: [...stats.paxNights, stats.paxNights.reduce((a, b) => a + b, 0)] },
-          {
-            label: "Occupancy %", formato: "pct",
-            // Fracción, no 12.5: el % en Excel se guarda como 0.125.
-            valores: [...stats.occupied.map((v, i) => stats.available[i] ? v / stats.available[i] : null),
-              tAvail ? tOcc / tAvail : null],
-          },
-          {
-            label: "ADR", formato: "usd2",
-            valores: [...stats.roomRev.map((v, i) => stats.occupied[i] ? v / stats.occupied[i] : null),
-              tOcc ? tRev / tOcc : null],
-          },
-        ],
+        filas: filasKpi,
       });
     }
 
@@ -574,14 +637,27 @@ export default function RevenueCheckbookPage() {
       ) : (
         <>
         {stats && (() => {
-          const tAvail = stats.available.reduce((s, v) => s + v, 0);
-          const tOcc = stats.occupied.reduce((s, v) => s + v, 0);
-          const tRev = stats.roomRev.reduce((s, v) => s + v, 0);
+          const sum = (a: number[]) => a.reduce((x, v) => x + v, 0);
           const numCell = (n: number) => Math.round(n).toLocaleString("en-US");
-          const pctCell = (occ: number, av: number) => av ? (occ / av * 100).toFixed(1) + "%" : "—";
-          const adrCell = (rev: number, occ: number) => occ ? "$" + (rev / occ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+          const pctCell = (ocu: number, av: number) => av ? (ocu / av * 100).toFixed(1) + "%" : "\u2014";
+          const adrCell = (rev: number, ocu: number) => ocu ? "$" + (rev / ocu).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "\u2014";
           const td: React.CSSProperties = { textAlign: "right" };
           const yr: React.CSSProperties = { textAlign: "right", borderLeft: "1px solid var(--border)", fontWeight: 600 };
+          // Las cinco metricas, cada una sabiendo medirse sobre CUALQUIER
+          // bloque: el hotel entero o un set. Asi la fila del total y la del
+          // set no pueden calcularse distinto.
+          const METRICAS: {
+            label: string;
+            mes: (b: Medible, i: number) => string;
+            anio: (b: Medible) => string;
+            marca?: boolean;
+          }[] = [
+            { label: "Total Rooms Available", mes: (b, i) => numCell(b.available[i]), anio: b => numCell(sum(b.available)) },
+            { label: "Total Rooms Occupied", mes: (b, i) => numCell(b.occupied[i]), anio: b => numCell(sum(b.occupied)) },
+            { label: "Total Pax", mes: (b, i) => numCell(b.paxNights[i]), anio: b => numCell(sum(b.paxNights)) },
+            { label: "Occupancy %", marca: true, mes: (b, i) => pctCell(b.occupied[i], b.available[i]), anio: b => pctCell(sum(b.occupied), sum(b.available)) },
+            { label: "ADR", marca: true, mes: (b, i) => adrCell(b.roomRev[i], b.occupied[i]), anio: b => adrCell(sum(b.roomRev), sum(b.occupied)) },
+          ];
           return (
             <div className="fin-sticky" style={{ overflowX: "auto", marginBottom: 16 }}>
               <table className="fin-table" style={{ minWidth: 1200 }}>
@@ -593,31 +669,26 @@ export default function RevenueCheckbookPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>Total Rooms Available</td>
-                    {stats.available.map((v, i) => <td key={i} className="mono" style={td}>{numCell(v)}</td>)}
-                    <td className="mono" style={yr}>{numCell(tAvail)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>Total Rooms Occupied</td>
-                    {stats.occupied.map((v, i) => <td key={i} className="mono" style={td}>{numCell(v)}</td>)}
-                    <td className="mono" style={yr}>{numCell(tOcc)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>Total Pax</td>
-                    {stats.paxNights.map((v, i) => <td key={i} className="mono" style={td}>{numCell(v)}</td>)}
-                    <td className="mono" style={yr}>{numCell(stats.paxNights.reduce((a, b) => a + b, 0))}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>Occupancy %</td>
-                    {stats.occupied.map((v, i) => <td key={i} className="mono" style={td}>{pctCell(v, stats.available[i])}</td>)}
-                    <td className="mono" style={{ ...yr, color: "var(--brand)" }}>{pctCell(tOcc, tAvail)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ textAlign: "left", fontWeight: 500 }}>ADR</td>
-                    {stats.roomRev.map((v, i) => <td key={i} className="mono" style={td}>{adrCell(v, stats.occupied[i])}</td>)}
-                    <td className="mono" style={{ ...yr, color: "var(--brand)" }}>{adrCell(tRev, tOcc)}</td>
-                  </tr>
+                  {METRICAS.map(met => (
+                    <Fragment key={met.label}>
+                      <tr>
+                        <td style={{ textAlign: "left", fontWeight: 500 }}>{met.label}</td>
+                        {MONTHS.map((_m, i) => <td key={i} className="mono" style={td}>{met.mes(stats, i)}</td>)}
+                        <td className="mono" style={met.marca ? { ...yr, color: "var(--brand)" } : yr}>{met.anio(stats)}</td>
+                      </tr>
+                      {/* La apertura. Indentada y en gris porque NO suma con la
+                          fila de arriba: la parte. Ocupacion y ADR de un set se
+                          miden contra SUS propias disponibles y SUS noches, que
+                          es justamente lo que no se puede leer del promedio. */}
+                      {stats.sets.map(sr => (
+                        <tr key={sr.key} style={{ color: "var(--text-secondary)" }}>
+                          <td style={{ textAlign: "left", paddingLeft: 26 }}>{sr.nombre}</td>
+                          {MONTHS.map((_m, i) => <td key={i} className="mono" style={td}>{met.mes(sr, i)}</td>)}
+                          <td className="mono" style={{ ...yr, fontWeight: 500 }}>{met.anio(sr)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -634,7 +705,8 @@ export default function RevenueCheckbookPage() {
             </thead>
             <tbody>
               {rows.map((r, ri) => (
-                <tr key={r.line}>
+                <Fragment key={r.line}>
+                <tr>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>
                     {/* La cuenta va al lado del nombre donde la línea ES una
                         cuenta — hoy las tres del Club. Ver el ojo del backend:
@@ -664,6 +736,46 @@ export default function RevenueCheckbookPage() {
                     {fmtUsd(rowTotal(r))}
                   </td>
                 </tr>
+                {/* Room Revenue abierto por set: de donde sale cada dolar.
+                    Es read-only y sale de los DRIVERS (noches x neta), no del
+                    numero digitado arriba -- el checkbook guarda una sola linea
+                    de Rooms y no tiene donde partirla. Si las dos cifras no
+                    coinciden se dice abajo, porque una apertura que no cuadra
+                    con la linea que abre es peor que no tenerla. */}
+                {r.line === "ROOMS" && stats && stats.sets.length > 0 && (() => {
+                  const sum = (a: number[]) => a.reduce((x, v) => x + v, 0);
+                  const drivers = sum(stats.roomRev);
+                  const dif = rowTotal(r) - drivers;
+                  const cel: React.CSSProperties = { textAlign: "right", padding: "3px 6px" };
+                  return (
+                    <>
+                      {stats.sets.map(sr => (
+                        <tr key={sr.key} style={{ color: "var(--text-secondary)" }}>
+                          <td style={{ textAlign: "left", paddingLeft: 26 }}>
+                            {sr.nombre}
+                            <span style={{ fontSize: 11, color: "var(--text-disabled)", marginLeft: 6 }}>drivers</span>
+                          </td>
+                          {MONTH_KEYS.map((_mk, mi) => (
+                            <td key={mi} className="mono" style={cel}>{fmtUsd(sr.roomRev[mi])}</td>
+                          ))}
+                          <td className="mono" style={{ textAlign: "right", fontWeight: 500, borderLeft: "1px solid var(--border)" }}>
+                            {fmtUsd(sum(sr.roomRev))}
+                          </td>
+                        </tr>
+                      ))}
+                      {Math.abs(dif) > 1 && (
+                        <tr style={{ color: "#c8a24a" }}>
+                          <td colSpan={MONTH_KEYS.length + 2} style={{ textAlign: "left", paddingLeft: 26, fontSize: 12 }}>
+                            {t("setsVsDrivers", {
+                              drivers: fmtUsd(drivers), linea: fmtUsd(rowTotal(r)), dif: fmtUsd(dif),
+                            })}
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })()}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>
