@@ -1334,6 +1334,42 @@ export async function getRackRates(scenarioId: string): Promise<RackRatesRespons
   return api.get<RackRatesResponse>(`/scenarios/${scenarioId}/revenue/rack-rates/`);
 }
 
+/** La tarifa NETA guardada, y cuáles de sus celdas puso una persona a mano.
+ *
+ *  ⚠️ `neto` es lo ALMACENADO, que es lo que lee el motor de ingresos — no
+ *  `rack × factor` recalculado en la pantalla. Para las celdas que NO son
+ *  manuales las dos cifras coinciden; la distinción importa en las que sí. */
+export interface NetRateRow {
+  room_type_id: string;
+  code?: string;
+  name: string;
+  neto: Record<MonthKey, string>;
+  manual: Record<MonthKey, boolean>;
+}
+
+export interface NetRatesResponse {
+  scenario_id: string;
+  year: number;
+  rooms: NetRateRow[];
+}
+
+export async function getNetRates(scenarioId: string): Promise<NetRatesResponse> {
+  return api.get<NetRatesResponse>(`/scenarios/${scenarioId}/revenue/net-rates/`);
+}
+
+/** Fija la neta de una celda, o la suelta para que vuelva a la fórmula.
+ *
+ *  `netRate = null` SUELTA la celda: el backend la recalcula desde el rack y el
+ *  mix del mes en el acto, así que la pantalla muestra de una a qué volvió. */
+export async function setNetRateManual(
+  scenarioId: string, roomTypeId: string, month: number, netRate: number | null,
+): Promise<{ net_rate: string; manual: boolean }> {
+  return api.put(
+    `/scenarios/${scenarioId}/revenue/net-rates/${roomTypeId}/${month}/`,
+    { net_rate: netRate },
+  );
+}
+
 export type RackRateBulkRow = { room_type_id: string } & Record<MonthKey, number>;
 
 export async function saveRackRates(

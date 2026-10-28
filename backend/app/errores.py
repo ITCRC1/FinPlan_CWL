@@ -128,6 +128,12 @@ MENSAJES: dict[str, dict[str, str]] = {
     "mes.fuera_de_rango": {
         "es": "El mes debe estar entre 1 y 12",
         "en": "Month must be between 1 and 12"},
+    "tarifa.negativa": {
+        "es": "La tarifa neta no puede ser negativa",
+        "en": "The net rate cannot be negative"},
+    "tarifa.no_encontrada": {
+        "es": "No hay tarifa cargada para esa categoría y ese mes: cargá primero el rack",
+        "en": "There is no rate for that category and month: load the rack rate first"},
     "escenarios.requerido": {
         "es": "Hace falta indicar el escenario",
         "en": "A scenario is required"},

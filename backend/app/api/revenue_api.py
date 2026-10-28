@@ -2817,6 +2817,99 @@ async def get_rack_rates(scenario_id: str, db: AsyncSession = Depends(get_db)):
     return {"scenario_id": scenario_id, "year": scenario.year, "rooms": rooms}
 
 
+@router.get("/scenarios/{scenario_id}/revenue/net-rates/")
+async def get_net_rates(scenario_id: str, db: AsyncSession = Depends(get_db)):
+    """La tarifa NETA tal como está guardada, con cuáles se pusieron a mano.
+
+    ⚠️ Devuelve lo ALMACENADO, no `rack × factor` recalculado. Es la cifra que
+    lee el motor de ingresos, y mostrar otra cosa es exactamente el error que se
+    quiere evitar: la pantalla decía $1,354.90 y el checkbook otra cifra.
+    """
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    rts = (await db.execute(
+        select(RoomTypeConfig)
+        .where(RoomTypeConfig.hotel_id == scenario.hotel_id,
+               aplica_en(scenario.year))
+        .order_by(RoomTypeConfig.sort_order)
+    )).scalars().all()
+    cards = {(c.room_type_id, c.month): c for c in (await db.execute(
+        select(RateCard).where(RateCard.scenario_id == scenario_id)
+    )).scalars().all()}
+
+    rooms = []
+    for rt in rts:
+        neto, manual = {}, {}
+        for i, mk in enumerate(_RR_MONTHS, start=1):
+            c = cards.get((rt.id, i))
+            neto[mk] = str(c.net_rate if c else Decimal("0"))
+            manual[mk] = bool(c.net_rate_manual) if c else False
+        rooms.append({"room_type_id": rt.id, "code": rt.code, "name": rt.name,
+                      "neto": neto, "manual": manual})
+    return {"scenario_id": scenario_id, "year": scenario.year, "rooms": rooms}
+
+
+class NetRateManual(BaseModel):
+    #: `None` = soltar el valor fijo y volver a `rack × factor`.
+    net_rate: Decimal | None = None
+
+
+@router.put("/scenarios/{scenario_id}/revenue/net-rates/{room_type_id}/{month}/")
+async def set_net_rate_manual(
+    scenario_id: str,
+    room_type_id: str,
+    month: int,
+    payload: NetRateManual,
+    db: AsyncSession = Depends(get_db),
+):
+    """Fija la tarifa neta a mano, o la suelta para que vuelva a la fórmula.
+
+    Owner, 2026-10-27: *«dame para yo poner esto manual por ahora.. editable»*.
+    Las villas se venden a **$1,700 netos** y no hay un rack del que derivarlos:
+    cargarlos como rack les descontaba la comisión encima.
+
+    Soltar (`net_rate: null`) NO deja el valor viejo congelado — recalcula ahí
+    mismo desde el rack y el mix del mes, para que la pantalla muestre de una
+    a qué volvió y nadie quede con una cifra huérfana.
+    """
+    from app.models.sales_channel_config import compute_net_factor
+
+    if not 1 <= month <= 12:
+        raise ErrorApi(422, "mes.fuera_de_rango")
+    if payload.net_rate is not None and payload.net_rate < 0:
+        raise ErrorApi(422, "tarifa.negativa")
+
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    try:
+        scenario.assert_editable()
+    except Exception as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    rc = (await db.execute(select(RateCard).where(
+        RateCard.scenario_id == scenario_id,
+        RateCard.room_type_id == room_type_id,
+        RateCard.month == month,
+    ))).scalar_one_or_none()
+    if rc is None:
+        raise ErrorApi(404, "tarifa.no_encontrada")
+
+    if payload.net_rate is None:
+        canales = (await db.execute(select(SalesChannelConfig).where(
+            SalesChannelConfig.scenario_id == scenario_id,
+            SalesChannelConfig.month == month,
+        ))).scalars().all()
+        nf = compute_net_factor(canales)
+        _exigir_mix({month: nf}, scenario_id)
+        rc.net_rate_manual = False
+        rc.net_rate = (Decimal(str(rc.rack_rate or 0)) * nf).quantize(Decimal("0.01"))
+    else:
+        rc.net_rate_manual = True
+        rc.net_rate = payload.net_rate.quantize(Decimal("0.01"))
+
+    await db.commit()
+    return {"room_type_id": room_type_id, "month": month,
+            "net_rate": str(rc.net_rate), "manual": rc.net_rate_manual}
+
+
 class RackRateRow(BaseModel):
     room_type_id: str
     jan: Decimal = Decimal("0"); feb: Decimal = Decimal("0")
@@ -2899,7 +2992,11 @@ async def bulk_rack_rates(
             card = existing.get((r.room_type_id, i))
             if card:
                 card.rack_rate = rack
-                card.net_rate = neto
+                # La neta a mano sobrevive a guardar el rack (mig 159): el rack
+                # se actualiza igual —sirve de referencia— pero la neta la
+                # decidió una persona y no se deriva de ella.
+                if not card.net_rate_manual:
+                    card.net_rate = neto
             else:
                 db.add(RateCard(
                     id=str(_uuid.uuid4()), scenario_id=scenario_id,
@@ -3570,7 +3667,11 @@ async def update_rate_card(
         db.add(rc)
     else:
         rc.rack_rate = payload.rack_rate
-        rc.net_rate = payload.net_rate
+        # La neta puesta a mano manda sobre la que venga en el cuerpo (mig 159).
+        # Quien la quiera cambiar usa la puerta de la neta manual; esta guarda
+        # el rack y deriva la neta, y una tarifa negociada no se deriva.
+        if not rc.net_rate_manual:
+            rc.net_rate = payload.net_rate
         if payload.pax_per_room is not None:
             rc.pax_per_room = payload.pax_per_room
 
@@ -3893,6 +3994,11 @@ async def push_revenue_to_checkbook(
     _exigir_mix(nf_mes, scenario_id)
     resync = 0
     for t in tarjetas:
+        # Una neta puesta a mano no se resincroniza (mig 159). Sin esto, el
+        # botón que pasa el ingreso al checkbook le devolvía la fórmula encima
+        # y el presupuesto salía con una cifra distinta a la de la pantalla.
+        if t.net_rate_manual:
+            continue
         esperado = (Decimal(str(t.rack_rate or 0)) * nf_mes.get(t.month, Decimal("1"))
                     ).quantize(Decimal("0.01"))
         if (t.net_rate or Decimal("0")) != esperado:

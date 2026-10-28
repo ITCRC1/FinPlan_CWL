@@ -456,6 +456,11 @@ async def aplicar(cuerpo: Aplicar, _=Depends(get_current_user),
                 rcs = list((await s.execute(select(RateCard).where(
                     RateCard.scenario_id == sid))).scalars())
                 for rc in rcs:
+                    # ⚠️ La neta puesta a mano NO se recalcula (mig 159).
+                    # Las villas se venden a $1,700 NETOS: derivarlos del
+                    # rack les quita la comisión dos veces.
+                    if rc.net_rate_manual:
+                        continue
                     if not rc.rack_rate:
                         continue
                     rc.net_rate = (rc.rack_rate * nf_por_mes.get(rc.month, nf_por_mes[1])
