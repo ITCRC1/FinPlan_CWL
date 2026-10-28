@@ -448,11 +448,22 @@ export default function RevenueCheckbookPage() {
             sum(b.occupied) ? sum(b.roomRev) / sum(b.occupied) : null],
         },
       ];
+      // Un bloque por set, igual que la pantalla: encabezado de seccion y
+      // debajo sus cinco metricas. Antes iban interleaveadas con sangria, que
+      // es justo lo que el owner no queria leer.
       const filasKpi: FilaCuadro[] = [];
-      for (const met of METRICAS) {
-        filasKpi.push({ label: met.label, formato: met.formato, valores: met.val(stats) });
-        for (const sr of stats.sets)
-          filasKpi.push({ label: "    " + sr.nombre, formato: met.formato, valores: met.val(sr) });
+      const bloque = (titulo: string | null, b: Medible) => {
+        // 13 nulos = los 12 meses + Full Year. Una fila de seccion corta deja
+        // el Excel desalineado de ahi para abajo (convencion de total-revenue).
+        if (titulo) filasKpi.push({ label: titulo, es_seccion: true, valores: Array(13).fill(null) });
+        for (const met of METRICAS)
+          filasKpi.push({ label: met.label, formato: met.formato, valores: met.val(b) });
+      };
+      if (stats.sets.length > 0) {
+        bloque("Rooms \u00b7 Total", stats);
+        for (const sr of stats.sets) bloque(sr.nombre, sr);
+      } else {
+        bloque(null, stats);
       }
       cuadros.push({
         titulo: t("xlsRoomsTitle"),
@@ -644,7 +655,7 @@ export default function RevenueCheckbookPage() {
           const td: React.CSSProperties = { textAlign: "right" };
           const yr: React.CSSProperties = { textAlign: "right", borderLeft: "1px solid var(--border)", fontWeight: 600 };
           // Las cinco metricas, cada una sabiendo medirse sobre CUALQUIER
-          // bloque: el hotel entero o un set. Asi la fila del total y la del
+          // bloque: el hotel entero o un set. Asi la tabla del total y la del
           // set no pueden calcularse distinto.
           const METRICAS: {
             label: string;
@@ -658,39 +669,54 @@ export default function RevenueCheckbookPage() {
             { label: "Occupancy %", marca: true, mes: (b, i) => pctCell(b.occupied[i], b.available[i]), anio: b => pctCell(sum(b.occupied), sum(b.available)) },
             { label: "ADR", marca: true, mes: (b, i) => adrCell(b.roomRev[i], b.occupied[i]), anio: b => adrCell(sum(b.roomRev), sum(b.occupied)) },
           ];
+
+          /* Una TABLA POR SET, no una tabla con las tres mezcladas.
+           *
+           * Owner, 2026-10-27, viendo la version interleaveada: *"podemos hacer
+           * 2 sets, separados (...) no quiero verlo asi todo junto"*. Con las
+           * cinco metricas repetidas tres veces en la misma tabla hay que leer
+           * el rotulo de CADA fila para saber de quien habla, y comparar dos
+           * meses de Villas obliga a saltar dos filas cada vez. Separadas, cada
+           * tabla se lee entera y sola.
+           *
+           * El TOTAL se queda, y primero: para disponibles, ocupadas y pax es
+           * la suma de los sets, pero ocupacion% y ADR son promedios
+           * PONDERADOS, y ese es el numero que va al P&L y al reporte a duenos.
+           * No se puede deducir mirando los dos sets.
+           *
+           * Sin sets (un hotel sin villas) queda UNA tabla, igual que siempre. */
+          const bloques: { titulo: string; b: Medible; total: boolean }[] =
+            stats.sets.length > 0
+              ? [{ titulo: "Rooms \u00b7 Total", b: stats, total: true },
+                 ...stats.sets.map(sr => ({ titulo: sr.nombre, b: sr as Medible, total: false }))]
+              : [{ titulo: "Rooms", b: stats, total: true }];
+
           return (
             <div className="fin-sticky" style={{ overflowX: "auto", marginBottom: 16 }}>
-              <table className="fin-table" style={{ minWidth: 1200 }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", minWidth: 150 }}>Rooms</th>
-                    {MONTHS.map(m => <th key={m} style={{ textAlign: "right", minWidth: 80 }}>{m}</th>)}
-                    <th style={{ textAlign: "right", minWidth: 100, borderLeft: "1px solid var(--border)" }}>Full Year</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {METRICAS.map(met => (
-                    <Fragment key={met.label}>
-                      <tr>
+              {bloques.map(bl => (
+                <table key={bl.titulo} className="fin-table"
+                       style={{ minWidth: 1200, marginBottom: 14 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", minWidth: 150,
+                                   color: bl.total ? undefined : "#c8a24a" }}>
+                        {bl.titulo}
+                      </th>
+                      {MONTHS.map(m => <th key={m} style={{ textAlign: "right", minWidth: 80 }}>{m}</th>)}
+                      <th style={{ textAlign: "right", minWidth: 100, borderLeft: "1px solid var(--border)" }}>Full Year</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {METRICAS.map(met => (
+                      <tr key={met.label}>
                         <td style={{ textAlign: "left", fontWeight: 500 }}>{met.label}</td>
-                        {MONTHS.map((_m, i) => <td key={i} className="mono" style={td}>{met.mes(stats, i)}</td>)}
-                        <td className="mono" style={met.marca ? { ...yr, color: "var(--brand)" } : yr}>{met.anio(stats)}</td>
+                        {MONTHS.map((_m, i) => <td key={i} className="mono" style={td}>{met.mes(bl.b, i)}</td>)}
+                        <td className="mono" style={met.marca ? { ...yr, color: "var(--brand)" } : yr}>{met.anio(bl.b)}</td>
                       </tr>
-                      {/* La apertura. Indentada y en gris porque NO suma con la
-                          fila de arriba: la parte. Ocupacion y ADR de un set se
-                          miden contra SUS propias disponibles y SUS noches, que
-                          es justamente lo que no se puede leer del promedio. */}
-                      {stats.sets.map(sr => (
-                        <tr key={sr.key} style={{ color: "var(--text-secondary)" }}>
-                          <td style={{ textAlign: "left", paddingLeft: 26 }}>{sr.nombre}</td>
-                          {MONTHS.map((_m, i) => <td key={i} className="mono" style={td}>{met.mes(sr, i)}</td>)}
-                          <td className="mono" style={{ ...yr, fontWeight: 500 }}>{met.anio(sr)}</td>
-                        </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              ))}
             </div>
           );
         })()}
