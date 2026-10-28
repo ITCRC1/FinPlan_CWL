@@ -39,7 +39,8 @@
       "pacingBudget": "Budget",
       "pacingDetail": "Detail",
       "pacingData": "Data",
-      "pacingMonths": "Special analysis"
+      "pacingMonths": "Special analysis",
+      "villas": "Villas"
     },
     "items": {
       "scenarios": "Scenarios (Budgets / Forecast)",
@@ -159,7 +160,16 @@
       "pacingCargas": "Uploads & settings",
       "pacingNov2026": "November 2026",
       "pacingDic2026": "December 2026",
-      "pacingMedida": "Custom study 2027"
+      "pacingMedida": "Custom study 2027",
+      "villasInventory": "Villas · Inventory (Units)",
+      "villasAvailability": "Villas · Availability",
+      "villasRoomNights": "Villas · Room Nights by Category",
+      "villasRackRates": "Villas · Rack Rates",
+      "villasOccupancy": "Villas · Occupancy",
+      "villasPax": "Villas · Pax (Guests)",
+      "villasNetRate": "Villas · Net Rate",
+      "villasSets": "Villas · Sets and cost split",
+      "villasReport": "Villas · Rooms by set"
     },
     "groupsFull": {
       "financials": "Financial Statements",
@@ -5304,5 +5314,11 @@
     "invalidaDetalle": "It may already have been used, it may have expired, or a newer one may have been sent. Ask whoever gave you access for another.",
     "irALogin": "Go to sign in",
     "privacidad": "Your password does not leave this browser until you submit it, and the system stores only a fingerprint of it — not even the administrator can see it."
+  },
+  "roomSetView": {
+    "badge": "Showing {set} only",
+    "help": "Inventory, rate, occupancy and nights for {set} — {n} units. The 30 standard rooms are not shown here; the cost still consolidates inside the P&L Rooms line.",
+    "empty": "No category is assigned to {set}. Assign it in Master Data › Room sets and give it units in Inventory.",
+    "showAll": "Show all categories"
   }
 }

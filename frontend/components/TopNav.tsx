@@ -94,6 +94,27 @@ export const NAV: NavGroup[] = [
       { key: "club", href: "/revenue/club" },
       { key: "totalRevenue", href: "/revenue/total-revenue" },
       { key: "revenueCheckbook", href: "/revenue/checkbook" },
+      // ── Villas ────────────────────────────────────────────────────────────
+      // Las MISMAS pantallas, con `?set=0115`. No son copias: una pantalla
+      // duplicada se arregla una vez y se olvida la otra, y acá se cargan
+      // tarifas — dos Rack Rates que divergen es plata mal presupuestada.
+      //
+      // Owner, 2026-10-27: *«un set diferente con su propio ADR, ocupación,
+      // revenue y todo»* · *«pero que al final se consoliden como parte de
+      // Rooms»*. Lo segundo ya lo hace la contabilidad: Villas (0115) cuelga de
+      // Rooms (0110) y consolida sola en el P&L.
+      { key: "villas", header: true },
+      { key: "villasInventory", href: "/revenue/inventory?set=0115" },
+      { key: "villasAvailability", href: "/revenue/availability?set=0115" },
+      { key: "villasRoomNights", href: "/revenue/room-nights?set=0115" },
+      { key: "villasRackRates", href: "/revenue/rack-rates?set=0115" },
+      { key: "villasOccupancy", href: "/revenue/occupancy?set=0115" },
+      { key: "villasPax", href: "/revenue/pax?set=0115" },
+      { key: "villasNetRate", href: "/revenue/net-rate?set=0115" },
+      // El cierre del círculo: acá se ve lo que las villas CUESTAN, ya
+      // consolidado dentro de la línea de Rooms.
+      { key: "villasSets", href: "/master-data/room-sets" },
+      { key: "villasReport", href: "/reports/rooms-sets" },
       { key: "payroll", header: true },
       { key: "payrollByDept", href: "/payroll/checkbook" },
       { key: "fteReport", href: "/payroll/fte" },

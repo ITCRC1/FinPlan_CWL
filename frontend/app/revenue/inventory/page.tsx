@@ -8,6 +8,8 @@ import {
   type RoomType,
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const HOTEL = HOTEL_ID;
@@ -49,6 +51,10 @@ export default function InventoryPage() {
   const tc = useTranslations("common");
   const t = useTranslations("inventory");
   const [rows, setRows] = useState<RoomType[]>([]);
+  // `rows` sigue siendo TODO el inventario: el set filtra lo que se muestra,
+  // no lo que se cargó. Editar una villa tiene que seguir funcionando igual.
+  const info = useInfoSet(rows);
+  const visibles = info.activo ? info.tipos : rows;
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -108,11 +114,15 @@ export default function InventoryPage() {
   }
 
   // Live total reflects edits in flight too.
-  const liveTotal = rows.reduce((s, r) => s + (Number(r.units) || 0), 0) || total;
+  // Con un set puesto el total es el del SET, no el del hotel: un cuadro que
+  // muestra 3 villas y dice «30» abajo no sirve para revisar nada.
+  const liveTotal = info.activo
+    ? visibles.reduce((s, r) => s + (Number(r.units) || 0), 0)
+    : (rows.reduce((s, r) => s + (Number(r.units) || 0), 0) || total);
 
   // ── Excel: la misma tabla ─────────────────────────────────────────────────
   async function bajarExcel() {
-    const filas: FilaCuadro[] = rows.map(r => ({
+    const filas: FilaCuadro[] = visibles.map(r => ({
       label: rtLabel(r.code, r.name), nivel: 1,
       valores: [Number(r.units) || 0],
     }));
@@ -160,6 +170,8 @@ export default function InventoryPage() {
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
+
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>
       ) : (
@@ -174,7 +186,7 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {visibles.map((r, i) => (
                 <tr key={r.id}>
                   <td className="mono" style={{ color: "var(--text-disabled)" }}>{i + 1}</td>
                   {/* El nombre se edita ACÁ. Antes era texto muerto con un

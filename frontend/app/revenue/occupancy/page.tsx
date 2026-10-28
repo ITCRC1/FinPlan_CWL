@@ -6,16 +6,18 @@ import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScena
 import { manejarPegado, repartirPegado, numeroDePorcentaje } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import {
   getScenarios, getOccupancyPct, saveOccupancyPct, getRoomTypes, rtLabel,
-  type Scenario, type OccPctRow, type OccPctBulkRow, type MonthKey,
+  type Scenario, type OccPctRow, type OccPctBulkRow, type MonthKey, type RoomType,
 } from "@/lib/api";
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { useHotel } from "@/lib/useHotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -43,6 +45,15 @@ export default function OccupancyPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
   const [rows, setRows] = useState<OccPctRow[]>([]);   // % (string)
+  const [tipos, setTipos] = useState<RoomType[]>([]);
+  const info = useInfoSet(tipos);
+  /** Lo que se ve, con el índice real de `rows` — ver la nota en Rack Rates. */
+  const vis = useMemo(() => {
+    const pares = rows.map((r, idx) => ({ r, idx }));
+    if (!info.activo) return pares;
+    const ids = new Set(info.tipos.map(x => x.id));
+    return pares.filter(({ r }) => ids.has(r.room_type_id));
+  }, [rows, info]);
   const [unitsById, setUnitsById] = useState<Record<string, number>>({});
   const [codeById, setCodeById] = useState<Record<string, string>>({});
   const [closed, setClosed] = useState<Set<number>>(new Set());
@@ -76,6 +87,7 @@ export default function OccupancyPage() {
     setLoading(true); setMsg(null);
     try {
       const [res, rt] = await Promise.all([getOccupancyPct(sid), getRoomTypes(HOTEL_ID, sid)]);
+      setTipos(rt.room_types);
       setUnitsById(Object.fromEntries(rt.room_types.map(r => [r.id, r.units])));
       setCodeById(Object.fromEntries(rt.room_types.map(r => [r.id, r.code])));
       setClosed(new Set(rt.closed_months));
@@ -109,12 +121,14 @@ export default function OccupancyPage() {
    * resultado que se ve plausible y nada que avise. El recorte de rotulos vive
    * en `manejarPegado`, asi que esta pantalla lo hereda.
    */
-  function handlePaste(ri: number, mi: number, e: React.ClipboardEvent) {
+  function handlePaste(vi: number, mi: number, e: React.ClipboardEvent) {
     manejarPegado(e, bloque => {
       setRows(prev => {
         const next = prev.map(r => ({ ...r }));
-        repartirPegado(bloque, ri, mi, next.length, MONTH_KEYS.length,
-          (f, c, valor) => { next[f][MONTH_KEYS[c]] = String(pctNum(valor)); });
+        // `f` es la fila que se VE; `vis[f].idx` la del dato. Sin el mapeo,
+        // con un set puesto el bloque entraría en la categoría de al lado.
+        repartirPegado(bloque, vi, mi, vis.length, MONTH_KEYS.length,
+          (f, c, valor) => { next[vis[f].idx][MONTH_KEYS[c]] = String(pctNum(valor)); });
         return next;
       });
       setDirty(true);
@@ -152,7 +166,11 @@ export default function OccupancyPage() {
     const units = unitsById[rows[ri]?.room_type_id] ?? 0;
     return (pctNum(rows[ri][MONTH_KEYS[mi]]) / 100) * units * daysInMonth(year, mi + 1);
   }
-  const monthOccTotals = MONTHS.map((_, mi) => rows.reduce((s, _r, ri) => s + occNights(ri, mi), 0));
+  // Los totales corren sobre lo que se VE: con Villas puesto, la ocupación
+  // general es la de las villas y no la del hotel. Es el punto entero de la
+  // vista por set — un denominador de 30 habitaciones sobre 3 villas no mide
+  // nada.
+  const monthOccTotals = MONTHS.map((_, mi) => vis.reduce((s, { idx }) => s + occNights(idx, mi), 0));
   const grandOcc = monthOccTotals.reduce((s, v) => s + v, 0);
 
   // Noches DISPONIBLES = unidades totales × días del mes, y CERO en un mes que
@@ -168,7 +186,7 @@ export default function OccupancyPage() {
   // Un hotel cerrado no tiene inventario que vender. Dejar sus noches en el
   // denominador hace que la ocupación anual salga MÁS BAJA de lo real —46,8 %
   // en vez de ~51 %—, y un número desfavorable se acepta sin revisarlo.
-  const unidadesTotales = rows.reduce((s, r) => s + (unitsById[r.room_type_id] ?? 0), 0);
+  const unidadesTotales = vis.reduce((s, { r }) => s + (unitsById[r.room_type_id] ?? 0), 0);
   const monthAvail = MONTHS.map((_, mi) =>
     closed.has(mi + 1) ? 0 : unidadesTotales * daysInMonth(year, mi + 1));
   const grandAvail = monthAvail.reduce((s, v) => s + v, 0);
@@ -189,11 +207,11 @@ export default function OccupancyPage() {
     const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
     const colRT = { label: "Room Type", ancho: 34, formato: "texto" as const };
     // Los % viajan como FRACCIÓN (0.45), no como 45.
-    const filasPct: FilaCuadro[] = rows.map(r => ({
+    const filasPct: FilaCuadro[] = vis.map(({ r }) => ({
       label: rtLabel(codeById[r.room_type_id], r.name), nivel: 1,
       valores: MONTH_KEYS.map(mk => pctNum(r[mk]) / 100),
     }));
-    const filasNoches: FilaCuadro[] = rows.map((r, ri) => ({
+    const filasNoches: FilaCuadro[] = vis.map(({ r, idx: ri }) => ({
       label: rtLabel(codeById[r.room_type_id], r.name), nivel: 1,
       valores: [...MONTHS.map((_m, mi) => occNights(ri, mi)),
                 MONTHS.reduce((s, _m, mi) => s + occNights(ri, mi), 0)],
@@ -264,6 +282,8 @@ export default function OccupancyPage() {
       {msg && <div style={{ color: "var(--accent-green, #1A7F4B)", fontSize: 13, marginBottom: 8 }}>{msg}</div>}
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
+
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>
       ) : (
@@ -277,7 +297,7 @@ export default function OccupancyPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, ri) => (
+              {vis.map(({ r, idx: ri }, vi) => (
                 <tr key={r.room_type_id}>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{rtLabel(codeById[r.room_type_id], r.name)}</td>
                   {MONTH_KEYS.map((mk, mi) => (
@@ -285,7 +305,7 @@ export default function OccupancyPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <input className="fin-input mono" value={r[mk]} disabled={sel?.is_locked}
                           onChange={e => setCell(ri, mk, e.target.value)}
-                          onPaste={e => handlePaste(ri, mi, e)} onFocus={e => e.target.select()}
+                          onPaste={e => handlePaste(vi, mi, e)} onFocus={e => e.target.select()}
                           style={{ flex: 1, minWidth: 0, textAlign: "right", padding: "3px 4px" }} />
                         <span style={{ color: "var(--text-disabled)", fontSize: 11 }}>%</span>
                       </div>
@@ -309,7 +329,7 @@ export default function OccupancyPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, ri) => {
+              {vis.map(({ r, idx: ri }) => {
                 const annual = MONTHS.reduce((s, _m, mi) => s + occNights(ri, mi), 0);
                 return (
                   <tr key={r.room_type_id}>

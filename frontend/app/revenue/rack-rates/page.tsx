@@ -9,14 +9,16 @@ import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScena
 import { manejarPegado, repartirPegado, numeroDeExcel } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
-  getScenarios, getRackRates, saveRackRates, rtLabel,
-  type Scenario, type RackRateRow, type RackRateBulkRow, type MonthKey,
+  getScenarios, getRackRates, saveRackRates, getRoomTypes, rtLabel,
+  type Scenario, type RackRateRow, type RackRateBulkRow, type MonthKey, type RoomType,
 } from "@/lib/api";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -36,6 +38,23 @@ export default function RackRatesPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
   const [rows, setRows] = useState<RackRateRow[]>([]);
+  const [tipos, setTipos] = useState<RoomType[]>([]);
+  const info = useInfoSet(tipos);
+  /**
+   * Las filas que se VEN, cada una con su índice real en `rows`.
+   *
+   * ⚠️ El par `{fila, índice}` no es adorno: todo lo que edita acá —celda,
+   * blur y pegado— trabaja por índice sobre `rows`. Filtrar el arreglo y
+   * seguir usando el índice del filtrado escribiría la tarifa en OTRA
+   * categoría, con un número plausible y nada que avise. Es el mismo modo de
+   * falla que este repo ya pagó con el pegado corrido una columna.
+   */
+  const vis = useMemo(() => {
+    const pares = rows.map((r, idx) => ({ r, idx }));
+    if (!info.activo) return pares;
+    const ids = new Set(info.tipos.map(t => t.id));
+    return pares.filter(({ r }) => ids.has(r.room_type_id));
+  }, [rows, info]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -45,7 +64,13 @@ export default function RackRatesPage() {
   useEffect(() => {
     (async () => {
       try {
-        const all = await getScenarios(HOTEL_ID);
+        const [all, rt] = await Promise.all([
+          getScenarios(HOTEL_ID),
+          // Las categorías se cargan solo para saber a qué set pertenece cada
+          // fila. Si falla, la pantalla igual sirve: sin set, sin filtro.
+          getRoomTypes(HOTEL_ID).then(r => r.room_types).catch(() => [] as RoomType[]),
+        ]);
+        setTipos(rt);
         setScenarios(all);
         // La regla del owner, una sola: `elegir(all, "budget")` = Budget Working
         // 2027. Acá había un año QUEMADO A MANO y, si no aparecía, `all[0]` —
@@ -103,12 +128,16 @@ export default function RackRatesPage() {
    * resultado que se ve plausible y nada que avise. El recorte de rotulos vive
    * en `manejarPegado`, asi que esta pantalla lo hereda.
    */
-  function handlePaste(ri: number, mi: number, e: React.ClipboardEvent) {
+  function handlePaste(vi: number, mi: number, e: React.ClipboardEvent) {
     manejarPegado(e, bloque => {
       setRows(prev => {
         const next = prev.map(r => ({ ...r }));
-        repartirPegado(bloque, ri, mi, next.length, MONTH_KEYS.length,
-          (f, c, valor) => { next[f][MONTH_KEYS[c]] = fmt2(valor); });
+        // `vi` es el índice de lo que se VE y `vis[f].idx` el de `rows`: el
+        // bloque baja por las filas de la pantalla y se escribe en las del
+        // dato. Sin set las dos listas son la misma, así que el comportamiento
+        // de siempre no cambia.
+        repartirPegado(bloque, vi, mi, vis.length, MONTH_KEYS.length,
+          (f, c, valor) => { next[vis[f].idx][MONTH_KEYS[c]] = fmt2(valor); });
         return next;
       });
       setDirty(true);
@@ -144,7 +173,7 @@ export default function RackRatesPage() {
   // ── Excel: la misma grilla, con las tarifas como número ───────────────────
   async function bajarExcel() {
     const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
-    const filas: FilaCuadro[] = rows.map(r => ({
+    const filas: FilaCuadro[] = vis.map(({ r }) => ({
       label: rtLabel(r.code, r.name), nivel: 1,
       valores: MONTH_KEYS.map(mk => num(r[mk])),
     }));
@@ -194,6 +223,8 @@ export default function RackRatesPage() {
       {msg && <div style={{ color: "var(--accent-green, #1A7F4B)", fontSize: 13, marginBottom: 8 }}>{msg}</div>}
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
+
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>
       ) : (
@@ -206,7 +237,7 @@ export default function RackRatesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, ri) => (
+              {vis.map(({ r, idx }, vi) => (
                 <tr key={r.room_type_id}>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{rtLabel(r.code, r.name)}</td>
                   {MONTH_KEYS.map((mk, mi) => (
@@ -217,9 +248,9 @@ export default function RackRatesPage() {
                           className="fin-input mono"
                           value={r[mk]}
                           disabled={sel?.is_locked}
-                          onChange={e => setCell(ri, mk, e.target.value)}
-                          onBlur={() => blurCell(ri, mk)}
-                          onPaste={e => handlePaste(ri, mi, e)}
+                          onChange={e => setCell(idx, mk, e.target.value)}
+                          onBlur={() => blurCell(idx, mk)}
+                          onPaste={e => handlePaste(vi, mi, e)}
                           onFocus={e => e.target.select()}
                           style={{ flex: 1, minWidth: 0, textAlign: "right", padding: "3px 4px" }}
                         />

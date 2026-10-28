@@ -2,16 +2,18 @@
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import {
-  getScenarios, getOccupancyPct, getRoomTypes, rtLabel,
+  getScenarios, getOccupancyPct, getRoomTypes, rtLabel, type RoomType,
   type Scenario,
 } from "@/lib/api";
 import GrillaPax from "./GrillaPax";
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -37,6 +39,15 @@ export default function PaxPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
   const [rows, setRows] = useState<Row[]>([]);
+  const [tipos, setTipos] = useState<RoomType[]>([]);
+  const info = useInfoSet(tipos);
+  /** Las filas del set. Pax no se edita por índice, así que acá alcanza
+   *  con filtrar: no hay nada que pueda escribirse en la fila de al lado. */
+  const vis = useMemo(() => {
+    if (!info.activo) return rows;
+    const ids = new Set(info.tipos.map(x => x.id));
+    return rows.filter(r => ids.has(r.id));
+  }, [rows, info]);
   /** El pax de CADA celda —`${room_type_id}:${mes}`—, que es como se carga y
    *  como el motor lo multiplica. Antes acá había un solo número para todo el
    *  hotel y todo el año (owner, 2026-10-04: «que tome los datos por mes y por
@@ -68,6 +79,7 @@ export default function PaxPage() {
     try {
       const [occ, rt] = await Promise.all([getOccupancyPct(sid), getRoomTypes(HOTEL_ID, sid)]);
       const year = occ.year;
+      setTipos(rt.room_types);
       const unitsById = Object.fromEntries(rt.room_types.map(r => [r.id, r.units]));
       const codeById: Record<string, string> = Object.fromEntries(rt.room_types.map(r => [r.id, r.code]));
       const closed = new Set(rt.closed_months);
@@ -96,7 +108,7 @@ export default function PaxPage() {
    *  ANTES de dejar escribir: el backend contesta 409, pero dejar teclear un
    *  año entero para que el Guardar lo rechace es perder el trabajo dos veces. */
   const bloqueado = scenarios.find(s2 => s2.id === scenarioId)?.is_locked ?? false;
-  const monthTotals = MONTHS.map((_m, mi) => rows.reduce((s, r) => s + paxOf(r, mi), 0));
+  const monthTotals = MONTHS.map((_m, mi) => vis.reduce((s, r) => s + paxOf(r, mi), 0));
   const grand = monthTotals.reduce((s, v) => s + v, 0);
   const fmt = fmtInt;
 
@@ -104,7 +116,7 @@ export default function PaxPage() {
   async function bajarExcel() {
     const sel = scenarios.find(s => s.id === scenarioId);
     const esc = sel ? `${sel.type} ${sel.version} ${sel.year}` : "";
-    const filas: FilaCuadro[] = rows.map(r => ({
+    const filas: FilaCuadro[] = vis.map(r => ({
       label: rtLabel(r.code, r.name), nivel: 1,
       valores: [...MONTHS.map((_m, mi) => paxOf(r, mi)),
                 MONTHS.reduce((s, _m, mi) => s + paxOf(r, mi), 0)],
@@ -153,6 +165,8 @@ export default function PaxPage() {
                  onCambio={setPaxCelda} />
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
+
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
 
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>

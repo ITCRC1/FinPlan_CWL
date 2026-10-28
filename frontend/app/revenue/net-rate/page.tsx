@@ -2,15 +2,17 @@
 import { usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import {
-  getScenarios, getRackRates, getChannelsConfig,
-  type Scenario,
+  getScenarios, getRackRates, getChannelsConfig, getRoomTypes,
+  type Scenario, type RoomType,
 } from "@/lib/api";
 import { fmtUsd } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -31,6 +33,13 @@ export default function NetRatePage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = usePlanningScenarioConUrl();
   const [rows, setRows] = useState<NetRow[]>([]);
+  const [tipos, setTipos] = useState<RoomType[]>([]);
+  const info = useInfoSet(tipos);
+  const vis = useMemo(() => {
+    if (!info.activo) return rows;
+    const ids = new Set(info.tipos.map(x => x.id));
+    return rows.filter(r => ids.has(r.room_type_id));
+  }, [rows, info]);
   const [netFactor, setNetFactor] = useState<number[]>(Array(12).fill(0));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +65,11 @@ export default function NetRatePage() {
   const load = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const [rack, ch] = await Promise.all([getRackRates(sid), getChannelsConfig(sid)]);
+      const [rack, ch, rt] = await Promise.all([
+        getRackRates(sid), getChannelsConfig(sid),
+        getRoomTypes(HOTEL_ID, sid).then(r => r.room_types).catch(() => [] as RoomType[]),
+      ]);
+      setTipos(rt);
       setRows(rack.rooms.map(r => ({
         room_type_id: r.room_type_id, name: r.name,
         rack: MONTH_KEYS.map(mk => parseFloat(r[mk]) || 0),
@@ -124,6 +137,8 @@ export default function NetRatePage() {
       </p>
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
+
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
 
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>

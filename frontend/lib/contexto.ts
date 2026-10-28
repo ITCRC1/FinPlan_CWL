@@ -46,11 +46,25 @@ export interface Contexto {
    * cuesta una línea; después de cablear 90 pantallas, cuesta noventa.
    */
   cta?: string;
+  /**
+   * Set de habitaciones: '0115' Villas, '0116' Residencias. Vacío = todas.
+   *
+   * Es una coordenada de PANTALLA, no de dato: el motor sigue calculando el
+   * hotel entero. Lo que hace es decidir qué categorías se ven, para poder
+   * mirar las villas con su propio inventario, su tarifa y su ocupación sin
+   * que se mezclen con las 30 estándar.
+   *
+   * Viaja en el `lleva` por defecto a propósito: si estás en Villas y saltás a
+   * otra pantalla de Planning, tiene que seguir siendo Villas. Un salto que te
+   * devuelve en silencio a las 30 es el mismo modo de falla que ya costó caro
+   * con el escenario.
+   */
+  set?: string;
   /** de dónde venís, para el «volver a» */
   de?: string;
 }
 
-export const PARAMS = ["esc", "mes", "dep", "cta", "de"] as const;
+export const PARAMS = ["esc", "mes", "dep", "cta", "set", "de"] as const;
 
 /** Lee el contexto de la dirección. Vacío si la URL no dice nada. */
 export function useContexto(): Contexto {
@@ -64,6 +78,7 @@ export function useContexto(): Contexto {
       mes: mes >= 1 && mes <= 12 ? mes : undefined,
       dep: sp.get("dep") || undefined,
       cta: sp.get("cta") || undefined,
+      set: sp.get("set") || undefined,
       de: sp.get("de") || undefined,
     };
   }, [sp]);
@@ -80,7 +95,7 @@ export function useContexto(): Contexto {
 export function conContexto(
   href: string,
   ctx: Contexto,
-  lleva: ReadonlyArray<keyof Contexto> = ["esc", "mes", "dep"],
+  lleva: ReadonlyArray<keyof Contexto> = ["esc", "mes", "dep", "set"],
   desde?: string,
 ): string {
   const q = new URLSearchParams();
@@ -88,6 +103,7 @@ export function conContexto(
   if (lleva.includes("mes") && ctx.mes) q.set("mes", String(ctx.mes));
   if (lleva.includes("dep") && ctx.dep) q.set("dep", ctx.dep);
   if (lleva.includes("cta") && ctx.cta) q.set("cta", ctx.cta);
+  if (lleva.includes("set") && ctx.set) q.set("set", ctx.set);
   // El «de» es de ida nomás: se pone al saltar, no se arrastra. Si se
   // encadenara, tres saltos dejarían un `de` apuntando al primero y el «volver»
   // mentiría sobre de dónde venís.

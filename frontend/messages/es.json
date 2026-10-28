@@ -39,7 +39,8 @@
       "pacingBudget": "Presupuesto",
       "pacingDetail": "Detalle",
       "pacingData": "Datos",
-      "pacingMonths": "Análisis especial"
+      "pacingMonths": "Análisis especial",
+      "villas": "Villas"
     },
     "items": {
       "scenarios": "Escenarios (Budgets / Forecast)",
@@ -159,7 +160,16 @@
       "pacingCargas": "Cargas y configuración",
       "pacingNov2026": "Noviembre 2026",
       "pacingDic2026": "Diciembre 2026",
-      "pacingMedida": "Estudio a medida 2027"
+      "pacingMedida": "Estudio a medida 2027",
+      "villasInventory": "Villas · Inventario (Units)",
+      "villasAvailability": "Villas · Disponibilidad",
+      "villasRoomNights": "Villas · Noches por Categoría",
+      "villasRackRates": "Villas · Rack Rates",
+      "villasOccupancy": "Villas · Ocupación",
+      "villasPax": "Villas · Pax (Huéspedes)",
+      "villasNetRate": "Villas · Net Rate",
+      "villasSets": "Villas · Sets y reparto del costo",
+      "villasReport": "Villas · Rooms por set"
     },
     "groupsFull": {
       "financials": "Estados financieros",
@@ -5304,5 +5314,11 @@
     "invalidaDetalle": "Puede que ya se haya usado, que haya vencido o que se haya enviado uno más nuevo. Pídale otro a quien le dio el acceso.",
     "irALogin": "Ir al inicio de sesión",
     "privacidad": "Su contraseña no sale de este navegador hasta que la envía, y el sistema guarda solo una huella de ella — ni el administrador puede verla."
+  },
+  "roomSetView": {
+    "badge": "Viendo solo {set}",
+    "help": "Inventario, tarifa, ocupación y noches de {set} — {n} unidades. Las 30 habitaciones estándar no se muestran acá; el costo igual consolida dentro de la línea de Rooms del P&L.",
+    "empty": "No hay ninguna categoría asignada a {set}. Asignala en Master Data › Sets de habitaciones y ponele unidades en Inventario.",
+    "showAll": "Ver todas las categorías"
   }
 }

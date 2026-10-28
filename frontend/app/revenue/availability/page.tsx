@@ -1,10 +1,12 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { getRoomTypes, setClosedMonths } from "@/lib/api";
+import { getRoomTypes, setClosedMonths, type RoomType } from "@/lib/api";
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const HOTEL = HOTEL_ID;
@@ -28,7 +30,12 @@ export default function AvailabilityPage() {
   const tm = useTranslations("months");
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const [year, setYear] = useState(2026);
-  const [units, setUnits] = useState(0);
+  const [tipos, setTipos] = useState<RoomType[]>([]);
+  const [totalUnits, setTotalUnits] = useState(0);
+  const info = useInfoSet(tipos);
+  /** Las unidades que multiplican los días. Con un set puesto son las del
+   *  set: la disponibilidad de las villas no es la del hotel. */
+  const units = info.activo ? info.unidades : totalUnits;
   const [closed, setClosed] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +44,8 @@ export default function AvailabilityPage() {
     (async () => {
       try {
         const res = await getRoomTypes(HOTEL);
-        setUnits(res.total_units);
+        setTipos(res.room_types);
+        setTotalUnits(res.total_units);
         setClosed(new Set(res.closed_months));
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : tc("error"));
@@ -142,6 +150,8 @@ export default function AvailabilityPage() {
       <div style={{ marginTop: 16 }} />
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
+
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
 
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>

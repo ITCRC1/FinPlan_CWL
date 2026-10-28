@@ -5,6 +5,8 @@ import { getRoomTypes, setClosedMonths, rtLabel, type RoomType } from "@/lib/api
 import { fmtInt } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type FilaCuadro } from "@/lib/exportCuadro";
+import { useInfoSet } from "@/lib/roomSet";
+import AvisoSet from "@/components/AvisoSet";
 import IrA from "@/components/IrA";
 
 const HOTEL = HOTEL_ID;
@@ -26,6 +28,8 @@ export default function RoomNightsPage() {
   const MONTHS = (tm.raw("short") as string[]) ?? MONTHS_FALLBACK;
   const [year, setYear] = useState(2026);
   const [rooms, setRooms] = useState<RoomType[]>([]);
+  const info = useInfoSet(rooms);
+  const vis = info.activo ? info.tipos : rooms;
   const [closed, setClosed] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +66,7 @@ export default function RoomNightsPage() {
   }
 
   const monthTotals = days.map(d =>
-    rooms.reduce((s, r) => s + r.units * d, 0));
+    vis.reduce((s, r) => s + r.units * d, 0));
   const grandTotal = monthTotals.reduce((s, v) => s + v, 0);
 
   const numTd: React.CSSProperties = { textAlign: "right", padding: "5px 9px", fontFamily: "var(--font-mono)" };
@@ -71,7 +75,7 @@ export default function RoomNightsPage() {
   // ── Excel: la misma grilla, con las noches como número ────────────────────
   async function bajarExcel() {
     const cerrados = MONTHS.filter((_m, i) => closed.has(i + 1));
-    const filas: FilaCuadro[] = rooms.map(r => {
+    const filas: FilaCuadro[] = vis.map(r => {
       const cells = days.map(d => r.units * d);
       return {
         label: rtLabel(r.code, r.name), nivel: 1,
@@ -115,6 +119,8 @@ export default function RoomNightsPage() {
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
+      <AvisoSet set={info.set} unidades={info.unidades} vacio={info.vacio} />
+
       {loading ? (
         <div style={{ color: "var(--text-secondary)", padding: 24 }}>{tc("loading")}</div>
       ) : (
@@ -144,7 +150,7 @@ export default function RoomNightsPage() {
               </tr>
             </thead>
             <tbody>
-              {rooms.map(r => {
+              {vis.map(r => {
                 const cells = days.map(d => r.units * d);
                 const annual = cells.reduce((s, v) => s + v, 0);
                 return (
