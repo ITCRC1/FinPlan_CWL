@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import PushRevenueButton from "@/components/PushRevenueButton";
 import {
   getScenarios, getRackRates, getChannelsConfig, getRoomTypes,
+  getNetRates, setNetRateManual,
   type Scenario, type RoomType,
 } from "@/lib/api";
 import { fmtUsd } from "@/lib/fmt";
@@ -23,7 +24,15 @@ const excelBtn: React.CSSProperties = {
   background: "transparent", color: "var(--positive)", border: "1px solid var(--positive)",
 };
 
-interface NetRow { room_type_id: string; name: string; rack: number[]; }
+interface NetRow {
+  room_type_id: string;
+  name: string;
+  rack: number[];
+  /** La neta GUARDADA por mes. Solo manda donde `manual` es true. */
+  neto: number[];
+  /** Qué meses tienen la neta puesta a mano (no derivada del rack). */
+  manual: boolean[];
+}
 
 export default function NetRatePage() {
   const tc = useTranslations("common");
@@ -42,6 +51,10 @@ export default function NetRatePage() {
   }, [rows, info]);
   const [netFactor, setNetFactor] = useState<number[]>(Array(12).fill(0));
   const [loading, setLoading] = useState(true);
+  /** Lo que se está tecleando, por `${room_type_id}:${mes}`. Sin esto el input
+   *  se repinta con el valor viejo en cada tecla y no se puede escribir. */
+  const [borrador, setBorrador] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,15 +78,23 @@ export default function NetRatePage() {
   const load = useCallback(async (sid: string) => {
     setLoading(true);
     try {
-      const [rack, ch, rt] = await Promise.all([
+      const [rack, ch, rt, net] = await Promise.all([
         getRackRates(sid), getChannelsConfig(sid),
         getRoomTypes(HOTEL_ID, sid).then(r => r.room_types).catch(() => [] as RoomType[]),
+        getNetRates(sid),
       ]);
       setTipos(rt);
-      setRows(rack.rooms.map(r => ({
-        room_type_id: r.room_type_id, name: r.name,
-        rack: MONTH_KEYS.map(mk => parseFloat(r[mk]) || 0),
-      })));
+      const netoPorTipo = new Map(net.rooms.map(n => [n.room_type_id, n]));
+      setRows(rack.rooms.map(r => {
+        const n = netoPorTipo.get(r.room_type_id);
+        return {
+          room_type_id: r.room_type_id, name: r.name,
+          rack: MONTH_KEYS.map(mk => parseFloat(r[mk]) || 0),
+          neto: MONTH_KEYS.map(mk => (n ? parseFloat(n.neto[mk]) || 0 : 0)),
+          manual: MONTH_KEYS.map(mk => Boolean(n?.manual[mk])),
+        };
+      }));
+      setBorrador({});
       setNetFactor(ch.net_factor.map(v => parseFloat(v) || 0));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : tc("error"));
@@ -83,6 +104,44 @@ export default function NetRatePage() {
   useEffect(() => { if (scenarioId) load(scenarioId); }, [scenarioId, load]);
 
   const fmt = fmtUsd;
+  const bloqueado = scenarios.find(x => x.id === scenarioId)?.is_locked ?? false;
+
+  /** Lo que se MUESTRA en la celda neta: lo guardado si es manual, la fórmula
+   *  si no. Para las celdas derivadas las dos cifras son la misma; mostrar la
+   *  fórmula mantiene el comportamiento de siempre en las seis categorías. */
+  const netoVisible = (r: NetRow, mi: number) =>
+    r.manual[mi] ? r.neto[mi] : r.rack[mi] * (netFactor[mi] || 0);
+
+  /** Guarda la celda, o la suelta si quedó vacía. */
+  async function guardarNeto(r: NetRow, mi: number, texto: string) {
+    const clave = `${r.room_type_id}:${mi}`;
+    const limpio = texto.trim().replace(/[$,\s]/g, "");
+    const valor = limpio === "" ? null : Number(limpio);
+    if (valor !== null && !Number.isFinite(valor)) {
+      setBorrador(b => { const n = { ...b }; delete n[clave]; return n; });
+      return;
+    }
+    // Sin cambio real no se molesta al servidor.
+    const antes = r.manual[mi] ? r.neto[mi] : null;
+    if ((valor === null && antes === null) ||
+        (valor !== null && antes !== null && Math.abs(valor - antes) < 0.005)) {
+      setBorrador(b => { const n = { ...b }; delete n[clave]; return n; });
+      return;
+    }
+    setGuardando(clave); setError(null);
+    try {
+      const res = await setNetRateManual(scenarioId, r.room_type_id, mi + 1, valor);
+      const neto = parseFloat(res.net_rate) || 0;
+      setRows(prev => prev.map(x => x.room_type_id !== r.room_type_id ? x : {
+        ...x,
+        neto: x.neto.map((v, i) => i === mi ? neto : v),
+        manual: x.manual.map((v, i) => i === mi ? res.manual : v),
+      }));
+      setBorrador(b => { const n = { ...b }; delete n[clave]; return n; });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : tc("error"));
+    } finally { setGuardando(null); }
+  }
 
   // ── Excel: la misma grilla, con las tarifas como número ───────────────────
   async function bajarExcel() {
@@ -132,8 +191,12 @@ export default function NetRatePage() {
         <PushRevenueButton scenarioId={scenarioId} />
         <button onClick={bajarExcel} title={t("excelHint")} style={excelBtn}>⬇ Excel</button>
       </div>
-      <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6, marginBottom: 12 }}>
+      <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 6, marginBottom: 6 }}>
         {t.rich("intro", { b: (c: React.ReactNode) => <b>{c}</b> })}
+      </p>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12.5, marginTop: 0, marginBottom: 12,
+        borderLeft: "2px solid #c8a24a", paddingLeft: 10, lineHeight: 1.6 }}>
+        {t.rich("editable", { b: (c: React.ReactNode) => <b>{c}</b> })}
       </p>
 
       {error && <div style={{ color: "var(--accent-red, #C0392B)", fontSize: 13, marginBottom: 8 }}>{error}</div>}
@@ -164,7 +227,7 @@ export default function NetRatePage() {
                   {t("blockRack")}
                 </td>
               </tr>
-              {rows.map(r => (
+              {vis.map(r => (
                 <tr key={`rack-${r.room_type_id}`}>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{r.name}</td>
                   {r.rack.map((rk, mi) => (
@@ -203,15 +266,35 @@ export default function NetRatePage() {
                   {t("blockNet")}
                 </td>
               </tr>
-              {rows.map(r => (
+              {vis.map(r => (
                 <tr key={`net-${r.room_type_id}`}>
                   <td style={{ textAlign: "left", fontWeight: 500 }}>{r.name}</td>
-                  {r.rack.map((rk, mi) => (
-                    <td key={mi} className="mono" style={{ textAlign: "right", fontWeight: 600,
-                      color: rk ? "var(--text-primary)" : "var(--text-disabled)" }}>
-                      {fmt(rk * (netFactor[mi] || 0))}
-                    </td>
-                  ))}
+                  {r.rack.map((rk, mi) => {
+                    const clave = `${r.room_type_id}:${mi}`;
+                    const manual = r.manual[mi];
+                    const valor = netoVisible(r, mi);
+                    return (
+                      <td key={mi} style={{ padding: "1px 2px",
+                        background: manual ? "rgba(200,162,74,0.10)" : undefined }}>
+                        <input
+                          className="fin-input mono"
+                          value={borrador[clave] ?? (valor ? valor.toFixed(2) : "")}
+                          disabled={bloqueado || guardando === clave}
+                          onChange={e => setBorrador(b => ({ ...b, [clave]: e.target.value }))}
+                          onBlur={e => guardarNeto(r, mi, e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                          onFocus={e => e.target.select()}
+                          title={manual ? t("manualCell") : t("formulaCell")}
+                          style={{
+                            width: "100%", minWidth: 0, textAlign: "right", padding: "3px 4px",
+                            fontWeight: 600,
+                            color: manual ? "#c8a24a"
+                                 : (rk ? "var(--text-primary)" : "var(--text-disabled)"),
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

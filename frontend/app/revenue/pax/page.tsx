@@ -181,7 +181,7 @@ export default function PaxPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => {
+              {vis.map(r => {
                 const annual = MONTHS.reduce((s, _m, mi) => s + paxOf(r, mi), 0);
                 return (
                   <tr key={r.id}>
