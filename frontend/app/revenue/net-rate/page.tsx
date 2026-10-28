@@ -7,7 +7,7 @@ import PushRevenueButton from "@/components/PushRevenueButton";
 import {
   getScenarios, getRackRates, getChannelsConfig, getRoomTypes,
   getNetRates, setNetRateManual,
-  type Scenario, type RoomType,
+  type Scenario, type RoomType, type NetRateRow,
 } from "@/lib/api";
 import { fmtUsd } from "@/lib/fmt";
 import { HOTEL_ID } from "@/lib/hotel";
@@ -81,7 +81,12 @@ export default function NetRatePage() {
       const [rack, ch, rt, net] = await Promise.all([
         getRackRates(sid), getChannelsConfig(sid),
         getRoomTypes(HOTEL_ID, sid).then(r => r.room_types).catch(() => [] as RoomType[]),
-        getNetRates(sid),
+        // ⚠️ Con su propio `catch`: la neta guardada es un AUXILIAR de esta
+        // pantalla —sirve para saber qué celdas son manuales— y si falla, lo
+        // que corresponde es dibujar la fórmula como siempre, no dejar la
+        // tabla en blanco. Iba dentro del `Promise.all` sin red, así que un
+        // 500 del endpoint nuevo borraba las ocho categorías de golpe.
+        getNetRates(sid).catch(() => ({ rooms: [] as NetRateRow[] })),
       ]);
       setTipos(rt);
       const netoPorTipo = new Map(net.rooms.map(n => [n.room_type_id, n]));
