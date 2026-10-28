@@ -3457,7 +3457,8 @@
     "discountPct": "Weighted commission for the month",
     "manualCell": "Set by hand — does not follow the formula. Clear the cell to return it to rack × net factor.",
     "formulaCell": "Calculated: rack × net factor. Type an amount to pin it by hand.",
-    "editable": "The net rate can be <b>pinned by hand</b>: type the amount in the cell and it stops following the formula (it turns gold). To return it to <b>rack × net factor</b>, clear the cell and tab out. Use it for what is negotiated net — the villas at $1,700 — where there is no rack to discount a commission from."
+    "editable": "The net rate can be <b>pinned by hand</b>: type the amount in the cell and it stops following the formula (it turns gold). To return it to <b>rack × net factor</b>, clear the cell and tab out. Use it for what is negotiated net — the villas at $1,700 — where there is no rack to discount a commission from.",
+    "naShort": "n/a"
   },
   "rackRates": {
     "errorSaving": "Error while saving",

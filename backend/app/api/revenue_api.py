@@ -2890,7 +2890,23 @@ async def set_net_rate_manual(
         RateCard.month == month,
     ))).scalar_one_or_none()
     if rc is None:
-        raise ErrorApi(404, "tarifa.no_encontrada")
+        # ⚠️ Se CREA, no se rechaza. Una categoría que se vende solo neta no
+        # tiene rack, y sin rack no hay tarjeta: exigirla dejaba la pantalla
+        # sin forma de guardar justo en el caso para el que se hizo esto.
+        # Owner, 2026-10-27: borró el rack de las villas —$1,700 es neto, no
+        # publicado— y a partir de ahí escribir en la celda no guardaba nada.
+        if payload.net_rate is None:
+            return {"room_type_id": room_type_id, "month": month,
+                    "net_rate": "0", "manual": False}
+        import uuid as _uuid_nr
+        rc = RateCard(
+            id=str(_uuid_nr.uuid4()), scenario_id=scenario_id,
+            hotel_id=scenario.hotel_id, room_type_id=room_type_id,
+            month=month, rack_rate=Decimal("0"), net_rate=Decimal("0"),
+            pax_per_room=await _semilla_del_escenario(scenario, db),
+        )
+        db.add(rc)
+        await db.flush()
 
     if payload.net_rate is None:
         canales = (await db.execute(select(SalesChannelConfig).where(

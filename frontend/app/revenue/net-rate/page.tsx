@@ -117,6 +117,16 @@ export default function NetRatePage() {
   const netoVisible = (r: NetRow, mi: number) =>
     r.manual[mi] ? r.neto[mi] : r.rack[mi] * (netFactor[mi] || 0);
 
+  /** ¿La comisión del canal gobierna ALGUNA de las filas que se ven este mes?
+   *
+   *  Owner, 2026-10-27: *«necesito quitar para villas el costo de comisión»*.
+   *  No es que las villas paguen 0% — es que su tarifa ya viene neta y no se
+   *  descuenta de ningún rack. Mostrar 20.30% sobre una fila fijada a mano
+   *  dice que la comisión hace algo, y no hace nada. Donde no gobierna
+   *  ninguna fila visible, el mes se muestra como «no aplica». */
+  const comisionAplica = (mi: number) =>
+    vis.length === 0 || vis.some(r => !r.manual[mi]);
+
   /** Guarda la celda, o la suelta si quedó vacía. */
   async function guardarNeto(r: NetRow, mi: number, texto: string) {
     const clave = `${r.room_type_id}:${mi}`;
@@ -253,15 +263,19 @@ export default function NetRatePage() {
               <tr>
                 <td style={{ textAlign: "left", fontWeight: 500 }}>{t("discountPct")}</td>
                 {netFactor.map((nf, mi) => (
-                  <td key={mi} className="mono" style={{ textAlign: "right" }}>
-                    {((1 - nf) * 100).toFixed(2)}%
+                  <td key={mi} className="mono" style={{ textAlign: "right",
+                    color: comisionAplica(mi) ? undefined : "var(--text-disabled)" }}>
+                    {comisionAplica(mi) ? `${((1 - nf) * 100).toFixed(2)}%` : t("naShort")}
                   </td>
                 ))}
               </tr>
               <tr style={{ color: "var(--brand)" }}>
                 <td style={{ textAlign: "left", fontWeight: 600 }}>Net Factor</td>
                 {netFactor.map((nf, mi) => (
-                  <td key={mi} className="mono" style={{ textAlign: "right" }}>{nf.toFixed(4)}</td>
+                  <td key={mi} className="mono" style={{ textAlign: "right",
+                    color: comisionAplica(mi) ? undefined : "var(--text-disabled)" }}>
+                    {comisionAplica(mi) ? nf.toFixed(4) : t("naShort")}
+                  </td>
                 ))}
               </tr>
 

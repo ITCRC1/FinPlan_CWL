@@ -3457,7 +3457,8 @@
     "discountPct": "Comisión ponderada del mes",
     "manualCell": "Puesta a mano — no sigue la fórmula. Borrá la celda para devolverla a rack × net factor.",
     "formulaCell": "Calculada: rack × net factor. Escribí un monto para fijarla a mano.",
-    "editable": "La tarifa neta se puede <b>fijar a mano</b>: escribí el monto en la celda y deja de seguir la fórmula (queda en dorado). Para devolverla a <b>rack × net factor</b>, borrá la celda y salí. Sirve para lo que se negocia neto — las villas a $1,700— donde no hay un rack del que descontar la comisión."
+    "editable": "La tarifa neta se puede <b>fijar a mano</b>: escribí el monto en la celda y deja de seguir la fórmula (queda en dorado). Para devolverla a <b>rack × net factor</b>, borrá la celda y salí. Sirve para lo que se negocia neto — las villas a $1,700— donde no hay un rack del que descontar la comisión.",
+    "naShort": "no aplica"
   },
   "rackRates": {
     "errorSaving": "Error al guardar",
