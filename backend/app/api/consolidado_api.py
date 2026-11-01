@@ -242,6 +242,7 @@ async def consolidado_cuentas(
         # repartido en la planilla, pero el Owner Dashboard muestra la cafetería con su costo y su crédito de reparto
         # (owner, 2026-11-01: «por qué acá dice que no hay food cost en cafetería»). El neto no cambia.
         acum = await _cargar_detalle(session, escenario, frozenset())
+        meses_de_precierre = await _asignaciones_de_precierre(session, escenario, acum)
         mensual = await pl_api._monthly_results(session, escenario)
         config = {r["line_code"]: r for r in await load_report_line_config(session)}
 
@@ -289,5 +290,60 @@ async def consolidado_cuentas(
                 "meses": serie,
             } for code, serie in por_mes.items()],
             "cuentas": cuentas,
+            # Meses en que Cafetería (0220) y Lavandería (0161) se tomaron del Pre-Cierre pasado a final.
+            "asignaciones_desde_precierre": meses_de_precierre,
             "leido_por": quien,
         }
+
+
+async def _asignaciones_de_precierre(session, escenario, acum) -> list[int]:
+    """Cafetería (0220) y Lavandería (0161) del ACTUAL, tomadas del Pre-Cierre de cada mes.
+
+    Owner, 2026-11-01: «deben estar en algún lugar, solo es moverlos». Al pasar a final, el importador saca del ACTUAL
+    el gasto de los departamentos de reparto (`ALLOCATION_EXCLUDE`) y su crédito de distribución, porque ese costo ya
+    viaja en la 6025/7310/7685 de cada departamento. El estado de cuenta original queda en el Pre-Cierre; acá se vuelve
+    a leer con el mismo armado (`_plantilla_para_importar` + `parse_gl_detail(en_overhead=True)`) y se agregan SOLO
+    esas filas, con su crédito: el departamento neta en cero, así que ningún total del P&L cambia.
+
+    Solo para ACTUAL (no el espejo) y solo en los meses en que el ACTUAL no las trae.
+    """
+    if escenario.type != "ACTUAL" or getattr(escenario, "es_precierre", False):
+        return []
+    from app.api.precierre_api import _plantilla_para_importar
+    from app.engine import pl_engine
+    from app.importers.gl_detail_importer import ALLOCATION_EXCLUDE, parse_gl_detail
+    from app.models.precierre import Precierre
+
+    def tiene(dept: str, mes: int) -> bool:
+        return any(abs(v[mes - 1]) > 0.005 for (d, _c), v in acum.datos.items() if d == dept)
+
+    hechos: list[int] = []
+    cierres = (await session.execute(
+        select(Precierre).where(Precierre.hotel_id == HOTEL_ID, Precierre.anio == escenario.year,
+                                Precierre.estado == "pasado_a_final")
+        .order_by(Precierre.mes, Precierre.creado_en.desc()))).scalars().all()
+    vistos: set[int] = set()
+    for pc in cierres:
+        if pc.mes in vistos:
+            continue  # el más reciente de cada mes
+        vistos.add(pc.mes)
+        faltan = [d for d in ALLOCATION_EXCLUDE if not tiene(d, pc.mes)]
+        if not faltan:
+            continue
+        bloques = parse_gl_detail(await _plantilla_para_importar(session, pc), en_overhead=True)
+        i = pc.mes - 1
+        agrego = False
+        for blk in bloques:
+            for fila in blk.get("costs", []) + blk.get("opex", []):
+                d, c = fila["dept_code"], fila["account_code"]
+                if d in faltan and (c[:1] in ALLOCATION_EXCLUDE[d] or "distribu" in (fila.get("account_name") or "").lower()):
+                    acum.add(d, c, i, fila["months"].get(pc.mes, 0.0), fila.get("account_name") or "")
+                    agrego = True
+            for fila in blk.get("payroll", []):
+                d = fila["dept_code"]
+                if d in faltan and "6" in ALLOCATION_EXCLUDE[d]:
+                    acum.add(d, pl_engine.payroll_account_for_column(fila["concept"]), i, fila["months"].get(pc.mes, 0.0))
+                    agrego = True
+        if agrego:
+            hechos.append(pc.mes)
+    return hechos
