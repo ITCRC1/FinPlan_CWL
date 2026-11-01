@@ -242,7 +242,12 @@ async def consolidado_cuentas(
         # repartido en la planilla, pero el Owner Dashboard muestra la cafetería con su costo y su crédito de reparto
         # (owner, 2026-11-01: «por qué acá dice que no hay food cost en cafetería»). El neto no cambia.
         acum = await _cargar_detalle(session, escenario, frozenset())
-        meses_de_precierre = await _asignaciones_de_precierre(session, escenario, acum)
+        # Un Pre-Cierre que no se puede leer no tumba la salida: se entrega sin ese detalle (neta en cero) y se avisa.
+        try:
+            meses_de_precierre = await _asignaciones_de_precierre(session, escenario, acum)
+            error_precierre = ""
+        except Exception as e:  # noqa: BLE001
+            meses_de_precierre, error_precierre = [], f"{type(e).__name__}: {e}"[:300]
         mensual = await pl_api._monthly_results(session, escenario)
         config = {r["line_code"]: r for r in await load_report_line_config(session)}
 
@@ -292,6 +297,7 @@ async def consolidado_cuentas(
             "cuentas": cuentas,
             # Meses en que Cafetería (0220) y Lavandería (0161) se tomaron del Pre-Cierre pasado a final.
             "asignaciones_desde_precierre": meses_de_precierre,
+            "asignaciones_error": error_precierre,
             "leido_por": quien,
         }
 
@@ -318,6 +324,7 @@ async def _asignaciones_de_precierre(session, escenario, acum) -> list[int]:
         return any(abs(v[mes - 1]) > 0.005 for (d, _c), v in acum.datos.items() if d == dept)
 
     hechos: list[int] = []
+    pendientes: list[tuple] = []  # se aplican al final: si algo falla a mitad, el detalle queda intacto
     cierres = (await session.execute(
         select(Precierre).where(Precierre.hotel_id == HOTEL_ID, Precierre.anio == escenario.year,
                                 Precierre.estado == "pasado_a_final")
@@ -337,13 +344,16 @@ async def _asignaciones_de_precierre(session, escenario, acum) -> list[int]:
             for fila in blk.get("costs", []) + blk.get("opex", []):
                 d, c = fila["dept_code"], fila["account_code"]
                 if d in faltan and (c[:1] in ALLOCATION_EXCLUDE[d] or "distribu" in (fila.get("account_name") or "").lower()):
-                    acum.add(d, c, i, fila["months"].get(pc.mes, 0.0), fila.get("account_name") or "")
+                    pendientes.append((d, c, i, fila["months"].get(pc.mes, 0.0), fila.get("account_name") or ""))
                     agrego = True
             for fila in blk.get("payroll", []):
                 d = fila["dept_code"]
                 if d in faltan and "6" in ALLOCATION_EXCLUDE[d]:
-                    acum.add(d, pl_engine.payroll_account_for_column(fila["concept"]), i, fila["months"].get(pc.mes, 0.0))
+                    pendientes.append((d, pl_engine.payroll_account_for_column(fila["concept"]), i,
+                                       fila["months"].get(pc.mes, 0.0), ""))
                     agrego = True
         if agrego:
             hechos.append(pc.mes)
+    for d, c, i, v, nombre in pendientes:
+        acum.add(d, c, i, v, nombre)
     return hechos
