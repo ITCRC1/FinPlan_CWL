@@ -311,7 +311,8 @@ async def _asignaciones_de_precierre(session, escenario, acum) -> list[int]:
     a leer con el mismo armado (`_plantilla_para_importar` + `parse_gl_detail(en_overhead=True)`) y se agregan SOLO
     esas filas, con su crédito: el departamento neta en cero, así que ningún total del P&L cambia.
 
-    Solo para ACTUAL (no el espejo) y solo en los meses en que el ACTUAL no las trae.
+    Solo para ACTUAL (no el espejo) y solo en los meses en que el ACTUAL no las trae. De cada mes se usa el Pre-Cierre
+    pasado a final; si no hay, el más reciente que no esté descartado (el departamento neta en cero igual).
     """
     if escenario.type != "ACTUAL" or getattr(escenario, "es_precierre", False):
         return []
@@ -327,8 +328,8 @@ async def _asignaciones_de_precierre(session, escenario, acum) -> list[int]:
     pendientes: list[tuple] = []  # se aplican al final: si algo falla a mitad, el detalle queda intacto
     cierres = (await session.execute(
         select(Precierre).where(Precierre.hotel_id == HOTEL_ID, Precierre.anio == escenario.year,
-                                Precierre.estado == "pasado_a_final")
-        .order_by(Precierre.mes, Precierre.creado_en.desc()))).scalars().all()
+                                Precierre.estado != "descartado")
+        .order_by(Precierre.mes, (Precierre.estado == "pasado_a_final").desc(), Precierre.creado_en.desc()))).scalars().all()
     vistos: set[int] = set()
     for pc in cierres:
         if pc.mes in vistos:
