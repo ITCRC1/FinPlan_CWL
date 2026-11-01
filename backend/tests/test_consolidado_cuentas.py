@@ -32,3 +32,11 @@ def test_version_exacta_manda():
 def test_la_ruta_esta_registrada():
     from app.api.consolidado_api import router
     assert "/consolidado/propia/cuentas/" in [r.path for r in router.routes]
+
+
+def test_el_consolidado_por_cuenta_no_saca_la_cafeteria():
+    """El Full Detail saca el 0220 de los reales importados; el consolidado por cuenta lo trae (owner, 2026-11-01)."""
+    import inspect
+    from app.api import consolidado_api
+    src = inspect.getsource(consolidado_api.consolidado_cuentas)
+    assert "_cargar_detalle(session, escenario, frozenset())" in src

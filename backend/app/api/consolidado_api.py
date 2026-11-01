@@ -238,7 +238,10 @@ async def consolidado_cuentas(
                                propiedad=HOTEL_NAME, tipo=tipo, version=version, anio=year)
             raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo=tipo, anio=year)
 
-        acum = await _cargar_detalle(session, escenario)
+        # Con TODOS los departamentos, también el 0220 Cafetería: el Full Detail lo saca porque su costo ya viaja
+        # repartido en la planilla, pero el Owner Dashboard muestra la cafetería con su costo y su crédito de reparto
+        # (owner, 2026-11-01: «por qué acá dice que no hay food cost en cafetería»). El neto no cambia.
+        acum = await _cargar_detalle(session, escenario, frozenset())
         mensual = await pl_api._monthly_results(session, escenario)
         config = {r["line_code"]: r for r in await load_report_line_config(session)}
 

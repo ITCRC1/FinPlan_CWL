@@ -205,7 +205,8 @@ class _Acum:
         return {d for (d, _c) in self.datos}
 
 
-async def _detalle_propio(db: AsyncSession, scenario: Scenario) -> _Acum:
+async def _detalle_propio(db: AsyncSession, scenario: Scenario,
+                          excluir: set[str] | frozenset[str] = EXCLUIR_EN_IMPORTADOS) -> _Acum:
     """El detalle cuenta × departamento × mes de UN escenario, sin mezclar.
 
     Dos caminos, según de dónde salga su P&L:
@@ -224,7 +225,7 @@ async def _detalle_propio(db: AsyncSession, scenario: Scenario) -> _Acum:
         for e in (await db.execute(select(ActualEntry).where(
                 ActualEntry.scenario_id == scenario.id))).scalars():
             dept = (e.dept_code or "").strip()
-            if dept in EXCLUIR_EN_IMPORTADOS:
+            if dept in excluir:
                 continue
             for i, m in enumerate(MESES):
                 acum.add(dept, e.account_code, i, getattr(e, m), e.account_name or "")
@@ -255,7 +256,8 @@ async def _detalle_propio(db: AsyncSession, scenario: Scenario) -> _Acum:
     return acum
 
 
-async def _cargar_detalle(db: AsyncSession, scenario: Scenario) -> _Acum:
+async def _cargar_detalle(db: AsyncSession, scenario: Scenario,
+                          excluir: set[str] | frozenset[str] = EXCLUIR_EN_IMPORTADOS) -> _Acum:
     """El detalle del escenario **siguiendo el mismo corte que el P&L**.
 
     Un forecast «vivo» con `actuals_through = N` no se lee entero de sí mismo:
@@ -266,7 +268,7 @@ async def _cargar_detalle(db: AsyncSession, scenario: Scenario) -> _Acum:
     Working 2026: +124,824.69 de ingreso y +340,419.67 de gasto que no eran de
     nadie.
     """
-    acum = await _detalle_propio(db, scenario)
+    acum = await _detalle_propio(db, scenario, excluir)
     corte = int(getattr(scenario, "actuals_through", 0) or 0)
     if scenario.type != "FORECAST" or corte <= 0:
         return acum
@@ -275,7 +277,7 @@ async def _cargar_detalle(db: AsyncSession, scenario: Scenario) -> _Acum:
     real = await linked_actual_scenario(db, scenario)
     if real is None:
         return acum
-    del_real = await _detalle_propio(db, real)
+    del_real = await _detalle_propio(db, real, excluir)
 
     mezcla = _Acum()
     mezcla.nombres.update(acum.nombres)
