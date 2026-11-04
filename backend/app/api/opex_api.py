@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from app.importers.registro_dep import registro_de_subida
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
@@ -181,12 +181,27 @@ async def import_all_opex(scenario_id: str, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=409, detail=str(e))
 
+    # ── 1. LEER. Si esto falla o viene vacío, no se tocó nada todavía. ──────
+    #
+    # ⚠️ Antes se borraba acá y se leía después. El 2026-11-03, en Amarena,
+    # el DELETE corrió, el importador no encontró un solo archivo —busca en
+    # `DATA_DIR`, la carpeta de la máquina vieja de CWL— y el Budget Working
+    # 2027 quedó en CERO: 166 líneas y $930.000,09, con un ✓ verde en pantalla.
+    #
+    # Una importación que no trae nada no puede borrar lo que había.
+    entries = import_opex_for_scenario(scenario_id, scenario.hotel_id, OPEX_BASE_DIR)
+    if not entries:
+        existentes = (await db.execute(
+            select(func.count()).select_from(OpexEntry)
+            .where(OpexEntry.scenario_id == scenario_id))).scalar_one()
+        raise ErrorApi(422, "opex.import_servidor_sin_archivos",
+                       carpeta=str(OPEX_BASE_DIR), lineas=existentes)
+
+    # ── 2. Recién ahora se reemplaza. ───────────────────────────────────────
     await db.execute(
         delete(OpexEntry).where(OpexEntry.scenario_id == scenario_id)
     )
     await db.flush()
-
-    entries = import_opex_for_scenario(scenario_id, scenario.hotel_id, OPEX_BASE_DIR)
     for e in entries:
         db.add(e)
 

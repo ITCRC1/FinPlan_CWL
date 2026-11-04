@@ -8,7 +8,7 @@ import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
 import RecalcButton from "@/components/RecalcButton";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
-  getScenarios, getOpexDepts, getOpexDeptCheckbook, updateOpexEntry, importAllOpex,
+  getScenarios, getOpexDepts, getOpexDeptCheckbook, updateOpexEntry,
   getTipoCambio,
   opexExcelUrl, importOpexExcel, addOpexLines,
   type Scenario, type OpexAccount, type OpexEntry, type OpexDeptCheckbook,
@@ -259,8 +259,6 @@ export default function OpexCheckbookPage() {
   const [loading, setLoading]             = useState(true);
   const [deptLoading, setDeptLoading]     = useState(false);
   const [saving, setSaving]               = useState<string | null>(null);
-  const [importing, setImporting]         = useState(false);
-  const [importMsg, setImportMsg]         = useState<string | null>(null);
   const [xlsxUploading, setXlsxUploading] = useState(false);
   const [xlsxMsg, setXlsxMsg]             = useState<string | null>(null);
   const [addingLines, setAddingLines]     = useState<string | null>(null);
@@ -396,24 +394,6 @@ export default function OpexCheckbookPage() {
     }
   }
 
-  async function handleImport() {
-    if (!scenarioId) return;
-    setImporting(true);
-    setImportMsg(null);
-    try {
-      const result = await importAllOpex(scenarioId);
-      setImportMsg(t("imported", { n: result.imported }));
-      const raw = await getOpexDepts(scenarioId);
-      const d = mergeDepts(raw.map(x => x.dept_code), "OPEX");
-      setDepts(d);
-      if (d.length > 0 && !selectedDept) setSelected(d[0].dept_code);
-      if (selectedDept) await loadDept(selectedDept);
-    } catch (e: unknown) {
-      setImportMsg(`${tc("error")}: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setImporting(false);
-    }
-  }
 
   async function handleAddLines(acct: OpexAccount) {
     if (!scenarioId || !selectedDept) return;
@@ -595,19 +575,23 @@ export default function OpexCheckbookPage() {
             {xlsxUploading ? t("uploading") : t("uploadExcel")}
           </button>
 
-          {/* Server import (legacy) */}
-          <button
-            onClick={handleImport}
-            disabled={importing || !scenarioId}
-            style={{
-              padding: "5px 14px", fontSize: 12, borderRadius: 4,
-              background: importing ? "var(--bg-elevated)" : "var(--bg-elevated)",
-              color: importing ? "var(--text-disabled)" : "var(--text-secondary)",
-              border: "1px solid var(--border-subtle)", cursor: importing ? "default" : "pointer",
-            }}
-          >
-            {importing ? t("importing") : t("importServer")}
-          </button>
+          {/* ⚠️ Acá estaba «Importar servidor», y se fue el 2026-11-03.
+              Leía los checkbooks del disco del servidor: diecisiete archivos
+              con el nombre escrito a mano —«OPEXC 2026 (CROW) BUDGET.xlsx»,
+              «...(CAF)...»— que son los de CORCOVADO. Era el cargador del día
+              uno, de cuando FinPlan corría en esa máquina y no existía «Subir
+              Excel»; quedó marcado como legacy en el código y nadie lo sacó
+              de la pantalla.
+
+              En producción esa carpeta no existe, así que el botón solo podía
+              hacer dos cosas: nada, o daño. Hizo daño — vació el Budget
+              Working 2027 de Amarena, 166 líneas y $930.000,09, con un cartel
+              verde que decía «Importado: 0 líneas».
+
+              El endpoint sigue vivo y ya no borra sin tener con qué
+              reemplazar (ver `opex_api.import_all_opex`), pero no hay ninguna
+              razón para ofrecerlo: «Subir Excel» hace el mismo trabajo, por
+              escenario y desde la máquina del usuario. */}
         </div>
       </div>
 
@@ -620,16 +604,6 @@ export default function OpexCheckbookPage() {
           border: `1px solid ${xlsxMsg.startsWith("✓") ? "var(--positive)" : "var(--negative)"}`,
         }}>
           {xlsxMsg}
-        </div>
-      )}
-      {importMsg && (
-        <div style={{
-          marginBottom: 12, padding: "8px 14px", borderRadius: 4, fontSize: 12,
-          background: importMsg.startsWith("✓") ? "rgba(38,166,154,0.08)" : "rgba(239,83,80,0.08)",
-          color: importMsg.startsWith("✓") ? "var(--positive)" : "var(--negative)",
-          border: `1px solid ${importMsg.startsWith("✓") ? "var(--positive)" : "var(--negative)"}`,
-        }}>
-          {importMsg}
         </div>
       )}
 

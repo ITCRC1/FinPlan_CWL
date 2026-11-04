@@ -566,6 +566,13 @@ MENSAJES: dict[str, dict[str, str]] = {
     "escenario.no_existe_id": {
         "es": "El escenario {escenario} no existe.",
         "en": "Scenario {escenario} does not exist."},
+    "opex.import_servidor_sin_archivos": {
+        "es": "No hay checkbooks de OPEX en el servidor ({carpeta}), así que no hay "
+              "nada que importar. El escenario queda como está, con sus {lineas} "
+              "líneas. Para cargar un presupuesto use «Subir Excel».",
+        "en": "There are no OPEX checkbooks on the server ({carpeta}), so there is "
+              "nothing to import. The scenario is left untouched, with its {lineas} "
+              "lines. To load a budget use «Upload Excel»."},
     "opex.archivo_no_encontrado": {
         "es": "Archivo no encontrado: {archivo}",
         "en": "File not found: {archivo}"},
