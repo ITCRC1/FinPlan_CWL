@@ -842,6 +842,19 @@ MENSAJES: dict[str, dict[str, str]] = {
               "saber de qué corte es. Indique la fecha al subirlo.",
         "en": "The file carries no movement date, so there is no way to tell which "
               "snapshot it is. Give the date when uploading."},
+    "deposits.fecha_invalida": {
+        "es": "«{valor}» no es una fecha válida para {campo}: use el formato "
+              "2026-12-20 (año-mes-día).",
+        "en": "«{valor}» is not a valid date for {campo}: use the 2026-12-20 "
+              "format (year-month-day)."},
+    "deposits.rango_al_reves": {
+        "es": "El rango está al revés: {desde} es posterior a {hasta}.",
+        "en": "The range runs backwards: {desde} is later than {hasta}."},
+    "deposits.sin_otb": {
+        "es": "No hay ningún corte de On the Books cargado: sin eso no se puede "
+              "calcular el saldo por cobrar.",
+        "en": "No On the Books snapshot is loaded: without it the balance due "
+              "cannot be worked out."},
     "deposits.corte_no_existe": {
         "es": "Ese corte del Deposit Ledger ya no existe.",
         "en": "That Deposit Ledger snapshot no longer exists."},

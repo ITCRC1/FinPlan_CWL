@@ -25,16 +25,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   getDepositLoads, getDepositLedger, getDepositAnalisis, compararDepositos,
-  subirDepositLedger, borrarDepositLoad,
+  getDepositRango, getDepositPorCobrar, subirDepositLedger, borrarDepositLoad,
   type DepositLoad, type DepositRow, type DepositAnalisis,
   type DepositComparacion, type DepositCambio, type DepositGrupoCambio,
+  type DepositRango, type DepositPorCobrar, type DepositMesPorCobrar,
 } from "@/lib/api";
 import { bajarCuadros, type Cuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 
 const GOLD = "#c8a24a";
-type Tab = "ledger" | "llegada" | "analisis" | "versiones";
-const TABS: Tab[] = ["ledger", "llegada", "analisis", "versiones"];
+type Tab = "ledger" | "llegada" | "rango" | "cobrar" | "analisis" | "versiones";
+const TABS: Tab[] = ["ledger", "llegada", "rango", "cobrar", "analisis", "versiones"];
 
 const usd = (n: number, d = 2) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD",
@@ -63,6 +64,11 @@ export default function DepositAnalysisPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [arrastrando, setArrastrando] = useState(false);
+  const [rango, setRango] = useState<DepositRango | null>(null);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [cobrar, setCobrar] = useState<DepositPorCobrar | null>(null);
+  const [verCerrados, setVerCerrados] = useState(false);
 
   /**
    * Trae la lista de cortes y deja todo apuntando a lo correcto.
@@ -105,6 +111,41 @@ export default function DepositAnalysisPage() {
       } catch (e) { setError(String(e)); }
     })();
   }, [loadId]);
+
+  // El rango lo calcula el servidor: trae los mismos análisis que el corte
+  // entero, pero sobre la ventana pedida. Sin fechas devuelve todo el ledger,
+  // así que la pestaña abre mostrando algo en vez de un vacío.
+  useEffect(() => {
+    if (tab !== "rango" || !loadId) { return; }
+    // Un rango al revés no se consulta: la pantalla ya sabe que está mal y lo
+    // dice con sus palabras. Preguntar igual traía un 422 que se pintaba crudo
+    // —con el JSON y la clave adentro— encima del aviso bueno. La validación
+    // del servidor sigue ahí como red, para quien llame a la ruta de frente.
+    if (desde && hasta && desde > hasta) { return; }
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await getDepositRango(desde || undefined, hasta || undefined, loadId);
+        if (vivo) { setRango(r); setError(null); }
+      } catch (e) { if (vivo) { setError(String(e)); setRango(null); } }
+    })();
+    return () => { vivo = false; };
+  }, [tab, desde, hasta, loadId]);
+
+  // El saldo por cobrar cruza dos fuentes: el On the Books (ingreso vendido,
+  // SIN impuestos) y los depósitos ya recibidos. El servidor toma el corte OTB
+  // más reciente salvo que se le pida otro.
+  useEffect(() => {
+    if (tab !== "cobrar" || !loadId) { return; }
+    let vivo = true;
+    (async () => {
+      try {
+        const r = await getDepositPorCobrar(undefined, undefined, loadId);
+        if (vivo) { setCobrar(r); setError(null); }
+      } catch (e) { if (vivo) { setError(String(e)); setCobrar(null); } }
+    })();
+    return () => { vivo = false; };
+  }, [tab, loadId]);
 
   useEffect(() => {
     if (tab !== "versiones" || !antes || !despues || antes === despues) { setCmp(null); return; }
@@ -282,6 +323,74 @@ export default function DepositAnalysisPage() {
       comentarios: [t("concentracionNota", { pct: pct(analisis.concentracion.pct_top) })],
     });
 
+    // El saldo por cobrar: solo los meses abiertos, que son los que se cobran.
+    if (cobrar) {
+      const ab = cobrar.meses.filter(m => !m.pasado && (m.otb_total || m.deposito));
+      const a = cobrar.total_abierto;
+      cuadros.push({
+        titulo: `${t("tab_cobrar")} · OTB semana ${cobrar.otb_week} · corte ${corte}`,
+        subtitulo: t("excelCobrarSub"), hoja: "Saldo por cobrar",
+        columnas: [
+          { label: t("colMes"), ancho: 13, formato: "texto" },
+          { label: t("colOtbSinImp"), ancho: 15, formato: "usd2" },
+          { label: `IVA ${(cobrar.iva_pct * 100).toFixed(0)}%`, ancho: 13, formato: "usd2" },
+          { label: t("colConImp"), ancho: 15, formato: "usd2" },
+          { label: t("colDepositos"), ancho: 15, formato: "usd2" },
+          { label: t("colReservas"), ancho: 10, formato: "num" },
+          { label: t("colSaldo"), ancho: 15, formato: "usd2", abre_grupo: true },
+          { label: t("colCobrado"), ancho: 11, formato: "pct" },
+        ],
+        filas: [
+          ...ab.map<FilaCuadro>(m => ({
+            label: m.etiqueta,
+            valores: [m.otb_total, m.iva, m.con_iva, m.deposito, m.reservas,
+                      m.saldo, m.pct_cobrado === null ? null : m.pct_cobrado / 100],
+          })),
+          { label: t("totalAbierto", { n: a.meses }), es_total: true,
+            valores: [a.otb_total, a.iva, a.con_iva, a.deposito, a.reservas,
+                      a.saldo, a.pct_cobrado === null ? null : a.pct_cobrado / 100] },
+        ],
+        comentarios: [
+          t("cobrarNota", { iva: `${(cobrar.iva_pct * 100).toFixed(0)}%` }),
+          t("cerradosNota"),
+        ],
+      });
+    }
+
+    // El rango, cuando hay uno puesto: su propia hoja, con las fechas en el
+    // título para que la hoja se entienda suelta, impresa o mandada aparte.
+    if (rango && (rango.desde || rango.hasta)) {
+      const vent = `${rango.desde ?? "…"} → ${rango.hasta ?? "…"}`;
+      cuadros.push({
+        titulo: `${t("tab_rango")} · ${vent}`,
+        subtitulo: t("excelRangoSub"), hoja: "Rango",
+        columnas: [
+          { label: t("colLlegada"), ancho: 12, formato: "texto" },
+          { label: t("colSalida"), ancho: 12, formato: "texto" },
+          { label: t("colHuesped"), ancho: 30, formato: "texto" },
+          { label: t("colHab"), ancho: 7, formato: "texto" },
+          { label: t("colNoches"), ancho: 9, formato: "num" },
+          { label: t("colEstado"), ancho: 9, formato: "texto" },
+          { label: t("colUltMov"), ancho: 12, formato: "texto" },
+          { label: t("colMonto"), ancho: 15, formato: "usd2", abre_grupo: true },
+        ],
+        filas: [
+          ...rango.filas.map<FilaCuadro>(f => ({
+            label: f.arrival ?? "—",
+            valores: [f.departure, f.name, f.room, f.nights, f.resv_status,
+                      f.last_date, Math.abs(f.total_paid_amt)],
+          })),
+          { label: "TOTAL", es_total: true,
+            valores: [null, null, null, rango.total.noches, null, null,
+                      rango.total.monto] },
+        ],
+        comentarios: [
+          `${rango.total.reservas} ${t("reservas")} · ${pct(rango.pct_del_corte)} ${t("delCorte")}`
+          + (rango.dias ? ` · ${rango.dias} ${t("dias")}` : ""),
+        ],
+      });
+    }
+
     if (cmp) {
       const bloque = (rot: string, g: DepositGrupoCambio, conDelta: boolean) => ({
         titulo: `${rot} · ${cmp.corte_antes.as_of} → ${cmp.corte_despues.as_of}`,
@@ -314,7 +423,7 @@ export default function DepositAnalysisPage() {
     }
 
     await bajarCuadros(`Deposit_Ledger_${corte}`, cuadros);
-  }, [ledger, analisis, cmp, t]);
+  }, [ledger, analisis, cmp, rango, cobrar, t]);
 
   // ── pintado ──────────────────────────────────────────────────────────────
   const corteActual = cortes.find(c => c.id === loadId) ?? null;
@@ -385,6 +494,14 @@ export default function DepositAnalysisPage() {
 
       {tab === "ledger" && ledger && <Ledger d={ledger} t={t} />}
       {tab === "llegada" && analisis && <PorLlegada a={analisis} t={t} />}
+      {tab === "rango" && analisis && (
+        <PorRango r={rango} a={analisis} desde={desde} hasta={hasta}
+                  setDesde={setDesde} setHasta={setHasta} t={t} />
+      )}
+      {tab === "cobrar" && (
+        <PorCobrar c={cobrar} verCerrados={verCerrados}
+                   setVerCerrados={setVerCerrados} t={t} />
+      )}
       {tab === "analisis" && analisis && <Analisis a={analisis} t={t} />}
       {tab === "versiones" && (
         <Versiones
@@ -547,7 +664,327 @@ function PorLlegada({ a, t }: { a: DepositAnalisis; t: ReturnType<typeof useTran
   );
 }
 
-// ═══════════════════════════ Pestaña 3 · Análisis ═══════════════════════════
+// ═════════════════════ Pestaña 3 · Por rango de llegada ════════════════════
+/**
+ * Owner, 2026-11-05: *«necesito poder buscar los deposits por rango de fecha de
+ * arrival. si yo quiero saber cuanto deposits hay del 20 de diciembre al 31 de
+ * diciembre»*.
+ *
+ * Los dos extremos entran. Los atajos de abajo son los meses que el corte
+ * realmente tiene —no una lista fija de doce—, porque un botón que lleva a un
+ * mes vacío es un botón que hace perder el tiempo.
+ */
+function PorRango({ r, a, desde, hasta, setDesde, setHasta, t }: {
+  r: DepositRango | null; a: DepositAnalisis;
+  desde: string; hasta: string;
+  setDesde: (s: string) => void; setHasta: (s: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const alReves = !!desde && !!hasta && desde > hasta;
+
+  const atajos = useMemo(() => {
+    const finDeMes = (ym: string) => {
+      const [y, m] = ym.split("-").map(Number);
+      return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+    };
+    return a.por_mes.meses.map(m => ({
+      rotulo: m.etiqueta, desde: `${m.mes}-01`, hasta: finDeMes(m.mes),
+      monto: m.monto,
+    }));
+  }, [a.por_mes.meses]);
+
+  const activo = (d: string, h: string) => desde === d && hasta === h;
+
+  return (
+    <>
+      <div style={nota}>{t("rangoNota")}</div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap",
+                    margin: "12px 0" }}>
+        <span style={{ fontSize: 13, color: "#666" }}>{t("llegadasEntre")}</span>
+        <input type="date" value={desde} onChange={e => setDesde(e.target.value)}
+               style={{ ...sel, ...(alReves ? { borderColor: "#b3261e" } : {}) }} />
+        <span style={{ fontSize: 13, color: "#666" }}>{t("yLa")}</span>
+        <input type="date" value={hasta} onChange={e => setHasta(e.target.value)}
+               style={{ ...sel, ...(alReves ? { borderColor: "#b3261e" } : {}) }} />
+        {(desde || hasta) && (
+          <button onClick={() => { setDesde(""); setHasta(""); }} style={btnMini}>
+            {t("limpiar")}
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ fontSize: 11.5, color: "#888", alignSelf: "center",
+                       marginRight: 2 }}>{t("atajos")}</span>
+        {atajos.map(x => (
+          <button key={x.desde} onClick={() => { setDesde(x.desde); setHasta(x.hasta); }}
+                  title={usd(x.monto, 0)}
+                  style={{ ...btnMini, color: "#444",
+                           borderColor: activo(x.desde, x.hasta) ? GOLD : "#ddd",
+                           background: activo(x.desde, x.hasta) ? "#fdf8ec" : "#fff" }}>
+            {x.rotulo}
+          </button>
+        ))}
+      </div>
+
+      {alReves && <div style={aviso("#b3261e")}>{t("rangoAlReves")}</div>}
+
+      {r && !alReves && (
+        <>
+          <Tarjetas items={[
+            { rot: t("enEseRango"), val: usd(r.total.monto, 0) },
+            { rot: t("reservas"), val: String(r.total.reservas) },
+            { rot: t("promedio"), val: usd(r.total.promedio, 0) },
+            { rot: t("delCorte"), val: pct(r.pct_del_corte) },
+            ...(r.dias ? [{ rot: t("dias"), val: String(r.dias) }] : []),
+          ]} />
+
+          {r.total.reservas === 0 ? (
+            <div style={{ ...aviso("#8a6d1f"), marginTop: 16 }}>{t("rangoVacio")}</div>
+          ) : (
+            <>
+              {r.por_dia.length > 1 && r.por_dia.length <= 45 && (
+                <>
+                  <h3 style={h3}>{t("porDia")}</h3>
+                  <table style={{ ...tabla, maxWidth: 620 }}>
+                    <thead>
+                      <tr>
+                        <th style={th}>{t("colFecha")}</th>
+                        <th style={thN}>{t("colReservas")}</th>
+                        <th style={thN}>{t("colNoches")}</th>
+                        <th style={thN}>{t("colMonto")}</th>
+                        <th style={thN}>{t("colPromedio")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.por_dia.map(d => (
+                        <tr key={d.fecha}>
+                          <td style={td}><b>{d.fecha}</b></td>
+                          <td style={tdN}>{d.reservas}</td>
+                          <td style={tdN}>{d.noches}</td>
+                          <td style={{ ...tdN, fontWeight: 600 }}>{usd(d.monto)}</td>
+                          <td style={tdN}>{usd(d.promedio)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style={{ ...tdT, textAlign: "left" }}>TOTAL</td>
+                        <td style={tdT}>{r.total.reservas}</td>
+                        <td style={tdT}>{r.total.noches}</td>
+                        <td style={tdT}>{usd(r.total.monto)}</td>
+                        <td style={tdT}>{usd(r.total.promedio)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </>
+              )}
+
+              <h3 style={h3}>{t("lasReservas")}</h3>
+              <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+                <table style={tabla}>
+                  <thead>
+                    <tr>
+                      <th style={th}>{t("colLlegada")}</th>
+                      <th style={th}>{t("colSalida")}</th>
+                      <th style={th}>{t("colHuesped")}</th>
+                      <th style={th}>{t("colHab")}</th>
+                      <th style={thN}>{t("colNoches")}</th>
+                      <th style={thN}>{t("colEstado")}</th>
+                      <th style={thN}>{t("colUltMov")}</th>
+                      <th style={thN}>{t("colMonto")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.filas.map(f => (
+                      <tr key={f.resv_name_id}>
+                        <td style={td}><b>{fecha(f.arrival)}</b></td>
+                        <td style={td}>{fecha(f.departure)}</td>
+                        <td style={td}>{fecha(f.name)}</td>
+                        <td style={td}>{fecha(f.room)}</td>
+                        <td style={tdN}>{f.nights}</td>
+                        <td style={tdN}>{fecha(f.resv_status)}</td>
+                        <td style={tdN}>{fecha(f.last_date)}</td>
+                        <td style={{ ...tdN, fontWeight: 600 }}>
+                          {usd(Math.abs(f.total_paid_amt))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td style={{ ...tdT, textAlign: "left" }} colSpan={4}>
+                        TOTAL · {r.total.reservas} {t("reservas")}
+                      </td>
+                      <td style={tdT}>{r.total.noches}</td>
+                      <td style={tdT} colSpan={2} />
+                      <td style={tdT}>{usd(r.total.monto)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <h3 style={h3}>{t("porEstado")}</h3>
+              <div style={{ maxWidth: 560 }}>
+                <Grupo titulo={t("porEstado")} filas={r.por_estado} t={t} />
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════ Pestaña 4 · Saldo por cobrar ══════════════════════════
+/**
+ * Owner, 2026-11-05: *«on the books no tiene impuestos. entonces on the books
+ * total revenue más el 13% menos los depósitos recibidos es el saldo por
+ * cobrar del mes»*. Y: *«debe tomar el reporte más reciente»*.
+ *
+ *     saldo = OTB total revenue × (1 + IVA) − depósitos recibidos
+ *
+ * Dos avisos que la pantalla tiene que dar, porque el número solo no los
+ * cuenta:
+ *
+ * · **Los meses cerrados no tienen saldo.** El OTB trae el año entero; el
+ *   ledger, solo llegadas futuras. De un mes que ya pasó el huésped se
+ *   hospedó y pagó al salir, así que la resta daría «nos deben el mes
+ *   completo». Van aparte, plegados.
+ * · **Las reservas que cruzan de mes.** Su depósito está entero en el mes de
+ *   llegada y su ingreso se reparte. En diciembre 2026 son 13 reservas por
+ *   $113,047 — no es un redondeo.
+ */
+function PorCobrar({ c, verCerrados, setVerCerrados, t }: {
+  c: DepositPorCobrar | null;
+  verCerrados: boolean; setVerCerrados: (b: boolean) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  if (!c) return <div style={nota}>{t("cargandoSaldo")}</div>;
+
+  const abiertos = c.meses.filter(m => !m.pasado && (m.otb_total || m.deposito));
+  const cerrados = c.meses.filter(m => m.pasado && (m.otb_total || m.deposito));
+  const a = c.total_abierto;
+
+  return (
+    <>
+      <div style={nota}>
+        {t("cobrarNota", { iva: `${(c.iva_pct * 100).toFixed(0)}%` })}
+      </div>
+      <div style={{ ...nota, marginTop: 0 }}>
+        {t("cobrarFuentes", { week: c.otb_week, corte: c.corte.as_of })}
+        {!c.otb_week_es_la_ultima && (
+          <b style={{ color: "#b3261e" }}> {t("noEsLaUltimaSemana")}</b>
+        )}
+      </div>
+
+      <Tarjetas items={[
+        { rot: t("vendidoConImp"), val: usd(a.con_iva, 0) },
+        { rot: t("yaCobrado"), val: usd(a.deposito, 0) },
+        { rot: t("saldoPorCobrar"), val: usd(a.saldo, 0), tono: "#b3261e" },
+        { rot: t("pctCobrado"), val: a.pct_cobrado === null ? "—" : pct(a.pct_cobrado) },
+      ]} />
+
+      <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+        <table style={{ ...tabla, marginTop: 16 }}>
+          <thead>
+            <tr>
+              <th style={th}>{t("colMes")}</th>
+              <th style={thN}>{t("colOtbSinImp")}</th>
+              <th style={thN}>+ IVA {(c.iva_pct * 100).toFixed(0)}%</th>
+              <th style={thN}>{t("colConImp")}</th>
+              <th style={thN}>{t("colDepositos")}</th>
+              <th style={thN}>{t("colReservas")}</th>
+              <th style={thN}>{t("colSaldo")}</th>
+              <th style={thN}>{t("colCobrado")}</th>
+              <th style={th}>{t("colCruzan")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {abiertos.map(m => <FilaCobrar key={`${m.year}-${m.month}`} m={m} t={t} />)}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style={{ ...tdT, textAlign: "left" }}>
+                {t("totalAbierto", { n: a.meses })}
+              </td>
+              <td style={tdT}>{usd(a.otb_total)}</td>
+              <td style={tdT}>{usd(a.iva)}</td>
+              <td style={tdT}>{usd(a.con_iva)}</td>
+              <td style={tdT}>{usd(a.deposito)}</td>
+              <td style={tdT}>{a.reservas}</td>
+              <td style={{ ...tdT, color: "#b3261e" }}>{usd(a.saldo)}</td>
+              <td style={tdT}>{a.pct_cobrado === null ? "—" : pct(a.pct_cobrado)}</td>
+              <td style={tdT} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {cerrados.length > 0 && (
+        <>
+          <button onClick={() => setVerCerrados(!verCerrados)}
+                  style={{ ...btnMini, color: "#444", marginTop: 16 }}>
+            {verCerrados ? "▾" : "▸"} {t("mesesCerrados", { n: cerrados.length })}
+          </button>
+          <div style={{ ...nota, marginTop: 6 }}>{t("cerradosNota")}</div>
+          {verCerrados && (
+            <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
+              <table style={{ ...tabla, opacity: 0.75 }}>
+                <thead>
+                  <tr>
+                    <th style={th}>{t("colMes")}</th>
+                    <th style={thN}>{t("colOtbSinImp")}</th>
+                    <th style={thN}>{t("colConImp")}</th>
+                    <th style={thN}>{t("colDepositos")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cerrados.map(m => (
+                    <tr key={`${m.year}-${m.month}`}>
+                      <td style={td}>{m.etiqueta}</td>
+                      <td style={tdN}>{usd(m.otb_total)}</td>
+                      <td style={tdN}>{usd(m.con_iva)}</td>
+                      <td style={tdN}>{usd(m.deposito)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function FilaCobrar({ m, t }: {
+  m: DepositMesPorCobrar; t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <tr>
+      <td style={td}><b>{m.etiqueta}</b></td>
+      <td style={tdN}>{m.sin_otb ? "—" : usd(m.otb_total)}</td>
+      <td style={tdN}>{m.sin_otb ? "—" : usd(m.iva)}</td>
+      <td style={{ ...tdN, fontWeight: 600 }}>{m.sin_otb ? "—" : usd(m.con_iva)}</td>
+      <td style={tdN}>{usd(m.deposito)}</td>
+      <td style={tdN}>{m.reservas || ""}</td>
+      <td style={{ ...tdN, fontWeight: 600,
+                   color: m.sin_otb ? "#8a6d1f" : m.saldo > 0 ? "#b3261e" : "#1a7f5a" }}>
+        {m.sin_otb ? t("sinOtb") : usd(m.saldo)}
+      </td>
+      <td style={tdN}>{m.pct_cobrado === null ? "—" : pct(m.pct_cobrado)}</td>
+      <td style={{ ...td, fontSize: 11, color: "#8a6d1f" }}>
+        {m.cruzan.reservas
+          ? t("cruzanDeMes", { n: m.cruzan.reservas, monto: usd(m.cruzan.monto, 0) })
+          : ""}
+      </td>
+    </tr>
+  );
+}
+
+// ═══════════════════════════ Pestaña 5 · Análisis ═══════════════════════════
 function Analisis({ a, t }: { a: DepositAnalisis; t: ReturnType<typeof useTranslations> }) {
   return (
     <>

@@ -6492,3 +6492,78 @@ export async function subirDepositLedger(
   }
   return res.json();
 }
+
+/** Un rango de fechas de llegada, con los mismos análisis que el corte entero. */
+export interface DepositRango {
+  corte: DepositLoad;
+  desde: string | null;
+  hasta: string | null;
+  total: DepositBloque;
+  /** Cuánto pesa el rango dentro del corte completo. */
+  pct_del_corte: number;
+  /** Días del rango, con los dos extremos adentro. */
+  dias: number | null;
+  por_dia: { fecha: string; reservas: number; monto: number; promedio: number; noches: number }[];
+  por_estado: DepositGrupo[];
+  concentracion: { top: DepositMayor[]; pct_top: number; total: number; reservas: number };
+  antiguedad: { corte: string; tramos: DepositTramo[]; sin_fecha: DepositBloque | null };
+  filas: DepositRow[];
+  sin_llegada: DepositBloque | null;
+}
+
+export async function getDepositRango(
+  desde?: string, hasta?: string, loadId?: string,
+): Promise<DepositRango> {
+  const q = new URLSearchParams();
+  if (desde) q.set("desde", desde);
+  if (hasta) q.set("hasta", hasta);
+  if (loadId) q.set("load_id", loadId);
+  return api.get(`/deposits/rango${q.toString() ? `?${q}` : ""}`);
+}
+
+/** Saldo por cobrar: OTB total revenue × (1+IVA) − depósitos recibidos. */
+export interface DepositMesPorCobrar {
+  year: number; month: number; etiqueta: string;
+  otb_total: number; otb_rooms: number; otb_noches: number;
+  iva: number; con_iva: number;
+  deposito: number; reservas: number;
+  saldo: number;
+  /** null cuando no hay OTB contra qué medir. */
+  pct_cobrado: number | null;
+  /** Llegan este mes y se van en otro: su depósito está entero acá, su ingreso no. */
+  cruzan: { reservas: number; monto: number };
+  /** Hay depósito y no hay OTB: la llegada cae más allá del horizonte del forecast. */
+  sin_otb: boolean;
+  /** El mes ya cerró antes del corte: lo vendido ahí se cobró al salir. */
+  pasado: boolean;
+}
+
+export interface DepositTotalPorCobrar {
+  otb_total: number; iva: number; con_iva: number; deposito: number;
+  saldo: number; meses: number; reservas: number; pct_cobrado: number | null;
+}
+
+export interface DepositPorCobrar {
+  corte: DepositLoad;
+  /** La semana del corte de On the Books que se usó. */
+  otb_week: number;
+  otb_week_es_la_ultima: boolean;
+  otb_weeks: number[];
+  iva_pct: number;
+  meses: DepositMesPorCobrar[];
+  /** El que sirve para cobrar: solo los meses que todavía no cerraron. */
+  total_abierto: DepositTotalPorCobrar;
+  total_pasado: DepositTotalPorCobrar;
+  total: DepositTotalPorCobrar;
+  sin_llegada: DepositBloque | null;
+}
+
+export async function getDepositPorCobrar(
+  week?: number, iva?: number, loadId?: string,
+): Promise<DepositPorCobrar> {
+  const q = new URLSearchParams();
+  if (week) q.set("week", String(week));
+  if (iva !== undefined) q.set("iva", String(iva));
+  if (loadId) q.set("load_id", loadId);
+  return api.get(`/deposits/por-cobrar${q.toString() ? `?${q}` : ""}`);
+}
