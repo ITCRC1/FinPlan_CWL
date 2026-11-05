@@ -143,5 +143,7 @@ from app.models.guillermo import (
 # Módulo PACING (2026-09-30): fotos de Opera, reservas y configuración.
 from app.models.pacing import (
     PacingSnapshot, PacingReservation, PacingResvLoad, PacingConfig)
+# Deposit Ledger (2026-11-04): la plata de huéspedes en custodia, corte a corte.
+from app.models.deposit import DepositLoad, DepositEntry  # noqa: F401
 from app.models.usali import (UsaliDefinicion, UsaliDocumento,  # noqa: F401
                               UsaliItem)

@@ -218,6 +218,9 @@ export const NAV: NavGroup[] = [
       { key: "headcounts", href: "/operation-insight/headcounts" },
       { key: "opsKpi", href: "/operation-insight/ops-kpi" },
       { key: "onTheBooksFull", href: "/operation-insight/on-the-books" },
+      // El Deposit Ledger va al lado del On the Books: las dos miran el mismo
+      // futuro, una en noches reservadas y la otra en plata ya cobrada.
+      { key: "depositAnalysis", href: "/operation-insight/deposits" },
     ],
   },
   {

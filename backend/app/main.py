@@ -74,6 +74,7 @@ from app.api.guillermo_api import router as guillermo_router
 from app.api.informe_api import router as informe_router
 from app.api.usali_api import router as usali_router
 from app.api.pacing_api import router as pacing_router
+from app.api.deposits_api import router as deposits_router
 from app.hotel_actual import HOTEL_ID, HOTEL_NAME
 
 app = FastAPI(
@@ -202,6 +203,7 @@ app.include_router(pl_full_detail_router, prefix="/api", dependencies=_guard)
 app.include_router(club_stats_router, prefix="/api", dependencies=_guard)
 app.include_router(sembrar_cuentas_router, prefix="/api", dependencies=_guard)
 app.include_router(owners_q_router, prefix="/api", dependencies=_guard)
+app.include_router(deposits_router, prefix="/api", dependencies=_guard)
 # El Cuadre —Resumen vs Detalle, y cuál de las dos produce el P&L de hoy—
 # existía desde el 2026-08-14 con sus pruebas, pero NUNCA se montó: el
 # módulo estaba escrito y la ruta no existía en producción. La pantalla que

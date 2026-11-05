@@ -213,6 +213,10 @@ NO_REGISTRAN = {
     # La auditoria del mayor NO guarda nada: lee el archivo, lo revisa y
     # devuelve. El registro existe para saber que archivo dejo que numero
     # adentro, y aca no entra ningun numero.
+    # Mismo caso que el preview del pacing: lee el Deposit Ledger, dice cuántas
+    # reservas trae y de qué corte es, y no guarda una sola fila. El `upload`,
+    # que sí escribe, está cubierto.
+    "deposits_api.py:preview",
     "auditoria_gl_api.py:revisar",
     "auditoria_gl_api.py:excel",
     "auditoria_gl_api.py:_revisar",

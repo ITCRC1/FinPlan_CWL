@@ -6362,3 +6362,133 @@ export async function auditarMayorExcel(file: File): Promise<void> {
   a.remove();
   URL.revokeObjectURL(url);
 }
+
+// ── Deposit Ledger (2026-11-04) ───────────────────────────────────────────────
+// La plata de huéspedes que el hotel tiene en custodia, corte a corte. Cada
+// subida se guarda entera para poder comparar una contra otra; ver
+// `backend/app/models/deposit.py`.
+//
+// ⚠️ `total_paid_amt` llega NEGATIVO, igual que en el XML de Opera: el depósito
+// es un crédito a favor del huésped. La pestaña Ledger lo muestra así a
+// propósito. Todo lo demás (`monto`) ya viene positivo desde el motor.
+
+export interface DepositLoad {
+  id: string;
+  as_of: string;
+  file_name: string | null;
+  cuenta: number;
+  total_amt: number;          // negativo
+  min_arrival: string | null;
+  max_arrival: string | null;
+  nota: string | null;
+  uploaded_at: string | null;
+  uploaded_by: string | null;
+}
+
+export interface DepositRow {
+  resv_name_id: string;
+  confirmation_no: string | null;
+  name: string | null;
+  sname: string | null;
+  room: string | null;
+  arrival: string | null;
+  departure: string | null;
+  last_date: string | null;
+  resv_status: string | null;
+  guarantee_code: string | null;
+  external_reference: string | null;
+  total_paid_amt: number;     // negativo, como el XML
+  nights: number;
+}
+
+export interface DepositBloque { reservas: number; monto: number; promedio: number; nights?: number; noches: number }
+export interface DepositMes extends DepositBloque {
+  mes: string; etiqueta: string; pct: number; acumulado: number;
+  pct_acumulado: number; por_estado: Record<string, number>;
+}
+export interface DepositGrupo extends DepositBloque { clave: string; pct: number }
+export interface DepositTramo extends DepositBloque { tramo: string; pct: number }
+export interface DepositVencido extends DepositRow { monto: number; dias_vencido: number }
+export interface DepositMayor {
+  resv_name_id: string; name: string | null; arrival: string | null;
+  resv_status: string | null; nights: number; monto: number; pct: number;
+}
+
+export interface DepositAnalisis {
+  corte: DepositLoad;
+  total: DepositBloque;
+  por_mes: { meses: DepositMes[]; sin_llegada: DepositBloque | null; total: DepositBloque };
+  por_estado: DepositGrupo[];
+  por_garantia: DepositGrupo[];
+  antiguedad: { corte: string; tramos: DepositTramo[]; sin_fecha: DepositBloque | null };
+  vencidos: DepositVencido[];
+  concentracion: { top: DepositMayor[]; pct_top: number; total: number; reservas: number };
+}
+
+export interface DepositCambio {
+  resv_name_id: string; name: string | null; arrival: string | null;
+  departure: string | null; room: string | null; resv_status: string | null;
+  nights: number; last_date: string | null; monto: number;
+  monto_antes?: number; delta?: number; estado_antes?: string | null;
+}
+export interface DepositGrupoCambio { reservas: number; monto: number; filas: DepositCambio[] }
+
+export interface DepositComparacion {
+  corte_antes: DepositLoad;
+  corte_despues: DepositLoad;
+  antes: { reservas: number; monto: number };
+  despues: { reservas: number; monto: number };
+  variacion: { reservas: number; monto: number };
+  entraron: DepositGrupoCambio;
+  salieron: DepositGrupoCambio;
+  subieron: DepositGrupoCambio;
+  bajaron: DepositGrupoCambio;
+  iguales: { reservas: number; monto: number };
+  /** Debe ser 0: entraron − salieron + subieron + bajaron = variación. */
+  cuadre: number;
+}
+
+export async function getDepositLoads(): Promise<{ cortes: DepositLoad[] }> {
+  return api.get("/deposits/loads");
+}
+export async function getDepositLedger(loadId?: string): Promise<{
+  corte: DepositLoad; filas: DepositRow[]; total_paid_amt: number;
+}> {
+  return api.get(`/deposits/ledger${loadId ? `?load_id=${loadId}` : ""}`);
+}
+export async function getDepositAnalisis(loadId?: string): Promise<DepositAnalisis> {
+  return api.get(`/deposits/analisis${loadId ? `?load_id=${loadId}` : ""}`);
+}
+export async function compararDepositos(antes?: string, despues?: string): Promise<DepositComparacion> {
+  const q = new URLSearchParams();
+  if (antes) q.set("antes", antes);
+  if (despues) q.set("despues", despues);
+  return api.get(`/deposits/comparar${q.toString() ? `?${q}` : ""}`);
+}
+export async function borrarDepositLoad(loadId: string): Promise<{ ok: boolean; as_of: string }> {
+  return api.delete(`/deposits/loads/${loadId}`);
+}
+
+export async function subirDepositLedger(
+  file: File, asOf?: string, nota?: string,
+): Promise<{
+  load_id: string; as_of: string; reemplazo: boolean; cuenta: number;
+  total_amt: number; min_arrival: string | null; max_arrival: string | null;
+  sin_llegada: number;
+  cambio: { contra: string; entraron: number; salieron: number; monto: number } | null;
+}> {
+  const form = new FormData();
+  form.append("file", file);
+  if (asOf) form.append("as_of", asOf);
+  if (nota) form.append("nota", nota);
+  const res = await fetch(`${BASE}/deposits/upload`, {
+    method: "POST", body: form, headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let clave: string | undefined;
+    try { clave = JSON.parse(text)?.clave; } catch { /* no era JSON */ }
+    throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave });
+  }
+  return res.json();
+}

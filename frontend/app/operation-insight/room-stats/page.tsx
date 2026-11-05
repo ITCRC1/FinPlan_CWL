@@ -725,7 +725,7 @@ export default function OperationRoomStatsPage() {
         {acumulado.length > 1 && (
           <div style={{ marginTop: 16, background: "var(--bg-elevated)", border: "1px solid var(--border-medium)", borderRadius: 8, overflow: "hidden" }}>
             <div style={{ padding: "10px 16px", background: "var(--bg-header)", borderBottom: "1px solid var(--border-medium)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "center" }}>{t("acumTitulo")}</div>
-            <div style={{ overflowX: "auto" }}>
+            <div className="fin-scroll-x" style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border-medium)" }}>

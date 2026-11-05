@@ -833,6 +833,24 @@ MENSAJES: dict[str, dict[str, str]] = {
         "es": "El mes {mes} reparte {pct}% del costo de Rooms. No se puede pasar del 100%: lo que no se asigna es lo que le queda a Rooms Standard.",
         "en": "Month {mes} allocates {pct}% of the Rooms cost. It cannot go above 100%: whatever is not allocated is what stays with Rooms Standard."},
     # ── PACING ────────────────────────────────────────────────────────────────
+    # ── Deposit Ledger ────────────────────────────────────────────────────
+    "deposits.xml_no_reconocido": {
+        "es": "El archivo no es un Deposit Ledger de Opera. {detalle}",
+        "en": "The file is not an Opera Deposit Ledger. {detalle}"},
+    "deposits.sin_fecha_de_corte": {
+        "es": "El archivo no trae ninguna fecha de movimiento, así que no se puede "
+              "saber de qué corte es. Indique la fecha al subirlo.",
+        "en": "The file carries no movement date, so there is no way to tell which "
+              "snapshot it is. Give the date when uploading."},
+    "deposits.corte_no_existe": {
+        "es": "Ese corte del Deposit Ledger ya no existe.",
+        "en": "That Deposit Ledger snapshot no longer exists."},
+    "deposits.sin_cortes": {
+        "es": "Todavía no hay ningún corte del Deposit Ledger. Suba el XML de Opera.",
+        "en": "There is no Deposit Ledger snapshot yet. Upload the Opera XML."},
+    "deposits.faltan_cortes": {
+        "es": "Hacen falta dos cortes para comparar: suba otro archivo.",
+        "en": "Two snapshots are needed to compare: upload another file."},
     "pacing.nada_valido": {
         "es": "Ninguno de los archivos es un History & Forecast ni un Reservations Entered On de Opera.",
         "en": "None of the files is an Opera History & Forecast or Reservations Entered On report."},
