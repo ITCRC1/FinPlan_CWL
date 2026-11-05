@@ -368,6 +368,54 @@ async def export_opex_excel(scenario_id: str, db: AsyncSession = Depends(get_db)
     )
 
 
+def asignar_detail_codes(rows: list[dict]) -> list[str]:
+    """El `detail_code` de cada fila que vuelve del Excel, sin que dos choquen.
+
+    `opex_entries` tiene `UniqueConstraint(scenario, dept, account,
+    detail_code)`: dos filas de la misma cuenta con el mismo codigo revientan
+    la insercion con IntegrityError, la peticion muere sin respuesta y el
+    navegador dice «Failed to fetch».
+
+    Tres reglas, en orden:
+
+    1. **El codigo que el archivo trae escrito se respeta.** La plantilla baja
+       con el suyo y subirla no se lo cambia.
+    2. **El primer detalle VACIO de una cuenta se queda vacio.** Es la linea
+       principal; la base lo admite (`default=""`). Asi bajar y subir la
+       devuelve a su lugar en vez de mandarla al final del orden
+       `account_code, detail_code`.
+    3. **Del segundo vacio en adelante, correlativo** —`001`, `002`…— saltando
+       los numeros que el archivo ya ocupo. Son las filas nuevas que alguien
+       agrego a mano sin ponerles codigo.
+
+    ⚠️ La regla 3 mira los codigos de TODO el archivo antes de repartir, no
+    solo los que ya paso. Contar al vuelo le daba `001` a la linea principal
+    por ser la primera, y la fila que traia `001` escrito chocaba contra ella.
+    Once choques en 0230 del Budget Working 2027 de CWL (owner, 2026-11-05):
+    la cuenta tenia la linea principal mas las diez sub-lineas que abre «Abrir
+    las cuentas del catalogo».
+    """
+    ocupados: dict[tuple, set[str]] = {}
+    for r in rows:
+        dc = (r.get("detail_code") or "").strip()
+        if dc:
+            ocupados.setdefault((r["dept_code"], r["account_code"]), set()).add(dc)
+
+    salida = []
+    for r in rows:
+        key = (r["dept_code"], r["account_code"])
+        usados = ocupados.setdefault(key, set())
+        dc = (r.get("detail_code") or "").strip()
+        if not dc and "" in usados:
+            n = 1
+            while str(n).zfill(3) in usados:
+                n += 1
+            dc = str(n).zfill(3)
+        usados.add(dc)
+        salida.append(dc)
+    return salida
+
+
 @router.post("/opex/{scenario_id}/import/excel/", dependencies=[Depends(registro_de_subida)])
 async def import_opex_excel(
     scenario_id: str,
@@ -407,12 +455,25 @@ async def import_opex_excel(
     # correlativo es solo para las filas NUEVAS, que el usuario agrego sin
     # codigo. Antes se recalculaba siempre, asi que reordenar el Excel le
     # cambiaba el `#` a una fila que nadie habia tocado.
-    detail_counter: dict[tuple, int] = {}
-    for r in rows:
-        key = (r["dept_code"], r["account_code"])
-        detail_counter[key] = detail_counter.get(key, 0) + 1
-        detail_code = (r.get("detail_code") or "").strip() or str(detail_counter[key]).zfill(3)
+    #
+    # ⚠️ **El correlativo no puede pisar un codigo que el archivo ya trae.**
+    # Una cuenta con sub-lineas abiertas —las que crea «Abrir las cuentas del
+    # catalogo»— baja asi: la linea principal con el detalle VACIO y despues
+    # `001`…`010`. El contador le daba `001` a la vacia por ser la primera, y
+    # la fila que ya traia `001` chocaba contra ella: `UniqueConstraint
+    # (scenario, dept, account, detail_code)` lanzaba IntegrityError, la
+    # peticion moria sin respuesta y el navegador decia «Failed to fetch» —
+    # cuatro palabras que no dicen nada. Once choques en 0230 del Budget
+    # Working 2027 de CWL (owner, 2026-11-05).
+    #
+    # La regla ahora: **el detalle vacio se queda vacio.** Es el codigo de la
+    # linea principal y la base lo admite (`default=""`), asi que bajar y
+    # subir la devuelve donde estaba en vez de mandarla al final del orden.
+    # El correlativo solo entra a partir del SEGUNDO vacio de la misma cuenta,
+    # y salta los numeros que el archivo ya ocupo.
+    codigos = asignar_detail_codes(rows)
 
+    for r, detail_code in zip(rows, codigos):
         db.add(OpexEntry(
             id=str(uuid.uuid4()),
             scenario_id=scenario_id,
