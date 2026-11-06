@@ -698,7 +698,9 @@
     "uploading": "Uploading...",
     "withoutAllocation": "without the allocation",
     "xlsImported": "✓ Excel imported: {n} lines",
-    "referenceTotal": "hotel total revenue"
+    "referenceTotal": "hotel total revenue",
+    "pasteColumnaAcostada": "Pasted {n} months into {cuenta}. You copied them as a column; months run across here, so they were laid out along the row.",
+    "pasteOk": "Pasted: {n} cells across {lineas} line(s)."
   },
   "control": {
     "activeRules": "Active rules:",

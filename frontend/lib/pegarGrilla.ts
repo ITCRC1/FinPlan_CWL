@@ -230,3 +230,33 @@ export function recortarRotulos(bloque: string[][]): string[][] {
   }
   return b;
 }
+
+/**
+ * Los doce meses copiados **en columna**, acostados en una fila.
+ *
+ * Owner, 2026-11-05, en el checkbook de costos: *«todavía no puedo hacer copy
+ * paste»*. Reproducido en local contra sus datos: pegar doce valores en
+ * columna sobre enero metía 11 en enero de una cuenta, 22 en enero de la
+ * siguiente, 33 en la otra… y tiraba los ocho restantes. O sea **escribía
+ * plata en cuentas que el usuario no tocó** y no llenaba ningún mes.
+ *
+ * En Excel los doce meses están tan seguido en columna como en fila —depende
+ * de qué auxiliar se esté mirando— y la grilla de la pantalla los tiene
+ * siempre en fila. Quien copia no está eligiendo una orientación: está
+ * copiando sus doce meses.
+ *
+ * ⚠️ **Sólo cuando el bloque es de UNA columna.** Un bloque de varias
+ * columnas ya trae su orientación puesta y no se toca; un bloque de una sola
+ * celda tampoco, que eso es escribir un número. Y el que llama tiene que
+ * decidir **dónde** aplica: acostar una columna sólo tiene sentido si se está
+ * pegando sobre una fila de meses. Por eso devuelve también `transpuesto`:
+ * la pantalla lo cuenta, y el usuario ve qué fue lo que pasó en vez de
+ * descubrirlo tres meses después en el P&L.
+ */
+export function acostarColumna(
+  bloque: string[][],
+): { bloque: string[][]; transpuesto: boolean } {
+  const esColumna = bloque.length > 1 && bloque.every(f => f.length === 1);
+  if (!esColumna) return { bloque, transpuesto: false };
+  return { bloque: [bloque.map(f => f[0])], transpuesto: true };
+}

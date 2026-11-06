@@ -698,7 +698,9 @@
     "uploading": "Subiendo...",
     "withoutAllocation": "sin el reparto",
     "xlsImported": "✓ Excel importado: {n} líneas",
-    "referenceTotal": "ingreso total del hotel"
+    "referenceTotal": "ingreso total del hotel",
+    "pasteColumnaAcostada": "Pegados {n} meses en {cuenta}. Los copiaste en columna; acá los meses van en fila, así que se acostaron a lo largo del renglón.",
+    "pasteOk": "Pegado: {n} celdas en {lineas} línea(s)."
   },
   "control": {
     "activeRules": "Reglas activas:",

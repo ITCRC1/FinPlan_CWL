@@ -1,6 +1,6 @@
 "use client";
 import { usePlanningScenario, usePlanningScenarioConUrl, sharedScenarioOr } from "@/lib/planningScenario";
-import { manejarPegado, numeroDeExcel, repartirPegado } from "@/lib/pegarGrilla";
+import { acostarColumna, manejarPegado, numeroDeExcel, repartirPegado } from "@/lib/pegarGrilla";
 import { elegir } from "@/lib/escenarioPreferido";
 import { useTranslations } from "next-intl";
 import AvisoMoneda from "@/components/AvisoMoneda";
@@ -146,6 +146,9 @@ export default function CostsCheckbookPage() {
   //: Fallos al GUARDAR. Aparte de `error`, que es de carga y vacía la
   //  pantalla: un guardado que falla no debe borrar lo que se está viendo.
   const [aviso, setAviso]                 = useState<string | null>(null);
+  //: Lo que SÍ pasó. `aviso` es rojo y es para lo que falló; esto es verde
+  //  y es para que un pegado no entre en silencio.
+  const [nota, setNota]                   = useState<string | null>(null);
   const [xlsxMsg, setXlsxMsg]            = useState<string | null>(null);
   const [xlsxUp, setXlsxUp]             = useState(false);
   const [addModal, setAddModal]         = useState(false);
@@ -280,9 +283,19 @@ export default function CostsCheckbookPage() {
    * ⚠️ **Un PATCH por LÍNEA y UNA recarga al final.** Y se saltean las líneas
    * con DRIVER: su monto lo calcula el motor, y pisarlo a mano lo dejaría
    * mintiendo hasta el siguiente recálculo.
+   *
+   * ⚠️ **Una columna se acuesta.** Reproducido en local con los datos del
+   * owner el 2026-11-05: pegar los doce meses en columna sobre enero metía el
+   * 1º en enero de esta cuenta, el 2º en enero de la siguiente, el 3º en la
+   * otra… y tiraba el resto. Escribía plata en cuentas que nadie tocó y no
+   * llenaba ningún mes. Acá las columnas son meses, así que una columna
+   * pegada son los meses de ESTA línea — y se dice en pantalla, para que el
+   * usuario vea qué pasó y no lo descubra en el P&L.
    */
-  async function pegarDesde(ei: number, mi: number, bloque: string[][]) {
+  async function pegarDesde(ei: number, mi: number, crudo: string[][]) {
     if (!scenarioId || !checkbook) return;
+    setNota(null);
+    const { bloque, transpuesto } = acostarColumna(crudo);
     const porLinea = new Map<string, { entry: CostEntry; meses: Record<string, number> }>();
     repartirPegado(bloque, ei, mi, checkbook.entries.length, MONTH_KEYS.length,
       (f, c, valor) => {
@@ -306,6 +319,12 @@ export default function CostsCheckbookPage() {
         }
         if (selectedDept) await loadDept(selectedDept);
       });
+      // Qué entró, dicho en pantalla. Un pegado silencioso que acomoda solo
+      // una columna es magia, y la magia que escribe plata no se perdona.
+      const n = [...porLinea.values()].reduce((s, l) => s + Object.keys(l.meses).length, 0);
+      setNota(transpuesto
+        ? t("pasteColumnaAcostada", { n, cuenta: [...porLinea.values()][0].entry.account_code })
+        : t("pasteOk", { n, lineas: porLinea.size }));
     } finally {
       setSaving(null);
     }
@@ -523,6 +542,21 @@ export default function CostsCheckbookPage() {
           <span style={{ flex: 1 }}>⚠ {aviso}</span>
           <button onClick={() => setAviso(null)} style={{
             background: "none", border: "none", color: "var(--negative)",
+            cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0,
+          }}>✕</button>
+        </div>
+      )}
+
+      {nota && (
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 12,
+          color: "var(--positive)", background: "rgba(38,166,154,0.08)",
+          border: "1px solid var(--positive)", borderRadius: 4,
+          padding: "10px 14px", margin: "10px 0", fontSize: 12.5,
+        }}>
+          <span style={{ flex: 1 }}>✓ {nota}</span>
+          <button onClick={() => setNota(null)} style={{
+            background: "none", border: "none", color: "var(--positive)",
             cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0,
           }}>✕</button>
         </div>
