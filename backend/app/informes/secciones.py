@@ -113,6 +113,8 @@ SECCIONES = [
     ("10", "Hallazgos de clasificacion y de sistema"),
     ("11", "Agenda de reunion por responsable"),
     ("12", "Anexos"),
+    ("13", "Analisis de proveedores"),
+    ("14", "Varianza contra el mes anterior"),
 ]
 
 

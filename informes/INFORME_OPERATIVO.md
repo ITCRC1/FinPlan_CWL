@@ -209,7 +209,7 @@ lo dice en la nota al pie del cuadro.
 
 ---
 
-## 4. Las doce secciones
+## 4. Las catorce secciones
 
 | # | Sección | Cuadros (automáticos) | Narrativa (se escribe) |
 |---|---|---|---|
@@ -225,6 +225,72 @@ lo dice en la nota al pie del cuadro.
 | 10 | Hallazgos de clasificación | El crédito 4999 | `clasificacion`, `sin_presupuesto`, `brechas` |
 | 11 | Agenda por responsable | — | `agenda` |
 | 12 | Anexos | A1 ingreso · A2 costo · A3 opex · A4 planilla · A5 metodología | — |
+| 13 | Análisis de proveedores | Resumen · dónde queda registrado · factura por factura | `proveedores_analisis` |
+| 14 | Varianza contra el mes anterior | Por clase · planilla por depto y posición · gastos por depto y cuenta | `varianza_mes_anterior` |
+
+### 4-bis. Las dos últimas secciones, y por qué van al final
+
+El owner las pidió **abajo de todo** (2026-11-06). Tiene sentido: las doce
+primeras son la conversación con cada gerente; estas dos son los anexos que uno
+se lleva a otra reunión —la del proveedor y la del repaso del mes—.
+
+#### 13 · Análisis de proveedores
+
+La lista de proveedores a seguir vive en **`backend/app/seed_data/<HOTEL>/proveedores.json`**,
+no en el código: la arma el owner y la va a cambiar sin avisar. Si el archivo no
+está, la sección simplemente no sale.
+
+Cuatro reglas, cada una medida contra el mayor de agosto–octubre 2026:
+
+1. **La factura es el ASIENTO.** `num_doc` llega destrozado desde Integrity
+   —`1.00003010000001e+17`, «CD», «MAINTENANCE»— y no identifica nada.
+2. **Se busca en `descripcion` Y en `referencia`.** Normalmente el tercero está
+   en `descripcion`, pero «Consultants Costa Rica» viene al revés: la marca en
+   `descripcion` y la razón social `3-102-844425 SOCIEDAD…` en `referencia`.
+   Mirar un campo solo pierde facturas enteras.
+3. **Solo clases 5-6-7-8.** ⚠️ Esto no es un filtro de comodidad: SDG RH
+   MANAGEMENT suma ₡195,5 M en el mayor y **al P&L solo llegan ₡21,9 M** — los
+   otros ₡173,6 M son la cuenta 2000, el pasivo de salarios que pasa por ellos.
+   Sumar todo se equivoca por nueve veces.
+4. **El IVA queda fuera.** Vive en la 2000, así que el filtro por clase ya lo
+   saca; las líneas que lo traen en cuenta de gasto se descartan aparte, porque
+   IVA en gasto es IVA que no se recuperó.
+
+**Cada cifra lleva su símbolo**, ₡ o $. Dos columnas de números pelados con un
+orden de magnitud de diferencia entre ellas es una confusión esperando a pasar.
+
+El USD **no se recalcula en la sección**: `extraccion.py` ya lo dejó en `usd`,
+dividido por el `tc` de cada línea. Los montos del mayor están siempre en
+colones **aunque `moneda` diga `DOL`** — una línea DOL trae ₡112.878.850 con tc
+460,73, que son USD 245.000.
+
+#### 14 · Varianza contra el mes anterior
+
+Este mes contra el anterior, el mismo escenario. Enero compara contra diciembre
+del año pasado.
+
+**Sale del MAYOR y no de los checkbooks**, y no es una preferencia: la
+**posición** (`seg3`) solo existe ahí. Ni `actual_entries` ni los checkbooks la
+tienen, porque el presupuesto se armó al nivel de la cuenta.
+
+⚠️ **Hace falta el mayor de DOS meses.** `extraccion.py` guarda el del mes
+anterior en `mayor_prev`. Si no está subido, la sección lo dice y no se arma —
+no inventa una comparación contra cero.
+
+⚠️ **Las reclasificaciones de allocation se excluyen.** Mueven costo de un
+departamento a otro con neto cero (`RECLASIF. ALLOCATION`, «SALE DE: 0200
+MAINTENANCE», «ENTRA A: 0122 KITCHEN»). Un mes con ellas y otro sin ellas se
+leen como un cambio de plantilla que no ocurrió. Medido en CWL: agosto 2026
+traía 160 líneas por neto ₡0; setiembre y octubre, ninguna.
+
+**El corte del 80%** ordena por el **valor absoluto** de la variación, y el
+denominador es la suma de los absolutos, no la variación neta. Con el neto, un
+mes donde un departamento sube 50 y otro baja 50 daría denominador cero y
+«explicaría» el infinito. Lo que se busca es el movimiento, no el saldo.
+
+Las posiciones salen con nombre, del catálogo `payroll_positions`: 36 de los 39
+`seg3` del mayor casan con un `position_code`. Los otros tres salen como
+`pos. <código>`.
 
 ### El orden de los departamentos
 
@@ -343,6 +409,9 @@ Todas opcionales: si falta una, sale `[PENDIENTE: clave]` y `armar.py` la lista.
 | `contexto_tipos` | lista de párrafos | bajo el cuadro por villa |
 | `contexto_secuencial` | lista de párrafos | bajo el secuencial |
 | `contexto_nota` | `(título, texto)` | recuadro gris al cierre de 3 |
+| `proveedores_lista` | lista de nombres | 13 — sale de `proveedores.json` si no se declara |
+| `proveedores_analisis` | lista de párrafos | 13.4, al cierre |
+| `varianza_mes_anterior` | lista de párrafos | 14, al cierre |
 | `dept_resumen` | lista de párrafos | 4.0 |
 | `dept.<nombre>.comentario` | lista de párrafos | cada departamento |
 | `dept.<nombre>.cuentas` | lista de `(depto, cuenta, etiqueta)` | tabla del mayor |
@@ -387,6 +456,7 @@ backend/app/
 ├── api/informe_api.py                el endpoint del botón
 ├── seed_data/<HOTEL>/informes/
 │   └── <año>_<mes>.json              EL ANÁLISIS — uno por mes
+├── seed_data/<HOTEL>/proveedores.json   LA LISTA de la sección 13
 └── informes/
     ├── extraccion.py                 el corte, desde una sesión
     ├── armador.py                    ensambla el documento y calcula el cuadre

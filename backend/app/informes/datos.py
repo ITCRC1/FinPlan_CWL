@@ -241,6 +241,198 @@ class Datos:
             return []
         return sorted(v["prov"].items(), key=lambda x: -abs(x[1]))[:top]
 
+    def por_proveedor(self, nombres: list[str]) -> list[dict]:
+        """Factura por factura de una lista de proveedores — **solo 5-6-7-8**.
+
+        Owner, 2026-11-06: *«que venga el detalle de las facturas una a una por
+        proveedor, el monto en colones y el monto en usd, de los cargos
+        posteados en las cuentas 5-6-7-8 solamente»* y *«la cuenta y
+        departamento donde esta quedando registrado»* y *«alguna nota que se
+        haya puesto»*.
+
+        Cuatro decisiones, cada una medida contra el mayor de ago–oct 2026:
+
+        1. **La factura es el ASIENTO.** `num_doc` viene destrozado desde
+           Integrity —`1.00003010000001e+17`, «CD», «MAINTENANCE»— y no
+           identifica nada. El asiento agrupa limpio.
+        2. **Se busca en `descripcion` Y en `referencia`.** Normalmente el
+           tercero esta en `descripcion`, pero «Consultants Costa Rica» lo trae
+           al reves: la marca en `descripcion` y la razon social
+           `3-102-844425 SOCIEDAD...` en `referencia`. Mirar uno solo pierde
+           facturas enteras.
+        3. **Solo clases 5-6-7-8.** Lo que cae en 1-3 es balance y **no es
+           gasto del periodo**: SDG RH suma ₡195,5M en el mayor pero ₡173,6M de
+           eso es la cuenta 2000 —el pasivo de salarios que pasa por ellos— y
+           al P&L solo llegan ₡21,9M. Sumar todo se equivoca por nueve veces.
+        4. **El IVA queda fuera.** Vive en la 2000, asi que el filtro por clase
+           ya lo saca; las lineas que lo traen en cuenta de gasto se descartan
+           aparte, porque IVA en gasto es IVA que no se recupero.
+
+        El USD **no se recalcula**: `extraccion` ya lo dejo en `usd`, dividido
+        por el `tc` de cada linea. Dos caminos hacia el mismo numero terminan
+        dando dos numeros.
+        """
+        patrones = [(n or "").strip().upper() for n in nombres if (n or "").strip()]
+        fuera = []
+        for patron in patrones:
+            facturas, cargos = {}, {}
+            for m in self.d["mayor"]:
+                if (m["seg1"] or "")[:1] not in "5678":
+                    continue
+                ref = (m.get("referencia") or "")
+                desc = (m.get("descripcion") or "")
+                if patron not in desc.upper() and patron not in ref.upper():
+                    continue
+                if "IVA" in ref.upper():
+                    continue
+                crc = float(m["debito"] or 0) - float(m["credito"] or 0)
+                usd_ = float(m.get("usd") or 0)
+                k = (str(m.get("fecha") or ""), str(m.get("asiento") or ""))
+                f = facturas.setdefault(k, {
+                    "fecha": k[0], "asiento": k[1], "crc": 0.0, "usd": 0.0,
+                    "tc": float(m.get("tc") or 0), "cuentas": set(),
+                    "conceptos": set(), "notas": set()})
+                f["crc"] += crc
+                f["usd"] += usd_
+                f["cuentas"].add(f'{m["seg1"]} · {m["seg2"]}')
+                if ref:
+                    f["conceptos"].add(ref[:34])
+                if m.get("desc_asiento"):
+                    f["notas"].add(str(m["desc_asiento"])[:90])
+                c = cargos.setdefault((m["seg2"], m["seg1"]), {
+                    "dept": m["seg2"], "cuenta": m["seg1"], "crc": 0.0,
+                    "usd": 0.0, "n": 0})
+                c["crc"] += crc
+                c["usd"] += usd_
+                c["n"] += 1
+            if not facturas:
+                fuera.append({"nombre": patron, "facturas": [], "cargos": [],
+                              "crc": 0.0, "usd": 0.0})
+                continue
+            fuera.append({
+                "nombre": patron,
+                "facturas": sorted(facturas.values(), key=lambda x: (x["fecha"], x["asiento"])),
+                "cargos": sorted(cargos.values(), key=lambda x: -abs(x["usd"])),
+                "crc": sum(f["crc"] for f in facturas.values()),
+                "usd": sum(f["usd"] for f in facturas.values()),
+            })
+        return sorted(fuera, key=lambda x: -abs(x["usd"]))
+
+    #: El corte de la varianza: las lineas que explican el 80% del movimiento.
+    CORTE_EXPLICA = 0.80
+
+    def _mayor_de(self, previo: bool) -> list:
+        return self.d.get("mayor_prev" if previo else "mayor") or []
+
+    @staticmethod
+    def _top_que_explica(filas: list[dict], corte: float) -> tuple[list[dict], float]:
+        """Las filas que explican `corte` del movimiento total, y cuanto cubren.
+
+        ⚠️ Se ordena por el VALOR ABSOLUTO de la variacion y el denominador es
+        la suma de los absolutos, no la variacion neta. Si se usara el neto, un
+        mes donde un departamento sube 50 y otro baja 50 tendria denominador
+        cero y «explicaria» el infinito. Lo que el owner pidio —«el 80% de las
+        cuentas que explican la varianza»— es el movimiento, no el saldo.
+        """
+        orden = sorted(filas, key=lambda x: -abs(x["var"]))
+        total = sum(abs(f["var"]) for f in orden)
+        if total <= 0:
+            return [], 0.0
+        acum, fuera = 0.0, []
+        for f in orden:
+            fuera.append(f)
+            acum += abs(f["var"])
+            if acum / total >= corte:
+                break
+        return fuera, acum / total
+
+    def varianza_mes_anterior(self) -> dict:
+        """Este mes contra el anterior, en el mismo escenario (Pre-Cierre).
+
+        Owner, 2026-11-06: *«ANALISIS DE VARIANZAS VERSUS EL MES PASADO... las
+        cuentas 6 que es salario, un analisis por posicion por departamento...
+        y las cuentas de gastos por departamento por cuenta... el 80% de las
+        cuentas que explican la varianza total versus el mes previo»*.
+
+        **Sale del MAYOR, no de los checkbooks**, y por una razon dura: la
+        posicion (`seg3`) solo existe ahi. Ni `actual_entries` ni los
+        checkbooks la tienen — el presupuesto se armo al nivel de la cuenta
+        (ver `el-presupuesto-no-tiene-tercer-nivel`). El mayor es tambien lo
+        que alimenta el Pre-Cierre, asi que los dos miran el mismo dato.
+
+        ⚠️ **Las reclasificaciones de allocation distorsionan la comparacion
+        por departamento.** Mueven costo de un departamento a otro con neto
+        cero: un mes con reclasificaciones y otro sin ellas se ven como un
+        cambio de plantilla que no ocurrio. Se cuentan aparte y se avisan.
+        Medido en CWL: agosto 2026 traia 160 lineas de reclasificacion por neto
+        ₡0; setiembre y octubre, ninguna.
+        """
+        act, prev = self._mayor_de(False), self._mayor_de(True)
+        if not act or not prev:
+            return {"hay": False, "periodo_prev": self.d.get("mayor_prev_periodo", "")}
+
+        def recl(m) -> bool:
+            return ("RECLASIF" in (m.get("referencia") or "").upper()
+                    or "RECLASIF" in (m.get("descripcion") or "").upper())
+
+        def junta(filas, clave, clases):
+            fuera = {}
+            for m in filas:
+                if (m["seg1"] or "")[:1] not in clases or recl(m):
+                    continue
+                fuera[clave(m)] = fuera.get(clave(m), 0.0) + float(m.get("usd") or 0)
+            return fuera
+
+        def arma(clave, clases, campos):
+            a = junta(act, clave, clases)
+            b = junta(prev, clave, clases)
+            filas = []
+            for k in set(a) | set(b):
+                va, vb = a.get(k, 0.0), b.get(k, 0.0)
+                if abs(va) < 0.005 and abs(vb) < 0.005:
+                    continue
+                f = dict(zip(campos, k if isinstance(k, tuple) else (k,)))
+                f.update({"act": va, "prev": vb, "var": va - vb})
+                filas.append(f)
+            top, cubre = self._top_que_explica(filas, self.CORTE_EXPLICA)
+            return {"todas": filas, "top": top, "cubre": cubre,
+                    "act": sum(f["act"] for f in filas),
+                    "prev": sum(f["prev"] for f in filas),
+                    "var": sum(f["var"] for f in filas)}
+
+        clases = {}
+        for cl, etiqueta in (("5", "Costo de ventas"), ("6", "Planilla"),
+                             ("7", "Opex"), ("8", "Propiedad")):
+            a = sum(float(m.get("usd") or 0) for m in act
+                    if (m["seg1"] or "")[:1] == cl and not recl(m))
+            b = sum(float(m.get("usd") or 0) for m in prev
+                    if (m["seg1"] or "")[:1] == cl and not recl(m))
+            clases[cl] = {"etiqueta": etiqueta, "act": a, "prev": b, "var": a - b}
+
+        return {
+            "hay": True,
+            "periodo_prev": self.d.get("mayor_prev_periodo", ""),
+            "corte": self.CORTE_EXPLICA,
+            "clases": clases,
+            # Clase 6 por departamento y posicion — lo que pidio para salarios.
+            "planilla": arma(lambda m: (m["seg2"] or "", m["seg3"] or ""),
+                             "6", ("dept", "pos")),
+            # Gastos por departamento y cuenta.
+            "gastos": arma(lambda m: (m["seg2"] or "", m["seg1"] or ""),
+                           "578", ("dept", "cuenta")),
+            "reclasif": {
+                "act": sum(1 for m in act if recl(m)),
+                "prev": sum(1 for m in prev if recl(m)),
+                "neto_act": sum(float(m.get("usd") or 0) for m in act if recl(m)),
+                "neto_prev": sum(float(m.get("usd") or 0) for m in prev if recl(m)),
+            },
+        }
+
+    def nombre_posicion(self, dept: str, pos: str) -> str:
+        """`seg3` -> nombre, del catalogo de posiciones. 36 de 39 casan."""
+        cat = self.d.get("posiciones") or {}
+        return cat.get(f"{dept}|{pos}") or cat.get(pos) or ""
+
     def creditos_allocation(self) -> dict:
         """Los creditos 4999 que el reporte DESCARTA — ver la seccion 10.1.
 

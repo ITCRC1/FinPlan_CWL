@@ -44,7 +44,34 @@ def cargar_narrativa(anio: int, mes: int, hotel: str | None = None) -> dict:
         return {}
     datos = json.loads(ruta.read_text(encoding="utf-8"))
     datos.pop("_nota", None)
+    datos.setdefault("proveedores_lista", cargar_proveedores(hotel))
     return datos
+
+
+def ruta_proveedores(hotel: str | None = None) -> pathlib.Path:
+    from app.hotel_actual import HOTEL_ID
+    return (pathlib.Path(__file__).resolve().parents[1] / "seed_data"
+            / (hotel or HOTEL_ID) / "proveedores.json")
+
+
+def cargar_proveedores(hotel: str | None = None) -> list[str]:
+    """Los proveedores que la seccion 13 sigue mes a mes.
+
+    ⚠️ Vive en `seed_data/<HOTEL>/` y no en el codigo, por dos motivos. Uno: es
+    contenido DE UNA PROPIEDAD, igual que la narrativa — un clon no hereda los
+    proveedores de otro hotel. Dos: la lista la arma el owner y la va a cambiar
+    sin avisar; si estuviera en el codigo, agregar un proveedor seria un
+    despliegue.
+
+    Si el archivo no esta, la seccion 13 simplemente no sale.
+    """
+    ruta = ruta_proveedores(hotel)
+    if not ruta.exists():
+        return []
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    if isinstance(datos, dict):
+        datos = datos.get("proveedores", [])
+    return [str(x).strip() for x in datos if str(x).strip()]
 
 
 def vigencia(D: Datos, nar: dict | None = None) -> dict:
@@ -197,6 +224,13 @@ def armar(D: Datos, nar: dict | None = None):
     S2.seccion11(d, D, nar)
     d.add_page_break()
     S2.seccion12(d, D, nar)
+    # Las dos ultimas van AL FINAL porque asi las pidio el owner: son los
+    # anexos que se llevan a la reunion con el proveedor y al repaso del mes,
+    # no los que abren la discusion con el gerente.
+    d.add_page_break()
+    S2.seccion13(d, D, nar)
+    d.add_page_break()
+    S2.seccion14(d, D, nar)
     return d, sorted(set(S1.FALTANTES))
 
 

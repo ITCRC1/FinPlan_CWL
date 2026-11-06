@@ -1,0 +1,15 @@
+{
+  "_nota": "Los proveedores que la seccion 13 del informe operativo sigue mes a mes. Se buscan en `descripcion` Y en `referencia` del mayor, por coincidencia parcial y sin distinguir mayusculas. Integrity corta el nombre a 40 caracteres: poner el prefijo, no el nombre juridico completo.",
+  "proveedores": [
+    "SDG RH MANAGEMENT",
+    "THE COSTA RICA COLLECTION",
+    "SEED COLLABORATIVE COMPANY",
+    "ANC RENTING",
+    "Consultants Costa Rica",
+    "SISTEMA NACIONAL DE AREAS DE CONSERVACIO",
+    "RONALD DAVID FALLAS BERMUDEZ",
+    "Alta Batalla",
+    "DETOXIGEN",
+    "INSTITUTO NACIONAL DE SEGUROS"
+  ]
+}

@@ -175,7 +175,13 @@ async def extraer(db, anio: int, mes: int, hotel: str | None = None) -> dict:
     for f in (await db.execute(text("""
             SELECT seg1, seg2, seg3, cuenta, descripcion, desc_asiento, asiento,
                    fecha, origen, debito, credito, tc, moneda, moneda_archivo,
-                   archivo
+                   archivo,
+                   -- ⚠️ `referencia` es el ARTICULO y `descripcion` el TERCERO,
+                   -- pero no siempre: en «Consultants Costa Rica» vienen al
+                   -- reves (la marca en descripcion, la razon social
+                   -- 3-102-844425 en referencia). La seccion 13 busca en las
+                   -- DOS, si no se pierde facturas enteras.
+                   referencia
             FROM mayor_movimientos
             WHERE hotel_id=:h AND anio=:a AND mes=:m"""),
             {"h": hotel, "a": anio, "m": mes})).mappings().all():
@@ -189,6 +195,50 @@ async def extraer(db, anio: int, mes: int, hotel: str | None = None) -> dict:
             d[x] = float(d[x] or 0)
         d["fecha"] = str(d["fecha"] or "")
         out["mayor"].append(d)
+    # ── el mayor del MES ANTERIOR: la seccion 14 compara contra el ──────────
+    #
+    # El corte traia solo el mes del reporte. La varianza contra el mes previo
+    # —Pre-Cierre octubre contra Pre-Cierre setiembre— necesita los dos, y por
+    # posicion (`seg3`), que es un grano que SOLO existe en el mayor: ni
+    # `actual_entries` ni los checkbooks lo tienen.
+    #
+    # Enero compara contra diciembre del año anterior.
+    a_prev, m_prev = (anio - 1, 12) if mes == 1 else (anio, mes - 1)
+    out["mayor_prev_periodo"] = f"{a_prev}-{m_prev:02d}"
+    out["mayor_prev"] = []
+    for f in (await db.execute(text("""
+            SELECT seg1, seg2, seg3, cuenta, descripcion, desc_asiento, asiento,
+                   fecha, debito, credito, tc, moneda_archivo, referencia
+            FROM mayor_movimientos
+            WHERE hotel_id=:h AND anio=:a AND mes=:m"""),
+            {"h": hotel, "a": a_prev, "m": m_prev})).mappings().all():
+        d = dict(f)
+        neto = float(d["debito"] or 0) - float(d["credito"] or 0)
+        if (d["moneda_archivo"] or "COL").upper().startswith("COL"):
+            neto = neto / float(d["tc"] or 1)
+        d["usd"] = signo_de(d["seg1"]) * neto
+        d["dept"] = pl_engine.consolidate_dept(puente.get(d["seg2"], d["seg2"]))
+        for x in ("debito", "credito", "tc"):
+            d[x] = float(d[x] or 0)
+        d["fecha"] = str(d["fecha"] or "")
+        out["mayor_prev"].append(d)
+    # El catalogo de posiciones, para que la seccion 14 ponga nombres y no
+    # codigos. 36 de los 39 `seg3` del mayor casan con `position_code`.
+    out["posiciones"] = {}
+    for f in (await db.execute(text("""
+            SELECT DISTINCT dept_code, position_code, position_name
+            FROM payroll_positions
+            WHERE hotel_id=:h AND position_name <> ''"""),
+            {"h": hotel})).mappings().all():
+        out["posiciones"].setdefault(f"{f['dept_code']}|{f['position_code']}",
+                                     f["position_name"])
+        out["posiciones"].setdefault(f["position_code"], f["position_name"])
+
+    if out["mayor"] and not out["mayor_prev"]:
+        out["avisos"].append(
+            f"El mayor de {a_prev}-{m_prev:02d} no esta subido: la seccion 14 "
+            "—varianza contra el mes anterior— sale vacia.")
+
     if not out["mayor"]:
         out["avisos"].append(
             f"El mayor de {anio}-{mes:02d} no esta subido: el informe sale sin "

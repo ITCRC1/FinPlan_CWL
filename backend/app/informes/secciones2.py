@@ -448,3 +448,173 @@ def seccion12(d, D, nar):
     par(d, "Todas las cifras estan en dolares de los Estados Unidos. El archivo del "
            "mayor venia en colones y la conversion se hizo con el tipo de cambio de "
            "cada asiento, no con un promedio del mes.", size=9)
+
+
+def _crc(x) -> str:
+    """Colones con su signo. `us()` devuelve «—» en cero: eso NO lleva simbolo."""
+    v = us(x)
+    return v if v == "—" else f"₡{v}"
+
+
+def _usd(x) -> str:
+    v = us(x)
+    return v if v == "—" else f"${v}"
+
+
+def seccion13(d, D, nar):
+    """Analisis de proveedores — la lista que pide el owner, factura a factura.
+
+    Va **al final del documento** porque asi lo pidio, y porque es el anexo que
+    se lleva a la reunion con el proveedor, no el que abre la discusion con el
+    gerente.
+
+    ⚠️ **Solo cuentas 5-6-7-8.** Lo que el proveedor deja en cuentas de balance
+    —el pasivo, el IVA, lo capitalizado— no es gasto del periodo y mezclarlo
+    miente a lo grande: SDG RH suma ₡195,5M en el mayor de ago–oct 2026 y al
+    P&L solo llegan ₡21,9M.
+
+    ⚠️ **Cada cifra lleva su simbolo de moneda.** Owner, 2026-11-06: *«tienes
+    que poner el signo de la moneda»*. Dos columnas de numeros pelados, una en
+    colones y otra en dolares, con un orden de magnitud de diferencia entre
+    ellas, es una confusion esperando a pasar.
+    """
+    lista = (nar.get("proveedores_lista") or [])
+    if not lista:
+        return
+    h1(d, "Analisis de proveedores", 13)
+    par(d, "Los proveedores que se pidio seguir, con cada factura del mes, la "
+           "cuenta y el departamento donde quedo registrada, la nota del asiento "
+           "y el monto en colones y en dolares. Solo se cuentan los cargos a "
+           "cuentas 5, 6, 7 y 8: lo que el proveedor deja en cuentas de balance "
+           "—el pasivo, el IVA, lo capitalizado— no es gasto del periodo.")
+    datos = D.por_proveedor(lista)
+    if not any(p["facturas"] for p in datos):
+        nota(d, "Sin movimientos",
+             "Ninguno de los proveedores de la lista tiene cargos a cuentas "
+             "5-6-7-8 en este mes.")
+        return
+
+    h2(d, "13.1  Resumen")
+    filas = [[p["nombre"][:38], str(len(p["facturas"])),
+              _crc(p["crc"]), _usd(p["usd"])] for p in datos]
+    filas.append([("TOTAL", "tot"),
+                  (str(sum(len(p["facturas"]) for p in datos)), "tot"),
+                  (_crc(sum(p["crc"] for p in datos)), "tot"),
+                  (_usd(sum(p["usd"] for p in datos)), "tot")])
+    tabla(d, ["Proveedor", "Facturas", "Colones", "USD"], filas, size=8.5,
+          nota_pie="El USD sale del tipo de cambio de cada asiento, no de un "
+                   "supuesto: los montos del mayor estan siempre en colones "
+                   "aunque la moneda del documento diga dolares.")
+
+    h2(d, "13.2  Donde queda registrado")
+    filas = []
+    for p in datos:
+        for c in p["cargos"]:
+            filas.append([p["nombre"][:28], f'{c["cuenta"]} · {c["dept"]}',
+                          D.nom(c["dept"])[:22], str(c["n"]),
+                          _crc(c["crc"]), _usd(c["usd"])])
+    if filas:
+        tabla(d, ["Proveedor", "Cuenta · depto", "Departamento", "Cargos",
+                  "Colones", "USD"], filas, size=8)
+
+    h2(d, "13.3  Factura por factura")
+    for p in datos:
+        if not p["facturas"]:
+            nota(d, p["nombre"],
+                 "Sin cargos a cuentas 5-6-7-8 en este mes.")
+            continue
+        h3(d, f'{p["nombre"]}  —  {len(p["facturas"])} facturas · '
+              f'{_crc(p["crc"])} · {_usd(p["usd"])}')
+        filas = [[f["fecha"], f["asiento"],
+                  " · ".join(sorted(f["cuentas"]))[:24],
+                  " · ".join(sorted(f["conceptos"]))[:38],
+                  " | ".join(sorted(f["notas"]))[:44],
+                  _crc(f["crc"]), _usd(f["usd"])] for f in p["facturas"]]
+        tabla(d, ["Fecha", "Asiento", "Cuenta · depto", "Concepto",
+                  "Nota del asiento", "Colones", "USD"], filas, size=7.5)
+
+    textos(d, nar, "proveedores_analisis")
+
+
+def seccion14(d, D, nar):
+    """Varianza contra el mes anterior, en el mismo escenario.
+
+    Owner, 2026-11-06: *«ANALISIS DE VARIANZAS VERSUS EL MES PASADO... en el
+    escenario Pre-Cierre, en este caso Pre-Cierre setiembre versus Pre-Cierre
+    octubre... las cuentas 6 que es salario, un analisis por posicion por
+    departamento... y las cuentas de gastos por departamento por cuenta...
+    el 80% de las cuentas que explican la varianza total»*.
+
+    ⚠️ Sale del MAYOR y no de los checkbooks: la **posicion** (`seg3`) solo
+    existe ahi. Y las reclasificaciones de allocation se excluyen — mueven
+    costo entre departamentos con neto cero, asi que un mes con ellas y otro
+    sin ellas se leen como un cambio de plantilla que no ocurrio.
+    """
+    v = D.varianza_mes_anterior()
+    h1(d, "Varianza contra el mes anterior", 14)
+    if not v.get("hay"):
+        nota(d, "Sin comparacion",
+             f'El mayor de {v.get("periodo_prev") or "el mes anterior"} no esta '
+             "subido, asi que esta seccion no se puede construir. Subalo en "
+             "«Auditoria del mayor» y vuelva a generar el informe.")
+        return
+
+    prev = v["periodo_prev"]
+    par(d, f"Este mes contra {prev}, el mismo escenario y el mismo mayor. "
+           f"Se listan las lineas que explican el {v['corte']:.0%} del movimiento, "
+           f"ordenadas por el tamano del cambio y no por el saldo: lo que "
+           f"interesa es que se movio, no que es grande.")
+
+    r = v["reclasif"]
+    if r["act"] or r["prev"]:
+        nota(d, "Reclasificaciones excluidas",
+             f'Se dejaron fuera {r["act"]} lineas de reclasificacion de este mes '
+             f'y {r["prev"]} del anterior. Mueven costo de un departamento a otro '
+             f'con neto cero (${us(r["neto_act"])} y ${us(r["neto_prev"])}); '
+             f'contarlas haria ver como cambio de plantilla lo que es solo un '
+             f'traslado entre departamentos.')
+
+    h2(d, "14.1  Por clase de cuenta")
+    filas = []
+    for cl in ("5", "6", "7", "8"):
+        c = v["clases"][cl]
+        if abs(c["act"]) < 0.005 and abs(c["prev"]) < 0.005:
+            continue
+        filas.append([f'{cl}xxx  {c["etiqueta"]}', f'${us(c["act"])}',
+                      f'${us(c["prev"])}', var_gasto(c["act"], c["prev"])])
+    ta = sum(c["act"] for c in v["clases"].values())
+    tp = sum(c["prev"] for c in v["clases"].values())
+    filas.append([("TOTAL", "tot"), (f"${us(ta)}", "tot"), (f"${us(tp)}", "tot"),
+                  (var_gasto(ta, tp)[0], "tot")])
+    tabla(d, ["Clase", "Este mes", prev, "Var $"], filas, size=9)
+
+    for clave, titulo, campos, cab in (
+            ("planilla", "14.2  Planilla (6xxx) por departamento y posicion",
+             ("dept", "pos"), ["Departamento", "Posicion"]),
+            ("gastos", "14.3  Gastos (5xxx, 7xxx, 8xxx) por departamento y cuenta",
+             ("dept", "cuenta"), ["Departamento", "Cuenta"])):
+        b = v[clave]
+        h2(d, titulo)
+        if not b["top"]:
+            nota(d, "Sin movimiento", "No hay variacion que explicar en este bloque.")
+            continue
+        par(d, f'Variacion total del bloque: ${us(b["var"])} '
+               f'(${us(b["act"])} contra ${us(b["prev"])}). Las '
+               f'{len(b["top"])} lineas de abajo explican el {b["cubre"]:.0%} '
+               f'del movimiento; las otras {len(b["todas"]) - len(b["top"])} '
+               f'se reparten el resto.', size=9.5)
+        filas = []
+        for f in b["top"]:
+            if clave == "planilla":
+                etiq = D.nombre_posicion(f["dept"], f["pos"]) or f'pos. {f["pos"]}'
+                prim = [D.nom(f["dept"])[:24], f'{f["pos"]} · {etiq[:26]}']
+            else:
+                prim = [D.nom(f["dept"])[:26], f["cuenta"]]
+            filas.append(prim + [f'${us(f["act"])}', f'${us(f["prev"])}',
+                                 var_gasto(f["act"], f["prev"])])
+        filas.append([("TOTAL del bloque", "tot"), ("", "tot"),
+                      (f'${us(b["act"])}', "tot"), (f'${us(b["prev"])}', "tot"),
+                      (var_gasto(b["act"], b["prev"])[0], "tot")])
+        tabla(d, cab + ["Este mes", prev, "Var $"], filas, size=8)
+
+    textos(d, nar, "varianza_mes_anterior")
