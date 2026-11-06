@@ -548,6 +548,13 @@ MENSAJES: dict[str, dict[str, str]] = {
     "break_even.sin_escenarios": {
         "es": "Hay que mandar al menos un escenario.",
         "en": "At least one scenario has to be sent."},
+    "costos.cuenta_ya_existe": {
+        "es": "El departamento {dept} ya tiene la cuenta {cuenta} («{nombre}»). "
+              "Cada cuenta lleva una sola línea por departamento: edite la que "
+              "ya está, o use otra cuenta.",
+        "en": "Department {dept} already has account {cuenta} («{nombre}»). "
+              "Each account has a single line per department: edit the existing "
+              "one, or use a different account."},
     "costos.driver_type_invalido": {
         "es": "driver_type debe ser uno de {validos}",
         "en": "driver_type must be one of {validos}"},

@@ -44,6 +44,8 @@ const REV_LINE_OPTIONS: { value: RevenueLine; label: string }[] = [
   { value: "RETAIL",         label: "Retail Revenue" },
   { value: "SPA",            label: "Spa Revenue" },
   { value: "SUSTAINABILITY", label: "Sustainability Revenue" },
+  { value: "LAUNDRY",        label: "Laundry Revenue" },
+  { value: "CLUB",           label: "Club Revenue" },
 ];
 
 function fmtUsd(v: string | number) {
@@ -124,6 +126,9 @@ export default function CostsCheckbookPage() {
   const [saving, setSaving]               = useState<string | null>(null);  // entry id being saved
   const [recalcRunning, setRecalcRunning] = useState(false);
   const [error, setError]                 = useState<string | null>(null);
+  //: Fallos al GUARDAR. Aparte de `error`, que es de carga y vacía la
+  //  pantalla: un guardado que falla no debe borrar lo que se está viendo.
+  const [aviso, setAviso]                 = useState<string | null>(null);
   const [xlsxMsg, setXlsxMsg]            = useState<string | null>(null);
   const [xlsxUp, setXlsxUp]             = useState(false);
   const [addModal, setAddModal]         = useState(false);
@@ -220,12 +225,33 @@ export default function CostsCheckbookPage() {
     if (selectedDept) loadDept(selectedDept);
   }, [selectedDept, loadDept]);
 
+  /**
+   * Corre un guardado y **enseña el error si falla**.
+   *
+   * ⚠️ Las cuatro funciones de guardado de esta pantalla tenían `try/finally`
+   * sin `catch`: cuando el PUT fallaba, la celda se revertía sola y no salía
+   * ningún mensaje. Desde afuera es idéntico a que la pantalla no deje
+   * escribir — el owner lo reportó así el 2026-11-05 («NO PUEDO EDITAR PARA
+   * PONER», «NO ME DEJA AGREGAR ESTE COSTO») y el servidor estaba contestando
+   * un 409 perfectamente claro que nadie llegaba a ver.
+   */
+  async function conAviso(fn: () => Promise<void>) {
+    try {
+      setAviso(null);
+      await fn();
+    } catch (e) {
+      setAviso(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function saveEntryMonth(entry: CostEntry, monthKey: string, value: number) {
     if (!scenarioId) return;
     setSaving(entry.id);
     try {
-      await updateCostEntry(scenarioId, entry.id, { [monthKey]: value });
-      if (selectedDept) await loadDept(selectedDept);
+      await conAviso(async () => {
+        await updateCostEntry(scenarioId, entry.id, { [monthKey]: value });
+        if (selectedDept) await loadDept(selectedDept);
+      });
     } finally {
       setSaving(null);
     }
@@ -266,8 +292,10 @@ export default function CostsCheckbookPage() {
     if (!scenarioId) return;
     setSaving(entry.id);
     try {
-      await updateCostEntry(scenarioId, entry.id, patch);
-      if (selectedDept) await loadDept(selectedDept);
+      await conAviso(async () => {
+        await updateCostEntry(scenarioId, entry.id, patch);
+        if (selectedDept) await loadDept(selectedDept);
+      });
     } finally {
       setSaving(null);
     }
@@ -278,9 +306,11 @@ export default function CostsCheckbookPage() {
     if (!scenarioId) return;
     setSaving(entry.id);
     try {
-      await updateCostEntry(scenarioId, entry.id, { ["rate_" + monthKey]: String(pct / 100) });
-      await recalculateCosts(scenarioId);
-      if (selectedDept) await loadDept(selectedDept);
+      await conAviso(async () => {
+        await updateCostEntry(scenarioId, entry.id, { ["rate_" + monthKey]: String(pct / 100) });
+        await recalculateCosts(scenarioId);
+        if (selectedDept) await loadDept(selectedDept);
+      });
     } finally {
       setSaving(null);
     }
@@ -301,12 +331,16 @@ export default function CostsCheckbookPage() {
     if (!scenarioId) return;
     const dept = (body.dept_code as string) || selectedDept;
     if (!dept) return;
-    await createCostEntry(scenarioId, dept, body);
-    const dbDepts = await getCostDepts(scenarioId);
-    setDepts(mergeDepts(dbDepts.map(x => x.dept_code), "COST"));
-    setSelected(dept);
-    await loadDept(dept);
-    setAddModal(false);
+    // Si esto revienta —p.ej. el departamento ya tiene esa cuenta— el modal se
+    // queda abierto y el motivo sale arriba, en vez de no pasar nada.
+    await conAviso(async () => {
+      await createCostEntry(scenarioId, dept, body);
+      const dbDepts = await getCostDepts(scenarioId);
+      setDepts(mergeDepts(dbDepts.map(x => x.dept_code), "COST"));
+      setSelected(dept);
+      await loadDept(dept);
+      setAddModal(false);
+    });
   }
 
   async function handleDeleteCost(entry: CostEntry) {
@@ -450,6 +484,24 @@ export default function CostsCheckbookPage() {
       {error && (
         <div style={{ color: "var(--negative)", background: "var(--bg-surface)", padding: "12px 16px", borderRadius: 4 }}>
           ⚠ {error}
+        </div>
+      )}
+
+      {/* Un guardado que falló. Va aparte del error de carga —que vacía la
+          pantalla— porque acá lo que se estaba viendo sigue siendo válido, y
+          se cierra a mano para que no se escape de la vista. */}
+      {aviso && (
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 12,
+          color: "var(--negative)", background: "rgba(239,83,80,0.08)",
+          border: "1px solid var(--negative)", borderRadius: 4,
+          padding: "10px 14px", margin: "10px 0", fontSize: 12.5,
+        }}>
+          <span style={{ flex: 1 }}>⚠ {aviso}</span>
+          <button onClick={() => setAviso(null)} style={{
+            background: "none", border: "none", color: "var(--negative)",
+            cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0,
+          }}>✕</button>
         </div>
       )}
       {!loading && !error && deptLoading && (
@@ -866,9 +918,29 @@ function MonthPctCell({
 
 // Cada departamento → su línea de ingreso (el costo suele ser % de ese ingreso).
 // F&B arranca en FOOD; para Beverage se agrega una segunda línea de costo.
+/**
+ * Qué línea de ingreso propone el modal «Agregar costo» según el departamento.
+ *
+ * ⚠️ **Solo es el valor POR DEFECTO del selector**, no una restricción: el
+ * modal y la grilla ofrecen las nueve líneas para cualquier departamento. Un
+ * departamento que falte acá abre el selector en `FOOD`, que es lo que hacía
+ * parecer que «solo F&B deja escoger el revenue» (owner, 2026-11-05).
+ *
+ * Faltaban seis de los doce que tienen costo en el Budget Working 2027: Spa
+ * vive en 0140 y no en 0130, la lavandería que vende afuera es 0162, la tienda
+ * 0151 y el Gift Shop 0165 van los dos a RETAIL, y el Club y el Área
+ * Recreativa tienen su propia línea.
+ */
 const DEPT_REV_LINE: Record<string, RevenueLine> = {
-  "0110": "ROOMS", "0120": "FOOD", "0130": "SPA", "0150": "ACTIVITIES",
-  "0152": "TRANSPORT", "0155": "INNOCEANA", "0165": "RETAIL",
+  "0110": "ROOMS",
+  "0120": "FOOD", "0121": "BEVERAGE", "0122": "FOOD", "0123": "FOOD",
+  "0130": "SPA", "0140": "SPA",
+  "0150": "ACTIVITIES", "0151": "RETAIL", "0152": "TRANSPORT",
+  "0155": "INNOCEANA", "0162": "LAUNDRY", "0165": "RETAIL",
+  "260": "CLUB",
+  // 0156 Crowther Lab, 0205 Claro del Bosque, 0220 Cafetería, 0230 IT y
+  // 270 Área Recreativa no venden nada: sus costos van MANUAL, sin % de
+  // ningún ingreso. Dejarlos fuera es la respuesta correcta, no un olvido.
 };
 
 // ── Add cost line modal ─────────────────────────────────────────────────────────
@@ -1038,8 +1110,10 @@ function AddCostModal({
               <div>
                 <label style={lbl}>{t("revenueLine")}</label>
                 <select value={revLine} onChange={e => setRevLine(e.target.value as RevenueLine)} style={inp}>
-                  {["FOOD","BEVERAGE","ROOMS","ACTIVITIES","TRANSPORT","INNOCEANA","RETAIL","SPA","SUSTAINABILITY"]
-                    .map(v => <option key={v} value={v}>{v}</option>)}
+                  {/* La MISMA lista que la grilla: dos copias se separan solas. */}
+                  {REV_LINE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
               <div>

@@ -442,6 +442,25 @@ async def create_cost_entry(
     if body.driver_type == "REVENUE_LINE" and body.revenue_line_ref.upper() not in REVENUE_LINES:
         raise ErrorApi(422, "costos.revenue_line_ref_invalido", validos=REVENUE_LINES)
 
+    # ⚠️ **Una cuenta, una fila por departamento.** `cost_entries` tiene
+    # `UniqueConstraint(scenario_id, dept_code, account_code)` —sin codigo de
+    # detalle, a diferencia del OPEX—, asi que agregar una cuenta que el
+    # departamento ya tiene revienta el commit con IntegrityError. Sin este
+    # chequeo la excepcion sale sin atrapar: el servidor muere sin responder y
+    # el boton «Agregar» no hace nada, sin decir por que.
+    #
+    # Le paso al owner el 2026-11-05 queriendo meter CAR RENTAL en 5350 de
+    # 0152, que ya tenia esa cuenta con driver por huespedes y $20.881,30 al
+    # año. «NO ME DEJA AGREGAR ESTE COSTO», y la pantalla callada.
+    ya = (await db.execute(select(CostEntry).where(
+        CostEntry.scenario_id == scenario_id,
+        CostEntry.dept_code == dept_code,
+        CostEntry.account_code == body.account_code))).scalar_one_or_none()
+    if ya is not None:
+        raise ErrorApi(409, "costos.cuenta_ya_existe",
+                       cuenta=body.account_code, dept=dept_code,
+                       nombre=ya.account_name or body.account_code)
+
     entry = CostEntry(
         id=str(uuid.uuid4()),
         scenario_id=scenario_id,

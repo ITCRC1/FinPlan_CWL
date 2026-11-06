@@ -1895,8 +1895,12 @@ export async function getFteReport(scenarioId: string): Promise<FteReportRow[]> 
 
 export type CalcMode = "MANUAL" | "DRIVER";
 export type DriverType = "REVENUE_LINE" | "OCC_ROOMS" | "GUESTS" | "AVAIL_ROOMS" | "KILOS" | "";
+// Las que el backend valida en `REVENUE_LINES` (app/models/revenue_entry.py).
+// LAUNDRY y CLUB faltaban acá aunque el motor las acepta: sin ellas el
+// checkbook de costos no podía tomar un % del ingreso de lavandería ni del
+// Club (owner, 2026-11-05).
 export type RevenueLine = "ROOMS" | "FOOD" | "BEVERAGE" | "ACTIVITIES" | "TRANSPORT"
-  | "INNOCEANA" | "RETAIL" | "SPA" | "SUSTAINABILITY" | "";
+  | "INNOCEANA" | "RETAIL" | "SPA" | "SUSTAINABILITY" | "LAUNDRY" | "CLUB" | "";
 
 export interface CostEntry {
   id: string;
