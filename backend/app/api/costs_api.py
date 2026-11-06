@@ -338,6 +338,14 @@ async def get_dept_checkbook(scenario_id: str, dept_code: str, db: AsyncSession 
                 "innoceana": str(rev_by_month[m].innoceana) if m in rev_by_month else "0",
                 "retail": str(rev_by_month[m].retail) if m in rev_by_month else "0",
                 "spa": str(rev_by_month[m].spa) if m in rev_by_month else "0",
+                # Estas tres faltaban aunque el motor las calcula desde
+                # siempre. Sin ellas, la fila de referencia de Lavandería,
+                # F&B Misceláneo y el Club salía en cero: el usuario tenía que
+                # sacar el % contra un ingreso que la pantalla no le enseñaba.
+                "laundry": str(rev_by_month[m].laundry) if m in rev_by_month else "0",
+                "fnb_misc": str(rev_by_month[m].fnb_misc) if m in rev_by_month else "0",
+                "club": str(rev_by_month[m].club + rev_by_month[m].club_actividad
+                            + rev_by_month[m].club_visitantes) if m in rev_by_month else "0",
                 "total": str(rev_by_month[m].total_revenue) if m in rev_by_month else "0",
                 "rooms_occupied": str(rev_by_month[m].rooms_occupied) if m in rev_by_month else "0",
                 "guests": str(rev_by_month[m].guests) if m in rev_by_month else "0",

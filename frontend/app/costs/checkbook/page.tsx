@@ -13,6 +13,7 @@ import {
   createCostEntry, deleteCostEntry, getCostCatalog,
   type Scenario, type CostEntry, type CostDeptCheckbook, type CostMonthlySummary,
   type CalcMode, type DriverType, type RevenueLine, type CostCatalogItem,
+  type CostRevenueRef,
   sembrarCuentas,
 } from "@/lib/api";
 import { mergeDepts, deptName, cargarDepartamentos, type CwlDept } from "@/lib/cwl-depts";
@@ -526,10 +527,37 @@ export default function CostsCheckbookPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Reference revenue rows */}
+              {/* El ingreso CONTRA EL QUE SE SACA EL COSTO.
+                  Owner, 2026-11-05: «acá debe estar el ingreso del
+                  departamento en vista… y si cambio debe estar el otro».
+                  Antes solo salía el total del hotel, que para un % de Tours
+                  no sirve de nada: la cuenta se hace contra los $948.613 de
+                  Tours, no contra los $6,65 millones de todo CWL. */}
+              {LINEAS_DEL_DEPTO(selectedDept).map(linea => (
+                <tr key={linea} style={{ background: "var(--bg-elevated)" }}>
+                  <td colSpan={6} style={{ color: "var(--brand)", fontSize: 11, fontWeight: 600 }}>
+                    {REV_LINE_LABEL[linea] ?? linea}
+                    <span style={{ color: "var(--text-disabled)", fontWeight: 400 }}>
+                      {" "}· {t("referenceRow")}
+                    </span>
+                  </td>
+                  {MONTHS.map((_, i) => (
+                    <td key={i} className="mono" style={{ textAlign: "right", color: "var(--brand)", fontSize: 11 }}>
+                      {fmtUsd(revRefVal(revRef[i + 1], linea))}
+                    </td>
+                  ))}
+                  <td className="mono" style={{ textAlign: "right", color: "var(--brand)", fontSize: 11, fontWeight: 600 }}>
+                    {fmtUsd(String(Object.values(revRef).reduce(
+                      (s, r) => s + parseFloat(revRefVal(r, linea) || "0"), 0)))}
+                  </td>
+                </tr>
+              ))}
+
+              {/* El total del hotel sigue abajo y más apagado: sirve para ver
+                  cuánto pesa el departamento, no para sacar el porcentaje. */}
               <tr style={{ background: "var(--bg-elevated)" }}>
                 <td colSpan={6} style={{ color: "var(--text-secondary)", fontStyle: "italic", fontSize: 11 }}>
-                  {t("referenceRow")}
+                  {t("referenceTotal")}
                 </td>
                 {MONTHS.map((_, i) => (
                   <td key={i} className="mono" style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 11 }}>
@@ -918,6 +946,42 @@ function MonthPctCell({
 
 // Cada departamento → su línea de ingreso (el costo suele ser % de ese ingreso).
 // F&B arranca en FOOD; para Beverage se agrega una segunda línea de costo.
+/**
+ * Las líneas de ingreso que le pertenecen a cada departamento.
+ *
+ * Es lo que la fila de referencia del checkbook enseña arriba de los costos:
+ * contra ESE ingreso se saca el porcentaje, no contra el total del hotel. Un
+ * departamento puede tener más de una —A&B vende comida, bebida y misceláneo—
+ * y por eso es una lista.
+ *
+ * Los que no venden nada (Crowther, Claro del Bosque, Cafetería, IT, Área
+ * Recreativa) no aparecen: sus costos van MANUAL y no hay ingreso contra qué
+ * medirlos. Ahí la pantalla enseña solo el total del hotel.
+ */
+const DEPT_REV_REF: Record<string, RevenueLine[]> = {
+  "0110": ["ROOMS"],
+  "0120": ["FOOD", "BEVERAGE"], "0121": ["BEVERAGE"],
+  "0122": ["FOOD"], "0123": ["FOOD"],
+  "0130": ["SPA"], "0140": ["SPA"],
+  "0150": ["ACTIVITIES"], "0151": ["RETAIL"], "0152": ["TRANSPORT"],
+  "0155": ["INNOCEANA"], "0162": ["LAUNDRY"], "0165": ["RETAIL"],
+  "260": ["CLUB"],
+};
+
+const LINEAS_DEL_DEPTO = (dept: string | null): RevenueLine[] =>
+  (dept && DEPT_REV_REF[dept]) || [];
+
+/** Rótulo de cada línea, el mismo que usa el selector de la grilla. */
+const REV_LINE_LABEL: Record<string, string> = Object.fromEntries(
+  REV_LINE_OPTIONS.map(o => [o.value, o.label]));
+
+/** El monto de una línea dentro de la referencia del mes. Las llaves del
+ *  backend van en minúscula. */
+function revRefVal(ref: CostRevenueRef | undefined, linea: RevenueLine): string {
+  if (!ref) return "0";
+  return (ref as unknown as Record<string, string>)[linea.toLowerCase()] ?? "0";
+}
+
 /**
  * Qué línea de ingreso propone el modal «Agregar costo» según el departamento.
  *

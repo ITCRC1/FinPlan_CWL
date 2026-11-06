@@ -1928,6 +1928,9 @@ export interface CostRevenueRef {
   rooms: string; food: string; beverage: string; activities: string;
   transport: string; sustainability: string; innoceana: string;
   retail: string; spa: string; total: string;
+  // El motor las calcula desde siempre; faltaban en la respuesta y por eso la
+  // fila de referencia de Lavandería, F&B Misc y el Club salía en cero.
+  laundry: string; fnb_misc: string; club: string;
   rooms_occupied: string; guests: string; rooms_available: number;
 }
 
