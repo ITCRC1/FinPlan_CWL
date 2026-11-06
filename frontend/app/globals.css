@@ -284,6 +284,22 @@ body {
 }
 .fin-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
+/* Celda de tabla que se puede escribir y pegar sin haber entrado a editar.
+
+   Lleva `tabIndex` para recibir foco, así que el navegador le manda el evento
+   `paste`: se puede parar en enero, Ctrl+V y que caigan los doce meses. Sin
+   una marca visible, una celda en cero se ve igual que una de sólo lectura
+   —las dos dicen «—»— y nadie adivina que acepta un pegado. */
+.fin-celda-editable { outline: none; }
+.fin-celda-editable:hover {
+  background: var(--bg-elevated);
+  box-shadow: inset 0 -1px 0 var(--border-medium);
+}
+.fin-celda-editable:focus-visible {
+  background: var(--bg-input);
+  box-shadow: inset 0 0 0 1px var(--border-focus);
+}
+
 /* Cuadros financieros: header (y 1ª columna ya sticky por página) fijos al hacer
    scroll. El contenedor scrollea internamente (max-height) para que el thead se
    pegue a su tope. La 1ª columna usa position:sticky;left:0 por celda en cada página. */

@@ -87,9 +87,28 @@ function NumCell({
 
   return (
     <td
-      className="mono"
+      className="mono fin-celda-editable"
+      // ⚠️ **Enfocar la celda ya la pone a editar**, y el `onPaste` vive acá.
+      //
+      // Owner, 2026-11-05: *«copio en excel y hago paste en los 12 meses y
+      // todo queda... pero ahora no se puede hacer nada»*. El pegado existía
+      // desde 109dbbb, pero colgado del `<input>`, que sólo se monta DESPUÉS
+      // de hacer clic. Y una celda en cero se dibuja «—», igual que una de
+      // sólo lectura: nadie adivina que hay que hacerle clic primero.
+      //
+      // `tabIndex` + `onFocus` cierran eso: con Tab o con un clic siempre se
+      // termina dentro de un `<input>` de verdad, que es donde el `paste`
+      // llega seguro. **No depende de que el navegador le mande el evento a
+      // un `<td>` que no es editable** — eso no lo pude comprobar y no se
+      // apuesta a lo que no se midió. El handler se queda en la celda igual
+      // porque el evento del `<input>` burbujea hasta acá: un solo camino.
+      tabIndex={0}
       style={{ textAlign: "right", cursor: "text", padding: "2px 6px" }}
       onClick={() => { setDraft(money2(value)); setEditing(true); }}
+      onFocus={() => { setDraft(money2(value)); setEditing(true); }}
+      onPaste={onPegar
+        ? e => manejarPegado(e, b => { setEditing(false); onPegar(b); })
+        : undefined}
     >
       {editing ? (
         <input
@@ -97,9 +116,6 @@ function NumCell({
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
-          onPaste={onPegar
-            ? e => manejarPegado(e, b => { setEditing(false); onPegar(b); })
-            : undefined}
           onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
           className="fin-input"
           style={{ width: 90, textAlign: "right" }}
@@ -280,10 +296,16 @@ export default function CostsCheckbookPage() {
     if (!porLinea.size) return;
     setSaving([...porLinea.values()][0].entry.id);
     try {
-      for (const { entry, meses } of porLinea.values()) {
-        await updateCostEntry(scenarioId, entry.id, meses);
-      }
-      if (selectedDept) await loadDept(selectedDept);
+      // ⚠️ Con `conAviso`, como las otras cuatro. Ésta se me quedó afuera el
+      // 2026-11-05 y es la peor de todas: un pegado que falla no deja ni
+      // rastro —la grilla se recarga igual y vuelve a enseñar lo de antes—,
+      // así que se ve exactamente como «la pantalla no deja pegar».
+      await conAviso(async () => {
+        for (const { entry, meses } of porLinea.values()) {
+          await updateCostEntry(scenarioId, entry.id, meses);
+        }
+        if (selectedDept) await loadDept(selectedDept);
+      });
     } finally {
       setSaving(null);
     }
