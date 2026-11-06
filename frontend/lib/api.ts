@@ -657,7 +657,10 @@ export async function saveScenarioMaster(
   scenarioId: string,
   body: { closed_months: number[]; pax_per_night: number; units: Record<string, number> },
 ): Promise<{ saved: boolean }> {
-  return api.put(`/scenarios/${scenarioId}/master/`, body);
+  // POST, no PUT: el backend no acepta PUT aca y contestaba 405, o sea que
+  // el Master Data del anio no guardaba nada. Verificado en el OpenAPI de
+  // produccion: /scenarios/{id}/master/ -> GET, POST.
+  return api.post(`/scenarios/${scenarioId}/master/`, body);
 }
 
 export async function setPaxPerNight(
@@ -1133,7 +1136,8 @@ export async function getCatalogoEstadisticas(): Promise<CatalogoEstadisticas> {
 export async function editarCuentaEstadistica(
   code: string, body: { nombre_es?: string; nombre_en?: string; activa?: boolean },
 ): Promise<{ ok: boolean }> {
-  return api.put(`/estadisticas/catalogo/${encodeURIComponent(code)}/`, body);
+  // POST, no PUT (405). OpenAPI: /estadisticas/catalogo/{code}/ -> POST.
+  return api.post(`/estadisticas/catalogo/${encodeURIComponent(code)}/`, body);
 }
 export async function getEstadisticas(scenarioId: string): Promise<EstadisticasValores> {
   return api.get(`/estadisticas/${scenarioId}/`);
@@ -2543,7 +2547,10 @@ export async function bulkReplaceNonOp(
   scenarioId: string,
   rows: NonOpBulkRow[],
 ): Promise<{ imported: number }> {
-  return api.put<{ imported: number }>(`/nonop/${scenarioId}/bulk/`, rows);
+  // El backend tiene POST en esta puerta, no PUT. Con `put` contestaba
+  // **405 Method Not Allowed** y «Guardar cambios» del auxiliar below-GOP
+  // no guardaba nada. Comprobado contra produccion: PUT -> 405, POST -> 401.
+  return api.post<{ imported: number }>(`/nonop/${scenarioId}/bulk/`, rows);
 }
 
 /**
@@ -3959,7 +3966,10 @@ export async function savePLManualInput(
   month: number,
   payload: Partial<Omit<PLManualInput, "month">>,
 ): Promise<{ ok: boolean; month: number }> {
-  return api.put<{ ok: boolean; month: number }>(`/pl/${scenarioId}/manual/${month}/`, payload);
+  // POST, no PUT (405). OpenAPI: /pl/{id}/manual/{month}/ -> POST.
+  // Esta es la que guarda renta, seguro, depreciacion y el % de management
+  // fee: mientras contesto 405, esas lineas se quedaron en cero.
+  return api.post<{ ok: boolean; month: number }>(`/pl/${scenarioId}/manual/${month}/`, payload);
 }
 
 export async function recalculatePL(scenarioId: string): Promise<RecalcResult> {
