@@ -170,7 +170,8 @@
       "villasPax": "Villas · Pax (Guests)",
       "villasNetRate": "Villas · Net Rate",
       "villasSets": "Villas · Sets and cost split",
-      "villasReport": "Villas · Rooms by set"
+      "villasReport": "Villas · Rooms by set",
+      "glByMonth": "GL Accounts by Month"
     },
     "groupsFull": {
       "financials": "Financial Statements",
@@ -5452,5 +5453,79 @@
     "mesesCerrados": "{n} months already closed",
     "cerradosNota": "Those months are past: the guest stayed and paid at checkout, so no balance is left to collect. On the Books still carries them —it is the whole year— but the Deposit Ledger only lists future arrivals, and subtracting one from the other would invent a debt.",
     "excelCobrarSub": "On the Books + VAT − deposits received = balance due, month by month."
+  },
+  "gl": {
+    "title": "GL Accounts by Month",
+    "subtitle": "Every account × 12 months, with the P&L line each one lands in, and its reconciliation.",
+    "tabDetail": "GL detail by month",
+    "tabSummary": "Summary by month",
+    "tabValidation": "Validation",
+    "search": "Search",
+    "searchPlaceholder": "Dept, GL, description, P&L line…",
+    "category": "Category",
+    "allCategories": "All categories",
+    "accounts": "accounts",
+    "rows": "rows",
+    "noRows": "No row matches the filter.",
+    "noSuma": "does not add up",
+    "netIsProfit": "With revenue negative, NET is net profit with the sign flipped: when the report ties, NET = −Net Profit from the P&L.",
+    "incomplete": "This scenario is built in the checkbooks: revenue is computed from rates and lives by P&L line, not by account. The grid does NOT carry the 4xxx accounts and the sum does not give net profit.",
+    "colDept": "Dept",
+    "colDeptName": "Department Name",
+    "colGl": "GL Account",
+    "colGlDesc": "GL Description",
+    "colPlLine": "P&L line",
+    "colCorporate": "Corporate code",
+    "colCategory": "Category",
+    "noMapping": "NOT MAPPED",
+    "fallbackHint": "Resolved by fallback: it reaches the P&L through the only rule that uses this account. The day a second one appears, the money moves line on its own.",
+    "changedHint": "This account's mapping changed during the year. The P&L applies today's line to all twelve months.",
+    "classHint": "The account class disagrees with the P&L section it lands in. The two allocation 'Distribución' accounts are exactly this, and they are fine.",
+    "notApplicable": "The identity does not apply to this scenario",
+    "ties": "✓ Ties to the P&L",
+    "doesNotTie": "✗ Does not tie to the P&L",
+    "sumOfRows": "Σ of all rows",
+    "minusNetProfit": "−Net Profit from the P&L",
+    "difference": "Difference",
+    "fromGl": "GL",
+    "fromPl": "P&L",
+    "cat": {
+      "REVENUE": "Revenue",
+      "COST_OF_SALES": "Cost of Sales",
+      "PAYROLL": "Payroll",
+      "OPERATING_EXPENSES": "Operating Expenses",
+      "BELOW_GOP": "Below GOP",
+      "STATISTICS": "Statistics",
+      "OTHER": "Other",
+      "NET": "NET"
+    },
+    "sinMapeo": {
+      "title": "Accounts with no mapping",
+      "why": "They are in the ledger and do NOT reach the P&L. This is the number-one reason the report fails to tie: their amount is almost always the whole difference."
+    },
+    "porDescarte": {
+      "title": "Resolved by fallback",
+      "why": "They reach the P&L through the only rule that exists for that account, without matching on department. It does not break today; the day a second rule appears the money moves line on its own."
+    },
+    "claseDiscrepa": {
+      "title": "Class vs section",
+      "why": "4xxx accounts the P&L treats as expense, or the reverse. The two laundry and cafeteria 'Distribución' accounts are this, and they are fine; a third one deserves a look."
+    },
+    "mapeoCambio": {
+      "title": "Mapping changed during the year",
+      "why": "These accounts changed P&L line mid-year. It moves no number — the P&L uses today's line for all twelve months — but it explains why January's ledger may show up on a different line."
+    },
+    "porLinea": {
+      "title": "Lines with a difference",
+      "why": "Sum of the ledger accounts against what that P&L line shows. Only MAPPED lines are compared: calculated ones are formulas over others, not the sum of some accounts."
+    },
+    "signNote": "revenue negative (credit), expenses positive; Σ all rows = −net profit",
+    "motivo": {
+      "vacio": "This scenario has no accounts loaded at all: there is nothing to reconcile.",
+      "checkbook": "This scenario is built in the checkbooks: revenue is computed from rates and lives by P&L line, not by account, so the grid does not carry the 4xxx accounts.",
+      "mezcla": "This forecast is a blend: months 1 to {mes} come from the linked ACTUAL and the rest from this scenario's own rates. Its own accounts are not the whole picture."
+    },
+    "colAccount": "Department / Account",
+    "excelHint": "The Excel always downloads every account, filtered view or not: it is the reconciliation paper trail."
   }
 }

@@ -170,7 +170,8 @@
       "villasPax": "Villas · Pax (Huéspedes)",
       "villasNetRate": "Villas · Net Rate",
       "villasSets": "Villas · Sets y reparto del costo",
-      "villasReport": "Villas · Rooms por set"
+      "villasReport": "Villas · Rooms por set",
+      "glByMonth": "Cuentas del Mayor por Mes"
     },
     "groupsFull": {
       "financials": "Estados financieros",
@@ -5452,5 +5453,79 @@
     "mesesCerrados": "{n} meses ya cerrados",
     "cerradosNota": "Esos meses ya pasaron: el huésped se hospedó y pagó al salir, así que no queda saldo que cobrar. El On the Books los trae igual —es el año completo— pero el Deposit Ledger solo lista llegadas futuras, y restar uno del otro inventaría una deuda.",
     "excelCobrarSub": "On the Books + IVA − depósitos recibidos = saldo por cobrar, mes a mes."
+  },
+  "gl": {
+    "title": "Cuentas del Mayor por Mes",
+    "subtitle": "Todas las cuentas × 12 meses, con la línea del P&L donde cae cada una y su conciliación.",
+    "tabDetail": "Detalle por mes",
+    "tabSummary": "Resumen por mes",
+    "tabValidation": "Validación",
+    "search": "Buscar",
+    "searchPlaceholder": "Departamento, cuenta, descripción, línea del P&L…",
+    "category": "Categoría",
+    "allCategories": "Todas las categorías",
+    "accounts": "cuentas",
+    "rows": "filas",
+    "noRows": "Ninguna fila coincide con el filtro.",
+    "noSuma": "no suma",
+    "netIsProfit": "Con el ingreso en negativo, NETO es la utilidad cambiada de signo: si el reporte cierra, NETO = −Net Profit del P&L.",
+    "incomplete": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta. La grilla NO trae las cuentas 4xxx y la suma no da la utilidad.",
+    "colDept": "Dept",
+    "colDeptName": "Departamento",
+    "colGl": "Cuenta",
+    "colGlDesc": "Descripción",
+    "colPlLine": "Línea del P&L",
+    "colCorporate": "Código corporativo",
+    "colCategory": "Categoría",
+    "noMapping": "SIN MAPEO",
+    "fallbackHint": "Resuelta por descarte: llega al P&L por la única regla que usa esa cuenta. El día que aparezca una segunda, la plata se mueve de renglón sola.",
+    "changedHint": "El mapeo de esta cuenta cambió durante el año. El P&L le aplica el renglón vigente HOY a los doce meses.",
+    "classHint": "La clase de la cuenta no coincide con la sección del P&L donde cae. Las dos «Distribución» del reparto son esto y están bien.",
+    "notApplicable": "La igualdad no aplica a este escenario",
+    "ties": "✓ Cuadra con el P&L",
+    "doesNotTie": "✗ No cuadra con el P&L",
+    "sumOfRows": "Σ de todas las filas",
+    "minusNetProfit": "−Net Profit del P&L",
+    "difference": "Diferencia",
+    "fromGl": "Mayor",
+    "fromPl": "P&L",
+    "cat": {
+      "REVENUE": "Ingresos",
+      "COST_OF_SALES": "Costo de ventas",
+      "PAYROLL": "Planilla",
+      "OPERATING_EXPENSES": "Gastos operativos",
+      "BELOW_GOP": "Below GOP",
+      "STATISTICS": "Estadísticas",
+      "OTHER": "Otras",
+      "NET": "NETO"
+    },
+    "sinMapeo": {
+      "title": "Cuentas sin mapeo",
+      "why": "Están en el mayor y NO llegan al P&L. Es la causa número uno de que el reporte no cuadre: su monto es, casi siempre, toda la diferencia."
+    },
+    "porDescarte": {
+      "title": "Resueltas por descarte",
+      "why": "Llegan al P&L por la única regla que existe para esa cuenta, sin coincidir en departamento. No rompe hoy; el día que aparezca una segunda regla la plata se mueve de renglón sola."
+    },
+    "claseDiscrepa": {
+      "title": "Clase contra sección",
+      "why": "Cuentas 4xxx que el P&L trata como gasto, o al revés. Las dos «Distribución» del reparto de lavandería y cafetería son esto y están bien; una tercera merece una mirada."
+    },
+    "mapeoCambio": {
+      "title": "Mapeo cambiado durante el año",
+      "why": "A estas cuentas les cambió el renglón del P&L a mitad de año. No mueve ningún número —el P&L usa el vigente hoy para los doce meses— pero explica por qué el mayor de enero puede verse en otro renglón."
+    },
+    "porLinea": {
+      "title": "Renglones con diferencia",
+      "why": "Suma de las cuentas del mayor contra lo que muestra ese renglón del P&L. Sólo se comparan los renglones MAPEADOS: los calculados son fórmulas sobre otros, no la suma de unas cuentas."
+    },
+    "signNote": "ingreso negativo (crédito), gasto positivo; Σ todas las filas = −utilidad",
+    "motivo": {
+      "vacio": "Este escenario no tiene ni una cuenta cargada: no hay nada que conciliar.",
+      "checkbook": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta, así que la grilla no trae las 4xxx.",
+      "mezcla": "Este forecast mezcla: los meses 1 a {mes} vienen del ACTUAL enlazado y el resto de las tarifas de este escenario. Sus propias cuentas no son la película completa."
+    },
+    "colAccount": "Departamento / Cuenta",
+    "excelHint": "El Excel baja SIEMPRE las cuentas completas, con el filtro puesto o no: es el papel de la conciliación."
   }
 }
