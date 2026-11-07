@@ -59,15 +59,17 @@ async def consolidado_propia(
     from app.api import pl_api
 
     async with get_session() as session:
-        q = select(Scenario).where(
-            Scenario.hotel_id == HOTEL_ID,
-            Scenario.year == year,
-            Scenario.type == tipo,
-        )
-        if version:
-            q = q.where(Scenario.version == version)
-        escenario = (await session.execute(
-            q.order_by(Scenario.created_at.desc()))).scalars().first()
+        # Misma regla que `/cuentas/`: con «el más reciente» a secas, el ACTUAL
+        # salía del espejo del Pre-Cierre (un solo mes, siempre lo último creado)
+        # y el FORECAST no respetaba el ★ Current. Owner, 2026-11-06: «el actual
+        # debe ser actual 2026 no precierre».
+        escenarios = (await session.execute(
+            select(Scenario).where(
+                Scenario.hotel_id == HOTEL_ID,
+                Scenario.year == year,
+                Scenario.type == tipo,
+            ).order_by(Scenario.created_at.desc()))).scalars().all()
+        escenario = _escoger_escenario(escenarios, tipo, version)
 
         if escenario is None:
             # 404 y no una respuesta vacía: un consolidador que recibe ceros los

@@ -29,6 +29,14 @@ def test_version_exacta_manda():
     assert _escoger_escenario(lista, "ACTUAL", "Pre-Cierre").version == "Pre-Cierre"
 
 
+def test_el_pl_por_linea_escoge_igual_que_por_cuenta():
+    """`/propia/` (el que lee el Excel en vivo) usaba «el más reciente» a secas y
+    entregaba el espejo del Pre-Cierre como ACTUAL (owner, 2026-11-06)."""
+    import inspect
+    from app.api.consolidado_api import consolidado_propia
+    assert "_escoger_escenario(" in inspect.getsource(consolidado_propia)
+
+
 def test_la_ruta_esta_registrada():
     from app.api.consolidado_api import router
     assert "/consolidado/propia/cuentas/" in [r.path for r in router.routes]
