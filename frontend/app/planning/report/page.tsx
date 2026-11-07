@@ -43,11 +43,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  getAllocationSummary, getDetalleDeCelda, getEstadisticasCierre,
-  getGastoPorClase, getPLDetail, getPosiciones, getScenarios,
+  getDetalleDeCelda, getGastoPorClase, getPLDetail, getPosiciones, getScenarios,
   type AllocationSummary, type DetalleCelda, type EstadisticasCierre,
   type GastoEscenario, type PLDetail, type PosicionesVersion, type Scenario,
 } from "@/lib/api";
+import {
+  AMBITOS, armarPaquete, cargarReparto as cargarRepartoDe, cargarStats as cargarStatsDe,
+  extrasDe, hojasDe as hojasDelPaquete, llaveLibro, statsACuadro as statsACuadroDe,
+  VISTAS, type ContextoPaquete,
+} from "@/lib/budgetPackage";
 import { bajarCuadros, type Cuadro } from "@/lib/exportCuadro";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
@@ -59,29 +63,8 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import IrA from "@/components/IrA";
 import Tabla from "./Tabla";
 
-const AMBITOS = [
-  { id: "consolidado", rotulo: "Consolidado", ayuda: "Hotel + Club Madresal" },
-  { id: "hotel", rotulo: "Hotel", ayuda: "Sin el Club Madresal" },
-  { id: "club", rotulo: "Club Madresal", ayuda: "Sólo el departamento 260" },
-] as const;
-
-const VISTAS = [
-  { id: "pl", rotulo: "P&L", ayuda: "La cascada completa, por ámbito" },
-  { id: "aperturas", rotulo: "Aperturas", ayuda: "Por departamento, línea y cuenta" },
-  { id: "checkbooks", rotulo: "Checkbooks", ayuda: "Cuenta por cuenta del mayor" },
-  { id: "detalle", rotulo: "Checkbooks con detalle",
-    ayuda: "Cada cuenta abierta en sus sub-líneas: 800 · Coral, 801 · Fumigación…" },
-  { id: "plantilla", rotulo: "Plantilla",
-    ayuda: "Posiciones por departamento, con salario y FTE" },
-  { id: "reparto", rotulo: "Reparto",
-    ayuda: "Cafetería y lavandería: cuánto se repartió y con qué base" },
-  { id: "estadisticas", rotulo: "Estadísticas", ayuda: "Noches, ocupación, ADR, Club" },
-] as const;
-
 /** Cuántas versiones se pueden comparar contra la principal. */
 const COMPARAR = 3;
-
-const DOCE = Array.from({ length: 12 }, (_, i) => i + 1);
 
 export default function PlanningReportPage() {
   const [escenarios, setEscenarios] = useState<Scenario[]>([]);
@@ -131,40 +114,10 @@ export default function PlanningReportPage() {
   const ids = useMemo(
     () => (principal ? [principal, ...otros] : []), [principal, otros]);
 
-  /** La misma llave con la que se guarda un checkbook: la clase y si está
-   *  abierto. Sin el `abrir` en la llave, pedir el detalle devolvía el cuadro
-   *  sin abrir que ya estaba en memoria. */
-  const llaveLibro = (c: string, abrir: boolean) => `${c}${abrir ? ":abierto" : ""}`;
-
-  /** Las estadísticas: los doce meses de la versión principal, uno por llamada,
-   *  y el año de cada versión con el período completo.
-   *
-   *  ⚠️ El año NO se suma acá. La ocupación, el ADR y el promedio de socios del
-   *  año no son la suma de los doce meses, y el servidor ya sabe calcularlos
-   *  sobre el período: rehacerlo del lado de la pantalla sería una segunda
-   *  definición de la misma cifra. */
-  const cargarStats = useCallback(async () => {
-    const unoNulo = async (id: string, d: number, h: number) =>
-      getEstadisticasCierre(id, d, h).catch(() => null);
-    const [mesesPorVersion, anios] = await Promise.all([
-      // ⚠️ Los doce meses de CADA versión, no sólo de la elegida: desde que el
-      // cuadro abre varias a la derecha, pedir una sola dejaba esas columnas en
-      // blanco justo en la hoja donde el owner mira la estacionalidad.
-      Promise.all(ids.map(id => Promise.all(DOCE.map(m => unoNulo(id, m, m))))),
-      Promise.all(ids.map(id => unoNulo(id, 1, 12))),
-    ]);
-    return { mesesPorVersion, anios };
-  }, [ids]);
-
-  /** El reparto de las dos: el resumen del motor por versión, más los nombres de
-   *  departamento, que viven en el endpoint de gasto. */
-  const cargarReparto = useCallback(async () => {
-    const [resumen, deptos] = await Promise.all([
-      Promise.all(ids.map(id => getAllocationSummary(id).catch(() => null))),
-      getGastoPorClase(ids, false).then(r => r.departamentos ?? {}).catch(() => ({})),
-    ]);
-    return { resumen, deptos };
-  }, [ids]);
+  /** Las estadísticas y el reparto se piden con el armador COMPARTIDO
+   *  (`lib/budgetPackage.ts`): es el mismo que usa la ruta del Excel en vivo. */
+  const cargarStats = useCallback(() => cargarStatsDe(ids), [ids]);
+  const cargarReparto = useCallback(() => cargarRepartoDe(ids), [ids]);
 
   const cargar = useCallback(async () => {
     if (!principal) return;
@@ -223,15 +176,11 @@ export default function PlanningReportPage() {
     (s: { mesesPorVersion: (EstadisticasCierre | null)[][];
           anios: (EstadisticasCierre | null)[] },
      op: { ambito: string; compacto: boolean; mesesDe?: number; extras?: number[] }) =>
-      cuadroEstadisticas({ ...s, versiones: s.anios.map((a, i) => ({
-        scenario_id: ids[i], escenario: a?.escenario })) }, escenarios, op),
+      statsACuadroDe(s, ids, escenarios, op),
     [ids, escenarios]);
 
-  /** Las versiones que abren sus doce meses a la DERECHA: todas las elegidas
-   *  menos la que ya los abre a la izquierda. Owner, 2026-10-05: *«después de
-   *  la línea roja … doce meses, y con una columna de espacio, otros doce»*. */
-  const extras = useMemo(
-    () => ids.map((_id, i) => i).filter(i => i !== mesesDe), [ids, mesesDe]);
+  /** Las versiones que abren sus doce meses a la DERECHA (ver `extrasDe`). */
+  const extras = useMemo(() => extrasDe(ids, mesesDe), [ids, mesesDe]);
 
   /**
    * Las estadísticas, encima del P&L.
@@ -291,60 +240,20 @@ export default function PlanningReportPage() {
   }, [vista, pl, gastos, libro, plantilla, reparto, stats, clase, metrica,
       tipoReparto, escenarios, ambito, compacto, mesesDe, extras, ids, statsACuadro]);
 
-  /** Todas las hojas de una vista. Las usa tanto el botón de la vista como el
-   *  del paquete completo, para que las dos bajen exactamente lo mismo. */
-  const hojasDe = useCallback(async (v: string): Promise<Cuadro[]> => {
-    const op = { compacto, ambito, mesesDe, extras };
-    const out: Cuadro[] = [];
-    if (v === "pl") {
-      for (const a of AMBITOS) {
-        const d = a.id === ambito && pl ? pl
-          : await getPLDetail(a.id, principal, otros).catch(() => null);
-        if (d) out.push(cuadroPlanning(d, escenarios, { ...op, ambito: a.id }));
-      }
-    } else if (v === "aperturas") {
-      let g = gastos;
-      if (!g) {
-        const r = await getGastoPorClase(ids, true);
-        g = { escenarios: r.escenarios, departamentos: r.departamentos ?? {} };
-      }
-      for (const a of APERTURAS) {
-        out.push(cuadroApertura(a.clase, g.escenarios, g.departamentos,
-                                escenarios, op));
-      }
-    } else if (v === "checkbooks" || v === "detalle") {
-      const abrir = v === "detalle";
-      for (const a of APERTURAS) {
-        const d = libro[llaveLibro(a.clase, abrir)]
-          ?? await getDetalleDeCelda(ids, a.clase, "", 0, abrir).catch(() => null);
-        // ⚠️ La clase que no tiene nada debajo de la cuenta NO baja dos veces.
-        // Su hoja «con detalle» saldría idéntica a la normal, y dos hojas
-        // iguales con nombres distintos hacen dudar de las dos.
-        if (d && (!abrir || seAbre(d))) out.push(cuadroCheckbook(d, escenarios, op));
-      }
-    } else if (v === "plantilla") {
-      const ps = plantilla ?? (await getPosiciones(ids)).escenarios;
-      // Las DOS métricas: el FTE dice cuánta gente y el sueldo cuánto cuesta.
-      // Quien revisa un presupuesto mira las dos, y una sola obliga a volver.
-      for (const m of METRICAS_POSICION) {
-        out.push(cuadroPosiciones(ps, escenarios, { ...op, metrica: m.id }));
-      }
-    } else if (v === "reparto") {
-      const r = reparto ?? await cargarReparto();
-      // ⚠️ Los tipos salen de los DATOS. Con la lista fija de dos, CWL bajaba
-      // el paquete sin su reparto de Habitaciones ni el de salarios — plata que
-      // se movió y que el libro no mencionaba.
-      for (const t of tiposDeReparto(r.resumen)) {
-        out.push(cuadroReparto(t,
-          { versiones: r.resumen.map((_x, i) => ({ scenario_id: ids[i] })), ...r },
-          escenarios, op));
-      }
-    } else {
-      out.push(statsACuadro(stats ?? await cargarStats(), op));
-    }
-    return out;
-  }, [compacto, ambito, mesesDe, extras, pl, gastos, libro, plantilla, reparto, stats,
-      principal, otros, ids, escenarios, cargarReparto, cargarStats, statsACuadro]);
+  /** El contexto del armador compartido, con lo que la pantalla ya cargó para
+   *  no volver a pedirlo. */
+  const contexto = useCallback((): ContextoPaquete => ({
+    principal, otros, escenarios,
+    op: { compacto, ambito, mesesDe, extras },
+    cache: { pl: pl ? { ambito, datos: pl } : null, gastos, libro, plantilla, reparto, stats },
+  }), [principal, otros, escenarios, compacto, ambito, mesesDe, extras,
+      pl, gastos, libro, plantilla, reparto, stats]);
+
+  /** Todas las hojas de una vista, con el armador COMPARTIDO (`hojasDe` de
+   *  `lib/budgetPackage.ts`): el botón de la vista, el del paquete y la ruta
+   *  del Excel en vivo bajan exactamente lo mismo. */
+  const hojasDe = useCallback(
+    (v: string): Promise<Cuadro[]> => hojasDelPaquete(v, contexto()), [contexto]);
 
   const nombreDelArchivo = (sufijo: string) => {
     const e = escenarios.find(s => s.id === principal);
@@ -383,18 +292,11 @@ export default function PlanningReportPage() {
     setBajando("paquete");
     setError(null);
     try {
-      const cuadros: Cuadro[] = [];
-      for (const v of VISTAS) {
-        try {
-          cuadros.push(...await hojasDe(v.id));
-        } catch {
-          // Una vista que falla no se lleva el paquete entero: se avisa al
-          // final y las demás bajan. Un libro de veintitrés hojas que no baja
-          // por una es peor que uno de veintidós que sí.
-          setError(e => (e ? `${e} · ` : "")
-            + `no se pudo armar «${v.rotulo}»; el resto del paquete sí bajó`);
-        }
-      }
+      // ⚠️ `armarPaquete` recorre las siete vistas con `hojasDe`: el MISMO
+      // armador del botón de cada vista y de la ruta del Excel en vivo.
+      const cuadros = await armarPaquete(contexto(), rotulo =>
+        setError(e => (e ? `${e} · ` : "")
+          + `no se pudo armar «${rotulo}»; el resto del paquete sí bajó`));
       if (!cuadros.length) throw new Error("no se pudo armar ninguna hoja");
       await bajarCuadros(nombreDelArchivo("Budget_Package"), cuadros);
     } catch (e) {

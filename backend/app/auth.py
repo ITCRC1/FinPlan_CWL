@@ -11,7 +11,7 @@ import base64
 import hashlib
 from typing import Optional
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,12 +80,78 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
+# ─── Llave del Budget Package en vivo ─────────────────────────────────────────
+#
+# Owner, 2026-11-06: *«automatiza este [Budget Package] de una, así como está…
+# cada tab»* — y, preguntado si eso incluía la plantilla con sueldos, *«sí,
+# las 22»*. El libro se refresca desde Excel: quien lo pide es la ruta
+# `/api/paquete` del frontend, que no tiene usuario con sesión.
+#
+# ⚠️ **Es OTRA llave que la del consolidado, a propósito.** Aquélla abre el P&L
+# por línea y nada más; ésta abre la plantilla por posición con su sueldo. Que
+# sean distintas permite revocar una sin tocar la otra.
+#
+# Tres candados, igual que la del consolidado:
+#   * abre SÓLO las rutas que arma el paquete (`RUTAS_DEL_PAQUETE`), y sólo en
+#     el método con que se leen — ninguna escribe en la base;
+#   * nace apagada: sin `PAQUETE_API_KEY` no existe ninguna llave válida;
+#   * se compara en tiempo constante.
+RUTAS_DEL_PAQUETE = frozenset({
+    ("GET", "/api/scenarios/"),
+    ("GET", "/api/reports/pl-detail/{ambito}/"),
+    ("GET", "/api/gasto-por-clase/"),
+    ("GET", "/api/gasto-por-clase/detalle-de-celda/"),
+    ("GET", "/api/payroll/posiciones/"),
+    ("GET", "/api/allocations/{scenario_id}/summary/"),
+    ("GET", "/api/pl/{scenario_id}/estadisticas/"),
+    # Arma la grilla del libro con el exportador de siempre. No toca la base.
+    ("POST", "/api/export/cuadros/grilla/"),
+})
+
+#: Quien entra con la llave del paquete. No existe en la tabla de usuarios ni
+#: se guarda: es sólo para que los endpoints que piden un `User` lo reciban.
+LECTOR_DEL_PAQUETE_ID = "llave-budget-package"
+
+
+def llave_del_paquete_valida(recibida: str) -> bool:
+    esperada = (os.environ.get("PAQUETE_API_KEY") or "").strip()
+    if not esperada or not recibida:
+        return False
+    return hmac.compare_digest(recibida.strip(), esperada)
+
+
+def _ruta_del_paquete(request: Request | None) -> bool:
+    if request is None:
+        return False
+    ruta = request.scope.get("route")
+    plantilla = getattr(ruta, "path", "") or request.url.path
+    # ⚠️ La ruta del router viene SIN el prefijo `/api` con que la monta
+    # `main.py`; la URL cruda, con él. Se comparan las dos igual.
+    if not plantilla.startswith("/api/"):
+        plantilla = "/api" + plantilla
+    return (request.method, plantilla) in RUTAS_DEL_PAQUETE
+
+
 # ─── FastAPI dependencies ─────────────────────────────────────────────────────
 async def get_current_user(
+    request: Request = None,
     authorization: str = Header(default=""),
     token: str | None = None,   # alterna para descargas <a href> (no mandan header)
+    x_paquete_key: str = Header(default=""),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    # ⚠️ `isinstance`: quien llama a esta función a mano —`lector_del_consolidado`—
+    # no pasa la cabecera, y lo que recibe es el `Header(...)` por defecto, que
+    # es un objeto y daría verdadero.
+    if isinstance(x_paquete_key, str) and x_paquete_key:
+        # Una llave que no es, o una ruta que el paquete no usa, no cae a la
+        # sesión: contesta 401. Si cayera, quien probara llaves vería la
+        # diferencia entre «llave mala» y «ruta cerrada».
+        if llave_del_paquete_valida(x_paquete_key) and _ruta_del_paquete(request):
+            return User(id=LECTOR_DEL_PAQUETE_ID, email=LECTOR_DEL_PAQUETE_ID,
+                        name="Budget Package en vivo", role="viewer",
+                        password_hash="", active=True)
+        raise ErrorApi(401, "auth.no_autenticado")
     raw = ""
     if authorization.lower().startswith("bearer "):
         raw = authorization[7:].strip()

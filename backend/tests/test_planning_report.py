@@ -48,6 +48,10 @@ RAIZ = pathlib.Path(__file__).resolve().parents[2]
 FRONT = RAIZ / "frontend"
 LIB = FRONT / "lib/planningReport.ts"
 PAGINA = FRONT / "app/planning/report/page.tsx"
+#: El armador del paquete, compartido por la pantalla y por la ruta del Excel en
+#: vivo (owner, 2026-11-06). Lo que antes vivía en la página vive acá.
+PAQUETE = FRONT / "lib/budgetPackage.ts"
+RUTA_EN_VIVO = FRONT / "app/api/paquete/route.ts"
 TABLA = FRONT / "app/planning/report/Tabla.tsx"
 HARNESS = pathlib.Path(__file__).parent / "js/planning_report.js"
 
@@ -57,7 +61,9 @@ def _lib() -> str:
 
 
 def _pagina() -> str:
-    return PAGINA.read_text(encoding="utf-8")
+    """La pantalla Y su armador compartido: lo que la pantalla hace, lo hace
+    con `lib/budgetPackage.ts`."""
+    return PAGINA.read_text(encoding="utf-8") + PAQUETE.read_text(encoding="utf-8")
 
 
 def test_la_pantalla_existe_y_esta_en_el_menu():
@@ -263,7 +269,7 @@ def test_el_excel_trae_TODO_lo_que_la_vista_abre():
     la vista como el del paquete.
     """
     pagina = _pagina()
-    bloque = pagina[pagina.index("const hojasDe = useCallback("):]
+    bloque = pagina[pagina.index("export async function hojasDe("):]
     assert "for (const a of AMBITOS)" in bloque, "el P&L dejo de traer los tres ambitos"
     assert bloque.count("for (const a of APERTURAS)") == 2, (
         "los checkbooks —con y sin detalle— y las aperturas bajan las CINCO clases")
@@ -427,12 +433,24 @@ def test_el_BUDGET_PACKAGE_arma_con_el_MISMO_armador():
     de cada una — y la que se manda a revision es justamente esa. `hojasDe` es
     el armador del boton de cada vista Y del paquete.
     """
-    pagina = _pagina()
-    assert "async function bajarPaquete()" in pagina
-    bloque = pagina[pagina.index("async function bajarPaquete()"):]
-    assert "for (const v of VISTAS)" in bloque
-    assert "await hojasDe(v.id)" in bloque, (
+    pantalla = PAGINA.read_text(encoding="utf-8")
+    assert "async function bajarPaquete()" in pantalla
+    bloque = pantalla[pantalla.index("async function bajarPaquete()"):]
+    assert "await armarPaquete(contexto()" in bloque, (
+        "el boton del paquete arma las hojas por su cuenta en vez de usar "
+        "`armarPaquete`")
+    paquete = PAQUETE.read_text(encoding="utf-8")
+    armar = paquete[paquete.index("export async function armarPaquete("):]
+    assert "for (const v of VISTAS)" in armar
+    assert "await hojasDe(v.id, ctx)" in armar, (
         "el paquete arma las hojas por su cuenta en vez de usar `hojasDe`")
+    # Y la ruta del Excel en vivo usa el mismo (owner, 2026-11-06).
+    ruta = RUTA_EN_VIVO.read_text(encoding="utf-8")
+    assert "await armarPaquete(" in ruta, (
+        "el Excel en vivo arma el paquete por su cuenta: diria otra cosa que el "
+        "boton")
+    assert '"/export/cuadros/grilla/"' in ruta
+    pagina = _pagina()
     # Y el boton de la vista usa el mismo.
     vista = pagina[pagina.index("async function bajar()"):
                    pagina.index("async function bajarPaquete()")]

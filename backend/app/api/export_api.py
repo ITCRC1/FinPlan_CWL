@@ -153,6 +153,24 @@ async def exportar_cuadros(body: ExportBody):
     )
 
 
+@router.post("/export/cuadros/grilla/")
+async def grilla_de_cuadros(body: ExportBody):
+    """El MISMO libro que `/export/cuadros/`, devuelto como tabla de celdas.
+
+    Owner, 2026-11-06: el Budget Package se refresca desde Excel. Power Query no
+    puede traer un archivo con formato, pero sí una tabla; ésta es la tabla del
+    libro que arma el botón, celda por celda, con su estilo.
+
+    ⚠️ Pasa por `_validar` y `build_cuadros_workbook` igual que el Excel del
+    botón: un cuadro que el botón rechaza, acá también; y el diseño del libro
+    —dónde va la cabecera, qué es total— sale del mismo lugar.
+    """
+    from app.export.grilla import grilla_de_libro
+    _validar(body)
+    return grilla_de_libro(
+        build_cuadros_workbook([c.model_dump() for c in body.cuadros]))
+
+
 @router.post("/export/cuadros/word/")
 async def exportar_word(body: WordBody):
     """El reporte de cierre en Word, con espacio para comentar cada cuadro.

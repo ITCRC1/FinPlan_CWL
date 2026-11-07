@@ -108,6 +108,19 @@ export async function refrescarSesion(): Promise<boolean> {
   }
 }
 
+/**
+ * Cabeceras para cuando NO hay navegador: la ruta `app/api/paquete` arma el
+ * Budget Package en el servidor de Next para el Excel en vivo, y ahí no hay
+ * sesión — entra con la llave del paquete (`x-paquete-key`).
+ *
+ * ⚠️ Sólo se mandan sin `window`. En el navegador nunca hay llave: si alguna
+ * vez se fijara por error del lado del cliente, quedaría ignorada.
+ */
+let cabecerasDeServidor: Record<string, string> = {};
+export function fijarCabecerasDeServidor(h: Record<string, string>) {
+  cabecerasDeServidor = h;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
@@ -115,6 +128,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(typeof window === "undefined" ? cabecerasDeServidor : {}),
       ...localeHeader(),
       ...(init?.headers ?? {}),
     },
