@@ -10,15 +10,16 @@ import { hacerTarifaNeta } from "@/lib/tarifaNeta";
 import AvisoLineasObligatorias from "@/components/AvisoLineasObligatorias";
 import { useTranslations } from "next-intl";
 import { money2 } from "@/lib/fmt";
-import { Fragment, useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useRef, useState, useCallback } from "react";
 import { HOTEL_ID } from "@/lib/hotel";
 import { bajarCuadros, type Cuadro, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import {
   getScenarios, getRevenueCheckbook, saveRevenueCheckbook, setRevenueSource,
   getRoomTypes, getOccupancyPct, getRackRates, getChannelsConfig,
   getDriverRatesSeed, getPackageDriverRates, getPaxGrid, getNetRates,
+  getScenarioDriverRates, saveScenarioDriverRates,
   type Scenario, type RevenueCheckbookRow, type RevenueSource, type RoomType,
-  type PackageDriverRates,
+  type PackageDriverRates, type PerillaDriver,
   type RevenueBulkRow, type MonthKey,
 } from "@/lib/api";
 import { recalcularYContar } from "@/lib/recalcular";
@@ -83,8 +84,39 @@ interface RoomStats extends Medible {
 const SIN_TARIFAS = {
   food: 0, tours: 0, transport: 0, nightsPerStay: 1, bevRatio: 0,
   retailPct: 0, innoceanaPct: 0, sustRate: 0, sustNonPay: 0,
+  // El «% que no consume»: la perilla de holgura del presupuesto.
+  //
+  // Owner, 2026-11-09, mirando el «% que no paga» de Sustainability: *«este
+  // solo aplica a sustainability… sería hacer una para todos los demás»*. Pidió
+  // UN recuadro global, no uno por línea.
+  //
+  // Aplica a las cuatro líneas que se venden POR CONSUMO —Food, Beverage,
+  // Tours y Transporte—, que son las que el huésped lleva incluidas y no
+  // siempre usa. Rooms no lleva (la noche se cobra igual) y Sustainability
+  // tiene la suya, que es otra cosa: un descuento de cobro, no un consumo.
+  //
+  // Es la palanca honesta para bajar el presupuesto: no toca un precio ni una
+  // ocupación —supuestos que después se le exigen a Ventas— sino que dice lo
+  // que de verdad dice: que no todo el mundo consume lo que lleva incluido.
+  noConsumePct: 0,
 };
 type DriverRatesUI = typeof SIN_TARIFAS;
+
+/** UI ↔ backend. Los recuadros son camelCase y la columna guarda snake_case. */
+const PERILLA_API: Record<keyof DriverRatesUI, PerillaDriver> = {
+  food: "food", tours: "tours", transport: "transport",
+  nightsPerStay: "nights_per_stay", bevRatio: "bev_ratio",
+  retailPct: "retail_pct", innoceanaPct: "innoceana_pct",
+  sustRate: "sust_rate", sustNonPay: "sust_non_pay",
+  noConsumePct: "no_consume_pct",
+};
+
+function aPerillasApi(r: DriverRatesUI): Partial<Record<PerillaDriver, number>> {
+  return Object.fromEntries(
+    (Object.keys(PERILLA_API) as (keyof DriverRatesUI)[])
+      .map(k => [PERILLA_API[k], r[k]]),
+  );
+}
 
 const num = numeroDeExcel;
 function fmtUsd(v: string | number): string {
@@ -124,55 +156,120 @@ export default function RevenueCheckbookPage() {
   // De dónde salieron las tarifas de arriba, para poder decirlo en pantalla.
   // Sin esto, un recuadro en cero se ve igual venga del paquete o de la nada.
   const [pkgRates, setPkgRates] = useState<PackageDriverRates | null>(null);
+  // ¿Las perillas de esta pantalla vienen de algo que alguien guardó, o son
+  // todavía el default? Lo dice la pantalla: un recuadro no distingue solo.
+  const [ratesGuardadas, setRatesGuardadas] = useState(false);
+  const [ratesSave, setRatesSave] = useState<"" | "va" | "ok" | "mal">("");
+  // El efecto de carga termina poniendo esto en true. Sin el candado, el
+  // `setRates` de la carga se vería igual que un tecleo del usuario y
+  // guardaría la semilla como si fuera una decisión suya: a partir de ahí el
+  // escenario quedaría congelado contra cualquier cambio del paquete.
+  const cargado = useRef(false);
+  const pendiente = useRef<{ t: ReturnType<typeof setTimeout>; enviar: () => void } | null>(null);
 
-  // Las tarifas de ESTA propiedad. Si no trae, el botón queda apagado.
-  //
-  // ⚠️ La semilla es FIJA POR HOTEL y las inclusiones del paquete viven por
-  // ESCENARIO. Owner, 2026-10-22: *«llena esto en forma automática de la vista
-  // anterior»*. En el BUDGET Working 2027 la semilla decía Tours 342 y la
-  // pantalla mostraba 0, porque alguien lo había editado a mano y la semilla no
-  // tiene dónde guardar eso. Por eso la semilla es el PISO y el paquete del
-  // escenario la pisa (efecto de abajo).
-  useEffect(() => {
-    (async () => {
-      try {
-        const s = await getDriverRatesSeed();
-        const r = s.tarifas ?? {};
-        if (!s.seeded) return;
-        setRates({
-          food: r.food ?? 0, tours: r.tours ?? 0, transport: r.transport ?? 0,
-          nightsPerStay: r.nights_per_stay ?? 1, bevRatio: r.bev_ratio ?? 0,
-          retailPct: r.retail_pct ?? 0, innoceanaPct: r.innoceana_pct ?? 0,
-          sustRate: r.sust_rate ?? 0, sustNonPay: r.sust_non_pay ?? 0,
-        });
-      } catch { /* sin semilla: el botón queda apagado y la pantalla lo dice */ }
-    })();
+  // Un recuadro que olvida lo que uno escribió es peor que no tenerlo: invita a
+  // poner un supuesto, lo usa una vez y después lo pierde sin avisar. Debounce
+  // de 800 ms, la convención del CLAUDE.md §26.9 (auto-save, sin botón).
+  const agendarGuardado = useCallback((next: DriverRatesUI, sid: string) => {
+    if (pendiente.current) clearTimeout(pendiente.current.t);
+    const enviar = () => {
+      pendiente.current = null;
+      setRatesSave("va");
+      saveScenarioDriverRates(sid, aPerillasApi(next))
+        .then(() => { setRatesGuardadas(true); setRatesSave("ok"); })
+        .catch(() => setRatesSave("mal"));
+    };
+    pendiente.current = { t: setTimeout(enviar, 800), enviar };
   }, []);
 
-  // El paquete DEL ESCENARIO manda sobre la semilla del hotel.
+  // Si la pantalla se va con un tecleo a medio camino, se manda igual. Perder
+  // el último número escrito por cerrar la pestaña es exactamente el defecto
+  // que esto vino a arreglar.
+  useEffect(() => () => {
+    const pend = pendiente.current;
+    if (pend) { clearTimeout(pend.t); pend.enviar(); }
+  }, []);
+
+  function tocarPerilla(key: keyof DriverRatesUI, valor: number) {
+    const next = { ...rates, [key]: valor };
+    setRates(next);
+    if (cargado.current && scenarioId && !sel?.is_locked)
+      agendarGuardado(next, scenarioId);
+  }
+
+  // Las tarifas del botón, en UN solo efecto y con un orden que importa:
   //
-  // Solo pisa las cuatro que el paquete sabe (Food, Tours, Transporte,
-  // Sustainability) y las noches por estadía. Bebidas, Retail, Innoceana y el
-  // «% que no paga» no son inclusiones: no tienen de dónde salir acá y se
-  // quedan como estaban. Pisarlas con cero sería peor que no tocarlas.
+  //   1. **La semilla del hotel** (`seed_data/<HOTEL>/driver_rates.json`) — el
+  //      piso. Es FIJA por propiedad. Sin ella el botón queda apagado: llenar
+  //      doce meses con ceros se ve igual que llenarlos bien, y eso es peor.
+  //   2. **El paquete DEL ESCENARIO** pisa la semilla en las cinco que sabe
+  //      (Food, Tours, Transporte, Sustainability y las noches). Owner,
+  //      2026-10-22: *«llena esto en forma automática de la vista anterior»*.
+  //      En el Budget Working 2027 la semilla decía Tours 342 y la pantalla 0,
+  //      porque alguien lo había editado a mano y la semilla no tiene dónde
+  //      guardar eso.
+  //   3. **Lo guardado en ESTE escenario** pisa a las dos. Es lo que el usuario
+  //      escribió con la mano, y la mano manda sobre cualquier default.
+  //
+  // ⚠️ Los tres iban en efectos sueltos y eso era una carrera: el que
+  // contestaba último ganaba. Van en uno solo, en secuencia, y `rates` se fija
+  // UNA vez al final.
   useEffect(() => {
     if (!scenarioId) return;
+    let vivo = true;
     (async () => {
+      const r: DriverRatesUI = { ...SIN_TARIFAS };
+
+      // 1 · semilla del hotel
       try {
-        const p = await getPackageDriverRates(scenarioId);
-        setPkgRates(p);
-        if (!p.disponible) return;
-        const tr = p.tarifas;
-        setRates(r => ({
-          ...r,
-          food: tr.food ?? r.food,
-          tours: tr.tours ?? r.tours,
-          transport: tr.transport ?? r.transport,
-          sustRate: tr.sust_rate ?? r.sustRate,
-          nightsPerStay: tr.nights_per_stay || r.nightsPerStay,
-        }));
-      } catch { setPkgRates(null); }
+        const sem = await getDriverRatesSeed();
+        const st = sem.tarifas ?? {};
+        if (sem.seeded) {
+          r.food = st.food ?? 0; r.tours = st.tours ?? 0;
+          r.transport = st.transport ?? 0;
+          r.nightsPerStay = st.nights_per_stay ?? 1;
+          r.bevRatio = st.bev_ratio ?? 0; r.retailPct = st.retail_pct ?? 0;
+          r.innoceanaPct = st.innoceana_pct ?? 0;
+          r.sustRate = st.sust_rate ?? 0; r.sustNonPay = st.sust_non_pay ?? 0;
+        }
+      } catch { /* sin semilla: el botón queda apagado y la pantalla lo dice */ }
+
+      // 2 · el paquete del escenario, solo en lo que el paquete sabe. Bebidas,
+      // Retail, Innoceana y los dos porcentajes no son inclusiones: no tienen
+      // de dónde salir acá y pisarlos con cero sería peor que no tocarlos.
+      try {
+        const pk = await getPackageDriverRates(scenarioId);
+        if (!vivo) return;
+        setPkgRates(pk);
+        if (pk.disponible) {
+          const pt = pk.tarifas;
+          r.food = pt.food ?? r.food;
+          r.tours = pt.tours ?? r.tours;
+          r.transport = pt.transport ?? r.transport;
+          r.sustRate = pt.sust_rate ?? r.sustRate;
+          r.nightsPerStay = pt.nights_per_stay || r.nightsPerStay;
+        }
+      } catch { if (vivo) setPkgRates(null); }
+
+      // 3 · lo que se guardó a mano en este escenario
+      let guardadas = false;
+      try {
+        const g = await getScenarioDriverRates(scenarioId);
+        if (!vivo) return;
+        guardadas = g.guardadas;
+        const gt = g.tarifas ?? {};
+        (Object.keys(PERILLA_API) as (keyof DriverRatesUI)[]).forEach(k => {
+          const v = gt[PERILLA_API[k]];
+          if (typeof v === "number") r[k] = v;
+        });
+      } catch { /* sin guardar: quedan el paquete y la semilla */ }
+
+      if (!vivo) return;
+      setRatesGuardadas(guardadas);
+      setRates(r);
+      cargado.current = true;
     })();
+    return () => { vivo = false; cargado.current = false; };
   }, [scenarioId]);
 
   useEffect(() => {
@@ -374,12 +471,25 @@ export default function RevenueCheckbookPage() {
     }
     const { occupied, roomRev, netFactor, paxNights } = stats;
     const np = rates.nightsPerStay || 1;
-    const food = paxNights.map((pn, i) => pn * rates.food * (netFactor[i] || 0));
+    // El «% que no consume», la perilla de holgura. Owner, 2026-11-09: *«este
+    // solo aplica a sustainability… sería hacer una para todos los demás»*.
+    //
+    // Se aplica a la CANTIDAD, no a la tarifa: el precio del paquete no cambia:
+    // lo que cambia es cuánta gente de verdad usa lo que lleva incluido. Por
+    // eso entra una sola vez acá y no en cada recuadro.
+    //
+    // Las cuatro que lo llevan son las que se venden por consumo. Food lo toma
+    // directo y **Beverage lo hereda**, porque sale de Food (`bevRatio %`): un
+    // huésped que no se sentó a comer tampoco pidió la bebida de esa comida.
+    // Rooms no lleva —la noche se cobra ocupada o no— y Sustainability tiene su
+    // propio «% que no paga», que es un descuento de cobro, no un consumo.
+    const consume = 1 - (rates.noConsumePct || 0) / 100;
+    const food = paxNights.map((pn, i) => pn * rates.food * (netFactor[i] || 0) * consume);
     const vals: Record<string, number[]> = {
       ROOMS: roomRev.slice(),
       FOOD: food,
-      ACTIVITIES: paxNights.map((pn, i) => (pn / np) * rates.tours * (netFactor[i] || 0)),
-      TRANSPORT: paxNights.map((pn, i) => (pn / np) * rates.transport * (netFactor[i] || 0)),
+      ACTIVITIES: paxNights.map((pn, i) => (pn / np) * rates.tours * (netFactor[i] || 0) * consume),
+      TRANSPORT: paxNights.map((pn, i) => (pn / np) * rates.transport * (netFactor[i] || 0) * consume),
       BEVERAGE: food.map(f => f * rates.bevRatio / 100),
       RETAIL: roomRev.map(r => r * rates.retailPct / 100),
       INNOCEANA: roomRev.map(r => r * rates.innoceanaPct / 100),
@@ -575,6 +685,7 @@ export default function RevenueCheckbookPage() {
           ["innoceanaPct", t("drvInnoceanaPct")],
           ["sustRate", t("drvSustRate")],
           ["sustNonPay", t("drvSustNonPay")],
+          ["noConsumePct", t("drvNoConsumePct")],
         ] as [keyof typeof rates, string][]).map(([key, label]) => (
           <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
             {label}
@@ -583,7 +694,7 @@ export default function RevenueCheckbookPage() {
               type="number"
               value={rates[key]}
               disabled={sel?.is_locked}
-              onChange={e => setRates(r => ({ ...r, [key]: parseFloat(e.target.value) || 0 }))}
+              onChange={e => tocarPerilla(key, parseFloat(e.target.value) || 0)}
               style={{ width: 110, textAlign: "right", padding: "4px 6px" }}
             />
           </label>
@@ -594,6 +705,20 @@ export default function RevenueCheckbookPage() {
         </button>
         <span style={{ fontSize: 11, color: "var(--text-disabled)", maxWidth: 320 }}>
           {t("fillHint")}
+        </span>
+
+        {/* Que se guardó, y de dónde salió lo que se está viendo.
+          *
+          * Sin esto los recuadros mienten por omisión en los dos sentidos: un
+          * valor tecleado se ve igual que uno que ya se perdió, y un default
+          * del paquete se ve igual que una decisión que alguien tomó. */}
+        <span style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 6,
+                       color: ratesSave === "mal" ? "var(--negative)" : "var(--text-disabled)" }}>
+          {ratesSave === "va" && <>● {tc("saving")}</>}
+          {ratesSave === "ok" && <span style={{ color: "var(--positive)" }}>✓ {t("ratesSaved")}</span>}
+          {ratesSave === "mal" && <>⚠ {t("ratesSaveFailed")}</>}
+          {ratesSave === "" && ratesGuardadas && <>✓ {t("ratesFromScenario")}</>}
+          {ratesSave === "" && !ratesGuardadas && <>{t("ratesFromDefaults")}</>}
         </span>
 
         {/* De dónde salieron las tarifas, y el neto que producen.

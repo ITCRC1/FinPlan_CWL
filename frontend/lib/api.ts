@@ -6684,3 +6684,38 @@ export async function getGl(scenarioId: string): Promise<GlRespuesta> {
 export async function getGlValidacion(scenarioId: string): Promise<GlValidacion> {
   return api.get(`/gl/${scenarioId}/validacion/`);
 }
+
+// ─── Las perillas del botón «Llenar desde drivers», por escenario ───────────
+//
+// ⚠️ Antes NO se guardaban: eran estado del navegador y se perdían al recargar.
+// El owner puso 2,80 de estadía promedio, no vio cambiar el revenue, y al
+// volver a la pantalla el recuadro estaba otra vez en 3 (el valor del paquete,
+// que además es un entero). Un recuadro que olvida invita a poner un supuesto
+// y después lo pierde sin avisar.
+
+export type PerillaDriver =
+  | "food" | "tours" | "transport" | "nights_per_stay" | "bev_ratio"
+  | "retail_pct" | "innoceana_pct" | "sust_rate" | "sust_non_pay"
+  | "no_consume_pct";
+
+export interface DriverRatesGuardadas {
+  scenario_id: string;
+  /** false = nadie las tocó; la pantalla se cae al paquete y luego a la semilla. */
+  guardadas: boolean;
+  tarifas: Partial<Record<PerillaDriver, number>>;
+}
+
+export async function getScenarioDriverRates(
+  scenarioId: string,
+): Promise<DriverRatesGuardadas> {
+  return api.get(`/scenarios/${scenarioId}/driver-rates/`);
+}
+
+export async function saveScenarioDriverRates(
+  scenarioId: string, tarifas: Partial<Record<PerillaDriver, number>>,
+): Promise<{ saved: boolean; tarifas: Record<string, number> }> {
+  // PUT, no POST: es la puerta que abre el backend. Y NO se reusa `/master/`,
+  // que escribe closed_months, pax y units — los tres — y acá no se conoce
+  // ninguno: llamarlo desde el checkbook se los borraría al escenario.
+  return api.put(`/scenarios/${scenarioId}/driver-rates/`, { tarifas });
+}

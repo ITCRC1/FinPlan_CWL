@@ -23,6 +23,7 @@ PUT  /api/scenarios/{id}/revenue/occupancy/{room_type_id}/{month}/
   Update a room type occupancy for a month.
 """
 import calendar
+import json
 import os
 from decimal import Decimal
 from datetime import datetime, timezone
@@ -245,6 +246,90 @@ async def put_scenario_master(
     sm.units_json = json.dumps({k: int(v) for k, v in body.units.items()})
     await db.commit()
     return {"saved": True, "scenario_id": scenario_id}
+
+
+#: Las perillas del boton «Llenar desde drivers», con su valor por defecto.
+#:
+#: `no_consume_pct` es la que pidio el owner el 2026-11-09: *«este solo aplica a
+#: sustainability... seria hacer una para todos los demas»*. Hoy el «% que no
+#: paga» existia solo para Sustainability; esta aplica a las cuatro lineas del
+#: paquete que se venden por consumo (Food, Beverage, Tours y Transporte) y es
+#: la perilla de holgura del presupuesto: baja el ingreso sin tocar un precio ni
+#: una ocupacion, porque dice lo que de verdad dice — que no todo el mundo
+#: consume lo que lleva incluido.
+PERILLAS = ("food", "tours", "transport", "nights_per_stay", "bev_ratio",
+            "retail_pct", "innoceana_pct", "sust_rate", "sust_non_pay",
+            "no_consume_pct")
+
+
+def _perillas_guardadas(sm) -> dict:
+    if sm is None or not (sm.driver_rates_json or "").strip():
+        return {}
+    try:
+        d = json.loads(sm.driver_rates_json)
+    except ValueError:
+        return {}
+    return {k: float(v) for k, v in d.items()
+            if k in PERILLAS and isinstance(v, (int, float))}
+
+
+@router.get("/scenarios/{scenario_id}/driver-rates/")
+async def get_scenario_driver_rates(
+    scenario_id: str, db: AsyncSession = Depends(get_db),
+):
+    """Las perillas guardadas DE ESTE ESCENARIO, si alguien las guardo.
+
+    Vacio no es un error: significa «nadie las toco», y la pantalla se cae al
+    paquete del escenario y despues a la semilla del hotel. Ese orden importa y
+    vive en el frontend, que es quien tiene las tres fuentes a mano.
+    """
+    await _get_scenario_or_404(scenario_id, db)
+    sm = (await db.execute(
+        select(ScenarioMaster).where(ScenarioMaster.scenario_id == scenario_id)
+    )).scalar_one_or_none()
+    guardadas = _perillas_guardadas(sm)
+    return {"scenario_id": scenario_id, "guardadas": bool(guardadas),
+            "tarifas": guardadas}
+
+
+class DriverRatesBody(BaseModel):
+    tarifas: dict[str, float]
+
+
+@router.put("/scenarios/{scenario_id}/driver-rates/")
+async def put_scenario_driver_rates(
+    scenario_id: str, body: DriverRatesBody, db: AsyncSession = Depends(get_db),
+):
+    """Guarda las perillas sin tocar el resto del master del escenario.
+
+    ⚠️ **No se reusa `POST /master/`.** Ese endpoint recibe `closed_months`,
+    `pax_per_night` y `units` y los ESCRIBE los tres: llamarlo desde el Revenue
+    Checkbook —que no conoce ninguno— le borraria las unidades y los meses
+    cerrados al escenario. Un endpoint propio que solo toca su columna.
+    """
+    scenario = await _get_scenario_or_404(scenario_id, db)
+    try:
+        scenario.assert_editable()
+    except Exception as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    sm = (await db.execute(
+        select(ScenarioMaster).where(ScenarioMaster.scenario_id == scenario_id)
+    )).scalar_one_or_none()
+    if sm is None:
+        sm = ScenarioMaster(scenario_id=scenario_id)
+        db.add(sm)
+    # Se mezcla con lo que ya estaba: la pantalla manda la fila entera, pero si
+    # manana manda solo una perilla las otras no se pierden.
+    mezcla = _perillas_guardadas(sm)
+    for k, v in body.tarifas.items():
+        if k in PERILLAS:
+            try:
+                mezcla[k] = float(v)
+            except (TypeError, ValueError):
+                continue
+    sm.driver_rates_json = json.dumps(mezcla)
+    await db.commit()
+    return {"saved": True, "scenario_id": scenario_id, "tarifas": mezcla}
 
 
 class PaxPerNightUpdate(BaseModel):
