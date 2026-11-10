@@ -195,6 +195,43 @@ def _formula(col: dict, f: dict, filas: list[dict], i: int, fila: int,
         return None
 
     letra = get_column_letter(i)
+
+    # ── La fórmula que escribe el cuadro, con ORDINALES ───────────────────
+    #
+    # `filas[n].formula_tpl = "={c}{r:4}*$B${r:1}"`, donde:
+    #
+    #   {c}     la letra de ESTA columna
+    #   {r:N}   la fila real del ordinal N del arreglo emitido
+    #   {R:N}   lo mismo, absoluta — para una celda de supuesto que todas las
+    #           columnas comparten. ⚠️ YA TRAE el `$`: se escribe `$B{R:1}`
+    #           —que da `$B$6`— y no `$B${R:1}`, que daría `$B$$6`.
+    #
+    # ⚠️ **Los ordinales, no los números de fila.** Es la misma razón por la
+    # que `suma_de` los usa: el cuadro no sabe en qué fila del Excel va a caer
+    # —depende de la franja de KPIs y de si la cabecera lleva dos pisos— y un
+    # número escrito a mano queda bien el día que se escribe y apunta a otra
+    # celda en cuanto cambia cualquiera de las dos. Esto lo resuelve el
+    # exportador, que es el único que lo sabe.
+    #
+    # ⚠️ **Esta NO se comprueba contra el valor que venía**, a diferencia de
+    # `suma_de` y `combina_filas`. Es a propósito: un bloque de validación
+    # existe para RECALCULAR y mostrar la diferencia, así que su resultado no
+    # se conoce de antemano — si se conociera, no haría falta la fórmula. Por
+    # eso se usa sólo donde el cuadro la pide explícitamente.
+    tpl = f.get("formula_tpl")
+    if tpl:
+        def _fila_de(m):
+            ordinal = int(m.group(2))
+            if not (0 <= ordinal < len(filas)):
+                return m.group(0)        # fuera de rango: se deja sin tocar
+            real = primera + ordinal
+            return f"${real}" if m.group(1) == "R" else str(real)
+
+        import re as _re
+        salida = _re.sub(r"\{([rR]):(\d+)\}", _fila_de, tpl).replace("{c}", letra)
+        # Un ordinal que no se pudo resolver deja la plantilla a medias: antes
+        # de escribir una fórmula rota, no se escribe ninguna.
+        return None if ("{r:" in salida or "{R:" in salida) else salida
     resta = col.get("resta")
     if resta and len(resta) == 2:
         a, b = (get_column_letter(x + 1) for x in resta)
@@ -460,10 +497,26 @@ def _hoja(wb: Workbook, cuadro: dict, usados: set[str]):
         # otra. Sin esto habría que partirlo en tres cuadros.
         fmt_fila = f.get("formato")
 
+        # El rótulo de esta fila, para que otra hoja pueda apuntarle por NOMBRE.
+        # El primero gana: un rótulo repetido —«Total 0110» no lo es, pero
+        # «6000 · Salary and Wages» aparece en cada departamento— se resuelve
+        # a su primera aparición, y por eso las referencias cruzadas usan
+        # rótulos únicos (los totales) o `SUMIF`, que los suma todos.
+        rot = str(f.get("label") or "").strip()
+        if rot:
+            _MAPA_ROTULOS.setdefault(ws.title, {}).setdefault(rot, fila)
+
         for i, valor in enumerate(f.get("valores") or [], start=2):
             if i > n_col:
                 break
             formula = _formula(columnas[i - 1], f, filas, i, fila, PRIMERA_FILA)
+            # Una fórmula que apunta a OTRA hoja no se puede escribir todavía:
+            # esa hoja puede venir después en el libro. Se aparta para la
+            # segunda pasada y la celda queda vacía mientras tanto.
+            if formula and "{h:" in formula:
+                _CRUZADAS.append((ws.title, fila, get_column_letter(i), formula))
+                formula = None
+                valor = None
             celda = ws.cell(fila, i, formula or valor)
             if formula is not None and isinstance(valor, (int, float)):
                 _VALORES_DE_FORMULA[(ws.title, celda.coordinate)] = float(valor)
@@ -721,9 +774,65 @@ def _con_resultados(blob: bytes, valores: dict[tuple[str, str], float]) -> bytes
         return blob
 
 
+#: {título de hoja: {rótulo de fila: fila real}} — se llena al escribir cada
+#: hoja y lo usa la segunda pasada para resolver `{h:Hoja:Rótulo}`.
+_MAPA_ROTULOS: dict[str, dict[str, int]] = {}
+
+#: Las celdas que esperan una referencia a otra hoja: (hoja, fila, col, plantilla).
+#: No se pueden escribir en la primera pasada porque la hoja a la que apuntan
+#: puede venir DESPUÉS en el libro — el P&L va adelante y los checkbooks atrás.
+_CRUZADAS: list[tuple] = []
+
+
+def _resolver_cruzadas(wb) -> list[str]:
+    """Segunda pasada: escribe las fórmulas que apuntan a otra hoja.
+
+    ⚠️ **Por RÓTULO y no por número de fila.** Las filas de un checkbook
+    dependen de cuántos departamentos y cuentas traiga el escenario, y de si
+    está activo «esconder las líneas en cero». Una referencia escrita a mano
+    —`'Checkbook Planilla'!B12`— queda bien el día que se escribe y apunta a
+    otra cuenta en cuanto cambia cualquiera de las dos, sin que nada falle.
+
+    Lo que no se puede resolver NO se escribe: una celda vacía se nota, una
+    fórmula que apunta a la fila equivocada no. Devuelve los rótulos que no
+    encontró, para que el que arma el libro pueda decirlo.
+    """
+    import re as _re
+
+    perdidos: list[str] = []
+    for titulo, fila, col, tpl in _CRUZADAS:
+        ws = wb[titulo]
+        falta = []
+
+        def _ref(m):
+            hoja, rotulo = m.group(1), m.group(2)
+            destino = _MAPA_ROTULOS.get(hoja, {})
+            r = destino.get(rotulo)
+            if r is None:
+                falta.append(f"{hoja} · {rotulo}")
+                return m.group(0)
+            return f"'{hoja}'!{col}{r}"
+
+        salida = _re.sub(r"\{h:([^:}]+):([^}]+)\}", _ref, tpl).replace("{c}", col)
+        if falta:
+            perdidos.extend(falta)
+            continue                      # se deja la celda como estaba
+        ws.cell(fila, _col_num(col)).value = salida
+    return perdidos
+
+
+def _col_num(letra: str) -> int:
+    n = 0
+    for ch in letra:
+        n = n * 26 + (ord(ch) - 64)
+    return n
+
+
 def build_cuadros_workbook(cuadros: list[dict]) -> bytes:
     """Un libro con una hoja por cuadro, y un índice adelante."""
     _VALORES_DE_FORMULA.clear()      # el libro anterior no contamina a éste
+    _MAPA_ROTULOS.clear()
+    _CRUZADAS.clear()
     wb = Workbook()
     wb.remove(wb.active)
     usados: set[str] = set()
@@ -732,6 +841,9 @@ def build_cuadros_workbook(cuadros: list[dict]) -> bytes:
         nombres.append(_hoja(wb, cuadro, usados).title)
     # ⚠️ El índice sólo cuando hay VARIAS hojas. En un libro de una, una portada
     # que dice «1. esa hoja» es un clic de más para llegar al único cuadro.
+    # ⚠️ ANTES del índice: la segunda pasada puede tocar cualquier hoja, y el
+    # índice se arma mirando el libro ya terminado.
+    _resolver_cruzadas(wb)
     if len(nombres) > 1:
         _indice(wb, cuadros or [], nombres)
     if not wb.sheetnames:            # nunca devolver un libro sin hojas

@@ -39,7 +39,13 @@ function cargar(rel, inyecta = {}) {
 }
 
 const T = cargar("lib/tresCortes.ts");
+const V = cargar("lib/validacionPL.ts");
 const P = cargar("lib/planningReport.ts", {
+  // ⚠️ Sin esta inyección el cuadro por categoría revienta: el cargador borra
+  // los imports y le pasa por parámetro lo que necesita. Es la segunda vez que
+  // pasa (la primera con RESULTADOS_POR_CATEGORIA) — cada módulo nuevo que
+  // use `planningReport.ts` tiene que entrar acá.
+  filasDeValidacion: V.filasDeValidacion,
   componentesDelPL: T.componentesDelPL,
   OPERANDOS_DE_LA_CASCADA: T.OPERANDOS_DE_LA_CASCADA,
   RESULTADOS_POR_CATEGORIA: T.RESULTADOS_POR_CATEGORIA,

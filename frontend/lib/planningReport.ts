@@ -3,6 +3,7 @@ import type {
   PLDetail, PLDetailFila, PLPorCategoria, PosicionesVersion, Scenario,
 } from "@/lib/api";
 import type { Cuadro, ColumnaCuadro, FilaCuadro, FormatoCol } from "@/lib/exportCuadro";
+import { filasDeValidacion } from "@/lib/validacionPL";
 import {
   componentesDelPL, OPERANDOS_DE_LA_CASCADA, RESULTADOS_POR_CATEGORIA,
   resultadosDelPL, rotuloAmbito, suma,
@@ -200,6 +201,10 @@ export interface FilaPlanning {
   formato?: FormatoCol;
   suma_de?: number[];
   combina_filas?: [number, number][];
+  /** Una fórmula propia, con ordinales y rótulos. Ver `FilaCuadro.formula_tpl`:
+   *  es para los bloques de VALIDACIÓN, que recalculan y muestran la
+   *  diferencia — no para dibujar el P&L. */
+  formula_tpl?: string;
 }
 
 export interface OpcionesCuadro {
@@ -262,6 +267,7 @@ export function armarCuadro(
         es_total: f.es_total, es_seccion: f.es_seccion, nivel: f.nivel,
         formato: f.formato ?? "usd2",
         suma_de: f.suma_de, combina_filas: f.combina_filas,
+        formula_tpl: f.formula_tpl,
         valores: [
           ...bloque(mv, true),
           ...anios,
@@ -418,6 +424,21 @@ export function cuadroPlanningPorCategoria(
       anios: versiones.map((_v, vi) => anioDe(f, vi)),
     };
   });
+
+  // El bloque de validación, DEBAJO del P&L y en la misma hoja: recalcula la
+  // cascada con fórmulas vivas y la compara contra lo que escribió el motor.
+  // Owner, 2026-11-09: *«favor implementar todas estas fórmulas de validación
+  // en el excel con fórmulas y todo»*.
+  //
+  // ⚠️ Va DESPUÉS de `emitidas` y ANTES de las fórmulas de abajo: sus ordinales
+  // se cuentan sobre el arreglo final, y `componentesDelPL`/`resultadosDelPL`
+  // recorren ese mismo arreglo. Agregarlo después los dejaría contando sobre
+  // una lista más corta que la que se escribe.
+  filas.push(...filasDeValidacion({
+    emitidas: emitidas.map(f => ({ label: f.rotulo })),
+    versiones: versiones.length,
+    mesesDe: mv,
+  }));
 
   componentesDelPL(emitidas).forEach((comp, i) => {
     if (comp) filas[i].suma_de = comp;

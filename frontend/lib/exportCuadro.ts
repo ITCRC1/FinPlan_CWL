@@ -108,6 +108,33 @@ export interface FilaCuadro {
    */
   combina_filas?: [number, number][];
   /**
+   * Una fórmula escrita por el cuadro, con ORDINALES y rótulos.
+   *
+   * ```
+   *   {c}              la letra de ESTA columna
+   *   {r:N}            la fila real del ordinal N de `filas`
+   *   {R:N}            lo mismo, absoluta — ya trae el `$`: `$B{R:3}` da `$B$8`
+   *   {h:Hoja:Rótulo}  la celda de esa fila EN OTRA HOJA del mismo libro
+   * ```
+   *
+   * ⚠️ **Cuándo usar cuál.** `suma_de` y `combina_filas` son para un número
+   * que el sistema YA calculó: el exportador comprueba la fórmula contra ese
+   * número y, si no coincide, deja el número. Eso es lo correcto para el P&L.
+   *
+   * `formula_tpl` es para lo contrario: un bloque de VALIDACIÓN que recalcula
+   * y muestra la diferencia. Su resultado no se conoce de antemano —si se
+   * conociera, no haría falta la fórmula— así que no se comprueba contra nada.
+   * Por eso no se usa para dibujar el P&L.
+   *
+   * ⚠️ **Nunca escribir un número de fila a mano.** El cuadro no sabe en qué
+   * fila del Excel va a caer: depende de la franja de KPIs y de si la cabecera
+   * lleva dos pisos. Y `{h:}` resuelve por RÓTULO porque las filas de un
+   * checkbook dependen de cuántas cuentas traiga el escenario. Una referencia
+   * fija queda bien el día que se escribe y apunta a otra celda en cuanto
+   * cambian los datos, sin que nada falle.
+   */
+  formula_tpl?: string;
+  /**
    * `null` deja la celda vacía — no es lo mismo que un cero.
    *
    * Se admite `string` para lo que es texto de verdad (nombre de cuenta,
