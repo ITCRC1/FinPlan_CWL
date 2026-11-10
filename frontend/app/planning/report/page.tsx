@@ -130,6 +130,14 @@ export default function PlanningReportPage() {
 
   const [pl, setPl] = useState<PLDetail | null>(null);
   const [plCat, setPlCat] = useState<PLPorCategoria | null>(null);
+  /** Por qué no se pudo traer el formato 2, si no se pudo.
+   *
+   *  ⚠️ Antes el fallo se tragaba con un `.catch(() => null)` y la pantalla
+   *  decía «Sin datos para esta vista» — que es lo mismo que dice un escenario
+   *  vacío. El 2026-11-09, con el frontend ya desplegado y el backend todavía
+   *  no (son servicios separados en Railway), el sub-tab salía en blanco y no
+   *  había forma de saber si faltaba el dato o faltaba el deploy. */
+  const [errorCat, setErrorCat] = useState<string | null>(null);
   const [gastos, setGastos] = useState<
     { escenarios: GastoEscenario[]; departamentos: Record<string, string> } | null>(null);
   const [libro, setLibro] = useState<Record<string, DetalleCelda>>({});
@@ -205,7 +213,15 @@ export default function PlanningReportPage() {
         // de para qué sirve un sub-tab.
         const [d, c, s] = await Promise.all([
           getPLDetail(ambito, principal, otros),
-          getPLPorCategoria(ambito, principal, otros).catch(() => null),
+          // Se tolera el fallo para que el P&L de siempre igual se dibuje,
+          // pero el motivo se GUARDA: un error silencioso acá se lee como
+          // «este escenario no tiene datos», que es otra cosa.
+          getPLPorCategoria(ambito, principal, otros)
+            .then(r => { setErrorCat(null); return r; })
+            .catch((e: unknown) => {
+              setErrorCat(e instanceof Error ? e.message : "no se pudo cargar");
+              return null;
+            }),
           cargarStats().catch(() => null),
         ]);
         setPl(d);
@@ -292,8 +308,13 @@ export default function PlanningReportPage() {
     const op = { ambito, compacto, mesesDe, extras };
     try {
       if (vista === "pl") {
-        if (formato === "categoria")
+        if (formato === "categoria") {
+          // ⚠️ Si la resta no da el mismo GOP que el formato USALI, NO se
+          // dibuja. Mostrar la cascada con un aviso arriba es peor: el aviso
+          // se lee una vez y los números se copian siempre.
+          if (plCat && !(plCat.cuadre ?? []).every(c => c.cuadra)) return null;
           return plCat ? cuadroPlanningPorCategoria(plCat, escenarios, op) : null;
+        }
         return pl ? cuadroPlanning(pl, escenarios, op) : null;
       }
       if (vista === "aperturas") {
@@ -661,7 +682,55 @@ export default function PlanningReportPage() {
           <Tabla cuadro={cuadro} />
         </>
       )}
-      {!cargando && !cuadro && !error && (
+      {/* ⚠️ Un fallo del formato 2 NO se puede ver igual que un escenario
+        * vacío: lo primero se arregla recargando o esperando el deploy, lo
+        * segundo no se arregla. Decir cuál es lo único que distingue las dos. */}
+      {/* No cuadra: se dice cuál versión y por cuánto. Un número concreto es
+        * lo único con lo que se puede empezar a buscar. */}
+      {!cargando && !cuadro && !error && vista === "pl" && formato === "categoria"
+        && plCat && !(plCat.cuadre ?? []).every(c => c.cuadra) && (
+        <div style={{ fontSize: 13, color: "var(--negative)", maxWidth: 680 }}>
+          No se muestra: la resta no da el mismo GOP que el formato USALI.
+          <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+            {(plCat.cuadre ?? []).filter(c => !c.cuadra).map(c => {
+              const v = escenarios.find(e => e.id === c.scenario_id);
+              return (
+                <li key={c.scenario_id} style={{ marginBottom: 3 }}>
+                  {v ? `${v.year} · ${v.type} ${v.version}` : c.scenario_id.slice(0, 8)}
+                  {": "}
+                  <span className="mono">
+                    ${c.gop_resta.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>{" contra "}
+                  <span className="mono">
+                    ${c.gop_motor.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>{" — diferencia "}
+                  <span className="mono">
+                    ${c.diferencia.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>
+            El formato USALI de al lado sí cuadra y se puede usar. Sacando esa
+            versión de la comparación, este formato vuelve a mostrarse.
+          </div>
+        </div>
+      )}
+      {!cargando && !cuadro && !error && vista === "pl"
+        && formato === "categoria" && errorCat && (
+        <div style={{ fontSize: 13, color: "var(--negative)", maxWidth: 620 }}>
+          No se pudo traer el P&amp;L por categoría: {errorCat}
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
+            El formato USALI de al lado sigue funcionando. Si esto acaba de
+            desplegarse, recargue la página: el frontend y el backend son
+            servicios separados y el de la pantalla puede llegar primero.
+          </div>
+        </div>
+      )}
+      {!cargando && !cuadro && !error
+        && !(vista === "pl" && formato === "categoria"
+             && (errorCat || (plCat && !(plCat.cuadre ?? []).every(c => c.cuadra)))) && (
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           Sin datos para esta vista.
         </div>

@@ -122,28 +122,61 @@ def _filtra_ambito(d: dict, ambito: str) -> dict:
     return d
 
 
-async def _por_naturaleza(s, scenario_id: str, ambito: str) -> dict[str, dict[str, list[float]]]:
-    """{naturaleza: {dept: [12 meses]}} — las cuatro agregaciones del motor.
+#: Cómo se mapea la salida de `build_actual_inputs` a las cuatro naturalezas.
+_DEL_MAYOR = {"cost": "cos_by_dept", "payroll": "payroll_by_dept",
+              "opex": "opex_by_dept", "reparto": "alloc_by_dept"}
 
-    Son las MISMAS funciones que `compute_pl_month` le pasa a `calculate_full_pl`.
-    Resumirlas por otro camino sería un segundo motor.
+
+async def _por_naturaleza(s, scenario_id: str, ambito: str) -> dict[str, dict[str, list[float]]]:
+    """{naturaleza: {dept: [12 meses]}} — desde la MISMA fuente que su P&L.
+
+    ⚠️ **Acá hay dos caminos y usar el que no es produce un reporte que no
+    cuadra sin que nada falle.**
+
+    * Un presupuesto armado en el sistema (`source_mode='checkbook'`) tiene su
+      gasto en los checkbooks, y su P&L sale de ahí.
+    * Un ACTUAL, o un presupuesto IMPORTADO, tienen su gasto en el MAYOR
+      (`ActualEntry`) — sus checkbooks pueden estar vacíos o traer otra cosa.
+
+    Leer siempre los checkbooks era sumar de una fuente y comparar contra otra:
+    el ACTUAL 2026 daba **$90.408,84** de diferencia contra su propio GOP y el
+    BUDGET 2026 Final **$205.676,93**. Medido el 2026-11-09.
+
+    Por mes se mira si hay filas de mayor; si las hay, mandan. Es la misma
+    prioridad que usa `_compute_pl_month_core`, y se decide mes a mes porque un
+    forecast rodante tiene meses cerrados con mayor y meses futuros sin él.
     """
+    from app.engine import pl_engine
     from app.engine import recalculate as recalc
 
-    fuentes = {
+    checkbook = {
         "cost": recalc.cos_by_dept,
         "payroll": recalc.payroll_by_dept,
         "opex": recalc.opex_by_dept,
         "reparto": recalc.alloc_by_dept,
     }
-    out: dict[str, dict[str, list[float]]] = {k: {} for k in fuentes}
+    out: dict[str, dict[str, list[float]]] = {k: {} for k in checkbook}
+
+    def _acumular(clase: str, datos: dict, m: int):
+        for dept, monto in _filtra_ambito(datos, ambito).items():
+            if not monto:
+                continue
+            serie = out[clase].setdefault(str(dept or "(sin depto)"), [0.0] * 12)
+            serie[m - 1] += float(monto)
+
+    escenario = await s.get(Scenario, scenario_id)
+    del_checkbook = getattr(escenario, "source_mode", "imported") == "checkbook"
+
     for m in range(1, 13):
-        for clase, fn in fuentes.items():
-            for dept, monto in _filtra_ambito(await fn(s, scenario_id, m), ambito).items():
-                if not monto:
-                    continue
-                serie = out[clase].setdefault(str(dept or "(sin depto)"), [0.0] * 12)
-                serie[m - 1] += float(monto)
+        filas = [] if del_checkbook else await recalc.actual_rows_for_month(
+            s, scenario_id, m)
+        if filas:
+            entradas = pl_engine.build_actual_inputs(filas)
+            for clase, llave in _DEL_MAYOR.items():
+                _acumular(clase, entradas.get(llave) or {}, m)
+        else:
+            for clase, fn in checkbook.items():
+                _acumular(clase, await fn(s, scenario_id, m), m)
     return out
 
 

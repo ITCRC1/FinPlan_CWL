@@ -256,6 +256,44 @@ def test_los_dos_formatos_se_piden_juntos():
 
 
 def test_si_el_formato_2_falla_el_P_y_L_igual_se_dibuja():
-    """Una hoja nueva que rompe el paquete entero es peor que no tenerla."""
+    """Una vista nueva que tumba la de siempre es peor que no tenerla.
+
+    Se mira la INTENCIÓN y no la letra: la llamada va dentro del `Promise.all`
+    con su propio `.catch`, así que un 404 —o un backend que todavía no
+    desplegó— deja `plCat` en null y el formato USALI sigue dibujándose."""
     src = _src(PANTALLA)
-    assert "getPLPorCategoria(ambito, principal, otros).catch(() => null)" in src
+    bloque = src.split("getPLPorCategoria(ambito, principal, otros)")[1]
+    bloque = bloque.split("cargarStats")[0]
+    assert ".catch(" in bloque, (
+        "la llamada al formato 2 ya no tolera el fallo: si revienta se lleva "
+        "puesto el P&L de siempre")
+    assert "return null" in bloque
+
+
+def test_un_fallo_del_formato_2_NO_se_ve_como_falta_de_datos():
+    """⚠️ El defecto que se midió el 2026-11-09.
+
+    El frontend desplegó antes que el backend —son servicios separados en
+    Railway— así que el sub-tab ya existía y la ruta todavía daba 404. El
+    `.catch` lo tragaba y la pantalla decía «Sin datos para esta vista», que es
+    exactamente lo que dice un escenario vacío. No había forma de distinguir
+    «falta el deploy» de «no hay nada que mostrar»."""
+    src = _src(PANTALLA)
+    assert "setErrorCat" in src, "el motivo del fallo no se guarda"
+    assert "No se pudo traer el P" in src and "por categor" in src, (
+        "la pantalla no dice por qué está vacía")
+
+
+def test_si_no_cuadra_NO_se_dibuja():
+    """Dibujar una cascada que no cuadra con un aviso arriba es peor que no
+    dibujarla: el aviso se lee una vez y los números se copian siempre.
+
+    Medido: con el ACTUAL 2026 Pre-Cierre como versión comparada la diferencia
+    es de $549,23. Chico — y «chico pero no cero» es justo lo que no se puede
+    mostrar en silencio."""
+    src = _src(PANTALLA)
+    bloque = src.split('if (formato === "categoria") {')[1].split("}")[0]
+    assert "cuadra" in bloque and "return null" in bloque, (
+        "el cuadro se arma aunque el cuadre falle")
+    assert "No se muestra: la resta no da el mismo GOP" in src, (
+        "no se dice por qué no se muestra")
