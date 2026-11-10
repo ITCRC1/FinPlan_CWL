@@ -354,3 +354,48 @@ def test_la_cuenta_anclada_vuelve_a_SU_linea():
     for linea, (dept, cuenta, _n) in ancla.items():
         regla, _como = resolver(dept, cuenta)
         assert regla is not None, f"{linea}: su cuenta de asiento no tiene mapeo"
+
+
+def test_el_nombre_de_la_cuenta_sale_limpio():
+    """⚠️ El ancla pedia `account_name_example` a un cargador que NO lo trae.
+
+    `recalc.load_active_account_mappings` devuelve un dict reducido -- cuenta,
+    depto, linea, estado, operador -- sin el nombre. Pedirselo igual devolvia
+    siempre vacio, y las 8xxx salian como `0250 Gastos de la Propiedad · 8020`
+    a secas teniendo «CAPITAL RESERVE» escrito en el mapeo. Hay que ir al
+    modelo.
+
+    Y el campo guarda EJEMPLOS separados por `|`: Integrity numera las
+    variantes de un mismo nombre. Volcar la lista entera en la celda la vuelve
+    ilegible.
+    """
+    assert gl.nombre_de_cuenta("RENT1 | RENT") == "RENT"
+    assert gl.nombre_de_cuenta(
+        "DEPRECIATION1 | DEPRECIATION2 | DEPRECIATION4 | DEPRECIATION") == "DEPRECIATION"
+    # Cuando TODAS llevan numero, se le quitan los digitos del final a la
+    # primera: el numero lo puso el mayor, no es parte del nombre.
+    assert gl.nombre_de_cuenta(
+        "PROPERTY INSURANCE1 | PROPERTY INSURANCE2 | PROPERTY INSURANCE5"
+    ) == "PROPERTY INSURANCE"
+    assert gl.nombre_de_cuenta("OWNERS FEES") == "OWNERS FEES"
+    assert gl.nombre_de_cuenta("") == ""
+    assert gl.nombre_de_cuenta(None) == ""
+
+
+def test_el_ancla_trae_el_nombre_del_mapeo():
+    """Si no lo trae, la cuenta sale sin descripcion en el Excel que se manda."""
+    ancla = gl.ancla_contable([
+        {"report_line_code": "DEPRECIATION", "account_code": "8040",
+         "dept_code": "0250",
+         "account_name_example": "DEPRECIATION1 | DEPRECIATION"},
+    ])
+    assert ancla["DEPRECIATION"] == ("0250", "8040", "DEPRECIATION")
+
+
+def test_una_prueba_que_use_el_cargador_REDUCIDO_falla():
+    """Lo que paso: el dict de `load_active_account_mappings` no tiene el
+    nombre, asi que el ancla salia sin descripcion y nada avisaba."""
+    reducido = [{"report_line_code": "RENT", "account_code": "8000",
+                 "dept_code": "0250", "active_status": "YES",
+                 "rollup_operator": "SUM"}]          # <- sin account_name_example
+    assert gl.ancla_contable(reducido)["RENT"] == ("0250", "8000", "")

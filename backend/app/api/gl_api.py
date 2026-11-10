@@ -228,7 +228,8 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     # (`revenue_account_entries`), ÉSE manda y el ancla no se usa: sumar los
     # dos contaría el ingreso dos veces.
     if not detalle_real:
-        ancla = gl.ancla_contable(await recalc.load_active_account_mappings(db))
+        ancla = gl.ancla_contable(
+            [_como_dict(m) for m in await _reglas_vigentes(db)])
         secciones = {l["line_code"]: (l.get("section") or "")
                      for l in await recalc.load_report_line_config(db)}
         for mes in range(1, 13):
@@ -295,6 +296,37 @@ def _fila(fila: dict, resolver, extremos, secciones, nombre_dept) -> dict:
     }
 
 
+async def _reglas_vigentes(db: AsyncSession) -> list[AccountMapping]:
+    """Las reglas ACTIVAS y VIGENTES del mapeo, como filas del modelo.
+
+    ⚠️ Hay que ir al modelo y no a `recalc.load_active_account_mappings`, que
+    devuelve un dict reducido -- cuenta, depto, línea, estado y operador -- y
+    **no trae `account_name_example`**. Pedírselo igual devolvía siempre vacío,
+    y el ancla contable dejaba sin descripción a todas las cuentas que no
+    estuvieran además en un checkbook: las 8xxx salían como `0250 Gastos de la
+    Propiedad · 8020` a secas, teniendo «CAPITAL RESERVE» escrito en el mapeo.
+
+    Mismo filtro que ese cargador, para que la regla que se vea acá sea la que
+    el motor va a resolver.
+    """
+    filas = (await db.execute(
+        select(AccountMapping).where(
+            AccountMapping.report_id == "P&L_DETAIL_OWNERS",
+            AccountMapping.active_status == "YES")
+    )).scalars().all()
+    return [m for m in filas if recalc._vigente_en(m, None)]
+
+
+def _como_dict(m: AccountMapping) -> dict:
+    """La regla con los campos que `ancla_contable` necesita, el nombre incluido."""
+    return {
+        "report_line_code": m.report_line_code,
+        "account_code": (m.account_code or "").strip(),
+        "dept_code": (m.dept_code or "").strip(),
+        "account_name_example": (m.account_name_example or "").strip(),
+    }
+
+
 async def _catalogo_de_cuentas(db: AsyncSession) -> list[dict]:
     """TODAS las cuentas del mapeo, en cero. El catálogo, no los movimientos.
 
@@ -311,19 +343,12 @@ async def _catalogo_de_cuentas(db: AsyncSession) -> list[dict]:
     ⚠️ Las filas salen en CERO, así que no mueven ningún total y no tocan la
     conciliación. Lo único que agregan es la pregunta «¿y esta cuenta?».
     """
-    filas = (await db.execute(
-        select(AccountMapping).where(
-            AccountMapping.report_id == "P&L_DETAIL_OWNERS",
-            AccountMapping.active_status == "YES")
-    )).scalars().all()
     fuera = []
-    for m in filas:
-        if not recalc._vigente_en(m, None):
-            continue
+    for m in await _reglas_vigentes(db):
         fuera.append({
             "dept_code": m.dept_code or "",
             "account_code": (m.account_code or "").strip(),
-            "account_name": (m.account_name_example or "").strip(),
+            "account_name": gl.nombre_de_cuenta(m.account_name_example),
             "outlet": "",
             **{mes: ZERO for mes in gl.MESES},
         })

@@ -148,6 +148,30 @@ def es_credito(account_code: str, seccion_pl: str | None = None) -> bool:
     return clase_de(account_code) == "4"
 
 
+def nombre_de_cuenta(ejemplo: str | None) -> str:
+    """El nombre limpio, de la columna de EJEMPLOS del mapeo.
+
+    `account_name_example` guarda, separados por `|`, los nombres con que esa
+    cuenta aparece en el mayor -- que suelen ser el mismo con un número
+    pegado, porque Integrity numera las variantes:
+
+        RENT1 | RENT                                    -> RENT
+        DEPRECIATION1 | DEPRECIATION2 | DEPRECIATION    -> DEPRECIATION
+        PROPERTY INSURANCE1 | ... | PROPERTY INSURANCE5 -> PROPERTY INSURANCE
+
+    Volcar la lista entera en la celda la vuelve ilegible. Se prefiere la
+    variante SIN número; si todas lo tienen, se le quitan los dígitos del final
+    a la primera -- que es de donde salía el número, no parte del nombre.
+    """
+    partes = [t.strip() for t in str(ejemplo or "").split("|") if t.strip()]
+    if not partes:
+        return ""
+    for t in partes:
+        if not t[-1].isdigit():
+            return t
+    return partes[0].rstrip("0123456789").strip()
+
+
 def ancla_contable(mapeos: Iterable[dict]) -> dict[str, tuple[str, str, str]]:
     """Línea del P&L → la cuenta y el departamento donde se contabiliza.
 
@@ -186,7 +210,7 @@ def ancla_contable(mapeos: Iterable[dict]) -> dict[str, tuple[str, str, str]]:
         dept = str(m.get("dept_code") or "").strip()
         if not linea or not cuenta:
             continue
-        nombre = str(m.get("account_name_example") or "").strip()
+        nombre = nombre_de_cuenta(m.get("account_name_example"))
         clave = (cuenta, dept)
         actual = por_linea.get(linea)
         if actual is None or clave < (actual[1], actual[0]):
