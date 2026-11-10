@@ -66,6 +66,9 @@ const ARRIBA = {
   reparto: "TOTAL REPARTO",
   gop: "TOTAL GROSS OPERATING PROFIT",
   rent: "Rent",
+  fee: "Management Fees (5%)",
+  capital: "CAPITAL EXPENSE",
+  renta: "Income Taxes (30%)",
   seguro: "Property Insurance",
   otros: "Other Expenses",
   financiero: "FINANCIAL EXPENSES",
@@ -183,13 +186,8 @@ export function filasDeValidacion(ctx: Contexto): FilaPlanning[] {
   // ════════════════════════════════════════════════════════════════════════
   // 1 · Los supuestos, editables
   // ════════════════════════════════════════════════════════════════════════
-  push("sec1", { label: "VALIDACIÓN · SUPUESTOS (celdas editables)", seccion: true });
-  push("pMgmt", { label: "Management Fee · % s/ Total Ingreso",
-                  v: SUPUESTOS.mgmtFeePct, formato: "pct" });
-  push("pCap", { label: "Capital Reserve · % s/ Total Ingreso",
-                 v: SUPUESTOS.capitalReservePct, formato: "pct" });
-  push("pRenta", { label: "Impuesto sobre la Renta · tasa",
-                   v: SUPUESTOS.tasaRenta, formato: "pct" });
+  push("sec1", { label: "VALIDACIÓN · SUPUESTOS DE PLANILLA (celdas editables)",
+                 seccion: true });
   push("pCcss", { label: "CCSS patronal · % s/ salario bruto",
                   v: SUPUESTOS.ccssPct, formato: "pct" });
   push("pAgui", { label: "Aguinaldo · % s/ salario bruto (1/12)",
@@ -198,7 +196,12 @@ export function filasDeValidacion(ctx: Contexto): FilaPlanning[] {
   // ════════════════════════════════════════════════════════════════════════
   // 2 · La cascada, recalculada desde los totales de arriba
   // ════════════════════════════════════════════════════════════════════════
-  push("sec2", { label: "VALIDACIÓN · RECÁLCULO Ingreso → Net Profit", seccion: true });
+  // ⚠️ Lo que este bloque prueba: que los renglones que la hoja MUESTRA suman
+  // los resultados que la hoja muestra. Cada término sale de una fila de
+  // arriba, así que un cero significa «la cascada cierra con lo que se ve» —
+  // que es justo la pregunta de integridad del P&L.
+  push("sec2", { label: "VALIDACIÓN · LA CASCADA CIERRA CON LO QUE SE VE",
+                 seccion: true });
   push("vIng", { label: "Total Ingreso", f: () => `=${A("ingreso")}` });
   push("vCos", { label: "(−) Costo de ventas", f: () => `=${A("costo")}` });
   push("vPay", { label: "(−) Planilla", f: () => `=${A("planilla")}` });
@@ -210,23 +213,33 @@ export function filasDeValidacion(ctx: Contexto): FilaPlanning[] {
                  f: () => `=ROUND(${R("vGop")}-${A("gop")},2)` });
 
   push("vRent", { label: "(−) Rent", f: () => `=${A("rent")}` });
-  push("vFee", { label: "(−) Management Fees · Ingreso × %",
-                 f: () => `=${R("vIng")}*${ABS("pMgmt")}` });
+  // ⚠️ El MONTO del P&L, no `ingreso × 3%`.
+  //
+  // Un % fijo acá convierte el CHECK en una comparación contra MI supuesto y
+  // no contra el sistema. Los escenarios de 2027 guardan 3% y coincidía por
+  // convención; los de 2026 **no tienen `pl_manual_inputs`** y toman el fee
+  // del mayor —el Forecast October paga 3,29%—, así que el check habría dado
+  // falsa alarma en cuanto él comparara contra el año anterior. Una falsa
+  // alarma gasta la confianza igual que un falso cero.
+  //
+  // El % sigue abajo, como DIAGNÓSTICO: ahí sí dice algo.
+  push("vFee", { label: "(−) Management Fees", f: () => `=${A("fee")}` });
   push("vSeg", { label: "(−) Property Insurance", f: () => `=${A("seguro")}` });
   push("vOtr", { label: "(−) Other Expenses", f: () => `=${A("otros")}` });
   push("vEbitda", { label: "EBITDA Before Capital recalculado", total: true,
                     f: () => `=${R("vGop")}-${R("vRent")}-${R("vFee")}`
                              + `-${R("vSeg")}-${R("vOtr")}` });
-  push("vCap", { label: "(−) Capital Reserve · Ingreso × %",
-                 f: () => `=${R("vIng")}*${ABS("pCap")}` });
+  push("vCap", { label: "(−) Capital Expense", f: () => `=${A("capital")}` });
   push("vEbitda2", { label: "EBITDA After Capital recalculado", total: true,
                      f: () => `=${R("vEbitda")}-${R("vCap")}` });
   push("vFin", { label: "(−) Financial Expenses", f: () => `=${A("financiero")}` });
   push("vDep", { label: "(−) Depreciation", f: () => `=${A("deprec")}` });
   push("vEbt", { label: "EBT recalculado", total: true,
                  f: () => `=${R("vEbitda2")}-${R("vFin")}-${R("vDep")}` });
-  push("vTax", { label: "(−) Impuesto · EBT × tasa",
-                 f: () => `=MAX(0,${R("vEbt")}*${ABS("pRenta")})` });
+  // El impuesto del motor es ANUAL —tiene piso de cero sobre el ejercicio, no
+  // sobre el mes— así que `MAX(0, EBT × tasa)` mes a mes no lo reproduce en un
+  // año con meses en pérdida. Se toma el monto y la tasa va de diagnóstico.
+  push("vTax", { label: "(−) Income Taxes", f: () => `=${A("renta")}` });
   push("vNeto", { label: "NET PROFIT recalculado", total: true,
                   f: () => `=${R("vEbt")}-${R("vTax")}` });
   push("kNeto", { label: "CHECK · Net Profit recalculado vs P&L (debe ser 0)",
@@ -236,6 +249,20 @@ export function filasDeValidacion(ctx: Contexto): FilaPlanning[] {
   // ════════════════════════════════════════════════════════════════════════
   // 3 · Contra los checkbooks, por rótulo
   // ════════════════════════════════════════════════════════════════════════
+  // ── Las tasas IMPLÍCITAS ─────────────────────────────────────────────
+  //
+  // Esto es lo que el % sí aporta: no manejar la cascada, sino decir a qué
+  // tasa está saliendo cada cosa. Un fee al 3,29% en vez del 3% se ve acá, y
+  // es información — no un error.
+  push("secTasas", { label: "VALIDACIÓN · TASAS IMPLÍCITAS (informativo)",
+                     seccion: true });
+  push("iFee", { label: "Management Fee ÷ Total Ingreso", formato: "pct",
+                 f: () => `=IFERROR(${R("vFee")}/${R("vIng")},"")` });
+  push("iCap", { label: "Capital Expense ÷ Total Ingreso", formato: "pct",
+                 f: () => `=IFERROR(${R("vCap")}/${R("vIng")},"")` });
+  push("iRenta", { label: "Impuesto ÷ EBT", formato: "pct",
+                   f: () => `=IFERROR(${R("vTax")}/${R("vEbt")},"")` });
+
   push("sec3", { label: "VALIDACIÓN · CONTRA LOS CHECKBOOKS", seccion: true });
   push("cIng", { label: "Total Ingreso · Checkbook",
                  f: () => `=${H("Checkbook Ingreso", "TOTAL INGRESO")}` });
