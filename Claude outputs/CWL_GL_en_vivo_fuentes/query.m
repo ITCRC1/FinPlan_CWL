@@ -8,7 +8,10 @@ let
 
     // La LISTA de versiones vive en una tabla del libro, no en el codigo: agregar
     // un Draft es escribir un renglon, no editar la consulta.
-    Versiones = Excel.CurrentWorkbook(){[Name = "tVersiones"]}[Content],
+    TodasLasFilas = Excel.CurrentWorkbook(){[Name = "tVersiones"]}[Content],
+    // Solo las prendidas. Apagar una fila es escribir NO, no borrarla.
+    Versiones = Table.SelectRows(TodasLasFilas, each
+        Text.Upper(Text.Trim(Text.From(Record.FieldOrDefault(_, "Usar", "SI")))) <> "NO"),
 
     Meses = {"M01","M02","M03","M04","M05","M06","M07","M08","M09","M10","M11","M12"},
     // Las mismas columnas del export de Admin · Account Mapping y en SU orden
@@ -37,7 +40,7 @@ let
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
                 // 401/403 no se pueden atrapar: Power Query los trata como error
                 // de credenciales y los muestra como tal.
-                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {307, 308, 400, 404, 422, 500, 502, 503}
             ]),
             Estado = Value.Metadata(Resp)[Response.Status],
             Salida =
@@ -45,6 +48,9 @@ let
                 else if Estado = 404 then
                     Fallo(etiqueta, "No existe " & tipo & " " & anio
                           & (if version = "" then "" else " version '" & version & "'"))
+                else if Estado = 307 or Estado = 308
+                then Fallo(etiqueta, "La direccion redirige: en Config poner la del BACKEND "
+                           & "(https://finplancwl-backend.up.railway.app), no la del frontend")
                 else if Estado <> 200 then Fallo(etiqueta, "El servidor respondio HTTP " & Text.From(Estado))
                 else
                     let
@@ -83,7 +89,7 @@ let
             R = Web.Contents(Url, [
                 RelativePath = "api/consolidado/escenarios/",
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
-                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {307, 308, 400, 404, 422, 500, 502, 503}
             ])
         in
             if Llave = "" or Value.Metadata(R)[Response.Status] <> 200

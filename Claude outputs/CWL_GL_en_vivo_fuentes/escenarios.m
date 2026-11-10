@@ -8,12 +8,15 @@ let
     Resp = Web.Contents(Url, [
         RelativePath = "api/consolidado/escenarios/",
         Headers = [#"x-api-key" = Llave, Accept = "application/json"],
-        ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+        ManualStatusHandling = {307, 308, 400, 404, 422, 500, 502, 503}
     ]),
     Estado = Value.Metadata(Resp)[Response.Status],
     Salida =
         if Llave = "" then Fallo("Falta la llave de solo lectura en Config")
-        else if Estado <> 200 then Fallo("El servidor respondio HTTP " & Text.From(Estado))
+        else if Estado = 307 or Estado = 308
+                then Fallo("La direccion redirige: en Config poner la del BACKEND "
+                           & "(https://finplancwl-backend.up.railway.app), no la del frontend")
+                else if Estado <> 200 then Fallo("El servidor respondio HTTP " & Text.From(Estado))
         else #table(Cols, List.Transform(Json.Document(Resp)[escenarios], each
                 {[year], [tipo], (let v = [version] in if v = null then "" else v), [status]}))
 in

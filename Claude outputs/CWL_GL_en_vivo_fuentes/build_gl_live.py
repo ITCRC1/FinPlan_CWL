@@ -29,12 +29,19 @@ GRIS = "657169"
 # `Working` y `Final`. Dejar la celda VACIA es valido y significa «la que el
 # sistema elija»: el ★ Current del forecast, el ACTUAL real.
 VERSIONES = [
-    # `*` = TODAS las versiones que FinPlan tenga de ese año y tipo. Un Draft4
-    # que se cree mañana aparece solo en el próximo refresh, y un nombre mal
-    # escrito deja de ser posible.
-    ("Budget 2027", 2027, "BUDGET", "*"),
-    ("Forecast 2026", 2026, "FORECAST", "*"),
-    ("Actual 2026", 2026, "ACTUAL", ""),
+    # `Usar` prende y apaga la fila sin borrarla: el owner quiere poder ELEGIR
+    # (2026-11-10: «que tenga para escoger varias versiones»). `*` = todas las
+    # que FinPlan tenga de ese año y tipo.
+    #
+    # ⚠️ No prender `*` y una versión suelta del MISMO año y tipo a la vez: esa
+    # versión baja dos veces y cualquier pivot la suma doble.
+    ("SI", "Budget 2027 — todas",     2027, "BUDGET",   "*"),
+    ("NO", "Budget 2027 — Final",     2027, "BUDGET",   "Final"),
+    ("NO", "Budget 2027 — Working",   2027, "BUDGET",   "Working"),
+    ("NO", "Forecast 2026 — todas",   2026, "FORECAST", "*"),
+    ("SI", "Forecast 2026 — vigente", 2026, "FORECAST", ""),
+    ("SI", "Actual 2026",             2026, "ACTUAL",   ""),
+    ("SI", "Actual 2025",             2025, "ACTUAL",   ""),
 ]
 
 
@@ -59,7 +66,7 @@ def construir(salida: str) -> None:
     cfg = wb.active
     cfg.title = "Config"
     cfg.sheet_view.showGridLines = False
-    for col, ancho in zip("ABCDEF", (30, 12, 16, 22, 16, 16)):
+    for col, ancho in zip("ABCDEF", (8, 30, 10, 14, 20, 16)):
         cfg.column_dimensions[col].width = ancho
 
     _titulo(cfg, 1, "CWL · Cuentas del mayor por mes — en vivo")
@@ -72,7 +79,11 @@ def construir(salida: str) -> None:
 
     cfg["A4"] = "Direccion del sistema"
     cfg["A4"].font = Font(bold=True)
-    cfg["C4"] = "https://finplan-cwl.up.railway.app"
+    # ⚠️ El BACKEND, no el frontend. `finplan-cwl.up.railway.app/api/...`
+    # responde 308 y redirige a la misma ruta SIN la barra final, que da 404 --
+    # y Power Query no sigue redirecciones: muestra «(308): Permanent
+    # Redirect» y no se conecta. Medido el 2026-11-10.
+    cfg["C4"] = "https://finplancwl-backend.up.railway.app"
     cfg["A5"] = "Llave de solo lectura"
     cfg["A5"].font = Font(bold=True)
     cfg["C5"] = ""                      # se guarda VACIA: la llave no viaja en el archivo
@@ -95,26 +106,31 @@ def construir(salida: str) -> None:
     cfg["A9"] = "Versiones a bajar"
     cfg["A9"].font = Font(bold=True, size=11)
     _nota(cfg, 10,
+          "Usar = SI / NO prende y apaga la fila sin borrarla.   "
           "Version = *  ->  TODAS las que FinPlan tenga de ese año y tipo; se "
           "actualizan solas y no hay nombres que escribir mal.   Version vacía  ->  la "
           "que el sistema elija (el ★ Current del forecast, el ACTUAL real).   Un "
           "nombre exacto  ->  solo esa.   Si una no existe, ESA fila baja con el error "
-          "y las demás siguen.")
+          "y las demás siguen.   No prender * y una versión suelta del mismo año y "
+          "tipo a la vez: esa versión bajaría dos veces.")
 
-    enc = ["Etiqueta", "Anio", "Tipo", "Version"]
+    enc = ["Usar", "Etiqueta", "Anio", "Tipo", "Version"]
     fila0 = 12
     for j, h in enumerate(enc, start=1):
         c = cfg.cell(fila0, j, h)
         c.font = Font(bold=True, color=TINTA)
         c.fill = PatternFill("solid", fgColor=BANDA)
         c.border = Border(bottom=Side(style="medium", color=TINTA))
-    for i, (etq, anio, tipo, ver) in enumerate(VERSIONES, start=1):
-        cfg.cell(fila0 + i, 1, etq)
-        cfg.cell(fila0 + i, 2, anio)
-        cfg.cell(fila0 + i, 3, tipo)
-        cfg.cell(fila0 + i, 4, ver)
+    for i, (usar, etq, anio, tipo, ver) in enumerate(VERSIONES, start=1):
+        c = cfg.cell(fila0 + i, 1, usar)
+        c.alignment = Alignment(horizontal="center")
+        c.font = Font(bold=True, color=("1B6B3A" if usar == "SI" else "A33A3A"))
+        cfg.cell(fila0 + i, 2, etq)
+        cfg.cell(fila0 + i, 3, anio)
+        cfg.cell(fila0 + i, 4, tipo)
+        cfg.cell(fila0 + i, 5, ver)
 
-    ref = f"A{fila0}:D{fila0 + len(VERSIONES)}"
+    ref = f"A{fila0}:E{fila0 + len(VERSIONES)}"
     t = Table(displayName="tVersiones", ref=ref)
     t.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=True)
     cfg.add_table(t)
