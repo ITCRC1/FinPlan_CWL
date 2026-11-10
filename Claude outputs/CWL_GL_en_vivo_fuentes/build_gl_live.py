@@ -77,12 +77,16 @@ def construir(salida: str) -> None:
           "completo de doce meses, así que el refresh tarda en proporción a cuántas "
           "pida esta tabla.")
 
-    cfg["A4"] = "Direccion del sistema"
+    cfg["A4"] = "Direccion del sistema (BACKEND)"
     cfg["A4"].font = Font(bold=True)
     # ⚠️ El BACKEND, no el frontend. `finplan-cwl.up.railway.app/api/...`
     # responde 308 y redirige a la misma ruta SIN la barra final, que da 404 --
-    # y Power Query no sigue redirecciones: muestra «(308): Permanent
-    # Redirect» y no se conecta. Medido el 2026-11-10.
+    # y Power Query no sigue redirecciones: muestra «(308): Permanent Redirect»
+    # y no se conecta. Medido el 2026-11-10.
+    #
+    # Tampoco se puede explicar en la consulta: Power Query RECHAZA los 3xx en
+    # `ManualStatusHandling` («'307' is not supported»). O sea que la unica
+    # defensa contra esto es que la direccion de aca este bien.
     cfg["C4"] = "https://finplancwl-backend.up.railway.app"
     cfg["A5"] = "Llave de solo lectura"
     cfg["A5"].font = Font(bold=True)

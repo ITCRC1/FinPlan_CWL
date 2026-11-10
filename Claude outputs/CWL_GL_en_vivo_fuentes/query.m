@@ -40,7 +40,7 @@ let
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
                 // 401/403 no se pueden atrapar: Power Query los trata como error
                 // de credenciales y los muestra como tal.
-                ManualStatusHandling = {307, 308, 400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
             ]),
             Estado = Value.Metadata(Resp)[Response.Status],
             Salida =
@@ -48,9 +48,6 @@ let
                 else if Estado = 404 then
                     Fallo(etiqueta, "No existe " & tipo & " " & anio
                           & (if version = "" then "" else " version '" & version & "'"))
-                else if Estado = 307 or Estado = 308
-                then Fallo(etiqueta, "La direccion redirige: en Config poner la del BACKEND "
-                           & "(https://finplancwl-backend.up.railway.app), no la del frontend")
                 else if Estado <> 200 then Fallo(etiqueta, "El servidor respondio HTTP " & Text.From(Estado))
                 else
                     let
@@ -89,7 +86,7 @@ let
             R = Web.Contents(Url, [
                 RelativePath = "api/consolidado/escenarios/",
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
-                ManualStatusHandling = {307, 308, 400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
             ])
         in
             if Llave = "" or Value.Metadata(R)[Response.Status] <> 200
