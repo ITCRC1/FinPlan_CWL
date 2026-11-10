@@ -167,9 +167,29 @@ async def _por_naturaleza(s, scenario_id: str, ambito: str) -> dict[str, dict[st
     escenario = await s.get(Scenario, scenario_id)
     del_checkbook = getattr(escenario, "source_mode", "imported") == "checkbook"
 
+    #: El ACTUAL enlazado de un forecast rodante. Sus meses CERRADOS no salen
+    #: de sus propias filas: salen de ahí.
+    #:
+    #: ⚠️ **Es la misma regla de `_compute_pl_month_core`, copiada de su
+    #: condición y no reinventada.** Leer las filas del propio forecast daba
+    #: $101.557,44 de diferencia en el FORECAST October 2026 — y sólo en junio,
+    #: julio, agosto y setiembre. Enero a mayo cuadraban porque el forecast se
+    #: armó cuando esos meses ya estaban cerrados y su foto coincide; los cuatro
+    #: siguientes cerraron después, y el ACTUAL tiene catorce cuentas más que la
+    #: foto del forecast. Un desfase que aparece sólo en los meses del medio es
+    #: justo el que nadie sale a buscar.
+    enlazado = None
+    if escenario is not None and escenario.type == "FORECAST":
+        enlazado = await recalc.linked_actual_scenario(s, escenario)
+    cierra_hasta = (getattr(escenario, "actuals_through", 0) or 0) if enlazado else 0
+
     for m in range(1, 13):
-        filas = [] if del_checkbook else await recalc.actual_rows_for_month(
-            s, scenario_id, m)
+        if m <= cierra_hasta:
+            # Mes cerrado de un rodante: manda el ACTUAL, como en el P&L.
+            filas = await recalc.actual_rows_for_month(s, enlazado.id, m)
+        else:
+            filas = [] if del_checkbook else await recalc.actual_rows_for_month(
+                s, scenario_id, m)
         if filas:
             entradas = pl_engine.build_actual_inputs(filas)
             for clase, llave in _DEL_MAYOR.items():

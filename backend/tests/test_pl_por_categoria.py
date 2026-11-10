@@ -371,3 +371,80 @@ def test_la_comparada_que_no_cierra_se_NOMBRA_en_el_subtitulo():
     bloque = bloque.split("export function")[0]
     assert "const flojas" in bloque and "nombreDe(" in bloque, (
         "el subtítulo no nombra las versiones comparadas que no cierran")
+
+
+# ── El forecast rodante: sus meses cerrados salen del ACTUAL enlazado ───────
+
+class _Esc:
+    def __init__(self, id, type, actuals_through=0, source_mode="imported"):
+        self.id, self.type = id, type
+        self.actuals_through, self.source_mode = actuals_through, source_mode
+
+
+class _Sesion:
+    def __init__(self, esc):
+        self._esc = esc
+
+    async def get(self, _modelo, _sid):
+        return self._esc
+
+
+@pytest.mark.asyncio
+async def test_un_rodante_lee_sus_meses_CERRADOS_del_actual_enlazado(monkeypatch):
+    """⚠️ El defecto del FORECAST October 2026: $101.557,44, y sólo en cuatro meses.
+
+    `_compute_pl_month_core` desvía los meses cerrados de un forecast rodante
+    (`month <= actuals_through`) al ACTUAL enlazado. Las agregaciones por
+    naturaleza leían las filas del PROPIO forecast, que es una foto: enero a
+    mayo coincidían porque el forecast se armó con esos meses ya cerrados;
+    junio a setiembre cerraron después y el ACTUAL tenía catorce cuentas más.
+
+    Un desfase que aparece sólo en los meses del medio es justo el que nadie
+    sale a buscar. La prueba exige de QUÉ escenario sale cada mes."""
+    from app.engine import recalculate as recalc
+
+    forecast = _Esc("fc", "FORECAST", actuals_through=9)
+    actual = _Esc("ac", "ACTUAL")
+    pedidos: list[tuple[str, int]] = []
+
+    async def filas(_s, sid, m):
+        pedidos.append((sid, m))
+        # Una fila de opex cuyo monto delata de qué escenario salió.
+        monto = 100 if sid == "ac" else 1
+        return [{"account_code": "7065", "dept_code": "0110", "amount": monto}]
+
+    async def enlazado(_s, _esc):
+        return actual
+
+    monkeypatch.setattr(recalc, "actual_rows_for_month", filas)
+    monkeypatch.setattr(recalc, "linked_actual_scenario", enlazado)
+
+    nat = await cat._por_naturaleza(_Sesion(forecast), "fc", "consolidado")
+    serie = nat["opex"]["0110"]
+    assert serie[:9] == [100.0] * 9, (
+        f"los meses cerrados no salieron del ACTUAL enlazado: {serie[:9]}")
+    assert serie[9:] == [1.0] * 3, (
+        f"los meses proyectados no salieron del propio forecast: {serie[9:]}")
+    assert [sid for sid, m in pedidos if m <= 9] == ["ac"] * 9
+    assert [sid for sid, m in pedidos if m > 9] == ["fc"] * 3
+
+
+@pytest.mark.asyncio
+async def test_un_escenario_que_NO_es_forecast_no_mira_ningun_enlazado(monkeypatch):
+    """Un BUDGET importado con `actuals_through` puesto por lo que sea no se
+    desvía: la regla del motor exige `type == "FORECAST"`."""
+    from app.engine import recalculate as recalc
+
+    budget = _Esc("bu", "BUDGET", actuals_through=9)
+
+    async def filas(_s, sid, m):
+        return [{"account_code": "7065", "dept_code": "0110", "amount": 1}]
+
+    async def enlazado(_s, _esc):          # pragma: no cover - no debe llamarse
+        raise AssertionError("un BUDGET no tiene por qué buscar ACTUAL enlazado")
+
+    monkeypatch.setattr(recalc, "actual_rows_for_month", filas)
+    monkeypatch.setattr(recalc, "linked_actual_scenario", enlazado)
+
+    nat = await cat._por_naturaleza(_Sesion(budget), "bu", "consolidado")
+    assert nat["opex"]["0110"] == [1.0] * 12
