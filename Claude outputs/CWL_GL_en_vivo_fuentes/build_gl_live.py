@@ -29,15 +29,11 @@ GRIS = "657169"
 # `Working` y `Final`. Dejar la celda VACIA es valido y significa «la que el
 # sistema elija»: el ★ Current del forecast, el ACTUAL real.
 VERSIONES = [
-    ("Budget 2027 · Working", 2027, "BUDGET", "Working"),
-    ("Budget 2027 · Final", 2027, "BUDGET", "Final"),
-    ("Budget 2027 · Draft1", 2027, "BUDGET", "Draft1"),
-    ("Budget 2027 · Draft2", 2027, "BUDGET", "Draft2"),
-    ("Budget 2027 · Draft3", 2027, "BUDGET", "Draft3"),
-    ("Forecast 2026 · Working", 2026, "FORECAST", "Working"),
-    ("Forecast 2026 · October", 2026, "FORECAST", "October"),
-    ("Forecast 2026 · November", 2026, "FORECAST", "November"),
-    ("Forecast 2026 · vigente (★)", 2026, "FORECAST", ""),
+    # `*` = TODAS las versiones que FinPlan tenga de ese año y tipo. Un Draft4
+    # que se cree mañana aparece solo en el próximo refresh, y un nombre mal
+    # escrito deja de ser posible.
+    ("Budget 2027", 2027, "BUDGET", "*"),
+    ("Forecast 2026", 2026, "FORECAST", "*"),
     ("Actual 2026", 2026, "ACTUAL", ""),
 ]
 
@@ -68,9 +64,11 @@ def construir(salida: str) -> None:
 
     _titulo(cfg, 1, "CWL · Cuentas del mayor por mes — en vivo")
     _nota(cfg, 2,
-          "Datos → Actualizar todo. Cada version se baja de FinPlan con la llave de "
-          "solo lectura. El ingreso viene NEGATIVO (es credito): la suma de todas las "
-          "filas es la utilidad cambiada de signo.")
+          "Datos → Actualizar todo. Cada versión se baja de FinPlan con la llave de "
+          "solo lectura. El ingreso viene NEGATIVO (es crédito): la suma de todas las "
+          "filas es la utilidad cambiada de signo.   Ojo: cada versión es un P&L "
+          "completo de doce meses, así que el refresh tarda en proporción a cuántas "
+          "pida esta tabla.")
 
     cfg["A4"] = "Direccion del sistema"
     cfg["A4"].font = Font(bold=True)
@@ -97,9 +95,11 @@ def construir(salida: str) -> None:
     cfg["A9"] = "Versiones a bajar"
     cfg["A9"].font = Font(bold=True, size=11)
     _nota(cfg, 10,
-          "Una fila por version. 'Version' vacia = la que el sistema elija (el ★ "
-          "Current del forecast, el ACTUAL real). Si una version no existe, ESA fila "
-          "baja con el error y las demas siguen bajando igual.")
+          "Version = *  ->  TODAS las que FinPlan tenga de ese año y tipo; se "
+          "actualizan solas y no hay nombres que escribir mal.   Version vacía  ->  la "
+          "que el sistema elija (el ★ Current del forecast, el ACTUAL real).   Un "
+          "nombre exacto  ->  solo esa.   Si una no existe, ESA fila baja con el error "
+          "y las demás siguen.")
 
     enc = ["Etiqueta", "Anio", "Tipo", "Version"]
     fila0 = 12
@@ -118,6 +118,13 @@ def construir(salida: str) -> None:
     t = Table(displayName="tVersiones", ref=ref)
     t.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=True)
     cfg.add_table(t)
+
+    esc = wb.create_sheet("Escenarios")
+    esc.sheet_view.showGridLines = False
+    esc["A1"] = ("Lo que FinPlan tiene hoy. La llena Power Query — sirve para ver "
+                 "cómo se llaman de verdad las versiones.")
+    esc["A1"].font = Font(size=10, color=GRIS)
+    esc.column_dimensions["A"].width = 70
 
     # ── Hoja de datos: la llena Power Query ──────────────────────────────
     datos = wb.create_sheet("GL")

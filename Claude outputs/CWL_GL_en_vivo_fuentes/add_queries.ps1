@@ -36,6 +36,23 @@ try {
     $qt.AdjustColumnWidth = $true
     if ($TestKey) { $qt.Refresh($false) | Out-Null }
 
+    # Lo que FinPlan tiene hoy: sirve para ver como se llaman DE VERDAD las
+    # versiones, y para que `*` en Config se pueda comprobar contra algo.
+    $me = Get-Content -Raw -Encoding UTF8 (Join-Path $here "escenarios.m")
+    $wb.Queries.Add("Escenarios", $me, "Escenarios y versiones disponibles en FinPlan CWL") | Out-Null
+    $ws2 = $wb.Worksheets.Item("Escenarios")
+    $ws2.Cells.Clear() | Out-Null
+    $conn2 = "OLEDB;Provider=Microsoft.Mashup.OleDb.1;Data Source=`$Workbook`$;Location=Escenarios;Extended Properties=`"`""
+    $lo2 = $ws2.ListObjects.Add(0, $conn2, $null, 1, $ws2.Range("A1"))
+    $lo2.Name = "tEscenarios"
+    $qt2 = $lo2.QueryTable
+    $qt2.CommandType = 2
+    $qt2.CommandText = "SELECT * FROM [Escenarios]"
+    $qt2.BackgroundQuery = $false
+    $qt2.RefreshStyle = 0
+    $qt2.AdjustColumnWidth = $true
+    if ($TestKey) { $qt2.Refresh($false) | Out-Null }
+
     $wb.Worksheets.Item("Config").Activate()
     # La llave NO se guarda en el archivo que se comparte.
     $wb.Worksheets.Item("Config").Range("pLlave").Value2 = ""

@@ -64,9 +64,58 @@ let
         in
             Salida,
 
-    ConDatos = Table.AddColumn(Versiones, "Datos", each
-        Traer(Text.From([Etiqueta]), Text.From([Anio]), Text.Upper(Text.From([Tipo])),
-              let v = [Version] in if v = null then "" else Text.Trim(Text.From(v)))),
+    // ── Las versiones las dice FinPlan, no el libro ─────────────────────
+    //
+    // Owner, 2026-11-10: *«puede el archivo de excel actualizar las versiones
+    // directamente desde finplan una vez que se conecta»*.
+    //
+    // Si en la columna Version se escribe `*`, esa fila se abre en TODAS las
+    // versiones que el sistema tenga de ese anio y ese tipo. Un Draft4 que se
+    // cree manana aparece solo en el proximo refresh, sin tocar el libro -- y
+    // un nombre mal escrito deja de ser posible.
+    //
+    // ⚠️ Se deja ELEGIR en vez de traer todo siempre a proposito: cada version
+    // es un P&L completo de doce meses del lado del servidor. Pedir de una el
+    // universo entero de escenarios -- budgets 2028 a 2035 incluidos -- hace
+    // del refresh una espera larga para datos que nadie estaba mirando.
+    ListaEscenarios =
+        let
+            R = Web.Contents(Url, [
+                RelativePath = "api/consolidado/escenarios/",
+                Headers = [#"x-api-key" = Llave, Accept = "application/json"],
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+            ])
+        in
+            if Llave = "" or Value.Metadata(R)[Response.Status] <> 200
+            then {}
+            else Json.Document(R)[escenarios],
+
+    // Una fila de Config -> una o varias filas {Etiqueta, Anio, Tipo, Version}.
+    Abrir = (fila as record) as list =>
+        let
+            anio = Text.From(fila[Anio]),
+            tipo = Text.Upper(Text.From(fila[Tipo])),
+            etq = Text.From(fila[Etiqueta]),
+            crudo = let v = fila[Version] in if v = null then "" else Text.Trim(Text.From(v))
+        in
+            if crudo <> "*" then {[E = etq, A = anio, T = tipo, V = crudo]}
+            else
+                let
+                    hay = List.Select(ListaEscenarios, each
+                        Text.From([year]) = anio and Text.Upper(Text.From([tipo])) = tipo),
+                    nombres = List.Distinct(List.Transform(hay, each
+                        let v = [version] in if v = null then "" else Text.From(v)))
+                in
+                    if List.Count(nombres) = 0
+                    then {[E = etq, A = anio, T = tipo, V = ""]}
+                    else List.Transform(nombres, (v) =>
+                        [E = etq & " · " & (if v = "" then "(sin version)" else v),
+                         A = anio, T = tipo, V = v]),
+
+    Expandidas = Table.FromRecords(List.Combine(
+        Table.TransformRows(Versiones, each Abrir(_)))),
+
+    ConDatos = Table.AddColumn(Expandidas, "Datos", each Traer([E], [A], [T], [V])),
     Solo = Table.SelectColumns(ConDatos, {"Datos"}),
     Unido = Table.ExpandTableColumn(Solo, "Datos", Cols),
     Tipado = Table.TransformColumnTypes(Unido,
