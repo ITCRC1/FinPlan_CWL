@@ -3,7 +3,7 @@ import type {
   PLDetail, PLDetailFila, PLPorCategoria, PosicionesVersion, Scenario,
 } from "@/lib/api";
 import type { Cuadro, ColumnaCuadro, FilaCuadro, FormatoCol } from "@/lib/exportCuadro";
-import { filasDeValidacion } from "@/lib/validacionPL";
+import { ARRIBA, filasDeValidacion } from "@/lib/validacionPL";
 import {
   componentesDelPL, OPERANDOS_DE_LA_CASCADA, RESULTADOS_POR_CATEGORIA,
   resultadosDelPL, rotuloAmbito, suma,
@@ -407,10 +407,15 @@ export function cuadroPlanningPorCategoria(
   // —Cocina sin opex, Spa sin costo— y además es el eje por el que el owner
   // viene a mirar, así que el compacto sólo saca los que están en cero en todas
   // las versiones.
+  // ⚠️ El compacto no puede esconder un renglón que el bloque de validación
+  // usa como término: sin él, el bloque entero no se emite. Misma regla que
+  // `OPERANDOS_DE_LA_CASCADA`, por la misma razón.
+  const NECESITA = new Set<string>(Object.values(ARRIBA));
   const emitidas = (datos.filas ?? []).filter(f =>
     f.tipo !== "esp"
     && (!compacto || f.tipo !== "det"
         || OPERANDOS_DE_LA_CASCADA.has(f.rotulo)
+        || NECESITA.has(f.rotulo)
         || (f.series ?? []).some(s => s && suma(s, DOCE) !== 0)));
 
   const par = parPorDefecto(versiones.length, opciones.par);

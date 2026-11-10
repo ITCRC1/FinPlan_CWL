@@ -57,8 +57,20 @@ export const SUPUESTOS: SupuestosValidacion = {
   aguinaldoPct: 1 / 12,
 };
 
-/** Los rótulos del P&L por categoría que el bloque necesita encontrar arriba. */
-const ARRIBA = {
+/**
+ * Los rótulos del P&L que el bloque necesita encontrar arriba.
+ *
+ * ⚠️ **Se exportan porque el modo compacto NO los puede esconder.** Es la misma
+ * regla que `OPERANDOS_DE_LA_CASCADA`: una fila que alguien usa como término de
+ * una resta no es detalle, y esconderla por estar en cero deja la fórmula sin
+ * a qué apuntar.
+ *
+ * Medido el 2026-11-09, y en la mano del owner: con «esconder las líneas en
+ * cero» marcado —que es como lo tiene— `Rent` y `Property Insurance` valían
+ * cero, el compacto los sacaba, el bloque no los encontraba y **se emitía
+ * vacío**. Él bajó el libro y escribió *«no está ya en el archivo… desapareció»*.
+ */
+export const ARRIBA = {
   ingreso: "TOTAL INGRESO",
   costo: "TOTAL COSTO DE VENTAS",
   planilla: "TOTAL PLANILLA",
@@ -113,12 +125,19 @@ export function filasDeValidacion(ctx: Contexto): FilaPlanning[] {
   /** El ordinal de un rótulo YA emitido, o -1. */
   const arriba = (rot: string) => emitidas.findIndex(f => f.label === rot);
 
-  // ⚠️ Si al P&L le falta alguno de los renglones que el bloque necesita, NO se
-  // emite nada. Media validación —con la mitad de los checks apuntando a filas
-  // que no existen— es peor que ninguna: los checks que sí salen dan cero y se
-  // leen como «todo bien».
+  // ⚠️ Media validación es peor que ninguna: los checks que sí salen dan cero
+  // y se leen como «todo bien». Pero **desaparecer en silencio es peor
+  // todavía** — el owner bajó el libro, no encontró el bloque y no tenía cómo
+  // saber por qué. Si falta algo, se emite UNA fila que lo dice.
   const faltan = Object.values(ARRIBA).filter(r => arriba(r) < 0);
-  if (faltan.length) return [];
+  if (faltan.length) {
+    return [{
+      label: `VALIDACIÓN no disponible · al P&L le faltan estos renglones: `
+        + `${faltan.join(" · ")}`,
+      es_seccion: true,
+      meses: null,
+    }];
+  }
 
   const filas: FilaPlanning[] = [];
   /** Ordinal de una fila del bloque, por su rótulo, una vez emitida. */

@@ -164,10 +164,16 @@ def test_cada_CHECK_dice_cuando_NO_pudo_comprobar():
 
 def test_si_al_P_y_L_le_falta_un_renglon_NO_se_emite_media_validacion():
     """Media validación es peor que ninguna: los checks que sí salen dan cero y
-    se leen como «todo bien»."""
+    se leen como «todo bien».
+
+    ⚠️ Pero tampoco se emite VACÍO — eso fue el defecto del 2026-11-09. Se
+    emite una fila que nombra lo que falta. Ver
+    `test_si_falta_un_renglon_el_bloque_lo_DICE`."""
     src = _src()
     assert "const faltan = Object.values(ARRIBA).filter" in src
-    assert "if (faltan.length) return [];" in src
+    assert "if (faltan.length) {" in src
+    bloque = src.split("if (faltan.length) {")[1].split("}")[0]
+    assert "faltan.join" in bloque, "la fila no nombra los renglones que faltan"
 
 
 def test_el_cuadro_por_categoria_lo_engancha():
@@ -180,3 +186,37 @@ def test_el_cuadro_por_categoria_lo_engancha():
     assert bloque.index("filasDeValidacion(") < bloque.index("componentesDelPL("), (
         "el bloque se agrega DESPUÉS de calcular las fórmulas: los ordinales "
         "quedarían contados sobre una lista más corta que la que se escribe")
+
+
+# ── El modo compacto no se puede comer el bloque ────────────────────────────
+
+def test_el_compacto_NO_esconde_lo_que_el_bloque_necesita():
+    """⚠️ El defecto que el owner encontró bajando el libro (2026-11-09).
+
+    Con «esconder las líneas en cero» marcado —que es como lo tiene— `Rent` y
+    `Property Insurance` valían cero, el compacto los sacaba del arreglo, el
+    bloque no los encontraba y **se emitía vacío**. Bajó el Excel y escribió
+    *«no está ya en el archivo… desapareció»*.
+
+    Es la misma regla que `OPERANDOS_DE_LA_CASCADA`: una fila que alguien usa
+    como término no es detalle, y esconderla por estar en cero deja la fórmula
+    sin a qué apuntar."""
+    src = sin_comentarios(
+        (FRONT / "lib/planningReport.ts").read_text(encoding="utf-8"))
+    bloque = src.split("export function cuadroPlanningPorCategoria")[1]
+    bloque = bloque.split("export function")[0]
+    assert "NECESITA.has(f.rotulo)" in bloque, (
+        "el compacto puede esconder un renglón que el bloque de validación "
+        "necesita, y entonces el bloque entero no se emite")
+    assert "Object.values(ARRIBA)" in bloque, (
+        "la lista de protegidos se escribió a mano: se separa de ARRIBA en el "
+        "primer rótulo que alguien agregue")
+
+
+def test_si_falta_un_renglon_el_bloque_lo_DICE():
+    """Desaparecer en silencio es peor que no estar: no hay cómo saber por qué."""
+    src = _src()
+    assert "return [];" not in src, (
+        "el bloque vuelve a desaparecer sin decir nada cuando le falta un "
+        "renglón")
+    assert "VALIDACIÓN no disponible" in src

@@ -45,6 +45,7 @@ const P = cargar("lib/planningReport.ts", {
   // los imports y le pasa por parámetro lo que necesita. Es la segunda vez que
   // pasa (la primera con RESULTADOS_POR_CATEGORIA) — cada módulo nuevo que
   // use `planningReport.ts` tiene que entrar acá.
+  ARRIBA: V.ARRIBA,
   filasDeValidacion: V.filasDeValidacion,
   componentesDelPL: T.componentesDelPL,
   OPERANDOS_DE_LA_CASCADA: T.OPERANDOS_DE_LA_CASCADA,
