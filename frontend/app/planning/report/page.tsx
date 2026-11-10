@@ -44,14 +44,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   getAllocationSummary, getDetalleDeCelda, getEstadisticasCierre,
-  getGastoPorClase, getPLDetail, getPosiciones, getScenarios,
+  getGastoPorClase, getPLDetail, getPLPorCategoria, getPosiciones, getScenarios,
   type AllocationSummary, type DetalleCelda, type EstadisticasCierre,
-  type GastoEscenario, type PLDetail, type PosicionesVersion, type Scenario,
+  type GastoEscenario, type PLDetail, type PLPorCategoria,
+  type PosicionesVersion, type Scenario,
 } from "@/lib/api";
 import { bajarCuadros, type Cuadro } from "@/lib/exportCuadro";
 import { HOTEL_ID } from "@/lib/hotel";
 import {
   APERTURAS, cuadroApertura, cuadroCheckbook, cuadroEstadisticas, cuadroPlanning,
+  cuadroPlanningPorCategoria,
   cuadroPosiciones, cuadroReparto, METRICAS_POSICION, REPARTOS, seAbre,
   tiposDeReparto, type ClaseApertura, type MetricaPosicion,
 } from "@/lib/planningReport";
@@ -78,6 +80,24 @@ const VISTAS = [
   { id: "estadisticas", rotulo: "Estadísticas", ayuda: "Noches, ocupación, ADR, Club" },
 ] as const;
 
+/**
+ * Los dos formatos del P&L. Owner, 2026-11-09: *«necesito que el P&L tenga 2
+ * versiones de formato»*.
+ *
+ * `usali` agrupa por DEPARTAMENTO y mezcla planilla, costo y opex en un solo
+ * renglón de gasto; sirve para cotejar contra su libro y contra cualquier hotel.
+ * `categoria` agrupa por NATURALEZA del gasto y abre los departamentos adentro:
+ * contesta «¿cuánta planilla tiene Cocina?», que en el otro hay que ir a buscar
+ * a otra pantalla.
+ *
+ * Los dos dan el MISMO GOP — el endpoint lo mide y lo devuelve en `cuadre`.
+ */
+const FORMATOS = [
+  { id: "usali", rotulo: "USALI", ayuda: "Por departamento, como siempre" },
+  { id: "categoria", rotulo: "Por categoría",
+    ayuda: "Ingreso − Costo − Planilla − OPEX = GOP" },
+] as const;
+
 /** Cuántas versiones se pueden comparar contra la principal. */
 const COMPARAR = 3;
 
@@ -96,6 +116,8 @@ export default function PlanningReportPage() {
     "planning/report:budget", escenarios, "budget", undefined, true);
   const [comparar, setComparar] = useState<string[]>(Array(COMPARAR).fill(""));
   const [vista, setVista] = useState<string>("pl");
+  /** Cuál de los dos formatos del P&L se está mirando. */
+  const [formato, setFormato] = useState<string>("usali");
   const [ambito, setAmbito] = useState<string>("consolidado");
   const [clase, setClase] = useState<ClaseApertura>("opex");
   const [metrica, setMetrica] = useState<MetricaPosicion>("fte");
@@ -107,6 +129,7 @@ export default function PlanningReportPage() {
   const [mesesDe, setMesesDe] = useState(0);
 
   const [pl, setPl] = useState<PLDetail | null>(null);
+  const [plCat, setPlCat] = useState<PLPorCategoria | null>(null);
   const [gastos, setGastos] = useState<
     { escenarios: GastoEscenario[]; departamentos: Record<string, string> } | null>(null);
   const [libro, setLibro] = useState<Record<string, DetalleCelda>>({});
@@ -172,15 +195,21 @@ export default function PlanningReportPage() {
     setError(null);
     try {
       if (vista === "pl") {
-        // ⚠️ Las dos a la vez, no una después de la otra: son dos endpoints
-        // distintos y encadenarlos duplicaría la espera de la vista que más se
-        // abre. Si las estadísticas fallan, el P&L igual se dibuja — por eso
+        // ⚠️ Las tres a la vez, no una después de la otra: son endpoints
+        // distintos y encadenarlos multiplicaría la espera de la vista que más
+        // se abre. Si las estadísticas fallan, el P&L igual se dibuja — por eso
         // `cargarStats` ya devuelve `null` por versión en vez de tirar.
-        const [d, s] = await Promise.all([
+        //
+        // Los DOS formatos se piden siempre, aunque sólo se dibuje uno: el
+        // Excel los baja juntos, y cambiar de sub-tab sin esperar es la mitad
+        // de para qué sirve un sub-tab.
+        const [d, c, s] = await Promise.all([
           getPLDetail(ambito, principal, otros),
+          getPLPorCategoria(ambito, principal, otros).catch(() => null),
           cargarStats().catch(() => null),
         ]);
         setPl(d);
+        setPlCat(c);
         setStats(s);
       } else if (vista === "aperturas") {
         const g = await getGastoPorClase(ids, true);
@@ -262,7 +291,11 @@ export default function PlanningReportPage() {
   const cuadro: Cuadro | null = useMemo(() => {
     const op = { ambito, compacto, mesesDe, extras };
     try {
-      if (vista === "pl") return pl ? cuadroPlanning(pl, escenarios, op) : null;
+      if (vista === "pl") {
+        if (formato === "categoria")
+          return plCat ? cuadroPlanningPorCategoria(plCat, escenarios, op) : null;
+        return pl ? cuadroPlanning(pl, escenarios, op) : null;
+      }
       if (vista === "aperturas") {
         return gastos
           ? cuadroApertura(clase, gastos.escenarios, gastos.departamentos,
@@ -288,7 +321,7 @@ export default function PlanningReportPage() {
     } catch {
       return null;
     }
-  }, [vista, pl, gastos, libro, plantilla, reparto, stats, clase, metrica,
+  }, [vista, pl, plCat, formato, gastos, libro, plantilla, reparto, stats, clase, metrica,
       tipoReparto, escenarios, ambito, compacto, mesesDe, extras, ids, statsACuadro]);
 
   /** Todas las hojas de una vista. Las usa tanto el botón de la vista como el
@@ -297,10 +330,20 @@ export default function PlanningReportPage() {
     const op = { compacto, ambito, mesesDe, extras };
     const out: Cuadro[] = [];
     if (v === "pl") {
+      // Los DOS formatos del P&L, uno detrás del otro por ámbito. Owner,
+      // 2026-11-09: *«lo pones como un sub tab pero también lo pones en el
+      // excel como versión 2»*.
+      //
+      // ⚠️ El formato 2 se agrega sólo si el endpoint contesta. Si falla, el
+      // paquete sale con el P&L de siempre en vez de no salir: perder una hoja
+      // nueva es molesto, perder el paquete entero por ella es peor.
       for (const a of AMBITOS) {
         const d = a.id === ambito && pl ? pl
           : await getPLDetail(a.id, principal, otros).catch(() => null);
         if (d) out.push(cuadroPlanning(d, escenarios, { ...op, ambito: a.id }));
+        const c = a.id === ambito && plCat ? plCat
+          : await getPLPorCategoria(a.id, principal, otros).catch(() => null);
+        if (c) out.push(cuadroPlanningPorCategoria(c, escenarios, { ...op, ambito: a.id }));
       }
     } else if (v === "aperturas") {
       let g = gastos;
@@ -343,7 +386,7 @@ export default function PlanningReportPage() {
       out.push(statsACuadro(stats ?? await cargarStats(), op));
     }
     return out;
-  }, [compacto, ambito, mesesDe, extras, pl, gastos, libro, plantilla, reparto, stats,
+  }, [compacto, ambito, mesesDe, extras, pl, plCat, formato, gastos, libro, plantilla, reparto, stats,
       principal, otros, ids, escenarios, cargarReparto, cargarStats, statsACuadro]);
 
   const nombreDelArchivo = (sufijo: string) => {
@@ -515,6 +558,32 @@ export default function PlanningReportPage() {
               {a.rotulo}
             </button>
           ))}
+        </nav>
+      )}
+      {/* Los dos formatos del MISMO P&L. Owner, 2026-11-09: *«lo pones como
+        * un sub tab»*. Va debajo del ámbito porque es un corte más fino: se
+        * elige primero de qué hotel y después cómo mirarlo. */}
+      {vista === "pl" && (
+        <nav aria-label="Formato" style={{ ...grupo, marginBottom: 12 }}>
+          {FORMATOS.map((f, i) => (
+            <button key={f.id} onClick={() => setFormato(f.id)} title={f.ayuda}
+              style={{ ...btn(f.id === formato),
+                       borderLeft: i ? "1px solid var(--border-medium)" : "none" }}>
+              {f.rotulo}
+            </button>
+          ))}
+          {/* El cuadre, al lado del sub-tab y no escondido en el cuadro: si el
+            * GOP de los dos formatos deja de coincidir hay que verlo ANTES de
+            * leer los números, no después. */}
+          {formato === "categoria" && plCat && (
+            <span style={{ marginLeft: 12, fontSize: 11.5, alignSelf: "center",
+                           color: (plCat.cuadre ?? []).every(c => c.cuadra)
+                             ? "var(--positive)" : "var(--negative)" }}>
+              {(plCat.cuadre ?? []).every(c => c.cuadra)
+                ? "✓ mismo GOP que el formato USALI"
+                : "⚠ el GOP NO coincide con el formato USALI"}
+            </span>
+          )}
         </nav>
       )}
       {(vista === "aperturas" || vista === "checkbooks" || vista === "detalle") && (

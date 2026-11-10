@@ -46,6 +46,7 @@ from app.api.auditoria_api import router as auditoria_router
 from app.api.detalle_celda_api import router as detalle_celda_router
 from app.api.comentario_pl_api import router as comentario_pl_router
 from app.api.pl_detail_api import router as pl_detail_router
+from app.api.pl_categoria_api import router as pl_categoria_router
 # Le devuelve el cero de adelante a los codigos de departamento que entran sin
 # el (`110` -> `0110`). Ver `app/departamentos.py`: hay cuatro caminos de
 # escritura y el ORM los ve a todos.
@@ -194,6 +195,7 @@ app.include_router(auditoria_router, prefix="/api", dependencies=_guard)
 app.include_router(detalle_celda_router, prefix="/api", dependencies=_guard)
 app.include_router(comentario_pl_router, prefix="/api", dependencies=_guard)
 app.include_router(pl_detail_router, prefix="/api", dependencies=_guard)
+app.include_router(pl_categoria_router, prefix="/api", dependencies=_guard)
 app.include_router(semillas_router, prefix="/api", dependencies=_guard)
 app.include_router(mixer_router, prefix="/api", dependencies=_guard)
 app.include_router(chequeo_router, prefix="/api", dependencies=_guard)

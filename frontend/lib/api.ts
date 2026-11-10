@@ -3237,6 +3237,42 @@ export async function getPLDetail(
   return api.get<PLDetail>(
     `/reports/pl-detail/${encodeURIComponent(ambito)}/?scenario_id=${encodeURIComponent(scenarioId)}${cmp}`);
 }
+/** El cuadre del formato por categoría, por versión. Tiene que dar cero: es el
+ *  MISMO GOP sumado en otro orden. Si deja de dar cero, la pantalla lo dice en
+ *  vez de mostrar un GOP distinto al del P&L de al lado. */
+export interface CuadrePorCategoria {
+  scenario_id: string;
+  gop_resta: number;
+  gop_motor: number;
+  diferencia: number;
+  peor_mes: number;
+  cuadra: boolean;
+}
+
+/** El P&L agrupado por NATURALEZA del gasto, no por departamento.
+ *
+ * Owner, 2026-11-09: *«Ingreso − Costo − Planilla − Opex igual a GOP … solo
+ * necesito poder ir viendo los totales por departamento de cada categoría»*.
+ *
+ * Viene con la MISMA forma que `PLDetail` a propósito: así la pantalla y el
+ * Excel reusan el armador de cuadros y no hay un segundo formato de payload
+ * que mantener.
+ */
+export interface PLPorCategoria extends Omit<PLDetail, "club" | "clases" | "control"> {
+  formato: "categoria";
+  cuadre: CuadrePorCategoria[];
+}
+
+export async function getPLPorCategoria(
+  ambito: string, scenarioId: string, comparar: string[] = [],
+): Promise<PLPorCategoria> {
+  const cmp = comparar.length
+    ? `&comparar=${encodeURIComponent(comparar.join(","))}` : "";
+  return api.get<PLPorCategoria>(
+    `/reports/pl-por-categoria/${encodeURIComponent(ambito)}/`
+    + `?scenario_id=${encodeURIComponent(scenarioId)}${cmp}`);
+}
+
 /** El Excel con la FORMA del cuadro (dos pisos de encabezado). Lo arma el
  *  servidor con los mismos parametros de la pantalla: mandarle el cuadro ya
  *  armado seria una segunda forma de llegar al numero. */

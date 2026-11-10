@@ -1,10 +1,11 @@
 import type {
   AllocationSummary, DetalleCelda, EstadisticasCierre, GastoEscenario,
-  PLDetail, PLDetailFila, PosicionesVersion, Scenario,
+  PLDetail, PLDetailFila, PLPorCategoria, PosicionesVersion, Scenario,
 } from "@/lib/api";
 import type { Cuadro, ColumnaCuadro, FilaCuadro, FormatoCol } from "@/lib/exportCuadro";
 import {
-  componentesDelPL, OPERANDOS_DE_LA_CASCADA, resultadosDelPL, rotuloAmbito, suma,
+  componentesDelPL, OPERANDOS_DE_LA_CASCADA, RESULTADOS_POR_CATEGORIA,
+  resultadosDelPL, rotuloAmbito, suma,
 } from "@/lib/tresCortes";
 
 /**
@@ -372,6 +373,78 @@ export function cuadroPlanning(
     subtitulo: `Los doce meses son de ${nombre(mv)}; el año, de todas. Su `
       + `columna Full Year es la suma de sus meses.`,
     hoja: `Planning ${datos.year} ${rotuloAmbito(ambito)}${mv ? ` m${mv}` : ""}`,
+    mesesDe: mv, extras: opciones.extras,
+  }, versiones.length, nombre, par, filas);
+}
+
+/**
+ * El MISMO P&L, en el segundo formato: por naturaleza del gasto.
+ *
+ * Owner, 2026-11-09: *«necesito que el P&L tenga 2 versiones de formato … 2)
+ * Ingreso − Costo − Planilla − Opex igual a GOP, en este formato no es formato
+ * USALI, solo necesito poder ir viendo los totales por departamento de cada
+ * categoría, GOP menos todo lo demás hasta llegar a net profit»*.
+ *
+ * El payload viene con la misma forma que el de `cuadroPlanning`, así que esto
+ * es casi la misma función. Lo único propio es la cascada: acá el GOP es la
+ * resta de las cuatro naturalezas y no «Operating Profit menos Overhead».
+ */
+export function cuadroPlanningPorCategoria(
+  datos: PLPorCategoria, escenarios: Scenario[], opciones: OpcionesPlanning,
+): Cuadro {
+  const { ambito, compacto = false } = opciones;
+  const versiones = datos.versiones ?? [];
+  const nombre = nombradorDeVersiones(versiones, escenarios);
+  const mv = Math.min(opciones.mesesDe ?? 0, Math.max(0, versiones.length - 1));
+
+  // ⚠️ Acá cada fila de detalle es un DEPARTAMENTO. Uno en cero es información
+  // —Cocina sin opex, Spa sin costo— y además es el eje por el que el owner
+  // viene a mirar, así que el compacto sólo saca los que están en cero en todas
+  // las versiones.
+  const emitidas = (datos.filas ?? []).filter(f =>
+    f.tipo !== "esp"
+    && (!compacto || f.tipo !== "det"
+        || OPERANDOS_DE_LA_CASCADA.has(f.rotulo)
+        || (f.series ?? []).some(s => s && suma(s, DOCE) !== 0)));
+
+  const par = parPorDefecto(versiones.length, opciones.par);
+
+  const filas: FilaPlanning[] = emitidas.map(f => {
+    if (f.tipo === "sec") return { label: f.rotulo, es_seccion: true, meses: null };
+    return {
+      label: f.rotulo,
+      es_total: f.tipo === "tot" || f.tipo === "sub",
+      meses: vi => mesesDe(f, vi),
+      anios: versiones.map((_v, vi) => anioDe(f, vi)),
+    };
+  });
+
+  componentesDelPL(emitidas).forEach((comp, i) => {
+    if (comp) filas[i].suma_de = comp;
+  });
+  // ⚠️ La cascada POR CATEGORÍA, no la de siempre: acá el GOP es
+  // `TOTAL INGRESO − las cuatro naturalezas`. Pasarle la de siempre dejaría el
+  // renglón más mirado del reporte como número pegado, porque sus operandos
+  // —«OPERATING PROFIT», «TOTAL OVERHEAD EXPENSES»— no existen en este formato.
+  resultadosDelPL(emitidas, RESULTADOS_POR_CATEGORIA).forEach((comb, i) => {
+    if (comb) filas[i].combina_filas = comb;
+  });
+
+  const cuadra = (datos.cuadre ?? []).every(c => c.cuadra);
+  const peor = Math.max(0, ...(datos.cuadre ?? []).map(c => Math.abs(c.diferencia)));
+
+  return armarCuadro({
+    titulo: `Planning Report ${datos.year} · ${rotuloAmbito(ambito)}`
+      + ` · por categoría (Ingreso − Costo − Planilla − OPEX = GOP)`,
+    subtitulo: cuadra
+      ? `Es el MISMO P&L sumado en otro orden: el GOP de este cuadro coincide `
+        + `al centavo con el del formato USALI. Los doce meses son de `
+        + `${nombre(mv)}; el año, de todas.`
+      // Un reporte que deja de cuadrar y no lo dice es peor que uno que falla.
+      : `⚠ EL GOP NO COINCIDE con el del formato USALI: diferencia `
+        + `$${peor.toLocaleString("en-US", { minimumFractionDigits: 2 })}. `
+        + `No use este cuadro hasta entender por qué.`,
+    hoja: `Planning ${datos.year} ${rotuloAmbito(ambito)} v2`,
     mesesDe: mv, extras: opciones.extras,
   }, versiones.length, nombre, par, filas);
 }

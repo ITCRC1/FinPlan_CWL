@@ -77,6 +77,14 @@ MENSAJES: dict[str, dict[str, str]] = {
     "reporte.ambito_desconocido": {
         "es": "Ámbito de reporte desconocido: {ambito}",
         "en": "Unknown report scope: {ambito}"},
+    # El P&L por categoría corta la plantilla del formato 1 en el renglón del
+    # GOP. Si ese rótulo cambia de nombre, el corte no existe y el reporte no
+    # se puede armar — mejor decirlo que devolver media cascada.
+    "reporte.sin_gop": {
+        "es": "La plantilla del P&L ({ambito}) no tiene el renglón del GOP: "
+              "no se puede armar el formato por categoría",
+        "en": "The P&L template ({ambito}) has no GOP row: the by-category "
+              "format cannot be built"},
     "version.no_encontrada": {
         "es": "Versión no encontrada",
         "en": "Version not found"},

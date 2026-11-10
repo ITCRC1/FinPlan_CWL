@@ -42,6 +42,7 @@ const T = cargar("lib/tresCortes.ts");
 const P = cargar("lib/planningReport.ts", {
   componentesDelPL: T.componentesDelPL,
   OPERANDOS_DE_LA_CASCADA: T.OPERANDOS_DE_LA_CASCADA,
+  RESULTADOS_POR_CATEGORIA: T.RESULTADOS_POR_CATEGORIA,
   resultadosDelPL: T.resultadosDelPL,
   rotuloAmbito: T.rotuloAmbito,
   suma: T.suma,
@@ -563,6 +564,108 @@ const suelto = P.armarCuadro(
   [{ label: "fila", meses: serie(7), anios: [1, 2] }]);
 ok(suelto.filas[0].valores.slice(14).every(v => v === null),
    "sin meses propios, el bloque de la derecha va VACÍO y no repite los de al lado");
+
+/* ── 7 · El SEGUNDO formato del P&L: por categoría ──────────────────────── */
+//
+// Owner, 2026-11-09: *«Ingreso − Costo − Planilla − Opex igual a GOP … GOP
+// menos todo lo demás hasta llegar a net profit»*.
+//
+// Lo que se comprueba acá no es la aritmética del servidor —eso se midió
+// contra producción y dio $0,00— sino que el CUADRO declare bien sus fórmulas:
+// los cinco totales sumando su detalle, y el GOP restando los cuatro totales.
+// Si el GOP se queda sin fórmula, el Excel lo baja pegado junto con EBITDA,
+// EBT y NET PROFIT, que es justo lo que más se mira. Y no falla nada.
+
+const ING = 1000, COS = 100, PAY = 300, OPX = 200, REPT = 0;
+const docePlano = (v) => Array(12).fill(v);
+const PL_CAT = {
+  year: 2027,
+  versiones: SID.slice(0, 2).map(id => ({ scenario_id: id, escenario: id })),
+  cuadre: [{ scenario_id: "s0", gop_resta: 0, gop_motor: 0, diferencia: 0,
+             peor_mes: 0, cuadra: true }],
+  filas: [
+    { tipo: "sec", rotulo: "INGRESO", series: [null, null] },
+    { tipo: "det", rotulo: "Rooms", series: [docePlano(600), docePlano(600)] },
+    { tipo: "det", rotulo: "F&B", series: [docePlano(400), docePlano(400)] },
+    { tipo: "tot", rotulo: "TOTAL INGRESO",
+      series: [docePlano(ING), docePlano(ING)] },
+    { tipo: "sec", rotulo: "COSTO DE VENTAS", series: [null, null] },
+    { tipo: "det", rotulo: "0120 · F&B", series: [docePlano(COS), docePlano(COS)] },
+    { tipo: "tot", rotulo: "TOTAL COSTO DE VENTAS",
+      series: [docePlano(COS), docePlano(COS)] },
+    { tipo: "sec", rotulo: "PLANILLA", series: [null, null] },
+    { tipo: "det", rotulo: "0122 · Kitchen", series: [docePlano(PAY), docePlano(PAY)] },
+    { tipo: "tot", rotulo: "TOTAL PLANILLA",
+      series: [docePlano(PAY), docePlano(PAY)] },
+    { tipo: "sec", rotulo: "GASTOS OPERATIVOS", series: [null, null] },
+    { tipo: "det", rotulo: "0180 · Admin", series: [docePlano(OPX), docePlano(OPX)] },
+    { tipo: "tot", rotulo: "TOTAL GASTOS OPERATIVOS",
+      series: [docePlano(OPX), docePlano(OPX)] },
+    { tipo: "sec", rotulo: "REPARTO · Cafetería y Lavandería", series: [null, null] },
+    { tipo: "det", rotulo: "0220 · Cafetería", series: [docePlano(-50), docePlano(-50)] },
+    { tipo: "det", rotulo: "0110 · Rooms", series: [docePlano(50), docePlano(50)] },
+    { tipo: "tot", rotulo: "TOTAL REPARTO",
+      series: [docePlano(REPT), docePlano(REPT)] },
+    { tipo: "tot", rotulo: "TOTAL GROSS OPERATING PROFIT",
+      series: [docePlano(ING - COS - PAY - OPX - REPT),
+               docePlano(ING - COS - PAY - OPX - REPT)] },
+  ],
+};
+
+const CAT = P.cuadroPlanningPorCategoria(PL_CAT, ESCENARIOS,
+                                         { ambito: "hotel", compacto: false });
+auditar(CAT, "P&L por categoría");
+
+const fila = (lab) => CAT.filas.find(f => f.label === lab);
+
+// Los cinco totales suman el detalle contiguo que tienen arriba.
+for (const [lab, esperado] of [["TOTAL INGRESO", ING], ["TOTAL COSTO DE VENTAS", COS],
+                               ["TOTAL PLANILLA", PAY],
+                               ["TOTAL GASTOS OPERATIVOS", OPX],
+                               ["TOTAL REPARTO", REPT]]) {
+  const f = fila(lab);
+  ok(f && f.suma_de && f.suma_de.length > 0,
+     `${lab} declara qué filas suma (si no, baja pegado)`);
+  if (f && f.suma_de) {
+    const suma = f.suma_de.reduce((a, j) => a + CAT.filas[j].valores[0], 0);
+    ok(Math.abs(suma - esperado) < CENT,
+       `⚠️ ${lab}: suma_de apunta a filas que dan ${suma}, y vale ${esperado}`);
+  }
+}
+
+// Y el GOP RESTA los cuatro, que es la mitad que `suma_de` no puede decir.
+const gop = fila("TOTAL GROSS OPERATING PROFIT");
+ok(gop && gop.combina_filas && gop.combina_filas.length === 5,
+   `el GOP declara su resta con los CINCO términos: `
+   + `${gop && gop.combina_filas ? gop.combina_filas.length : "ninguno"}`);
+if (gop && gop.combina_filas) {
+  const calc = gop.combina_filas.reduce(
+    (a, [j, signo]) => a + signo * CAT.filas[j].valores[0], 0);
+  ok(Math.abs(calc - (ING - COS - PAY - OPX - REPT)) < CENT,
+     `⚠️ la resta del GOP da ${calc} y el renglón vale ${gop.valores[0]}`);
+  ok(Math.abs(calc - gop.valores[0]) < CENT,
+     "y coincide con el número que trae el motor, así que la fórmula se escribe");
+  // El signo: el ingreso SUMA y las cuatro naturalezas RESTAN.
+  const signos = gop.combina_filas.map(([, sg]) => sg);
+  ok(signos.filter(x => x === 1).length === 1 && signos.filter(x => x === -1).length === 4,
+     `un término suma y cuatro restan: ${JSON.stringify(signos)}`);
+}
+
+// El subtítulo avisa cuando el servidor dice que NO cuadra. Un reporte que deja
+// de cuadrar y no lo dice es peor que uno que falla.
+const MAL = { ...PL_CAT, cuadre: [{ scenario_id: "s0", gop_resta: 1, gop_motor: 2,
+                                    diferencia: -1, peor_mes: 1, cuadra: false }] };
+const CATMAL = P.cuadroPlanningPorCategoria(MAL, ESCENARIOS, { ambito: "hotel" });
+ok(/NO COINCIDE/.test(CATMAL.subtitulo),
+   `el subtítulo avisa cuando no cuadra: ${CATMAL.subtitulo.slice(0, 60)}`);
+ok(!/NO COINCIDE/.test(CAT.subtitulo),
+   "y no asusta cuando sí cuadra");
+
+// La hoja del Excel se llama distinto que la del formato 1: dos hojas con el
+// mismo nombre hacen que el libro no abra.
+ok(CAT.hoja !== P.cuadroPlanning(PL, ESCENARIOS, { ambito: "hotel" }).hoja,
+   `la hoja v2 no pisa a la del formato 1: ${CAT.hoja}`);
+ok(CAT.hoja.length <= 31, `y cabe en una hoja de Excel: ${CAT.hoja.length} caracteres`);
 
 console.log(`${checks} comprobaciones · ${fallos} fallos`);
 process.exit(fallos ? 1 : 0);

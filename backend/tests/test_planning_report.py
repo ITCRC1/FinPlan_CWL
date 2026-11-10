@@ -488,9 +488,19 @@ def test_el_OPERANDO_de_la_cascada_no_lo_esconde_el_modo_compacto():
     """
     tres = (FRONT / "lib/tresCortes.ts").read_text(encoding="utf-8")
     assert "export const OPERANDOS_DE_LA_CASCADA = new Set(" in tres
-    assert "Object.values(RESULTADOS).flatMap(r => [...r.mas, ...r.menos])" in tres, (
-        "la lista de operandos se escribio a mano: se separa de RESULTADOS en el "
-        "primer resultado que alguien agregue")
+    # ⚠️ Lo que se exige es que la lista se DERIVE de las tablas, no su forma
+    # exacta. Desde el 2026-11-09 hay DOS cascadas —la USALI y la del formato
+    # por categoria— y los operandos salen de las dos: un `RESULTADOS` solo
+    # dejaria «TOTAL INGRESO» fuera, y el modo compacto podria esconderlo.
+    bloque = tres.split("export const OPERANDOS_DE_LA_CASCADA = new Set(")[1]
+    bloque = bloque.split(";")[0]
+    assert "flatMap(r => [...r.mas, ...r.menos])" in bloque, (
+        "la lista de operandos se escribio a mano: se separa de las tablas en "
+        "el primer resultado que alguien agregue")
+    for tabla in ("RESULTADOS", "RESULTADOS_POR_CATEGORIA"):
+        assert tabla in bloque, (
+            f"los operandos no salen de {tabla}: el modo compacto puede "
+            f"esconder un termino de esa cascada y la formula no se declara")
     for archivo in ("lib/tresCortes.ts", "lib/planningReport.ts"):
         src = (FRONT / archivo).read_text(encoding="utf-8")
         assert "OPERANDOS_DE_LA_CASCADA.has(f.rotulo)" in src, (
@@ -520,6 +530,13 @@ def test_la_cascada_usa_EL_ROTULO_DE_ESTE_REPO():
     # fuera rotulos que si existen.
     plantilla = set(re.findall(r'\("(?:tot|sub|det)",\s*"([^"]+)"', pl))
     assert plantilla, "no se pudo leer la plantilla del P&L"
+    # Y el SEGUNDO formato del P&L (2026-11-09), que emite sus propios rotulos
+    # —«TOTAL INGRESO», «TOTAL PLANILLA»…— y tambien se indexa por texto. Se
+    # leen de su lista con nombre, no se adivinan: adivinarlos seria el mismo
+    # defecto que esta prueba persigue.
+    from app.api.pl_categoria_api import ROTULOS_DEL_FORMATO
+
+    plantilla |= set(ROTULOS_DEL_FORMATO)
 
     tres = (FRONT / "lib/tresCortes.ts").read_text(encoding="utf-8")
     cascada = tres[tres.index("const SUMA_DEL_DETALLE"):

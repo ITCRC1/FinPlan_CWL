@@ -387,6 +387,11 @@ const SUMA_DEL_DETALLE = new Set([
   // mayúscula es la del Club; la del Consolidado va con e minúscula, tal como
   // la escribió el owner (ver `CONSOLIDADO` en `pl_detail_api.py`).
   "Total Slary and Benefits", "Total Operating Expenses",
+  // El formato 2 del P&L (Ingreso − Costo − Planilla − OPEX = GOP). Sus cinco
+  // totales suman el detalle por departamento que tienen arriba, igual que
+  // cualquier otro: lo único distinto es por qué eje se abrió el detalle.
+  "TOTAL INGRESO", "TOTAL COSTO DE VENTAS", "TOTAL PLANILLA",
+  "TOTAL GASTOS OPERATIVOS", "TOTAL REPARTO",
 ]);
 
 /** Los totales que suman SUBTOTALES, no detalle: el detalle ya está contado
@@ -441,8 +446,33 @@ const RESULTADOS: Record<string, { mas: string[]; menos: string[] }> = {
  * Un «Income Taxes (30%) — 0.00» visible es, además, lo que corresponde: un P&L
  * que salta del EBT al Net Profit sin mostrar el impuesto obliga a creerle.
  */
+/**
+ * La cascada del FORMATO 2 del P&L: el mismo GOP, armado por el otro camino.
+ *
+ * Owner, 2026-11-09: *«Ingreso − Costo − Planilla − Opex igual a GOP … GOP
+ * menos todo lo demás hasta llegar a net profit»*.
+ *
+ * Sólo cambia el renglón del GOP. De ahí para abajo la cascada es LA MISMA —
+ * se hereda con el spread en vez de copiarse, porque dos tablas con los mismos
+ * cinco resultados se separan en el primer renglón que alguien agregue de un
+ * lado.
+ *
+ * ⚠️ El reparto entra en la resta aunque sume cero. Es lo que hace netear a
+ * Cafetería y Lavandería: sin él, el GOP de este formato queda $245.126,80
+ * arriba del otro en el año — medido contra el Budget Working 2027.
+ */
+export const RESULTADOS_POR_CATEGORIA: typeof RESULTADOS = {
+  ...RESULTADOS,
+  "TOTAL GROSS OPERATING PROFIT": {
+    mas: ["TOTAL INGRESO"],
+    menos: ["TOTAL COSTO DE VENTAS", "TOTAL PLANILLA",
+            "TOTAL GASTOS OPERATIVOS", "TOTAL REPARTO"],
+  },
+};
+
 export const OPERANDOS_DE_LA_CASCADA = new Set(
-  Object.values(RESULTADOS).flatMap(r => [...r.mas, ...r.menos]));
+  [...Object.values(RESULTADOS), ...Object.values(RESULTADOS_POR_CATEGORIA)]
+    .flatMap(r => [...r.mas, ...r.menos]));
 
 /**
  * Qué filas suma cada subtotal y cada total, en ORDINALES del arreglo que se
@@ -492,10 +522,12 @@ export function componentesDelPL(
  */
 export function resultadosDelPL(
   emitidas: { tipo: "sec" | "det" | "sub" | "tot" | "esp"; rotulo: string }[],
+  /** Qué cascada: la de siempre, o la del formato por categoría. */
+  tabla: typeof RESULTADOS = RESULTADOS,
 ): ([number, number][] | undefined)[] {
   const donde = (rot: string) => emitidas.findIndex(f => f.rotulo === rot);
   return emitidas.map(f => {
-    const r = RESULTADOS[f.rotulo];
+    const r = tabla[f.rotulo];
     if (!r) return undefined;
     const partes: [number, number][] = [];
     for (const [lista, signo] of [[r.mas, 1], [r.menos, -1]] as const) {
