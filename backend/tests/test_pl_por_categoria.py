@@ -347,11 +347,27 @@ def test_el_paquete_no_pide_el_formato_para_el_club():
         "el paquete sigue pidiendo el formato 2 para el Club: 422 seguro")
 
 
-def test_el_paquete_solo_mete_la_hoja_que_CUADRA():
-    """La pantalla ya se niega a dibujar lo que no cuadra; el paquete tenía que
-    hacer lo mismo. Una hoja en el libro del owner que no cierra contra su
-    propio GOP se copia a una presentación sin volver a mirarla."""
+def test_el_paquete_mira_el_cuadre_de_la_PRINCIPAL():
+    """Una hoja que no cierra contra su propio GOP se copia a una presentación
+    sin volver a mirarla, así que no entra al libro.
+
+    ⚠️ Pero decide la PRINCIPAL, no todas. El 2026-11-09 el owner bajó el
+    paquete y las dos hojas v2 **habían desaparecido** porque una de las
+    versiones con las que comparaba no cerraba. Perder la hoja entera por una
+    columna secundaria es desproporcionado: el subtítulo la nombra y la hoja
+    baja igual."""
     src = _src(PANTALLA)
     bloque = src.split("const hojasDe")[1].split('} else if (v === "aperturas")')[0]
-    assert "cuadre" in bloque and "every(x => x.cuadra)" in bloque, (
-        "el paquete mete la hoja por categoría aunque no cuadre")
+    assert "cuadre?.[0]" in bloque, (
+        "el paquete vuelve a mirar TODAS las versiones: una comparada que no "
+        "cierra se lleva la hoja por delante")
+    assert "every(x => x.cuadra)" not in bloque
+
+
+def test_la_comparada_que_no_cierra_se_NOMBRA_en_el_subtitulo():
+    """Si no se dibuja el aviso, la columna floja se lee como buena."""
+    src = _src(LIBRERIA)
+    bloque = src.split("export function cuadroPlanningPorCategoria")[1]
+    bloque = bloque.split("export function")[0]
+    assert "const flojas" in bloque and "nombreDe(" in bloque, (
+        "el subtítulo no nombra las versiones comparadas que no cierran")

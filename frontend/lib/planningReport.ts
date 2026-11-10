@@ -456,8 +456,20 @@ export function cuadroPlanningPorCategoria(
     if (comb) filas[i].combina_filas = comb;
   });
 
-  const cuadra = (datos.cuadre ?? []).every(c => c.cuadra);
+  // La PRINCIPAL es la que decide si el cuadro vale. Las comparadas que no
+  // cierran se nombran: su columna de año dice otra cosa que su P&L USALI, y
+  // eso hay que verlo, no esconderlo ni usarlo para borrar la hoja.
+  const cuadra = !datos.cuadre?.[0] || datos.cuadre[0].cuadra;
+  const flojas = (datos.cuadre ?? []).slice(1).filter(c => !c.cuadra);
   const peor = Math.max(0, ...(datos.cuadre ?? []).map(c => Math.abs(c.diferencia)));
+  const nombreDe = (sid: string) => {
+    const vi = versiones.findIndex(v => v.scenario_id === sid);
+    return vi >= 0 ? nombre(vi) : sid.slice(0, 8);
+  };
+  const aviso = flojas.length
+    ? ` ⚠ Estas versiones comparadas NO cierran contra su propio GOP: `
+      + `${flojas.map(c => `${nombreDe(c.scenario_id)} ($${c.diferencia.toLocaleString("en-US", { minimumFractionDigits: 2 })})`).join(" · ")}.`
+    : "";
 
   return armarCuadro({
     titulo: `Planning Report ${datos.year} · ${rotuloAmbito(ambito)}`
@@ -465,7 +477,7 @@ export function cuadroPlanningPorCategoria(
     subtitulo: cuadra
       ? `Es el MISMO P&L sumado en otro orden: el GOP de este cuadro coincide `
         + `al centavo con el del formato USALI. Los doce meses son de `
-        + `${nombre(mv)}; el año, de todas.`
+        + `${nombre(mv)}; el año, de todas.${aviso}`
       // Un reporte que deja de cuadrar y no lo dice es peor que uno que falla.
       : `⚠ EL GOP NO COINCIDE con el del formato USALI: diferencia `
         + `$${peor.toLocaleString("en-US", { minimumFractionDigits: 2 })}. `

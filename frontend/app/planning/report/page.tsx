@@ -315,10 +315,15 @@ export default function PlanningReportPage() {
     try {
       if (vista === "pl") {
         if (formato === "categoria") {
-          // ⚠️ Si la resta no da el mismo GOP que el formato USALI, NO se
-          // dibuja. Mostrar la cascada con un aviso arriba es peor: el aviso
-          // se lee una vez y los números se copian siempre.
-          if (plCat && !(plCat.cuadre ?? []).every(c => c.cuadra)) return null;
+          // ⚠️ Sólo la PRINCIPAL decide. Si su resta no da el mismo GOP que el
+          // formato USALI, no se dibuja nada: la hoja es de ese escenario.
+          //
+          // Pero una versión COMPARADA que no cuadra NO se lleva el cuadro por
+          // delante. Owner, 2026-11-09: bajó el paquete y las dos hojas v2
+          // habían desaparecido porque una de las versiones con las que
+          // comparaba no cerraba. Perder la vista entera por una columna
+          // secundaria es desproporcionado — el subtítulo la nombra.
+          if (plCat && plCat.cuadre?.[0] && !plCat.cuadre[0].cuadra) return null;
           return plCat ? cuadroPlanningPorCategoria(plCat, escenarios, op) : null;
         }
         return pl ? cuadroPlanning(pl, escenarios, op) : null;
@@ -375,7 +380,9 @@ export default function PlanningReportPage() {
         if (a.id !== "club") {
           const c = a.id === ambito && plCat ? plCat
             : await getPLPorCategoria(a.id, principal, otros).catch(() => null);
-          if (c && (c.cuadre ?? []).every(x => x.cuadra))
+          // Igual que la pantalla: manda la PRINCIPAL. Una comparada que no
+          // cierra queda nombrada en el subtítulo de la hoja, no borra el libro.
+          if (c && (!c.cuadre?.[0] || c.cuadre[0].cuadra))
             out.push(cuadroPlanningPorCategoria(c, escenarios, { ...op, ambito: a.id }));
         }
       }
@@ -705,7 +712,7 @@ export default function PlanningReportPage() {
       {/* No cuadra: se dice cuál versión y por cuánto. Un número concreto es
         * lo único con lo que se puede empezar a buscar. */}
       {!cargando && !cuadro && !error && vista === "pl" && formato === "categoria"
-        && plCat && !(plCat.cuadre ?? []).every(c => c.cuadra) && (
+        && plCat && plCat.cuadre?.[0] && !plCat.cuadre[0].cuadra && (
         <div style={{ fontSize: 13, color: "var(--negative)", maxWidth: 680 }}>
           No se muestra: la resta no da el mismo GOP que el formato USALI.
           <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
@@ -747,7 +754,8 @@ export default function PlanningReportPage() {
       )}
       {!cargando && !cuadro && !error
         && !(vista === "pl" && formato === "categoria"
-             && (errorCat || (plCat && !(plCat.cuadre ?? []).every(c => c.cuadra)))) && (
+             && (errorCat
+                 || (plCat && plCat.cuadre?.[0] && !plCat.cuadre[0].cuadra))) && (
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           Sin datos para esta vista.
         </div>
