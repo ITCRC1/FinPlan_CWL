@@ -1119,9 +1119,10 @@ async def costo_a_repartir(scenario_id: str, dept: str = "0220"):
     """El POTE que se va a repartir, abierto por clase de cuenta y por mes.
 
     Es lo que el reparto toma del departamento origen, con el mismo criterio que
-    usa el motor (`_dept_total_cost`): costo de ventas (clase 5) + planilla
-    (clase 6) + gastos operativos (clase 7). Sin esto, el owner ve el resultado
-    del reparto pero no de dónde salió el monto.
+    usa el motor (`_dept_total_cost` + `_recibido`): costo de ventas (clase 5) +
+    planilla (clase 6) + gastos operativos (clase 7) + lo que otros repartos le
+    cargaron (fila «R»). Sin esto, el owner ve el resultado del reparto pero no de
+    dónde salió el monto.
     """
     from app.engine.recalculate import (
         cos_by_dept, opex_by_dept, payroll_by_dept,
@@ -1164,6 +1165,30 @@ async def costo_a_repartir(scenario_id: str, dept: str = "0220"):
                 "lineas_cargadas": int(n),
                 "donde": donde,
             })
+
+        # Lo que OTROS repartos le cargan a este depto también se reparte con él
+        # (mismo criterio que `_recibido` en el motor): el salario que se
+        # reasigna a la cafetería, la cafetería que le toca a la lavandería. Sin
+        # esta fila el pote de la pantalla no coincidiría con el que se reparte.
+        rec = (await session.execute(
+            select(AllocationEntry).where(
+                AllocationEntry.scenario_id == scenario_id,
+                AllocationEntry.target_dept == dept,
+                AllocationEntry.source_dept != dept,
+            ))).scalars().all()
+        meses_r = [Decimal("0")] * 12
+        for e in rec:
+            if 1 <= (e.month or 0) <= 12:
+                meses_r[e.month - 1] += e.amount_usd or Decimal("0")
+        for i, v in enumerate(meses_r):
+            por_mes[i] += v
+        lineas.append({
+            "clase": "R", "nombre": "Recibido de otros repartos",
+            "meses": [float(x) for x in meses_r],
+            "total": float(sum(meses_r)),
+            "lineas_cargadas": len(rec),
+            "donde": "Allocations",
+        })
 
         return {
             "scenario_id": scenario_id,

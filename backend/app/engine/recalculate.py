@@ -1376,47 +1376,26 @@ async def _recalc_allocations(session, scenario: Scenario,
             continue               # mes cerrado: su reparto no se refabrica
         desde = len(new_entries)   # dónde arrancan las filas de ESTE mes
         fte_attr = f"fte_{MONTH_ATTRS[month - 1]}"
-        # cafetería distributed by FTE
-        fte_by_dept: dict[str, Decimal] = {}
-        for p in positions:
-            if p.dept_code not in participating_caf:
-                continue
-            fte_by_dept[p.dept_code] = fte_by_dept.get(p.dept_code, ZERO) + (
-                getattr(p, fte_attr) or ZERO)
-        caf_cost = await _dept_total_cost(session, sid, "0220", month)
-        for row in calculate_cafeteria_distribution(caf_cost, fte_by_dept):
-            new_entries.append(AllocationEntry(
-                scenario_id=sid, allocation_type="CAFETERIA", month=month,
-                year=scenario.year, source_dept="0220", target_dept=row["target_dept"],
-                amount_usd=row["amount_usd"], basis_value=row["basis_value"],
-                basis_type=row["basis_type"], account=row["account"],
-                calculated_at=datetime.utcnow(),
-            ))
 
-        # lavandería 3 vías (linen 7310 por kilos / uniformes 7685 por FTE /
-        # huéspedes 5301 COGS va al 0162)
-        uni_fte: dict[str, Decimal] = {}
-        for p in positions:
-            if p.dept_code not in participating_lau_depts:
-                continue
-            uni_fte[p.dept_code] = uni_fte.get(p.dept_code, ZERO) + (
-                getattr(p, fte_attr) or ZERO)
-        lau_cost = await _dept_total_cost(session, sid, "0161", month)
-        linen_kilos = {dc: c.kilos_for(month) for dc, c in participating_lau_cfgs.items()}
-        kilos_uni = lau_params.uniformes_for(month) if lau_params else ZERO
-        kilos_gst = lau_params.huespedes_for(month) if lau_params else ZERO
-        lau = calculate_laundry_distribution(
-            lau_cost, linen_kilos, uni_fte, kilos_uni, kilos_gst,
-            acct_linen=acct_linen, acct_uniform=acct_uniform, acct_servicios=acct_servicios,
-        )
-        for row in lau["rows"]:
-            new_entries.append(AllocationEntry(
-                scenario_id=sid, allocation_type="LAUNDRY", month=month,
-                year=scenario.year, source_dept="0161", target_dept=row["target_dept"],
-                amount_usd=row["amount_usd"], basis_value=row["basis_value"],
-                basis_type=row["basis_type"], account=row["account"],
-                calculated_at=datetime.utcnow(),
-            ))
+        def _recibido(dept: str) -> Decimal:
+            """Lo que OTROS repartos de este mes ya le cargaron (o sacaron) a `dept`.
+
+            Cafetería y lavandería tienen que cerrar en $0, y para eso su pote no
+            puede ser solo su costo propio: tiene que incluir lo que les llegó por
+            otros repartos ANTES de repartir. Si no, eso se queda pegado en el
+            departamento — pasaba con el salario que se reasigna a la cafetería
+            ($1.261,54 al mes en el Budget 2027) y con la cafetería que le toca a
+            la lavandería (~$300).
+            """
+            return sum((e.amount_usd or ZERO) for e in new_entries[desde:]
+                       if e.target_dept == dept and e.source_dept != dept)
+
+        # ORDEN: salarios → cafetería → lavandería → Rooms. Los salarios van
+        # PRIMERO porque pueden caer en la cafetería (0220) o la lavandería
+        # (0161), y esas dos tienen que repartirlos junto con su costo.
+        # La cafetería va antes que la lavandería porque le carga al 0161.
+        # Ojo: si la lavandería le cargara al 0220 habría un círculo; hoy no
+        # pasa (0220 no participa) y, si pasara, el aviso de residuo lo dice.
 
         # SALARY allocation: por regla (salario de la posición fuente × % → destinos por FTE)
         if sal_cfgs:
@@ -1453,6 +1432,62 @@ async def _recalc_allocations(session, scenario: Scenario,
                         calculated_at=datetime.utcnow(),
                     ))
 
+        # cafetería distributed by FTE
+        fte_by_dept: dict[str, Decimal] = {}
+        for p in positions:
+            if p.dept_code not in participating_caf:
+                continue
+            fte_by_dept[p.dept_code] = fte_by_dept.get(p.dept_code, ZERO) + (
+                getattr(p, fte_attr) or ZERO)
+        caf_propio = await _dept_total_cost(session, sid, "0220", month)
+        caf_cost = caf_propio + _recibido("0220")   # incluye salarios reasignados
+        for row in calculate_cafeteria_distribution(caf_cost, fte_by_dept):
+            new_entries.append(AllocationEntry(
+                scenario_id=sid, allocation_type="CAFETERIA", month=month,
+                year=scenario.year, source_dept="0220", target_dept=row["target_dept"],
+                amount_usd=row["amount_usd"], basis_value=row["basis_value"],
+                basis_type=row["basis_type"], account=row["account"],
+                calculated_at=datetime.utcnow(),
+            ))
+
+        # lavandería 3 vías (linen 7310 por kilos / uniformes 7685 por FTE /
+        # huéspedes 5301 COGS va al 0162)
+        uni_fte: dict[str, Decimal] = {}
+        for p in positions:
+            if p.dept_code not in participating_lau_depts:
+                continue
+            uni_fte[p.dept_code] = uni_fte.get(p.dept_code, ZERO) + (
+                getattr(p, fte_attr) or ZERO)
+        lau_propio = await _dept_total_cost(session, sid, "0161", month)
+        lau_cost = lau_propio + _recibido("0161")   # incluye su parte de cafetería
+        linen_kilos = {dc: c.kilos_for(month) for dc, c in participating_lau_cfgs.items()}
+        kilos_uni = lau_params.uniformes_for(month) if lau_params else ZERO
+        kilos_gst = lau_params.huespedes_for(month) if lau_params else ZERO
+        lau = calculate_laundry_distribution(
+            lau_cost, linen_kilos, uni_fte, kilos_uni, kilos_gst,
+            acct_linen=acct_linen, acct_uniform=acct_uniform, acct_servicios=acct_servicios,
+        )
+        for row in lau["rows"]:
+            new_entries.append(AllocationEntry(
+                scenario_id=sid, allocation_type="LAUNDRY", month=month,
+                year=scenario.year, source_dept="0161", target_dept=row["target_dept"],
+                amount_usd=row["amount_usd"], basis_value=row["basis_value"],
+                basis_type=row["basis_type"], account=row["account"],
+                calculated_at=datetime.utcnow(),
+            ))
+
+        # ¿Cerraron en cero? Si un pote no encontró base (sin FTE, sin kilos) o
+        # alguien le cargó algo DESPUÉS de repartirse, se queda. Se avisa: un
+        # residuo mudo en un depto de reparto es plata que no llega a nadie.
+        for fuente, propio in (("0220", caf_propio), ("0161", lau_propio)):
+            resto = propio + sum((e.amount_usd or ZERO) for e in new_entries[desde:]
+                                 if e.target_dept == fuente)
+            if abs(resto) > Decimal("0.01"):
+                avisos.append(
+                    f"Mes {month}: el {fuente} no cerró en $0 después de repartir "
+                    f"(quedan ${resto:,.2f}). Revisar que tenga base para repartir "
+                    f"y que ningún reparto posterior le cargue algo.")
+
         # ── ROOMS → sets (Villas / Residencias). ÚLTIMO de la cadena ─────────
         # Corre después de cafetería, lavandería y salarios a propósito: así la
         # base «lo que llegó a Rooms» ya incluye esos repartos y las villas se
@@ -1466,9 +1501,11 @@ async def _recalc_allocations(session, scenario: Scenario,
                 (getattr(p, fte_attr) or ZERO
                  for p in positions if p.dept_code in rooms_familia), ZERO)
             pct = {c.dept_code: c.pct_for(month) for c in rooms_cfgs}
-            filas, fte_set, avisos = calculate_rooms_by_pct(
+            # `avisos_mes`, NO `avisos`: con ese nombre pisaba la lista del
+            # recálculo, y los avisos de Rooms (y los de residuo) se perdían.
+            filas, fte_set, avisos_mes = calculate_rooms_by_pct(
                 base, pct, source_dept="0110", fte=fte_rooms)
-            for a in avisos:
+            for a in avisos_mes:
                 avisos_rooms.append(f"Mes {month}: {a}")
             for row in filas:
                 new_entries.append(AllocationEntry(
