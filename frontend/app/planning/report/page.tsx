@@ -304,6 +304,12 @@ export default function PlanningReportPage() {
     }
   }, [vista, stats, statsACuadro, ambito, compacto, mesesDe, extras]);
 
+  // Cambiar a Club con «Por categoría» puesto dejaría la pantalla pidiendo un
+  // formato que ese ámbito no tiene. Vuelve sola al de siempre.
+  useEffect(() => {
+    if (ambito === "club" && formato !== "usali") setFormato("usali");
+  }, [ambito, formato]);
+
   const cuadro: Cuadro | null = useMemo(() => {
     const op = { ambito, compacto, mesesDe, extras };
     try {
@@ -362,9 +368,16 @@ export default function PlanningReportPage() {
         const d = a.id === ambito && pl ? pl
           : await getPLDetail(a.id, principal, otros).catch(() => null);
         if (d) out.push(cuadroPlanning(d, escenarios, { ...op, ambito: a.id }));
-        const c = a.id === ambito && plCat ? plCat
-          : await getPLPorCategoria(a.id, principal, otros).catch(() => null);
-        if (c) out.push(cuadroPlanningPorCategoria(c, escenarios, { ...op, ambito: a.id }));
+        // El Club no lleva este formato (ver el sub-tab): pedirlo sería un 422
+        // seguro. Y de los otros dos sólo entra la hoja que CUADRA — una hoja
+        // en el libro del owner que no cierra contra su propio GOP es la clase
+        // de cosa que se copia a una presentación sin volver a mirarla.
+        if (a.id !== "club") {
+          const c = a.id === ambito && plCat ? plCat
+            : await getPLPorCategoria(a.id, principal, otros).catch(() => null);
+          if (c && (c.cuadre ?? []).every(x => x.cuadra))
+            out.push(cuadroPlanningPorCategoria(c, escenarios, { ...op, ambito: a.id }));
+        }
       }
     } else if (v === "aperturas") {
       let g = gastos;
@@ -584,7 +597,11 @@ export default function PlanningReportPage() {
       {/* Los dos formatos del MISMO P&L. Owner, 2026-11-09: *«lo pones como
         * un sub tab»*. Va debajo del ámbito porque es un corte más fino: se
         * elige primero de qué hotel y después cómo mirarlo. */}
-      {vista === "pl" && (
+      {/* ⚠️ En el Club NO se ofrece: su P&L es de un solo departamento —va
+        * Ingreso → Planilla → Opex → Net Profit, sin GOP—, así que la apertura
+        * por naturaleza no tiene nada que abrir. Ofrecer un botón que sólo
+        * puede fallar es peor que no ofrecerlo. */}
+      {vista === "pl" && ambito !== "club" && (
         <nav aria-label="Formato" style={{ ...grupo, marginBottom: 12 }}>
           {FORMATOS.map((f, i) => (
             <button key={f.id} onClick={() => setFormato(f.id)} title={f.ayuda}

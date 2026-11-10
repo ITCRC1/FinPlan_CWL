@@ -297,3 +297,61 @@ def test_si_no_cuadra_NO_se_dibuja():
         "el cuadro se arma aunque el cuadre falle")
     assert "No se muestra: la resta no da el mismo GOP" in src, (
         "no se dice por qué no se muestra")
+
+
+# ── El Club: este formato no le aplica ──────────────────────────────────────
+
+def test_el_club_no_lleva_este_formato():
+    """⚠️ Reventaba con un 500 (2026-11-09).
+
+    El Club es UN departamento: su P&L va Ingreso → Planilla → Opex → Total
+    Gastos → Net Profit, sin GOP y sin cascada debajo. El corte en el renglón
+    del GOP no existe en su plantilla, así que el endpoint moría con
+    `reporte.sin_gop` — un 500, que se lee como «está roto» cuando en realidad
+    este formato no le corresponde.
+
+    Y en el paquete de Excel ese 500 se tragaba con un `.catch`: el libro bajaba
+    con cinco hojas de P&L en vez de seis y nada lo decía."""
+    from app.api import pl_detail_api as det
+
+    rotulos = {r for _t, r, _c in det.CLUB_FILAS}
+    assert cat.ROTULO_GOP not in rotulos, (
+        "la plantilla del Club ganó un renglón de GOP: revisar si ahora sí "
+        "puede llevar el formato por categoría")
+
+
+@pytest.mark.asyncio
+async def test_el_club_contesta_422_y_no_500():
+    from app.errores import ErrorApi
+
+    with pytest.raises(ErrorApi) as e:
+        await cat.pl_por_categoria("club", scenario_id="lo-que-sea", comparar=None)
+    assert e.value.status_code == 422
+    assert e.value.clave == "reporte.formato_no_aplica"
+
+
+def test_la_pantalla_no_ofrece_el_formato_en_el_club():
+    """Un botón que sólo puede fallar es peor que no tenerlo."""
+    src = _src(PANTALLA)
+    assert 'vista === "pl" && ambito !== "club" && (' in src, (
+        "el sub-tab de formato se sigue ofreciendo en el Club")
+    assert 'if (ambito === "club" && formato !== "usali") setFormato("usali")' in src, (
+        "cambiar a Club con «Por categoría» puesto deja la pantalla pidiendo un "
+        "formato que ese ámbito no tiene")
+
+
+def test_el_paquete_no_pide_el_formato_para_el_club():
+    src = _src(PANTALLA)
+    bloque = src.split("const hojasDe")[1].split('} else if (v === "aperturas")')[0]
+    assert 'if (a.id !== "club")' in bloque, (
+        "el paquete sigue pidiendo el formato 2 para el Club: 422 seguro")
+
+
+def test_el_paquete_solo_mete_la_hoja_que_CUADRA():
+    """La pantalla ya se niega a dibujar lo que no cuadra; el paquete tenía que
+    hacer lo mismo. Una hoja en el libro del owner que no cierra contra su
+    propio GOP se copia a una presentación sin volver a mirarla."""
+    src = _src(PANTALLA)
+    bloque = src.split("const hojasDe")[1].split('} else if (v === "aperturas")')[0]
+    assert "cuadre" in bloque and "every(x => x.cuadra)" in bloque, (
+        "el paquete mete la hoja por categoría aunque no cuadre")

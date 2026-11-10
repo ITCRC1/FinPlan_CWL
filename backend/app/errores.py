@@ -80,6 +80,13 @@ MENSAJES: dict[str, dict[str, str]] = {
     # El P&L por categoría corta la plantilla del formato 1 en el renglón del
     # GOP. Si ese rótulo cambia de nombre, el corte no existe y el reporte no
     # se puede armar — mejor decirlo que devolver media cascada.
+    # El Club es un solo departamento y su P&L no tiene GOP: el formato por
+    # categoría no le aplica. Se dice en vez de devolver medio reporte.
+    "reporte.formato_no_aplica": {
+        "es": "El formato por categoría no aplica al ámbito {ambito}: "
+              "su P&L es de un solo departamento y no tiene GOP",
+        "en": "The by-category format does not apply to the {ambito} scope: "
+              "its P&L covers a single department and has no GOP"},
     "reporte.sin_gop": {
         "es": "La plantilla del P&L ({ambito}) no tiene el renglón del GOP: "
               "no se puede armar el formato por categoría",

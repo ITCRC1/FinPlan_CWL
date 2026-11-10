@@ -214,6 +214,13 @@ async def pl_por_categoria(
     """
     if ambito not in AMBITOS:
         raise ErrorApi(422, "reporte.ambito_desconocido", ambito=ambito)
+    #: El Club es UN departamento: su P&L va Ingreso → Planilla → Opex → Total
+    #: Gastos → Net Profit, sin GOP y sin cascada debajo. Abrirlo «por
+    #: departamento dentro de cada categoría» daría una fila por bloque, y el
+    #: corte en el renglón del GOP —que su plantilla no tiene— reventaba con un
+    #: 500. No es un fallo: es que este formato no le corresponde.
+    if ambito == "club":
+        raise ErrorApi(422, "reporte.formato_no_aplica", ambito=ambito)
 
     ids = [scenario_id] + [x.strip() for x in (comparar or "").split(",") if x.strip()]
     vistos, orden = set(), []
