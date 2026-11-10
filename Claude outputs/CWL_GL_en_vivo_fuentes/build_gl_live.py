@@ -41,13 +41,23 @@ VERSIONES = [
     #
     # ⚠️ No prender `*` y una versión suelta del MISMO año y tipo a la vez: esa
     # versión baja dos veces y cualquier pivot la suma doble.
-    ("SI", "Budget 2027",             2027, "BUDGET",   "*"),
-    ("NO", "Budget 2027",             2027, "BUDGET",   "Final"),
-    ("NO", "Budget 2027",             2027, "BUDGET",   "Working"),
-    ("NO", "Forecast 2026",           2026, "FORECAST", "*"),
-    ("SI", "Forecast 2026 · vigente", 2026, "FORECAST", ""),
-    ("SI", "Actual 2026",             2026, "ACTUAL",   ""),
-    ("SI", "Actual 2025",             2025, "ACTUAL",   ""),
+    # Owner, 2026-11-10: *«yo quiero que sea sencillo, lo mas que voy a comparar
+    # son 5 o 6 versiones»*. Por eso filas FIJAS con el nombre exacto y nada de
+    # comodines: las columnas del resultado no cambian solas, asi que una
+    # formula de varianza escrita al lado sigue apuntando a lo mismo manana.
+    #
+    # ⚠️ Los nombres son los REALES del sistema (se ven en la hoja Escenarios).
+    # Los del Budget 2027 son Draft1, Draft4-BIG, Draft5, Final y Working --
+    # NO Draft1/2/3. Si una fila baja con «no existe», copiar el nombre de ahi.
+    ("SI", "Actual 2024",           2024, "ACTUAL",   ""),
+    ("SI", "Actual 2025",           2025, "ACTUAL",   ""),
+    ("SI", "Actual 2026",           2026, "ACTUAL",   ""),
+    ("SI", "Forecast 2026",         2026, "FORECAST", ""),
+    ("SI", "Budget 2027 Working",   2027, "BUDGET",   "Working"),
+    ("SI", "Budget 2027 Final",     2027, "BUDGET",   "Final"),
+    ("NO", "Budget 2027 Draft1",    2027, "BUDGET",   "Draft1"),
+    ("NO", "Budget 2027 Draft4",    2027, "BUDGET",   "Draft4-BIG"),
+    ("NO", "Budget 2027 Draft5",    2027, "BUDGET",   "Draft5"),
 ]
 
 
@@ -116,15 +126,11 @@ def construir(salida: str) -> None:
     cfg["A9"] = "Versiones a bajar"
     cfg["A9"].font = Font(bold=True, size=11)
     _nota(cfg, 10,
-          "Usar = SI / NO prende y apaga la fila sin borrarla.   La Etiqueta es el "
-          "PREFIJO: con * se le pega el nombre real de cada version detras "
-          "(\"Budget 2027\" -> \"Budget 2027 · Draft1\").   "
-          "Version = *  ->  TODAS las que FinPlan tenga de ese año y tipo; se "
-          "actualizan solas y no hay nombres que escribir mal.   Version vacía  ->  la "
-          "que el sistema elija (el ★ Current del forecast, el ACTUAL real).   Un "
-          "nombre exacto  ->  solo esa.   Si una no existe, ESA fila baja con el error "
-          "y las demás siguen.   No prender * y una versión suelta del mismo año y "
-          "tipo a la vez: esa versión bajaría dos veces.")
+          "Usar = SI / NO prende y apaga la fila sin borrarla.   Version vacía  ->  la "
+          "que el sistema elija (el ★ Current del forecast, el ACTUAL real); un nombre "
+          "exacto  ->  solo esa.   Los nombres reales están en la hoja Escenarios: si "
+          "una fila baja con «no existe», copiá el nombre de ahí.   (Avanzado: un * "
+          "trae todas las de ese año y tipo, pero entonces las columnas cambian solas.)")
 
     enc = ["Usar", "Etiqueta", "Anio", "Tipo", "Version"]
     fila0 = 12
