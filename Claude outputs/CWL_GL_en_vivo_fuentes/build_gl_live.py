@@ -33,13 +33,19 @@ VERSIONES = [
     # (2026-11-10: «que tenga para escoger varias versiones»). `*` = todas las
     # que FinPlan tenga de ese año y tipo.
     #
+    # ⚠️ La Etiqueta de una fila con `*` es el PREFIJO del resultado, no la
+    # descripcion del pedido: al expandirse se le pega el nombre real de cada
+    # version detras. Escribir «Budget 2027 — todas» produce columnas que dicen
+    # «Budget 2027 — todas · Draft1», y se lee como si «todas» fuera parte del
+    # nombre de la version (owner, 2026-11-10: «me confunde la palabra todas»).
+    #
     # ⚠️ No prender `*` y una versión suelta del MISMO año y tipo a la vez: esa
     # versión baja dos veces y cualquier pivot la suma doble.
-    ("SI", "Budget 2027 — todas",     2027, "BUDGET",   "*"),
-    ("NO", "Budget 2027 — Final",     2027, "BUDGET",   "Final"),
-    ("NO", "Budget 2027 — Working",   2027, "BUDGET",   "Working"),
-    ("NO", "Forecast 2026 — todas",   2026, "FORECAST", "*"),
-    ("SI", "Forecast 2026 — vigente", 2026, "FORECAST", ""),
+    ("SI", "Budget 2027",             2027, "BUDGET",   "*"),
+    ("NO", "Budget 2027",             2027, "BUDGET",   "Final"),
+    ("NO", "Budget 2027",             2027, "BUDGET",   "Working"),
+    ("NO", "Forecast 2026",           2026, "FORECAST", "*"),
+    ("SI", "Forecast 2026 · vigente", 2026, "FORECAST", ""),
     ("SI", "Actual 2026",             2026, "ACTUAL",   ""),
     ("SI", "Actual 2025",             2025, "ACTUAL",   ""),
 ]
@@ -110,7 +116,9 @@ def construir(salida: str) -> None:
     cfg["A9"] = "Versiones a bajar"
     cfg["A9"].font = Font(bold=True, size=11)
     _nota(cfg, 10,
-          "Usar = SI / NO prende y apaga la fila sin borrarla.   "
+          "Usar = SI / NO prende y apaga la fila sin borrarla.   La Etiqueta es el "
+          "PREFIJO: con * se le pega el nombre real de cada version detras "
+          "(\"Budget 2027\" -> \"Budget 2027 · Draft1\").   "
           "Version = *  ->  TODAS las que FinPlan tenga de ese año y tipo; se "
           "actualizan solas y no hay nombres que escribir mal.   Version vacía  ->  la "
           "que el sistema elija (el ★ Current del forecast, el ACTUAL real).   Un "
