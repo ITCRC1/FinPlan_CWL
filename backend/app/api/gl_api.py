@@ -69,6 +69,13 @@ ZERO = Decimal("0")
 #: igual a todo el renglón — ruido que tapa las diferencias de verdad.
 TIPOS_COMPARABLES = ("MAPPED", "MAPPED_REVIEW")
 
+#: Las secciones que el checkbook NO sube por cuenta -- el P&L las siembra por
+#: línea. Son las que hay que anclar para que la grilla las muestre.
+SECCIONES_SEMBRADAS = {
+    "REVENUES", "OWNER / NON-OP EXPENSES", "CAPITAL",
+    "FINANCIAL EXPENSES", "DEPRECIATION", "TAX / NET PROFIT",
+}
+
 
 async def _escenario(scenario_id: str, db: AsyncSession) -> Scenario:
     esc = (await db.execute(
@@ -162,6 +169,7 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     # la columna de descripción vacía y hay que adivinar qué es cada número.
     nombres = await _nombres_de_cuenta_checkbook(db, esc.id)
     acumulado: dict[tuple[str, str], dict] = {}
+    con_movimiento_real: set[tuple[str, str]] = set()
     for mes in range(1, 13):
         for r in await recalc.checkbook_account_rows_for_month(db, esc.id, mes):
             cuenta = str(r.get("account_code") or "").strip()
@@ -174,6 +182,7 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
                  "account_name": nombres.get(cuenta, ""),
                  "outlet": "", **{m: ZERO for m in gl.MESES}})
             fila[gl.MESES[mes - 1]] += Decimal(str(r.get("amount") or 0))
+            con_movimiento_real.add((dept, cuenta))
 
     # ⚠️ El ingreso (4xxx) y el below-GOP (8xxx) NO salen de los checkbooks:
     # `checkbook_account_rows_for_month` no los sube, porque el P&L los siembra
@@ -188,11 +197,58 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     #
     # Las claves ya presentes NO se pisan: los repartos entran por
     # `AllocationEntry` con su cuenta 4999 y no pueden contarse dos veces.
+    detalle_real = False
     for modelo in (RevenueAccountEntry, BelowGopAccountEntry):
-        for f in await _por_cuenta(db, modelo, esc.id):
+        filas_modelo = await _por_cuenta(db, modelo, esc.id)
+        if filas_modelo:
+            detalle_real = True
+        for f in filas_modelo:
             clave = (f["dept_code"], f["account_code"])
             if clave not in acumulado:
                 acumulado[clave] = f
+
+    # ── La liga contable del checkbook ───────────────────────────────────
+    #
+    # Owner, 2026-11-10: *«asigna cuenta y asigna departamento, realiza la liga
+    # contable al checkbook»* -- después de señalar, con razón, que el ingreso
+    # SÍ está en los checkbooks del Budget 2027.
+    #
+    # Está, pero por LÍNEA del P&L: la tabla es `(scenario, line)`, sin cuenta
+    # ni departamento. Abrir la línea en sus cuentas es imposible sin inventar
+    # el reparto -- sólo 3 de las 19 líneas de ingreso tienen una única cuenta.
+    # Lo que sí se puede es darle a cada línea su asiento: ver
+    # `gl.ancla_contable`.
+    #
+    # El monto se toma del P&L, no de una segunda lectura del checkbook, para
+    # que la grilla cuadre contra el P&L **por construcción** y no por
+    # coincidencia. Entran las secciones que el checkbook no sube por cuenta:
+    # ingreso y todo lo que vive debajo del GOP.
+    #
+    # ⚠️ Si alguien cargó el detalle por cuenta de verdad
+    # (`revenue_account_entries`), ÉSE manda y el ancla no se usa: sumar los
+    # dos contaría el ingreso dos veces.
+    if not detalle_real:
+        ancla = gl.ancla_contable(await recalc.load_active_account_mappings(db))
+        secciones = {l["line_code"]: (l.get("section") or "")
+                     for l in await recalc.load_report_line_config(db)}
+        for mes in range(1, 13):
+            for linea in await recalc.compute_pl_month(db, esc, mes):
+                sec = (secciones.get(linea.line_code) or "").strip().upper()
+                if sec not in SECCIONES_SEMBRADAS:
+                    continue
+                destino = ancla.get(linea.line_code)
+                if destino is None:
+                    continue
+                dept, cuenta, nombre = destino
+                if (dept, cuenta) in con_movimiento_real:
+                    continue
+                fila = acumulado.setdefault(
+                    (dept, cuenta),
+                    {"dept_code": dept, "account_code": cuenta,
+                     "account_name": nombre or nombres.get(cuenta, ""),
+                     "outlet": "", "por_linea": True,
+                     **{m: ZERO for m in gl.MESES}})
+                fila[gl.MESES[mes - 1]] += Decimal(str(linea.amount_usd or 0))
     return (list(acumulado.values()), "checkbook", False)
 
 
@@ -229,6 +285,10 @@ def _fila(fila: dict, resolver, extremos, secciones, nombre_dept) -> dict:
         "mapeo_cambio": len(vistos) > 1,
         "codigo_corporativo": "",
         "categoria": gl.categoria_de(cuenta, sec),
+        # True = el monto viene de la LÍNEA del P&L, puesto en su cuenta de
+        # asiento. El checkbook no lo tiene abierto por cuenta y abrirlo sería
+        # inventar el reparto -- ver `gl.ancla_contable`.
+        "por_linea": bool(fila.get("por_linea")),
         "clase_discrepa": gl.discrepa_clase(cuenta, credito=credito, seccion_pl=sec),
         "meses": meses,
         "total": sum(meses, ZERO),

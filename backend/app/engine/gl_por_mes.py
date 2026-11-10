@@ -148,6 +148,52 @@ def es_credito(account_code: str, seccion_pl: str | None = None) -> bool:
     return clase_de(account_code) == "4"
 
 
+def ancla_contable(mapeos: Iterable[dict]) -> dict[str, tuple[str, str, str]]:
+    """Línea del P&L → la cuenta y el departamento donde se contabiliza.
+
+    Owner, 2026-11-10: *«asigna cuenta y asigna departamento, realiza la liga
+    contable al checkbook»*.
+
+    ## Por qué hace falta un ancla y no basta con «abrir la línea»
+
+    El checkbook de ingresos guarda **un monto por línea del P&L** -- la tabla
+    es `(scenario, line)`, sin departamento ni cuenta -- porque el ingreso se
+    arma de tarifas y noches, no de asientos. Y abrir esa línea en sus cuentas
+    es imposible sin inventar el reparto: medido sobre el mapeo real de CWL,
+    **sólo 3 de las 19 líneas de ingreso tienen una única cuenta**; REV_ROOMS
+    tiene tres (0110, 0115, 0116) y REV_MISC_OTHER nueve. Repartir un total
+    entre nueve cuentas sin una base es fabricar detalle.
+
+    Lo que sí se puede, y es lo que el owner pidió: **asignarle a cada línea su
+    cuenta y su departamento**, el asiento donde esa plata se contabiliza. El
+    monto no se toca ni se parte; se le pone domicilio contable.
+
+    El ancla sale del mismo `account_mapping` que usa el P&L -- no de una lista
+    nueva que se desincronice -- y se elige de forma determinista: la cuenta
+    más baja de la línea y, dentro de ella, el departamento más bajo. Para
+    REV_ROOMS eso da `0110 / 4000`, que es el asiento principal.
+
+    ⚠️ **Esto NO cambia cómo se calcula el P&L.** El motor sigue sembrando el
+    ingreso por línea, igual que antes. El ancla es para el reporte del mayor:
+    hace que el ingreso aparezca con cuenta y departamento, y que la suma de la
+    grilla vuelva a dar la utilidad. Mover el cálculo a pasar por cuentas sería
+    otra cosa y movería plata; esto no mueve un centavo.
+    """
+    por_linea: dict[str, tuple[str, str, str]] = {}
+    for m in mapeos:
+        linea = str(m.get("report_line_code") or "")
+        cuenta = str(m.get("account_code") or "").strip()
+        dept = str(m.get("dept_code") or "").strip()
+        if not linea or not cuenta:
+            continue
+        nombre = str(m.get("account_name_example") or "").strip()
+        clave = (cuenta, dept)
+        actual = por_linea.get(linea)
+        if actual is None or clave < (actual[1], actual[0]):
+            por_linea[linea] = (dept, cuenta, nombre)
+    return por_linea
+
+
 def es_reparto(account_code: str) -> bool:
     """¿Es una cuenta de reparto conocida? (`49xx`.)"""
     return (account_code or "").strip().startswith(PREFIJO_REPARTO)

@@ -6646,6 +6646,8 @@ export interface GlRow {
   clase_discrepa: boolean;
   /** Viene del catálogo del mapeo y el escenario no la usó: toda en cero. */
   sin_movimiento?: boolean;
+  /** El monto viene de la LÍNEA del P&L, puesto en su cuenta de asiento. */
+  por_linea?: boolean;
   meses: number[];
   total: number;
 }

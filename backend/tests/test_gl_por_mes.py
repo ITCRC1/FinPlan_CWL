@@ -293,3 +293,64 @@ def test_la_cuenta_vacia_se_clasifica_igual_que_si_tuviera_plata():
         seccion_de_linea=SECCIONES.get)
     assert vacia["categoria"] == "REVENUE"
     assert vacia["total"] == Decimal("0")
+
+
+# --- La liga contable del checkbook ----------------------------------------
+#
+# Owner, 2026-11-10: *«asigna cuenta y asigna departamento, realiza la liga
+# contable al checkbook»*. El checkbook guarda el ingreso por LÍNEA, sin
+# cuenta ni departamento; `ancla_contable` le da su asiento.
+
+MAPEO_REV = [
+    {"report_line_code": "REV_ROOMS", "account_code": "4000",
+     "dept_code": "0116", "account_name_example": "Room Revenue"},
+    {"report_line_code": "REV_ROOMS", "account_code": "4000",
+     "dept_code": "0110", "account_name_example": "Room Revenue"},
+    {"report_line_code": "REV_ROOMS", "account_code": "4000",
+     "dept_code": "0115", "account_name_example": "Room Revenue"},
+    {"report_line_code": "REV_ROOMS_OTHER", "account_code": "4002",
+     "dept_code": "0110", "account_name_example": "No Show"},
+    {"report_line_code": "REV_ROOMS_OTHER", "account_code": "4001",
+     "dept_code": "0110", "account_name_example": "Cancellations"},
+]
+
+
+def test_el_ancla_es_determinista():
+    """Dos corridas tienen que dar la MISMA cuenta.
+
+    Si el ancla dependiera del orden en que la base devuelve las filas, el
+    ingreso de un mes aparecería un día en 0110 y otro en 0115 sin que nadie
+    tocara nada -- y el total seguiría cuadrando, que es lo que lo hace
+    peligroso.
+    """
+    a = gl.ancla_contable(MAPEO_REV)
+    b = gl.ancla_contable(list(reversed(MAPEO_REV)))
+    assert a == b
+    assert a["REV_ROOMS"] == ("0110", "4000", "Room Revenue")
+    assert a["REV_ROOMS_OTHER"] == ("0110", "4001", "Cancellations")
+
+
+def test_el_ancla_sale_del_mapeo_que_usa_el_PL():
+    """No de una lista aparte. Una línea sin regla no tiene ancla y la fila
+    no se inventa: mejor que falte a que aparezca en una cuenta cualquiera."""
+    assert "REV_INEXISTENTE" not in gl.ancla_contable(MAPEO_REV)
+    sin_cuenta = [{"report_line_code": "REV_X", "account_code": "",
+                   "dept_code": "0110"}]
+    assert gl.ancla_contable(sin_cuenta) == {}
+
+
+def test_la_cuenta_anclada_vuelve_a_SU_linea():
+    """⚠️ El invariante que hace que esto no mueva plata.
+
+    La cuenta de asiento de una línea tiene que resolver de vuelta a esa misma
+    línea. Si no, el ingreso aparecería en la grilla bajo un renglón distinto
+    del que lo tiene en el P&L, y la conciliación renglón por renglón acusaría
+    una diferencia en dos líneas -- una de más y otra de menos -- sobre un P&L
+    que está bien.
+    """
+    ancla = gl.ancla_contable(MAPEO_REV)
+    resolver = _resolver({m["account_code"]: m["report_line_code"]
+                          for m in MAPEO_REV})
+    for linea, (dept, cuenta, _n) in ancla.items():
+        regla, _como = resolver(dept, cuenta)
+        assert regla is not None, f"{linea}: su cuenta de asiento no tiene mapeo"
