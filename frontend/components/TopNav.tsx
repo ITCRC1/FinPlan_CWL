@@ -17,6 +17,9 @@ export interface MenuItem {
   href?: string;
   disabled?: boolean;
   header?: boolean;   // sección dentro del dropdown (no es link)
+  /** Texto ya resuelto para un encabezado armado en el momento (el menú «Más»
+   *  pone el nombre de cada pestaña escondida como encabezado). */
+  rotulo?: string;
   /**
    * La pantalla NO sirve de nada sin rol admin: su primera llamada ya devuelve
    * 403. Se ESCONDE, no se deshabilita — nadie tiene que ver una puerta que no
@@ -387,6 +390,9 @@ export const NAV: NavGroup[] = [
 
 /** Cuatro rótulos se acortan para que la barra entre sin scrollear; el nombre
  *  completo va en el tooltip para que no se pierda. */
+/** Las pestañas que van fijas a la derecha, en este orden. Ver `fijos` en TopNav. */
+const FIJOS_A_LA_DERECHA = ["masterData", "admin"];
+
 const ROTULO_LARGO = ["financials", "cashflow", "operationInsight",
   "marketingInsight", "breakEven"];
 
@@ -398,8 +404,11 @@ const ROTULO_LARGO = ["financials", "cashflow", "operationInsight",
  * uno solo y vive en `TopNav`; acá queda el botón, que reporta su posición y
  * pide abrir o cerrar.
  */
-function Tab({ group, open, activo, onAbrir, onCerrar, onToggle, registrar }: {
+function Tab({ group, open, activo, onAbrir, onCerrar, onToggle, registrar, oculto = false }: {
   group: NavGroup;
+  /** No entra en la barra: se deja en el lugar (para poder medir) pero
+   *  invisible, y aparece dentro de «Más ▾». */
+  oculto?: boolean;
   open: boolean;
   activo: boolean;
   /** El mouse entró: pedir apertura (con intención, ver `TopNav`). */
@@ -418,7 +427,9 @@ function Tab({ group, open, activo, onAbrir, onCerrar, onToggle, registrar }: {
   // Tab de link directo (Dashboard): no abre panel.
   if (group.href) {
     return (
-      <Link href={group.href} className="nav-nowrap" title={largo} style={{
+      <Link href={group.href} className="nav-nowrap" title={largo} data-nav-tab={group.key}
+        aria-hidden={oculto || undefined} tabIndex={oculto ? -1 : undefined} style={{
+        visibility: oculto ? "hidden" : undefined,
         color: activo ? "var(--nav-fg-strong)" : "var(--nav-fg)",
         fontSize: "var(--nav-fs)", padding: "0 var(--nav-px)", height: "var(--nav-h)",
         display: "flex", alignItems: "center",
@@ -442,9 +453,12 @@ function Tab({ group, open, activo, onAbrir, onCerrar, onToggle, registrar }: {
       onFocus={onAbrir}
       aria-expanded={open}
       aria-haspopup="menu"
+      aria-hidden={oculto || undefined}
+      tabIndex={oculto ? -1 : undefined}
       className="nav-nowrap"
       title={largo}
       style={{
+        visibility: oculto ? "hidden" : undefined,
         color: activo || open ? "var(--nav-fg-strong)" : "var(--nav-fg)",
         fontSize: "var(--nav-fs)",
         padding: "0 var(--nav-px)",
@@ -567,7 +581,7 @@ function Panel({ grupo, ancla, cajaRef, onCerrar, onAbrir }: {
                 textTransform: "uppercase",
                 cursor: "default",
               }}>
-                {th(item.key)}
+                {item.rotulo ?? th(item.key)}
               </div>
             );
           }
@@ -615,7 +629,7 @@ function Panel({ grupo, ancla, cajaRef, onCerrar, onAbrir }: {
                   aqui ? "rgba(41,98,255,0.08)" : "transparent";
               }}
             >
-              {ti(item.key)}
+              {item.rotulo ?? ti(item.key)}
             </Link>
           );
         })}
@@ -702,7 +716,52 @@ export default function TopNav() {
       .filter(g => g.href || g.items.some(i => i.href && !i.disabled));
   }, [esAdmin, apagados]);
   const nav = navFiltrado;
-  const grupoAdmin = nav.find(g => g.key === "admin");
+  // Fijos a la derecha, fuera de `.nav-scroll`: siempre visibles. Admin fue el
+  // primero (era inalcanzable); Master Data le siguió el 2026-11-10 por lo mismo
+  // — owner: «por qué Master Data se me esconde a veces». Era la última pestaña
+  // de la parte que scrollea y, según el ancho de la ventana, el zoom o el idioma
+  // (en español los rótulos son más largos), quedaba fuera del borde.
+  const fijos = FIJOS_A_LA_DERECHA
+    .map(k => nav.find(g => g.key === k))
+    .filter((g): g is NavGroup => !!g);
+
+  // ── Lo que no entra va a «Más ▾», hacia abajo ─────────────────────────────
+  // Owner, 2026-11-10: «también podés hacer que se desplieguen acá para abajo,
+  // y así no se esconde». Antes, la pestaña que no entraba quedaba cortada en el
+  // borde (scroll de lado con la barra oculta) y parecía que no existía. Ahora
+  // se mide cuáles se salen y esas se listan en un menú que baja.
+  const tgNav = useTranslations("nav.groups");
+  const filaRef = useRef<HTMLDivElement>(null);
+  const [ocultos, setOcultos] = useState<string[]>([]);
+  useEffect(() => {
+    const fila = filaRef.current;
+    if (!fila) return;
+    const medir = () => {
+      const borde = fila.getBoundingClientRect().right + 1;
+      const fuera: string[] = [];
+      fila.querySelectorAll<HTMLElement>("[data-nav-tab]").forEach(el => {
+        if (el.getBoundingClientRect().right > borde) fuera.push(el.dataset.navTab!);
+      });
+      setOcultos(prev => (prev.join("|") === fuera.join("|") ? prev : fuera));
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(fila);
+    window.addEventListener("resize", medir);
+    return () => { ro.disconnect(); window.removeEventListener("resize", medir); };
+  }, [nav]);
+  const grupoMas: NavGroup | null = useMemo(() => {
+    if (!ocultos.length) return null;
+    const items: MenuItem[] = [];
+    for (const k of ocultos) {
+      const g = nav.find(x => x.key === k);
+      if (!g) continue;
+      if (g.href) { items.push({ key: g.key, href: g.href, rotulo: tgNav(g.key) }); continue; }
+      items.push({ key: `__mas_${g.key}`, header: true, rotulo: tgNav(g.key) });
+      items.push(...g.items.filter(i => !i.header));
+    }
+    return { key: "mas", items };
+  }, [ocultos, nav, tgNav]);
 
   /**
    * Intención de hover: por qué el movimiento se siente continuo.
@@ -785,7 +844,8 @@ export default function TopNav() {
   // Que no quede un temporizador vivo si la barra se desmonta.
   useEffect(() => limpiar, []);
 
-  const grupoAbierto = openMenu ? nav.find(g => g.key === openMenu) : undefined;
+  const grupoAbierto = openMenu === "mas" ? grupoMas ?? undefined
+    : openMenu ? nav.find(g => g.key === openMenu) : undefined;
 
   // La fecha del header es lo único del chrome que YA cambia con el idioma:
   // es-CR / en-US. El formato de plata y de meses del resto de la app sigue
@@ -830,11 +890,12 @@ export default function TopNav() {
 
       {/* Los tabs. Si no entran, este contenedor scrollea de lado en vez de
           partir la barra en dos renglones (ver .nav-scroll en globals.css). */}
-      <div className="nav-scroll">
-        {nav.filter(g => g.key !== "admin").map(group => (
+      <div className="nav-scroll" ref={filaRef} style={{ overflowX: "hidden" }}>
+        {nav.filter(g => !FIJOS_A_LA_DERECHA.includes(g.key)).map(group => (
           <Tab
             key={group.key}
             group={group}
+            oculto={ocultos.includes(group.key)}
             open={openMenu === group.key}
             activo={esTabActivo(group, pathname)}
             onAbrir={() => pedirAbrir(group.key)}
@@ -855,6 +916,25 @@ export default function TopNav() {
         ))}
       </div>
 
+      {grupoMas && (
+        <Tab
+          group={grupoMas}
+          open={openMenu === "mas"}
+          activo={esTabActivo(grupoMas, pathname)}
+          onAbrir={() => pedirAbrir("mas")}
+          onCerrar={pedirCerrar}
+          onToggle={() => {
+            limpiar();
+            if (openMenu === "mas") setOpenMenu(null);
+            else abrirYa("mas");
+          }}
+          registrar={el => {
+            if (el) anclas.current.set("mas", el);
+            else anclas.current.delete("mas");
+          }}
+        />
+      )}
+
       {/* Lado derecho: nunca se encoge, y cada pieza va en una sola línea. */}
       <div className="nav-nowrap" style={{
         display: "flex", alignItems: "center", gap: 12, color: "var(--nav-fg)",
@@ -872,22 +952,25 @@ export default function TopNav() {
 
             Fijo a la derecha entra siempre, y además es donde se buscan los
             ajustes. Si mañana se agrega un tab trece, este sigue alcanzable. */}
-        {grupoAdmin && <Tab
-          group={grupoAdmin}
-          open={openMenu === "admin"}
-          activo={esTabActivo(grupoAdmin, pathname)}
-          onAbrir={() => pedirAbrir("admin")}
-          onCerrar={pedirCerrar}
-          onToggle={() => {
-            limpiar();
-            if (openMenu === "admin") setOpenMenu(null);
-            else abrirYa("admin");
-          }}
-          registrar={el => {
-            if (el) anclas.current.set("admin", el);
-            else anclas.current.delete("admin");
-          }}
-        />}
+        {fijos.map(grupo => (
+          <Tab
+            key={grupo.key}
+            group={grupo}
+            open={openMenu === grupo.key}
+            activo={esTabActivo(grupo, pathname)}
+            onAbrir={() => pedirAbrir(grupo.key)}
+            onCerrar={pedirCerrar}
+            onToggle={() => {
+              limpiar();
+              if (openMenu === grupo.key) setOpenMenu(null);
+              else abrirYa(grupo.key);
+            }}
+            registrar={el => {
+              if (el) anclas.current.set(grupo.key, el);
+              else anclas.current.delete(grupo.key);
+            }}
+          />
+        ))}
         <span className="nav-fecha" title={todayLargo} style={{ textTransform: "capitalize" }}>{today}</span>
         <LanguageSwitch />
         <div className="nav-hotel" style={{

@@ -13,6 +13,11 @@ ahí. El comentario del CSS todavía hablaba de «los 11 tabs».
 Por eso Admin se renderiza aparte, fijo en el bloque de la derecha que nunca se
 encoge. Estas pruebas existen para que un tab trece no lo vuelva a empujar
 afuera.
+
+**Master Data, el 2026-11-10, por lo mismo**: «por qué Master Data se me esconde
+a veces». Era la última pestaña de la parte que scrollea; según el ancho, el
+zoom o el idioma quedaba fuera del borde. Ahora las dos van en
+`FIJOS_A_LA_DERECHA`.
 """
 import io
 import os
@@ -27,16 +32,20 @@ def _nav() -> str:
 
 def test_admin_no_se_renderiza_dentro_del_contenedor_que_scrollea():
     src = _nav()
-    assert 'nav.filter(g => g.key !== "admin").map(' in src, (
+    assert 'nav.filter(g => !FIJOS_A_LA_DERECHA.includes(g.key)).map(' in src, (
         "Admin volvió a entrar a `.nav-scroll`: a doce tabs cae fuera del "
         "borde derecho y no hay scrollbar que lo delate")
+    fijos = re.search(r'const FIJOS_A_LA_DERECHA = \[([^\]]*)\]', src)
+    assert fijos, "falta la lista de pestañas fijas a la derecha"
+    assert '"admin"' in fijos.group(1) and '"masterData"' in fijos.group(1), (
+        "Admin y Master Data tienen que ir fijos: los dos se escondían")
 
 
 def test_admin_se_renderiza_en_el_bloque_fijo_de_la_derecha():
     src = _nav()
     # El bloque de la derecha es el que declara `flexShrink: 0`.
     derecha = src.split("Lado derecho")[-1]
-    assert "grupoAdmin" in derecha, (
+    assert "fijos.map(" in derecha, (
         "el dropdown de Admin tiene que colgar del bloque que no se encoge")
 
 
@@ -44,7 +53,7 @@ def test_el_grupo_admin_sale_de_NAV_y_no_esta_duplicado():
     """Si se copiara el arreglo de items, agregar una pantalla de admin
     obligaría a acordarse de DOS lugares — y el segundo se olvida."""
     src = _nav()
-    assert 'nav.find(g => g.key === "admin")' in src
+    assert ".map(k => nav.find(g => g.key === k))" in src
     assert src.count('key: "admin",') == 1, (
         "el grupo Admin quedó definido dos veces")
 

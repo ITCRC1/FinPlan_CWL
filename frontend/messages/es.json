@@ -16,7 +16,8 @@
       "monthEnd": "Cierre de Mes",
       "breakEven": "Break-Even",
       "cost": "Cost",
-      "pacing": "Pacing"
+      "pacing": "Pacing",
+      "mas": "Más"
     },
     "headers": {
       "progress": "Avance",

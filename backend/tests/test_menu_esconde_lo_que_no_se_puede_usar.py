@@ -69,9 +69,9 @@ def test_el_filtro_se_aplica_ANTES_de_partir_el_menu():
     constante `NAV` en vez de la lista filtrada, el filtro no lo alcanzaría —
     y es justo el tab que tiene `Users`."""
     src = _nav()
-    assert 'nav.find(g => g.key === "admin")' in src, (
+    assert ".map(k => nav.find(g => g.key === k))" in src, (
         "el grupo Admin volvió a salir de `NAV` sin filtrar")
-    assert 'nav.filter(g => g.key !== "admin").map(' in src, (
+    assert 'nav.filter(g => !FIJOS_A_LA_DERECHA.includes(g.key)).map(' in src, (
         "la fila de tabs volvió a recorrer `NAV` sin filtrar")
 
 
