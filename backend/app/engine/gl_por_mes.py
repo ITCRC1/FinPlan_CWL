@@ -81,9 +81,17 @@ CLASE_A_CATEGORIA: dict[str, str] = {
     "7": "OPERATING_EXPENSES", "8": "BELOW_GOP", "9": "STATISTICS",
 }
 
-#: Orden de presentación del resumen.
+#: Prefijo de las cuentas de REPARTO (allocation). Es el crédito con que
+#: lavandería y cafetería quedan en cero: `4999` en el catálogo de CWL, y
+#: `4900`/`4901` en el mayor del ACTUAL 2026. Sólo se usa cuando la cuenta no
+#: tiene mapeo — teniéndolo, manda la sección.
+PREFIJO_REPARTO = "49"
+
+#: Orden de presentación del resumen. Los repartos van DESPUÉS del gasto y
+#: antes de lo que vive bajo el GOP: ahí es donde el P&L los deja.
 ORDEN_CATEGORIAS = ("REVENUE", "COST_OF_SALES", "PAYROLL",
-                    "OPERATING_EXPENSES", "BELOW_GOP", "OTHER", "STATISTICS")
+                    "OPERATING_EXPENSES", "ALLOCATIONS", "BELOW_GOP",
+                    "OTHER", "STATISTICS")
 
 #: No entran en la suma: las 9xxx son cantidades (noches, kilos, covers), no
 #: plata. Meterlas rompería la igualdad con la utilidad sin que nada avise.
@@ -104,6 +112,22 @@ def categoria_de(account_code: str, seccion_pl: str | None = None) -> str:
     """
     clase = clase_de(account_code)
     sec = (seccion_pl or "").strip().upper()
+
+    # ⚠️ REPARTOS, antes que nada. Una cuenta clase 4 que el P&L NO manda a
+    # ingreso no es ingreso: es el crédito con que lavandería y cafetería
+    # quedan en cero (CLAUDE.md: «la cuenta 4xxx Distribución se excluye del
+    # revenue»). Mezclarla con el gasto de verdad —que es donde cae hoy, por
+    # su sección de overhead— esconde el reparto dentro del gasto operativo y
+    # hace que el gasto de un departamento no se pueda leer solo.
+    #
+    # El signo NO cambia y la fila SIGUE sumando: la igualdad que sostiene el
+    # reporte (Σ filas = −utilidad) sólo depende de `es_credito`, que no se
+    # toca acá. Esto es cómo se AGRUPA, no cuánto vale.
+    if clase == "4" and (
+            (sec and sec != SECCION_INGRESO)
+            or (not sec and (account_code or "").strip().startswith(PREFIJO_REPARTO))):
+        return "ALLOCATIONS"
+
     cat = SECCION_A_CATEGORIA.get(sec)
     if cat == "_GASTO":
         return "PAYROLL" if clase == "6" else "OPERATING_EXPENSES"
@@ -122,6 +146,30 @@ def es_credito(account_code: str, seccion_pl: str | None = None) -> bool:
     if sec:
         return sec == SECCION_INGRESO
     return clase_de(account_code) == "4"
+
+
+def es_reparto(account_code: str) -> bool:
+    """¿Es una cuenta de reparto conocida? (`49xx`.)"""
+    return (account_code or "").strip().startswith(PREFIJO_REPARTO)
+
+
+def discrepa_clase(account_code: str, *, credito: bool, seccion_pl: str | None) -> bool:
+    """Clase 4 que el P&L NO trata como ingreso, y que NO es un reparto conocido.
+
+    ⚠️ Antes esto marcaba también a las «Distribución», y el tab de validación
+    tenía que aclarar al lado que esas dos estaban bien. Una alarma que viene
+    con su propia excusa no es una alarma: enseña a ignorarla. Ahora los
+    repartos tienen su propia categoría y la bandera queda para lo que de
+    verdad no se espera -- una TERCERA cuenta clase 4 cayendo en gasto.
+
+    Estaba escrita igual en `armar_grilla` y en `gl_api._fila`; vive acá para
+    que no se arreglen de a una.
+    """
+    if not (seccion_pl or "").strip():
+        return False
+    if es_reparto(account_code):
+        return False
+    return (clase_de(account_code) == "4") != credito
 
 
 def _d(v) -> Decimal:
@@ -204,7 +252,8 @@ def armar_grilla(
             # Clase 4 que NO es ingreso (o al revés). No es un error: las dos
             # «Distribución» del reparto son exactamente esto. Se marca para
             # que el tab de validación las muestre en vez de esconderlas.
-            "clase_discrepa": (clase == "4") != credito and bool(seccion),
+            "clase_discrepa": discrepa_clase(cuenta, credito=credito,
+                                             seccion_pl=seccion),
             "meses": meses,
             "total": sum(meses, ZERO),
         })

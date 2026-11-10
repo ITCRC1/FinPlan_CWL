@@ -60,6 +60,10 @@ export default function GlReportPage() {
   const [val, setVal] = useState<GlValidacion | null>(null);
   const [busca, setBusca] = useState("");
   const [cat, setCat] = useState("");
+  // Mostrar también las cuentas del mapeo que este escenario no usó, en cero.
+  // Apagado por defecto: son ~1.100 contra ~200 con movimiento, y la vista de
+  // todos los días es la conciliación. Prendido es la vista de ARMADO.
+  const [catalogo, setCatalogo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [valLoading, setValLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +79,11 @@ export default function GlReportPage() {
   useEffect(() => {
     if (!scenarioId) return;
     setLoading(true); setError(null); setVal(null);
-    getGl(scenarioId)
+    getGl(scenarioId, catalogo)
       .then(setData)
       .catch(e => setError(e instanceof Error ? e.message : "Error"))
       .finally(() => setLoading(false));
-  }, [scenarioId]);
+  }, [scenarioId, catalogo]);
 
   // La validación se pide sólo cuando se abre su pestaña: calcula el P&L de
   // los doce meses y no tiene por qué pagarse al mirar el detalle.
@@ -204,6 +208,17 @@ export default function GlReportPage() {
                 {categorias.map(c => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}
               </select>
             </div>
+            {/* Owner, 2026-11-10: «¿por qué no jalas este master data a esta
+                vista? ya tiene todo». Una cuenta que existe en el mapeo y
+                quedó sin presupuestar era indistinguible de una que no
+                existe — justo lo que hay que ver al armar un budget. */}
+            <label style={{ display: "flex", alignItems: "flex-end", gap: 6,
+                            fontSize: 12.5, paddingBottom: 7,
+                            color: "var(--text-secondary)", cursor: "pointer" }}>
+              <input type="checkbox" checked={catalogo}
+                     onChange={e => setCatalogo(e.target.checked)} />
+              {t("catalogo")}
+            </label>
           </>
         )}
       </div>
@@ -229,6 +244,17 @@ export default function GlReportPage() {
       {meta && (
         <p style={{ fontSize: 11.5, color: "var(--text-secondary)", marginBottom: 10 }}>
           <b>{meta.cuentas}</b> {t("accounts")} · {meta.filas} {t("rows")} · {t("signNote")}
+          {/* El hueco se informa SIEMPRE, se pidan o no las cuentas en cero:
+              tener que prender algo para enterarte de que falta algo es la
+              forma de no enterarte nunca. */}
+          {!!meta.cuentas_catalogo && (
+            <>
+              <br />
+              {t("catalogoHint", {
+                usadas: meta.cuentas_catalogo - meta.cuentas_sin_movimiento,
+                total: meta.cuentas_catalogo })}
+            </>
+          )}
         </p>
       )}
 
@@ -237,7 +263,17 @@ export default function GlReportPage() {
                       background: "rgba(245,158,11,0.08)",
                       border: "1px solid var(--accent-amber, #856404)",
                       borderRadius: 4, padding: "9px 13px", marginBottom: 12 }}>
-          ⚠ {t("incomplete")}
+          {/* ⚠️ Antes esto era un adjetivo: «falta el ingreso», en TODO
+              escenario de checkbook, dijera lo que dijera la grilla. No
+              dice CUÁNTO falta, que es lo único que permite decidir si el
+              reporte sirve para conciliar — y con la apertura por cuenta
+              cargada, mentía al revés. */}
+          ⚠ {meta.ingreso_pl
+                ? t("incompleteMedido", {
+                    grilla: usd(meta.ingreso_grilla),
+                    pl: usd(meta.ingreso_pl),
+                    falta: usd(meta.falta_ingreso) })
+                : t("incomplete")}
         </div>
       )}
 

@@ -6644,6 +6644,8 @@ export interface GlRow {
   codigo_corporativo: string;
   categoria: string;
   clase_discrepa: boolean;
+  /** Viene del catálogo del mapeo y el escenario no la usó: toda en cero. */
+  sin_movimiento?: boolean;
   meses: number[];
   total: number;
 }
@@ -6667,9 +6669,19 @@ export interface GlMeta {
   actuals_through: number;
   /** 'actual_entries' | 'checkbook' */
   fuente: string;
-  /** false = la fuente no puede traer el ingreso por cuenta. */
+  /** false = la grilla NO lleva todo el ingreso que dice el P&L. */
   completo: boolean;
+  /** Cuánto ingreso lleva la grilla, cuánto dice el P&L, y el hueco. */
+  ingreso_grilla: number;
+  ingreso_pl: number;
+  falta_ingreso: number;
   cuentas: number;
+  /** Cuántas cuentas existen en el mapeo (Admin · Account Mapping). */
+  cuentas_catalogo: number;
+  /** De ésas, cuántas este escenario no tocó. */
+  cuentas_sin_movimiento: number;
+  /** Si la grilla las está mostrando en cero. */
+  catalogo: boolean;
   filas: number;
   signo: string;
 }
@@ -6713,8 +6725,9 @@ export interface GlValidacion {
   fuente: string;
 }
 
-export async function getGl(scenarioId: string): Promise<GlRespuesta> {
-  return api.get(`/gl/${scenarioId}/`);
+export async function getGl(scenarioId: string,
+                            catalogo = false): Promise<GlRespuesta> {
+  return api.get(`/gl/${scenarioId}/${catalogo ? "?catalogo=1" : ""}`);
 }
 
 export async function getGlValidacion(scenarioId: string): Promise<GlValidacion> {

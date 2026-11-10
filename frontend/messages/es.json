@@ -5499,10 +5499,11 @@
       "COST_OF_SALES": "Costo de ventas",
       "PAYROLL": "Planilla",
       "OPERATING_EXPENSES": "Gastos operativos",
-      "BELOW_GOP": "Below GOP",
+      "BELOW_GOP": "Gastos de Propiedad",
       "STATISTICS": "Estadísticas",
       "OTHER": "Otras",
-      "NET": "NETO"
+      "NET": "NETO",
+      "ALLOCATIONS": "Repartos (4999)"
     },
     "sinMapeo": {
       "title": "Cuentas sin mapeo",
@@ -5531,6 +5532,10 @@
       "mezcla": "Este forecast mezcla: los meses 1 a {mes} vienen del ACTUAL enlazado y el resto de las tarifas de este escenario. Sus propias cuentas no son la película completa."
     },
     "colAccount": "Departamento / Cuenta",
-    "excelHint": "El Excel baja SIEMPRE las cuentas completas, con el filtro puesto o no: es el papel de la conciliación."
+    "excelHint": "El Excel baja SIEMPRE las cuentas completas, con el filtro puesto o no: es el papel de la conciliación.",
+    "catalogo": "Mostrar todas las cuentas del mapeo (las no usadas, en cero)",
+    "sinMovimiento": "sin movimiento",
+    "catalogoHint": "Este escenario usa {usadas} de {total} cuentas de Admin · Account Mapping.",
+    "incompleteMedido": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta. La grilla lleva {grilla} de los {pl} de ingreso del P&L — faltan {falta}."
   }
 }

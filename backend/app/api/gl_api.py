@@ -47,10 +47,13 @@ from app.engine import pl_engine
 from app.engine import recalculate as recalc
 from app.errores import ErrorApi
 from app.models.actual_entry import ActualEntry
+from app.models.belowgop_account_entry import BelowGopAccountEntry
 from app.models.cost_entry import CostEntry
 from app.models.department_catalog import DepartmentCatalog
+from app.models.mapping import AccountMapping
 from app.models.nonop_entry import NonOpEntry
 from app.models.opex_entry import OpexEntry
+from app.models.revenue_account_entry import RevenueAccountEntry
 from app.models.scenario import Scenario
 
 router = APIRouter()
@@ -119,6 +122,22 @@ async def _nombres_de_cuenta_checkbook(db: AsyncSession, scenario_id: str) -> di
     return fuera
 
 
+async def _por_cuenta(db: AsyncSession, modelo, scenario_id: str) -> list[dict]:
+    """Las filas de una tabla `{scenario, dept, cuenta, 12 meses}` del escenario.
+
+    `revenue_account_entries` (4xxx) y `belowgop_account_entries` (8xxx) tienen
+    la misma forma que `ActualEntry`, así que entran a la grilla sin traducir.
+    """
+    filas = (await db.execute(
+        select(modelo).where(modelo.scenario_id == scenario_id)
+    )).scalars().all()
+    return [{
+        "dept_code": f.dept_code, "account_code": f.account_code,
+        "account_name": f.account_name, "outlet": "",
+        **{m: getattr(f, m) for m in gl.MESES},
+    } for f in filas]
+
+
 async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict], str, bool]:
     """Las filas por cuenta × departamento, y de dónde salieron.
 
@@ -155,6 +174,25 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
                  "account_name": nombres.get(cuenta, ""),
                  "outlet": "", **{m: ZERO for m in gl.MESES}})
             fila[gl.MESES[mes - 1]] += Decimal(str(r.get("amount") or 0))
+
+    # ⚠️ El ingreso (4xxx) y el below-GOP (8xxx) NO salen de los checkbooks:
+    # `checkbook_account_rows_for_month` no los sube, porque el P&L los siembra
+    # por LÍNEA -- el ingreso se calcula de tarifas y noches, y varias líneas
+    # de below-GOP comparten una misma cuenta del mayor. Por eso la grilla
+    # mostraba el escenario sin ingreso y el total no daba la utilidad.
+    #
+    # La apertura por cuenta SÍ existe cuando alguien la cargó, en
+    # `revenue_account_entries` y `belowgop_account_entries`. Se suma acá.
+    # Si están vacías la grilla queda como estaba y el encabezado lo dice con
+    # un número, no con un "incompleto" a secas.
+    #
+    # Las claves ya presentes NO se pisan: los repartos entran por
+    # `AllocationEntry` con su cuenta 4999 y no pueden contarse dos veces.
+    for modelo in (RevenueAccountEntry, BelowGopAccountEntry):
+        for f in await _por_cuenta(db, modelo, esc.id):
+            clave = (f["dept_code"], f["account_code"])
+            if clave not in acumulado:
+                acumulado[clave] = f
     return (list(acumulado.values()), "checkbook", False)
 
 
@@ -191,14 +229,55 @@ def _fila(fila: dict, resolver, extremos, secciones, nombre_dept) -> dict:
         "mapeo_cambio": len(vistos) > 1,
         "codigo_corporativo": "",
         "categoria": gl.categoria_de(cuenta, sec),
-        "clase_discrepa": (clase == "4") != credito and bool(sec),
+        "clase_discrepa": gl.discrepa_clase(cuenta, credito=credito, seccion_pl=sec),
         "meses": meses,
         "total": sum(meses, ZERO),
     }
 
 
-async def _grilla(db: AsyncSession, esc: Scenario):
+async def _catalogo_de_cuentas(db: AsyncSession) -> list[dict]:
+    """TODAS las cuentas del mapeo, en cero. El catálogo, no los movimientos.
+
+    Owner, 2026-11-10, señalando Admin · Account Mapping: *«¿por qué no jalas
+    este master data a esta vista? ya tiene todo»*. Tenía razón: la grilla sólo
+    mostraba las cuentas CON movimiento, así que una cuenta que existe y quedó
+    sin presupuestar era indistinguible de una que no existe. Para armar un
+    budget eso es justo lo que hay que ver.
+
+    Son las mismas reglas ACTIVAS y VIGENTES que usa el P&L —se filtra igual
+    que `load_active_account_mappings`— para que la cuenta que aparezca acá sea
+    la que el motor va a resolver, y no una regla apagada o de otro año.
+
+    ⚠️ Las filas salen en CERO, así que no mueven ningún total y no tocan la
+    conciliación. Lo único que agregan es la pregunta «¿y esta cuenta?».
+    """
+    filas = (await db.execute(
+        select(AccountMapping).where(
+            AccountMapping.report_id == "P&L_DETAIL_OWNERS",
+            AccountMapping.active_status == "YES")
+    )).scalars().all()
+    fuera = []
+    for m in filas:
+        if not recalc._vigente_en(m, None):
+            continue
+        fuera.append({
+            "dept_code": m.dept_code or "",
+            "account_code": (m.account_code or "").strip(),
+            "account_name": (m.account_name_example or "").strip(),
+            "outlet": "",
+            **{mes: ZERO for mes in gl.MESES},
+        })
+    return fuera
+
+
+async def _grilla(db: AsyncSession, esc: Scenario, *, catalogo: bool = False):
     filas, fuente, completo = await _filas_del_mayor(db, esc)
+    con_movimiento = {(f["dept_code"], f["account_code"]) for f in filas}
+    del_catalogo = await _catalogo_de_cuentas(db)
+    faltan = [f for f in del_catalogo
+              if (f["dept_code"], f["account_code"]) not in con_movimiento]
+    if catalogo:
+        filas = filas + faltan
     lineas_cfg = await recalc.load_report_line_config(db)
     secciones = {l["line_code"]: (l.get("section") or "") for l in lineas_cfg}
     nombres_linea = {l["line_code"]: (l.get("line_name") or "") for l in lineas_cfg}
@@ -210,9 +289,13 @@ async def _grilla(db: AsyncSession, esc: Scenario):
     grilla = [_fila(f, resolver, extremos, secciones, nombre_dept) for f in filas]
     for r in grilla:
         r["pl_line_name"] = nombres_linea.get(r["pl_line_code"], "")
+    # La fila sin movimiento se marca: es del catálogo, no del escenario.
+    vacias = {(f["dept_code"], f["account_code"]) for f in faltan}
+    for r in grilla:
+        r["sin_movimiento"] = (r["dept_code"], r["account_code"]) in vacias
     grilla.sort(key=lambda r: (r["categoria"] == "STATISTICS", r["account_code"],
                                r["dept_code"], r["outlet"]))
-    return grilla, fuente, completo, comparables, secciones
+    return grilla, fuente, completo, comparables, secciones, len(del_catalogo), len(faltan)
 
 
 def _n(v) -> float:
@@ -226,11 +309,38 @@ def _fila_json(r: dict) -> dict:
 
 
 @router.get("/gl/{scenario_id}/")
-async def listar_gl(scenario_id: str, db: AsyncSession = Depends(get_db)):
-    """La grilla completa: una fila por cuenta × departamento, doce meses."""
+async def listar_gl(scenario_id: str, catalogo: bool = False,
+                    db: AsyncSession = Depends(get_db)):
+    """La grilla completa: una fila por cuenta × departamento, doce meses.
+
+    `catalogo=1` agrega además, EN CERO, las cuentas del mapeo que el escenario
+    no usó: para armar un presupuesto hay que ver la que falta, no sólo la que
+    está.
+    """
     esc = await _escenario(scenario_id, db)
-    grilla, fuente, completo, _cmp, _sec = await _grilla(db, esc)
+    grilla, fuente, completo, _cmp, _sec, n_cat, n_vacias = await _grilla(
+        db, esc, catalogo=catalogo)
     resumen = gl.resumen_por_categoria(grilla)
+
+    # ⚠️ Cuánto ingreso trae la grilla contra el que dice el P&L.
+    #
+    # Antes esto era un sí/no: `completo=False` en todo escenario de checkbook,
+    # dijera lo que dijera la grilla. Con la apertura por cuenta cargada el
+    # aviso quedaba mintiendo al revés -- decía "falta el ingreso" teniéndolo
+    # entero. Y sin ella, "incompleto" no dice CUÁNTO falta, que es lo único
+    # que permite decidir si el reporte sirve para conciliar.
+    #
+    # La grilla lleva el ingreso en negativo (ver `gl_por_mes`); el P&L, no.
+    # Se comparan en la misma vara.
+    ingreso_grilla = -sum((r["total"] for r in grilla
+                           if r["categoria"] == "REVENUE"), ZERO)
+    ingreso_pl = ZERO
+    for mes in range(1, 13):
+        for linea in await recalc.compute_pl_month(db, esc, mes):
+            if linea.line_code == "TOTAL_REVENUES":
+                ingreso_pl += Decimal(str(linea.amount_usd or 0))
+    falta_ingreso = ingreso_pl - ingreso_grilla
+    completo = completo or abs(falta_ingreso) <= Decimal("0.01")
     return {
         "meta": {
             "scenario_id": esc.id,
@@ -243,7 +353,17 @@ async def listar_gl(scenario_id: str, db: AsyncSession = Depends(get_db)):
             "actuals_through": esc.actuals_through or 0,
             "fuente": fuente,
             "completo": completo,
+            # Para que el aviso diga un número y no un adjetivo.
+            "ingreso_grilla": _n(ingreso_grilla),
+            "ingreso_pl": _n(ingreso_pl),
+            "falta_ingreso": _n(falta_ingreso),
             "cuentas": len({r["account_code"] for r in grilla}),
+            # Cuántas cuentas existen en el mapeo y cuántas el escenario no
+            # tocó. Se informan SIEMPRE, aunque no se pidan: el hueco tiene que
+            # verse sin tener que ir a buscarlo.
+            "cuentas_catalogo": n_cat,
+            "cuentas_sin_movimiento": n_vacias,
+            "catalogo": catalogo,
             "filas": len(grilla),
             # La convención viaja como CLAVE por el mismo motivo que `motivo`:
             # la pantalla la dice en el idioma en que se está mirando. Sin
@@ -270,7 +390,7 @@ async def validar_gl(scenario_id: str, db: AsyncSession = Depends(get_db)):
     tres pruebas que sí valen siempre.
     """
     esc = await _escenario(scenario_id, db)
-    grilla, fuente, completo, comparables, secciones = await _grilla(db, esc)
+    grilla, fuente, completo, comparables, secciones, _nc, _nv = await _grilla(db, esc)
 
     # ⚠️ Un escenario VACÍO no «cuadra»: no hay nada que cuadrar. Σ=0 contra
     # −utilidad=0 da cero y el validador se pintaba de verde para los Working

@@ -93,8 +93,26 @@ def test_una_4xxx_que_el_PL_manda_a_overhead_NO_se_invierte():
         resolver=_resolver({"4900": "OH_LAUNDRY"}),
         seccion_de_linea=SECCIONES.get)
     assert fila["meses"][0] == Decimal("-18852.40"), "no se invierte"
-    assert fila["categoria"] == "OPERATING_EXPENSES"
-    assert fila["clase_discrepa"] is True, "y queda marcada para el validador"
+    # ⚠️ La categoría cambió el 2026-11-10 (owner: «4999 allocations»): el
+    # reparto dejó de esconderse dentro del gasto operativo y tiene la suya.
+    # El SIGNO -- que es lo que esta prueba cuida -- no se tocó.
+    assert fila["categoria"] == "ALLOCATIONS"
+    # Y ya no se marca como rareza: tener su propia categoría es mejor que una
+    # alarma que venía con la excusa al lado («estas dos están bien»).
+    assert fila["clase_discrepa"] is False
+
+
+def test_una_4xxx_que_NO_es_reparto_y_cae_en_gasto_SI_se_marca():
+    """La bandera queda para lo que de verdad no se espera: una tercera cuenta
+    clase 4 cayendo en gasto, que no sea una `49xx` de reparto."""
+    [fila] = gl.armar_grilla(
+        [_fila("4300", dept="0165", jan=Decimal("-500"))],
+        resolver=_resolver({"4300": "OH_ADMIN"}),
+        seccion_de_linea=SECCIONES.get)
+    assert fila["clase_discrepa"] is True
+    assert fila["categoria"] == "ALLOCATIONS", (
+        "se agrupa con los repartos -- es clase 4 que el P&L no trata como "
+        "ingreso -- pero la bandera avisa que no es una 49xx conocida")
 
 
 def test_sin_mapeo_el_signo_cae_al_primer_digito():
@@ -227,3 +245,51 @@ def test_el_resumen_abre_planilla_de_opex():
 ])
 def test_sin_seccion_la_categoria_sale_del_primer_digito(cuenta, esperado):
     assert gl.categoria_de(cuenta) == esperado
+
+
+# --- El catálogo del mapeo dentro de la grilla -----------------------------
+#
+# Owner, 2026-11-10, señalando Admin · Account Mapping: *«¿por qué no jalas
+# este master data a esta vista? ya tiene todo»*. La grilla sólo mostraba las
+# cuentas CON movimiento, así que una cuenta que existe y quedó sin
+# presupuestar era indistinguible de una que no existe.
+
+def test_las_cuentas_en_cero_NO_mueven_ningun_total():
+    """⚠️ La prueba que hace seguro traer el catálogo.
+
+    Las cuentas del mapeo entran en CERO. Si alguna moviera un total, el
+    reporte diría una cifra distinta según esté prendido o apagado el
+    interruptor — y el que concilia no tendría forma de saber cuál es la
+    buena.
+    """
+    con_plata = [_fila("7065", jan=Decimal("400")),
+                 _fila("4000", dept="0110", jan=Decimal("1000"))]
+    resolver = _resolver({"7065": "OH_ADMIN", "4000": "REV_ROOMS"})
+
+    solas = gl.armar_grilla(con_plata, resolver=resolver,
+                            seccion_de_linea=SECCIONES.get)
+    # Las mismas, más nueve cuentas del catálogo que el escenario no usó.
+    del_catalogo = [_fila(c, dept="0120") for c in
+                    ("4110", "4120", "5101", "5150", "6001", "7025",
+                     "7060", "7150", "8040")]
+    con_catalogo = gl.armar_grilla(con_plata + del_catalogo, resolver=resolver,
+                                   seccion_de_linea=SECCIONES.get)
+
+    assert len(con_catalogo) == len(solas) + 9, "las cuentas vacías sí se ven"
+    assert gl.total_del_reporte(con_catalogo) == gl.total_del_reporte(solas), (
+        "una cuenta en cero movió el total del reporte")
+
+    neto = lambda g: next(f["total"] for f in gl.resumen_por_categoria(g)
+                          if f["categoria"] == "NET")
+    assert neto(con_catalogo) == neto(solas), "el NET cambió al traer el catálogo"
+
+
+def test_la_cuenta_vacia_se_clasifica_igual_que_si_tuviera_plata():
+    """Una cuenta del catálogo tiene que caer en SU categoría, no en OTHER:
+    verla en cero sólo sirve si está en el renglón donde le tocaría estar."""
+    [vacia] = gl.armar_grilla(
+        [_fila("4110", dept="0120")],
+        resolver=_resolver({"4110": "REV_FB"}),
+        seccion_de_linea=SECCIONES.get)
+    assert vacia["categoria"] == "REVENUE"
+    assert vacia["total"] == Decimal("0")

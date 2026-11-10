@@ -5499,10 +5499,11 @@
       "COST_OF_SALES": "Cost of Sales",
       "PAYROLL": "Payroll",
       "OPERATING_EXPENSES": "Operating Expenses",
-      "BELOW_GOP": "Below GOP",
+      "BELOW_GOP": "Property Expenses",
       "STATISTICS": "Statistics",
       "OTHER": "Other",
-      "NET": "NET"
+      "NET": "NET",
+      "ALLOCATIONS": "Allocations (4999)"
     },
     "sinMapeo": {
       "title": "Accounts with no mapping",
@@ -5531,6 +5532,10 @@
       "mezcla": "This forecast is a blend: months 1 to {mes} come from the linked ACTUAL and the rest from this scenario's own rates. Its own accounts are not the whole picture."
     },
     "colAccount": "Department / Account",
-    "excelHint": "The Excel always downloads every account, filtered view or not: it is the reconciliation paper trail."
+    "excelHint": "The Excel always downloads every account, filtered view or not: it is the reconciliation paper trail.",
+    "catalogo": "Show every account in the mapping (unused ones at zero)",
+    "sinMovimiento": "no movement",
+    "catalogoHint": "{usadas} of {total} accounts in Admin · Account Mapping are used by this scenario.",
+    "incompleteMedido": "This scenario is built in the checkbooks: revenue is computed from rates and lives by P&L line, not by account. The grid carries {grilla} of the {pl} of revenue in the P&L — {falta} short."
   }
 }
