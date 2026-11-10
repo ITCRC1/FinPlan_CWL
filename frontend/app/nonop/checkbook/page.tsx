@@ -28,6 +28,32 @@ const SECTIONS: Section[] = [
   // Cuentas reales de dueños (8xxx). Owners Fee (8005) y Capital Reserve (8020)
   // son % de revenue → tab Management Fees. Income Tax (8060) se calcula (30% EBT).
   // Aquí van las manuales, mapeadas a las líneas P&L below-GOP existentes.
+  //
+  // ⚠️ **Renta y seguro faltaban, y eso era un agujero doble (2026-11-09).**
+  //
+  // El P&L los dibuja —`RENT` y `PROPERTY_INSURANCE` son renglones suyos de
+  // siempre— pero esta pantalla no los listaba, así que NO HABÍA DÓNDE
+  // cargarlos: en el Budget Working 2027 salían en cero mientras el Forecast
+  // 2026 traía $20.779,81 de renta y $56.851,81 de seguro del mayor. Un cero
+  // que nadie decidió se lee igual que uno decidido.
+  //
+  // Y peor: el guardado de esta pantalla usa `bulkReplaceNonOp`, que **borra
+  // todo el below-GOP** antes de insertar lo que ella conoce. Con la renta y
+  // el seguro cargados por otra vía, el primer Guardar de acá se los llevaba
+  // por delante, sin error y sin aviso.
+  {
+    title: "Rent", subtotal: "Total Rent",
+    lines: [
+      { code: "RENT", name: "Rent", account_code: "8000", kind: "manual" },
+    ],
+  },
+  {
+    title: "Property Insurance", subtotal: "Property Insurance",
+    lines: [
+      { code: "PROPERTY_INSURANCE", name: "Property Insurance",
+        account_code: "8015", kind: "manual" },
+    ],
+  },
   {
     title: "Other / Non-Deductible", subtotal: "Total Other Expenses",
     lines: [
