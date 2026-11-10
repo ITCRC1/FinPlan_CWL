@@ -53,6 +53,28 @@ class Fila(BaseModel):
     # problema que esto viene a evitar.
     valores: list[float | str | None] = Field(default_factory=list)
 
+    # ⚠️ **Lo que no está declarado acá NO LLEGA.** Pydantic descarta los
+    # campos que el modelo no nombra, en silencio y sin error.
+    #
+    # Medido el 2026-11-09 sobre el Budget Package del owner: **24 hojas, CERO
+    # celdas con fórmula**. Todo el andamiaje de `suma_de`, `combina_filas` y
+    # `resultadosDelPL` —con su arnés de node de 809 comprobaciones que verifica
+    # que los ordinales apunten a la fila correcta— armaba las fórmulas bien y
+    # las perdía en esta puerta. El libro bajaba con todo pegado.
+    #
+    # Es el modo de falla más caro que hay acá: nada falla, los números están
+    # bien, y lo único que se pierde es poder tocar una celda y ver moverse el
+    # resto. Nadie lo nota hasta que alguien busca el `=` y no está.
+    es_seccion: bool = False
+    #: `[ordinal, …]` — esta fila es la suma de esas otras.
+    suma_de: list[int] | None = None
+    #: `[[ordinal, signo], …]` — la cascada: GOP es Operating Profit MENOS
+    #: Overhead, y eso no es una suma.
+    combina_filas: list[tuple[int, int]] | None = None
+    #: Una fórmula escrita por el cuadro, con ordinales (`{r:N}`) y rótulos
+    #: (`{h:Hoja:Rótulo}`). Ver `FilaCuadro.formula_tpl` del frontend.
+    formula_tpl: str | None = None
+
 
 class FilaKpi(BaseModel):
     """Un renglón de la franja de estadísticas: el rótulo y un valor por
