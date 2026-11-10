@@ -835,7 +835,22 @@ def test_nadie_mas_que_la_auditoria_LEE_el_mayor_guardado():
         for p in base.rglob("*.py")
         if "MayorMovimiento" in p.read_text(encoding="utf-8")
         and not p.name.startswith("mayor_movimiento"))
-    assert lectores == ["api/auditoria_gl_api.py"], lectores
+    # La pestaña «Stats» de Estadísticas (owner, 2026-11-10: «la contabilidad
+    # manda») también lo lee, pero SOLO la clase 9 —cantidades, no plata— y para
+    # mirarla: no alimenta ningún total. La prueba de abajo lo amarra.
+    assert lectores == ["api/auditoria_gl_api.py", "api/stats_integrity_api.py"], lectores
+
+
+def test_stats_solo_lee_la_clase_9_del_mayor_y_no_escribe():
+    """La única otra lectora del mayor guardado no toca la plata ni escribe."""
+    import inspect
+
+    from app.api import stats_integrity_api
+
+    codigo = _sin_comentarios(inspect.getsource(stats_integrity_api))
+    assert 'MayorMovimiento.seg1.like("9%")' in codigo
+    for prohibido in ("db.add(", ".commit(", "delete(", "insert("):
+        assert prohibido not in codigo, prohibido
 
 
 # ── Abrir una cuenta y ver sus asientos ──────────────────────────────────────

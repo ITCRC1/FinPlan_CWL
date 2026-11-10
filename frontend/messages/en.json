@@ -3297,7 +3297,9 @@
     "uPax": "people",
     "uRooms": "rooms",
     "uTreatments": "treatments",
-    "uTrips": "trips"
+    "uTrips": "trips",
+    "tabFinplan": "FinPlan catalog",
+    "tabStats": "Stats (Integrity)"
   },
   "opexCheckbook": {
     "bajarCheckbook": "⬇ Download checkbook",
@@ -5543,5 +5545,36 @@
     "colNature": "Nature",
     "natRevenue": "Revenue",
     "natExpense": "Expense"
+  },
+  "statsInt": {
+    "intro": "Statistics (class 9) <b>as accounting records them in Integrity</b>, by month. They come from the <b>Trial Balance</b> uploaded in the GL Audit: there is no other upload. In Integrity level 6 of the account is the day (set by Opera, same as revenue); here it is summed and you see <b>only the full month</b>. Codes are Integrity's, mapped: room nights use the Opera segments, the same key as revenue 4000.",
+    "anio": "Year",
+    "depto": "Department",
+    "todos": "All",
+    "soloConDato": "Only accounts with data",
+    "excel": "Excel",
+    "meses": "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec",
+    "mesesCargados": "Trial balance saved for <b>{anio}</b>: {meses}.",
+    "sinBalanza": "No trial balance for {anio} saved yet. Upload it in the GL Audit.",
+    "conDato": "{n, plural, one {# cuenta estadística con dato.} other {# cuentas estadísticas con dato.}}",
+    "sinClase9": "The trial balance has no class 9 accounts yet: Integrity starts recording them in 2027.",
+    "fuera": "{n, plural, one {# class 9 account recorded} other {# class 9 accounts recorded}} in Integrity that the mapped catalog does not know — check the code:",
+    "total": "total",
+    "cargando": "Loading…",
+    "colCuenta": "Account (DD = day)",
+    "colConcepto": "Concept",
+    "colDescripcion": "Description",
+    "colDepto": "Dept",
+    "colUnidad": "Unit",
+    "colCuentas": "Accounts",
+    "colEnIntegrity": "Exists in Integrity?",
+    "colAnio": "Year",
+    "si": "Yes",
+    "crear": "create in Integrity",
+    "conDatoCorto": "{n} with data",
+    "ingreso": "revenue",
+    "excelTitulo": "Integrity statistics · {anio}",
+    "excelSubtitulo": "Full month (sum of days) · mapped catalog {version}",
+    "nota": "<b>Read only.</b> This tab feeds neither the P&L nor any scenario: it shows what accounting recorded. An account marked «create in Integrity» is part of the mapping and does not exist in Integrity's catalog yet (see the corrections list for accounting)."
   }
 }

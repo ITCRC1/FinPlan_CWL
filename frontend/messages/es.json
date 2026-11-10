@@ -3297,7 +3297,9 @@
     "uPax": "personas",
     "uRooms": "habitaciones",
     "uTreatments": "tratamientos",
-    "uTrips": "viajes"
+    "uTrips": "viajes",
+    "tabFinplan": "Catálogo FinPlan",
+    "tabStats": "Stats (Integrity)"
   },
   "opexCheckbook": {
     "bajarCheckbook": "⬇ Bajar checkbook",
@@ -5543,5 +5545,36 @@
     "colNature": "Naturaleza",
     "natRevenue": "Ingreso",
     "natExpense": "Gasto"
+  },
+  "statsInt": {
+    "intro": "Las estadísticas (clase 9) <b>tal como las registra contabilidad en Integrity</b>, al mes. Salen del <b>Balance de Comprobación</b> que se sube en la Auditoría del mayor: no hay otra carga. En Integrity el nivel 6 de la cuenta es el día (lo pone Opera, igual que en el ingreso); acá se suma y se ve <b>solo el mes completo</b>. Los códigos son los de Integrity, homologados: las noches usan los segmentos de Opera, la misma llave que el ingreso 4000.",
+    "anio": "Año",
+    "depto": "Departamento",
+    "todos": "Todos",
+    "soloConDato": "Solo cuentas con dato",
+    "excel": "Excel",
+    "meses": "Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Set,Oct,Nov,Dic",
+    "mesesCargados": "Balanza guardada de <b>{anio}</b>: {meses}.",
+    "sinBalanza": "No hay ninguna balanza de {anio} guardada todavía. Se sube en Auditoría del mayor.",
+    "conDato": "{n, plural, one {# cuenta estadística con dato.} other {# cuentas estadísticas con dato.}}",
+    "sinClase9": "La balanza todavía no trae cuentas clase 9: Integrity empieza a registrarlas en 2027.",
+    "fuera": "{n, plural, one {# cuenta clase 9 registrada} other {# cuentas clase 9 registradas}} en Integrity que el catálogo homologado no conoce — revisar el código:",
+    "total": "total",
+    "cargando": "Cargando…",
+    "colCuenta": "Cuenta (DD = día)",
+    "colConcepto": "Concepto",
+    "colDescripcion": "Descripción",
+    "colDepto": "Depto",
+    "colUnidad": "Unidad",
+    "colCuentas": "Cuentas",
+    "colEnIntegrity": "¿Existe en Integrity?",
+    "colAnio": "Año",
+    "si": "Sí",
+    "crear": "crear en Integrity",
+    "conDatoCorto": "{n} con dato",
+    "ingreso": "ingreso",
+    "excelTitulo": "Estadísticas de Integrity · {anio}",
+    "excelSubtitulo": "Mes completo (suma de los días) · catálogo homologado {version}",
+    "nota": "<b>Solo lectura.</b> Esta pestaña no alimenta el P&L ni ningún escenario: muestra lo que contabilidad registró. Una cuenta marcada «crear en Integrity» es parte de la homologación y todavía no existe en el catálogo de Integrity (ver la lista de correcciones para contabilidad)."
   }
 }

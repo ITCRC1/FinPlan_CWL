@@ -27,6 +27,7 @@ import { HOTEL_ID } from "@/lib/hotel";
 import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { bajarCuadros, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
+import StatsIntegrity from "./StatsIntegrity";
 
 const BTN: React.CSSProperties = {
   padding: "7px 14px", borderRadius: 6, cursor: "pointer",
@@ -69,6 +70,12 @@ export default function EstadisticasPage() {
   const [error, setError] = useState<string[] | null>(null);
   const [cargando, setCargando] = useState(true);
   const archivo = useRef<HTMLInputElement>(null);
+  // Dos pestañas que no se mezclan (owner, 2026-11-10): el catálogo propio de
+  // FinPlan y las estadísticas de Integrity tal como las registra contabilidad.
+  const [pestana, setPestana] = useState<"finplan" | "stats">(() => {
+    try { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "stats" ? "stats" : "finplan"; }
+    catch { return "finplan"; }
+  });
 
   useEffect(() => {
     (async () => {
@@ -179,6 +186,17 @@ export default function EstadisticasPage() {
       <h1 style={{ fontSize: 21, fontWeight: 700, marginBottom: 4 }}>
         {t("titulo")}
       </h1>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-medium)", margin: "10px 0 16px" }}>
+        {([["finplan", t("tabFinplan")], ["stats", t("tabStats")]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setPestana(k)}
+            style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none",
+              border: "none", borderBottom: `2px solid ${pestana === k ? "var(--brand)" : "transparent"}`,
+              color: pestana === k ? "var(--brand)" : "var(--text-secondary)", marginBottom: -1 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {pestana === "stats" ? <StatsIntegrity /> : (<>
       <p style={{ fontSize: 12.5, color: "var(--text-secondary)", maxWidth: 900, marginBottom: 18 }}>
         {t.rich("intro", { b })}
       </p>
@@ -335,6 +353,7 @@ export default function EstadisticasPage() {
       <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 14, maxWidth: 900 }}>
         {t.rich("nota", { b })}
       </p>
+      </>)}
     </div>
   );
 }

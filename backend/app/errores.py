@@ -827,6 +827,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "estadisticas.filas_no_reconocidas": {
         "es": "No se cargó nada. Estas filas traen dato y el escenario no las reconoce: corregilas y volvé a subir.",
         "en": "Nothing was loaded. These rows carry data and the scenario does not recognise them: fix them and upload again."},
+    "stats_integrity.anio_invalido": {
+        "es": "El año {anio} no es válido.",
+        "en": "Year {anio} is not valid."},
     "estadisticas.libro_con_problemas": {
         "es": "No se pudo leer el archivo de estadísticas. Revisá los problemas de la lista y volvé a subirlo.",
         "en": "The statistics file could not be read. Check the problems listed and upload it again."},

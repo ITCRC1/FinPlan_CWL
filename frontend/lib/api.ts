@@ -1142,6 +1142,53 @@ export async function editarCuentaEstadistica(
 export async function getEstadisticas(scenarioId: string): Promise<EstadisticasValores> {
   return api.get(`/estadisticas/${scenarioId}/`);
 }
+
+// ── Stats de Integrity (clase 9 al mes, desde el Balance de Comprobación) ──
+// Owner, 2026-11-10: «la contabilidad manda» · «solo full month». La pantalla
+// solo LEE: el dato es el del mayor guardado; en Integrity el nivel 6 es el día
+// y el backend lo suma al mes.
+export interface StatsIntegrityCuenta {
+  clave: string;            // código de Integrity sin el día (6 niveles)
+  codigo: string;           // con DD en el lugar del día
+  grupo: string;
+  concepto: string;
+  descripcion: string;
+  depto: string;
+  depto_nombre: string;
+  nivel3: string;
+  nivel4: string;
+  nivel5: string;
+  nivel7: string;
+  unidad: string;
+  estado_finplan: string;
+  en_integrity: boolean;
+  nota: string;
+  cuenta_ingreso: string;
+  meses: (number | null)[];  // 12
+  con_dato: boolean;
+  total: number;
+}
+export interface StatsIntegrityGrupo {
+  grupo: string;
+  concepto: string;
+  unidad: string;
+  cuentas: number;
+  con_dato: number;
+  meses: number[];
+}
+export interface StatsIntegrityVista {
+  anio: number;
+  hotel: string;
+  version_catalogo: string;
+  meses_cargados: number[];
+  grupos: StatsIntegrityGrupo[];
+  cuentas: StatsIntegrityCuenta[];
+  fuera_de_catalogo: { clave: string; grupo: string; depto: string; meses: (number | null)[]; total: number }[];
+  cuentas_con_dato: number;
+}
+export async function getStatsIntegrity(anio: number): Promise<StatsIntegrityVista> {
+  return api.get(`/stats-integrity/${anio}/`);
+}
 /** Baja el archivo. Por fetch y no por <a href> porque el endpoint pide token. */
 export async function bajarPlantillaEstadisticas(scenarioId: string): Promise<void> {
   const token = getToken();
