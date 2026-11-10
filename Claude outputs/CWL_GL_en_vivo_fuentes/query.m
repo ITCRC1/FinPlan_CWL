@@ -30,10 +30,14 @@ let
     Fallo = (etiqueta as text, msg as text) =>
         #table(Cols, {{etiqueta, "ERROR", msg} & List.Repeat({null}, List.Count(Cols) - 3)}),
 
-    Traer = (etiqueta as text, anio as text, tipo as text, version as text) =>
+    Traer = (etiqueta as text, anio as text, tipoArg as text, versionArg as text) =>
         let
-            Filtro = [year = anio, tipo = tipo, catalogo = Catalogo]
-                     & (if version = "" then [] else [version = version]),
+            // ⚠️ Los parametros NO pueden llamarse igual que los campos del
+            // registro. Con `[tipo = tipo]` Power Query no distingue el campo
+            // del parametro y falla con «We found one or more unbound names
+            // when recompiling a function internally ... tipo, version».
+            Filtro = [year = anio, tipo = tipoArg, catalogo = Catalogo]
+                     & (if versionArg = "" then [] else [version = versionArg]),
             Resp = Web.Contents(Url, [
                 RelativePath = "api/consolidado/gl/",
                 Query = Filtro,
@@ -46,8 +50,8 @@ let
             Salida =
                 if Llave = "" then Fallo(etiqueta, "Falta la llave de solo lectura en Config")
                 else if Estado = 404 then
-                    Fallo(etiqueta, "No existe " & tipo & " " & anio
-                          & (if version = "" then "" else " version '" & version & "'"))
+                    Fallo(etiqueta, "No existe " & tipoArg & " " & anio
+                          & (if versionArg = "" then "" else " version '" & versionArg & "'"))
                 else if Estado <> 200 then Fallo(etiqueta, "El servidor respondio HTTP " & Text.From(Estado))
                 else
                     let
