@@ -115,18 +115,52 @@ export default function GlReportPage() {
     // conciliación: si sale con el filtro puesto, le faltan cuentas y la suma
     // ya no da la utilidad — o sea que deja de servir para lo único que sirve.
     // El buscador y el filtro de categoría son para mirar en pantalla.
+    // ⚠️ Cada dato en SU columna, no pegados en una sola.
+    //
+    // Owner, 2026-11-10, sobre el Excel: *«debe venir separado por GL, GL
+    // descripción, department number, department description»*. Y señalando
+    // Admin · Account Mapping: *«me gusta todo el detalle que da»*.
+    //
+    // Antes la primera columna era `0110 Rooms / Habitaciones · 7680 Uniform
+    // Costs`, todo junto. Así no se puede filtrar por departamento, ni hacer
+    // una tabla dinámica por cuenta, ni cruzar contra otro archivo -- que es
+    // para lo que alguien baja un Excel en vez de mirar la pantalla.
+    //
+    // El orden de las columnas es el del mapeo, para que las dos vistas se
+    // lean igual.
+    const TEXTO = "texto" as const;
+    const natura = (r: GlRow) =>
+      (r.pl_section || "").trim().toUpperCase() === "REVENUES"
+        ? t("natRevenue") : t("natExpense");
     const detalle: FilaCuadro[] = (data.rows ?? []).map(r => ({
-      label: `${r.dept_code} ${r.dept_name} · ${r.account_code} ${r.account_name}`,
+      label: r.account_code,
       nivel: 0,
-      valores: [...r.meses, r.total],
+      valores: [r.account_name, r.dept_code, r.dept_name, r.pl_section,
+                r.pl_line_code, r.pl_line_name, natura(r),
+                ...r.meses, r.total],
     }));
+    const columnas = [
+      { label: t("colGl"), ancho: 12, formato: TEXTO },
+      { label: t("colGlDesc"), ancho: 34, formato: TEXTO },
+      { label: t("colDept"), ancho: 10, formato: TEXTO },
+      { label: t("colDeptDesc"), ancho: 30, formato: TEXTO },
+      { label: t("colSection"), ancho: 24, formato: TEXTO },
+      { label: t("colPlLine"), ancho: 22, formato: TEXTO },
+      { label: t("colReportLine"), ancho: 28, formato: TEXTO },
+      { label: t("colNature"), ancho: 11, formato: TEXTO },
+      ...MESES.map(m => ({ label: m, ancho: 14, formato: "usd" as const })),
+      { label: tc("annual"), ancho: 16, formato: "usd" as const },
+    ];
+
+    // El resumen tiene UNA columna de texto, no ocho: con las del detalle las
+    // cifras caerían siete columnas corridas.
     const resumen: FilaCuadro[] = data.resumen.map(f => ({
       label: t(`cat.${f.categoria}`) + (f.suma ? "" : ` (${t("noSuma")})`),
       nivel: 0, es_total: f.categoria === "NET",
       valores: [...f.meses, f.total],
     }));
-    const columnas = [
-      { label: t("colAccount"), ancho: 52, formato: "texto" as const },
+    const columnasResumen = [
+      { label: t("colAccount"), ancho: 34, formato: TEXTO },
       ...MESES.map(m => ({ label: m, ancho: 14, formato: "usd" as const })),
       { label: tc("annual"), ancho: 16, formato: "usd" as const },
     ];
@@ -137,7 +171,7 @@ export default function GlReportPage() {
           columnas, filas: detalle },
         { titulo: `${t("title")} — ${t("tabSummary")}`,
           subtitulo: t("signNote"), hoja: t("tabSummary"),
-          columnas, filas: resumen },
+          columnas: columnasResumen, filas: resumen },
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo generar el Excel");

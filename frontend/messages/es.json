@@ -5475,11 +5475,11 @@
     "noSuma": "no suma",
     "netIsProfit": "Con el ingreso en negativo, NETO es la utilidad cambiada de signo: si el reporte cierra, NETO = −Net Profit del P&L.",
     "incomplete": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta. La grilla NO trae las cuentas 4xxx y la suma no da la utilidad.",
-    "colDept": "Dept",
+    "colDept": "Depto",
     "colDeptName": "Departamento",
-    "colGl": "Cuenta",
-    "colGlDesc": "Descripción",
-    "colPlLine": "Línea del P&L",
+    "colGl": "Cuenta GL",
+    "colGlDesc": "Descripción GL",
+    "colPlLine": "Línea P&L",
     "colCorporate": "Código corporativo",
     "colCategory": "Categoría",
     "noMapping": "SIN MAPEO",
@@ -5536,6 +5536,12 @@
     "catalogo": "Mostrar todas las cuentas del mapeo (las no usadas, en cero)",
     "sinMovimiento": "sin movimiento",
     "catalogoHint": "Este escenario usa {usadas} de {total} cuentas de Admin · Account Mapping.",
-    "incompleteMedido": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta. La grilla lleva {grilla} de los {pl} de ingreso del P&L — faltan {falta}."
+    "incompleteMedido": "Este escenario se arma en los checkbooks: el ingreso se calcula de tarifas y vive por línea del P&L, no por cuenta. La grilla lleva {grilla} de los {pl} de ingreso del P&L — faltan {falta}.",
+    "colDeptDesc": "Nombre del Departamento",
+    "colSection": "Sección",
+    "colReportLine": "Renglón del reporte",
+    "colNature": "Naturaleza",
+    "natRevenue": "Ingreso",
+    "natExpense": "Gasto"
   }
 }

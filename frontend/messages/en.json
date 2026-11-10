@@ -5536,6 +5536,12 @@
     "catalogo": "Show every account in the mapping (unused ones at zero)",
     "sinMovimiento": "no movement",
     "catalogoHint": "{usadas} of {total} accounts in Admin · Account Mapping are used by this scenario.",
-    "incompleteMedido": "This scenario is built in the checkbooks: revenue is computed from rates and lives by P&L line, not by account. The grid carries {grilla} of the {pl} of revenue in the P&L — {falta} short."
+    "incompleteMedido": "This scenario is built in the checkbooks: revenue is computed from rates and lives by P&L line, not by account. The grid carries {grilla} of the {pl} of revenue in the P&L — {falta} short.",
+    "colDeptDesc": "Department Name",
+    "colSection": "Section",
+    "colReportLine": "Report line",
+    "colNature": "Nature",
+    "natRevenue": "Revenue",
+    "natExpense": "Expense"
   }
 }
