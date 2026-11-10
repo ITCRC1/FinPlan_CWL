@@ -35,19 +35,31 @@ class CostSummary:
 
 
 def _get_revenue_line(rev: RevenueResult, line_ref: str) -> Decimal:
-    """Map revenue_line_ref string to actual revenue amount."""
+    """Map revenue_line_ref string to actual revenue amount.
+
+    Cubre las 14 líneas del checkbook de ingresos (`revenue_entry.REVENUE_LINES`).
+    Antes faltaban FNB_MISC, LAUNDRY y las tres del Club: la pantalla las ofrecía
+    en el selector, pero un costo «% del ingreso» contra ellas daba $0 sin aviso
+    (auditoría 2026-11-10, costos H7). CLUB es el Club entero, igual que en la
+    fila de referencia de la pantalla.
+    """
     mapping = {
-        "ROOMS":          rev.rooms,
-        "FOOD":           rev.food,
-        "BEVERAGE":       rev.beverage,
-        "ACTIVITIES":     rev.activities,
-        "TRANSPORT":      rev.transport,
-        "SUSTAINABILITY": rev.sustainability,
-        "INNOCEANA":      rev.innoceana,
-        "RETAIL":         rev.retail,
-        "SPA":            rev.spa,
+        "ROOMS":           rev.rooms,
+        "FOOD":            rev.food,
+        "BEVERAGE":        rev.beverage,
+        "FNB_MISC":        rev.fnb_misc,
+        "ACTIVITIES":      rev.activities,
+        "TRANSPORT":       rev.transport,
+        "SUSTAINABILITY":  rev.sustainability,
+        "INNOCEANA":       rev.innoceana,
+        "RETAIL":          rev.retail,
+        "SPA":             rev.spa,
+        "LAUNDRY":         rev.laundry,
+        "CLUB":            rev.club + rev.club_actividad + rev.club_visitantes,
+        "CLUB_ACTIVIDAD":  rev.club_actividad,
+        "CLUB_VISITANTES": rev.club_visitantes,
     }
-    return mapping.get(line_ref.upper(), ZERO)
+    return mapping.get((line_ref or "").upper(), ZERO)
 
 
 def calculate_cost_amount(

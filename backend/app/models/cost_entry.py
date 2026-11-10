@@ -6,10 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
 # Supported revenue line references for REVENUE_LINE driver
-REVENUE_LINES = (
-    "ROOMS", "FOOD", "BEVERAGE", "ACTIVITIES", "TRANSPORT",
-    "INNOCEANA", "RETAIL", "SPA", "SUSTAINABILITY",
-)
+# Las mismas 14 líneas del checkbook de ingresos: un costo «% del ingreso» puede
+# apoyarse en cualquiera. Se toma de `revenue_entry` para que no vuelvan a
+# separarse (antes faltaban FNB_MISC, LAUNDRY y el Club).
+from app.models.revenue_entry import REVENUE_LINES  # noqa: E402,F401
 
 # Supported driver types
 # FTE: monto por persona × la gente del mes. Para costos que se mueven con el

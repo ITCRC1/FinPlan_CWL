@@ -74,7 +74,7 @@ _MES_CORTO = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
 from app.models.ops_kpi import OpsKpiEntry
 from app.models.balance_sheet_line import BalanceSheetLine
 from app.engine.revenue_calculator import (
-    calculate_annual_revenue, RevenueResult, room_type_breakdown,
+    RevenueResult, room_type_breakdown,
 )
 from app.importers.revenue_importer import import_revenue, repartir_tipos_para_el_excel
 from app.importers.historical_kpi_importer import import_historical_kpi
@@ -684,56 +684,23 @@ async def import_revenue_data(
 
 @router.get("/scenarios/{scenario_id}/revenue/monthly/")
 async def get_monthly_revenue(scenario_id: str, db: AsyncSession = Depends(get_db)):
-    """Return revenue results for all 12 months.
+    """Return revenue results for all 12 months — el MISMO ingreso que el P&L.
 
-    Respects scenario.revenue_source: 'checkbook' reads the direct RevenueEntry
-    amounts; 'drivers' (default) derives revenue from rate cards × occupancy.
+    Delega en `recalculate.load_revenue_results`, que respeta
+    `scenario.revenue_source` ('checkbook' lee `RevenueEntry`; 'drivers' calcula
+    tarifas × ocupación). Antes la rama de drivers tenía su propia copia del
+    cálculo sin meses cerrados ni unidades del escenario: Key Indicators contaba
+    12.045 noches disponibles contra 11.022 del P&L (auditoría 2026-11-10, H5).
     """
     scenario = await _get_scenario_or_404(scenario_id, db)
-
-    if getattr(scenario, "revenue_source", "drivers") == "checkbook":
-        from app.engine.recalculate import revenue_results_from_checkbook
-        results_by_month = await revenue_results_from_checkbook(db, scenario)
-        results = [results_by_month[m] for m in range(1, 13)]
-        annual_total = sum(r.total_revenue for r in results)
-        return {
-            "scenario_id": scenario_id,
-            "year": scenario.year,
-            "source": "checkbook",
-            "months": [_revenue_result_to_dict(r) for r in results],
-            "annual_total_revenue": str(annual_total),
-        }
-
-    data = await _load_revenue_data(scenario_id, db)
-
-    room_type_units = {rt.id: rt.units for rt in data["room_types"]}
-
-    # Group by month
-    rates_by_month = {}
-    for rc in data["rate_cards"]:
-        rates_by_month.setdefault(rc.month, []).append(rc)
-    occ_by_month = {}
-    for ob in data["occupancies"]:
-        occ_by_month.setdefault(ob.month, []).append(ob)
-    other_by_month = {}
-    for ot in data["other_revenues"]:
-        other_by_month.setdefault(ot.month, []).append(ot)
-
-    results = calculate_annual_revenue(
-        year=scenario.year,
-        rate_cards_by_month=rates_by_month,
-        occ_by_month=occ_by_month,
-        channels=data["channels"],
-        pkg_configs=data["pkg_configs"],
-        other_by_month=other_by_month,
-        room_type_units=room_type_units,
-    )
-
+    from app.engine.recalculate import load_revenue_results
+    por_mes = await load_revenue_results(db, scenario)
+    results = [por_mes[m] for m in range(1, 13)]
     annual_total = sum(r.total_revenue for r in results)
     return {
         "scenario_id": scenario_id,
         "year": scenario.year,
-        "source": "drivers",
+        "source": getattr(scenario, "revenue_source", None) or "drivers",
         "months": [_revenue_result_to_dict(r) for r in results],
         "annual_total_revenue": str(annual_total),
     }
@@ -2734,23 +2701,11 @@ async def get_monthly_revenue_single(
         raise ErrorApi(422, "mes.fuera_de_rango")
 
     scenario = await _get_scenario_or_404(scenario_id, db)
-    data = await _load_revenue_data(scenario_id, db)
-    room_type_units = {rt.id: rt.units for rt in data["room_types"]}
-
-    from app.engine.revenue_calculator import calculate_revenue
-    _hotel = await db.get(Hotel, scenario.hotel_id)
-    result = calculate_revenue(
-        month=month,
-        year=scenario.year,
-        # Mismo criterio que el recálculo: un mes sin operación no tiene noches.
-        cerrado=month in set(_hotel.closed_months_list if _hotel else []),
-        rate_cards=[rc for rc in data["rate_cards"] if rc.month == month],
-        occ_budgets=[ob for ob in data["occupancies"] if ob.month == month],
-        channels=[c for c in data["channels"] if getattr(c, "month", month) == month] or data["channels"],
-        pkg_configs=data["pkg_configs"],
-        other_revenues=[ot for ot in data["other_revenues"] if ot.month == month],
-        room_type_units=room_type_units,
-    )
+    # El mismo ingreso que el P&L (respeta `revenue_source`): antes este mes
+    # suelto se calculaba SIEMPRE por drivers, aunque el escenario leyera el
+    # checkbook, y no coincidía con el mes de /revenue/monthly/.
+    from app.engine.recalculate import load_revenue_results
+    result = (await load_revenue_results(db, scenario))[month]
     return _revenue_result_to_dict(result)
 
 

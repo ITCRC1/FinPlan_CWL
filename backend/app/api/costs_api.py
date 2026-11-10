@@ -29,13 +29,7 @@ from app.importers.gl_detail_importer import ALLOC_EXCL_COST, allocation_en_over
 from app.engine.cost_calculator import calculate_cost_amount, recalculate_cost_entries
 from app.api._nombres_de_depto import nombres_de_depto
 from app.export.costs_excel import export_costs_to_excel, import_costs_from_excel
-from app.engine.revenue_calculator import calculate_annual_revenue, RevenueResult
-from app.models.sales_channel_config import SalesChannelConfig
-from app.models.rate_card import RateCard
-from app.models.occupancy_budget import OccupancyBudget
-from app.models.package_config import PackageConfig
-from app.models.revenue_other import RevenueOther
-from app.models.room_type_config import RoomTypeConfig
+from app.engine.revenue_calculator import RevenueResult
 from app.models.mapping import AccountMapping
 from app.api._allocated import lineas_del_allocation
 
@@ -144,39 +138,24 @@ def _entry_to_dict(e: CostEntry) -> dict:
 
 
 async def _load_revenue_results(scenario_id: str, scenario: Scenario, db: AsyncSession) -> list[RevenueResult]:
-    """Load and calculate revenue for all 12 months."""
-    channels = (await db.execute(select(SalesChannelConfig).where(SalesChannelConfig.scenario_id == scenario_id))).scalars().all()
-    rate_cards = (await db.execute(select(RateCard).where(RateCard.scenario_id == scenario_id))).scalars().all()
-    occs = (await db.execute(select(OccupancyBudget).where(OccupancyBudget.scenario_id == scenario_id))).scalars().all()
-    pkgs = (await db.execute(select(PackageConfig).where(PackageConfig.scenario_id == scenario_id))).scalars().all()
-    others = (await db.execute(select(RevenueOther).where(RevenueOther.scenario_id == scenario_id))).scalars().all()
-    room_types = (await db.execute(
-        select(RoomTypeConfig)
-        .where(RoomTypeConfig.hotel_id == scenario.hotel_id)
-        .order_by(RoomTypeConfig.sort_order)
-    )).scalars().all()
+    """El ingreso de los 12 meses, el MISMO que usa el P&L.
 
-    # Group by month (current calculate_annual_revenue signature)
-    rates_by_month: dict[int, list] = {}
-    occ_by_month: dict[int, list] = {}
-    other_by_month: dict[int, list] = {}
-    for rc in rate_cards:
-        rates_by_month.setdefault(rc.month, []).append(rc)
-    for ob in occs:
-        occ_by_month.setdefault(ob.month, []).append(ob)
-    for ot in others:
-        other_by_month.setdefault(ot.month, []).append(ot)
-    room_type_units = {rt.id: rt.units for rt in room_types}
+    Delega en `recalculate.load_revenue_results`, que respeta
+    `scenario.revenue_source`. Antes este cargador armaba su propio ingreso con
+    tarifas × ocupación SIEMPRE, aunque el escenario leyera el checkbook: en el
+    Budget Working 2027 eso daba $134.810 más de ingreso que el P&L (el modelo no
+    conoce el «5 % que no consume» ni el Retail al 1 %), y los costos «% del
+    ingreso» salían $17.990 más altos — Food al 31,58 % en vez del 30 %
+    (auditoría 2026-11-10, hallazgo C2). Y como la fila de referencia de la
+    pantalla mostraba el mismo ingreso equivocado, el error se confirmaba solo.
 
-    return calculate_annual_revenue(
-        year=scenario.year,
-        rate_cards_by_month=rates_by_month,
-        occ_by_month=occ_by_month,
-        channels=channels,
-        pkg_configs=pkgs,
-        other_by_month=other_by_month,
-        room_type_units=room_type_units,
-    )
+    Ganancia adicional: noches disponibles, ocupadas y huéspedes salen de la misma
+    fuente que los KPIs del P&L (meses cerrados del hotel y unidades del
+    escenario incluidos), así que los drivers por noche y por huésped también.
+    """
+    from app.engine.recalculate import load_revenue_results
+    por_mes = await load_revenue_results(db, scenario)
+    return [por_mes[m] for m in sorted(por_mes)]
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -387,6 +366,30 @@ async def costs_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     return {"scenario_id": scenario_id, "depts": depts}
 
 
+#: Qué líneas de ingreso le corresponden a cada depto para su margen bruto.
+#: Antes el mapa era viejo (Spa y Retail juntos en 0140/0141, Innoceana con
+#: Tours, Gift Shop 0165 contra el ingreso TOTAL del hotel → 99,72 % de margen)
+#: — auditoría 2026-11-10, C11.
+_LINEAS_DEL_DEPTO = {
+    "0120": ("food", "beverage", "fnb_misc"),
+    "0130": ("spa",), "0140": ("spa",),
+    "0150": ("activities",),
+    "0151": ("retail",), "0165": ("retail",),
+    "0152": ("transport",),
+    "0155": ("innoceana",),
+    "0161": ("laundry",), "0162": ("laundry",),
+}
+
+
+def _ingreso_del_depto(rev, dept_code: str) -> Decimal:
+    if rev is None:
+        return Decimal("0")
+    campos = _LINEAS_DEL_DEPTO.get(dept_code)
+    if campos is None:
+        return rev.total_revenue
+    return sum((getattr(rev, c) or Decimal("0") for c in campos), Decimal("0"))
+
+
 @router.get("/costs/{scenario_id}/dept/{dept_code}/summary/")
 async def get_dept_cost_summary(scenario_id: str, dept_code: str, db: AsyncSession = Depends(get_db)):
     """
@@ -408,17 +411,7 @@ async def get_dept_cost_summary(scenario_id: str, dept_code: str, db: AsyncSessi
     for m in range(1, 13):
         total_cos = sum(e.get_month(m) for e in entries)
         rev = rev_by_month.get(m)
-        # For F&B dept (0120): use food + beverage; for others: use total_revenue
-        if dept_code == "0120":
-            relevant_rev = (rev.food + rev.beverage) if rev else Decimal("0")
-        elif dept_code in ("0140", "0141"):  # Spa / Retail
-            relevant_rev = (rev.spa + rev.retail) if rev else Decimal("0")
-        elif dept_code in ("0150", "0151"):  # Activities / Innoceana
-            relevant_rev = (rev.activities + rev.innoceana) if rev else Decimal("0")
-        elif dept_code == "0152":  # Transport
-            relevant_rev = rev.transport if rev else Decimal("0")
-        else:
-            relevant_rev = rev.total_revenue if rev else Decimal("0")
+        relevant_rev = _ingreso_del_depto(rev, dept_code)
         gross_profit = relevant_rev - total_cos
         margin_pct = (gross_profit / relevant_rev) if relevant_rev else Decimal("0")
         monthly.append({
