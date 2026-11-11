@@ -20,6 +20,11 @@ los KPIs. Si cambia, cambia en las cuatro — por eso hay prueba de su forma.
 fila del GL. Totales por línea; y, en `/consolidado/propia/cuentas/`, el
 P&L por (departamento, cuenta) —sumas, nunca movimientos—.
 
+⚠️ **Lo de arriba vale para ESTE módulo.** El 2026-11-11 el owner eligió, preguntado
+explícitamente, que por la misma llave salgan las posiciones **con nombre y
+salario** y los checkbooks de planilla, OPEX y costos: viven aparte, en
+`consolidado_planilla_api.py`, para que este archivo siga sin tocar el detalle.
+
 **Por qué ahora sale por cuenta (owner, 2026-10-26).** «Que vengan de FinPlan de
 una, y también todo». El Owner Dashboard deja de recibir el libro del P&L en
 Excel: toma el Actual y el Forecast vigente de acá. Ese tablero muestra el P&L
@@ -190,9 +195,21 @@ async def consolidado_revenue_checkbook(
 def _escoger_escenario(escenarios: list, tipo: str, version: str | None):
     """El escenario a entregar. Sin versión: para FORECAST el marcado ★ Current
     (o el más reciente si no hay marca); para ACTUAL el real, nunca el espejo del
-    Pre-Cierre (trae un solo mes y es siempre lo último creado)."""
+    Pre-Cierre (trae un solo mes y es siempre lo último creado).
+
+    **El Pre-Cierre se pide por su nombre** (`tipo=ACTUAL&version=Pre-Cierre`,
+    `precierre_api.VERSION_ESPEJO`). Owner, 2026-11-11, para el libro del Cierre
+    Mensual: «que tenga la versión Precierre, que es donde preliminarmente subo
+    los resultados para revisar». Pedirlo así es explícito y no cambia lo que
+    recibe quien no pide versión.
+
+    Con versión, si el espejo y un ACTUAL real llegaran a llamarse igual, gana el
+    real: el espejo solo sale cuando es lo ÚNICO con ese nombre.
+    """
     if version:
-        return next((e for e in escenarios if e.version == version), None)
+        iguales = [e for e in escenarios if e.version == version]
+        reales = [e for e in iguales if not getattr(e, "es_precierre", False)]
+        return (reales or iguales or [None])[0]
     if tipo == "ACTUAL":
         escenarios = [e for e in escenarios if not getattr(e, "es_precierre", False)]
     if tipo == "FORECAST":
@@ -448,4 +465,129 @@ async def consolidado_gl(
             "meses": [float(x or 0) for x in r["meses"]],
             "anual": float(r["total"] or 0),
         } for r in grilla],
+    }
+
+
+# ── Estadísticas de habitaciones para el Excel en vivo ───────────────────────
+
+#: (clave, nombre, unidad) en el orden de la pestaña.
+INDICADORES = [
+    ("units", "Unidades (habitaciones)", "hab"),
+    ("rooms_available", "Total rooms available", "noches"),
+    ("rooms_occupied", "Rooms occupied", "noches"),
+    ("guests", "Huéspedes", "pax"),
+    ("occupancy_pct", "% Ocupación", "%"),
+    ("adr", "ADR (habitaciones)", "USD"),
+    ("rooms_revenue", "Ingreso de habitaciones", "USD"),
+    ("total_revenue", "Ingreso total", "USD"),
+    ("adr_total", "ADR ingreso total (ingreso total / ocupadas)", "USD"),
+    ("revpar", "RevPAR (ingreso total / disponibles)", "USD"),
+    ("revpar_rooms", "RevPAR habitaciones (ADR × ocupación)", "USD"),
+]
+
+
+def _monto(lineas, codigo: str) -> float:
+    total = 0.0
+    for ln in lineas:
+        lc = ln["line_code"] if isinstance(ln, dict) else getattr(ln, "line_code", "")
+        if lc == codigo:
+            total += float(ln["amount_usd"] if isinstance(ln, dict) else ln.amount_usd)
+    return total
+
+
+def indicadores_del_periodo(kpis: dict, lineas, dias: int) -> dict[str, float]:
+    """Los indicadores de un mes (o del año) desde los KPIs y las líneas del P&L.
+
+    ADR, ocupación y RevPAR son los MISMOS del encabezado del P&L
+    (`pl_api`): el ADR sale de las estadísticas del escenario y no de la línea
+    REV_ROOMS (un no-show no ocupa habitación), y el RevPAR es ingreso TOTAL /
+    disponibles (owner, 2026-09-08). Lo nuevo se deriva de esos:
+    unidades = disponibles / días, ADR total = ingreso total / ocupadas y el
+    RevPAR de habitaciones = ADR × ocupación.
+
+    ⚠️ Sin ADR en las estadísticas (un ACTUAL no lo guarda por mes) se usa la
+    MISMA regla que `pl_api._aggregate_selected` aplica al año: ingreso de
+    habitaciones / ocupadas. Sin eso el mes salía en 0 y el año no.
+    """
+    disp = float(kpis.get("rooms_available") or 0)
+    ocup = float(kpis.get("rooms_occupied") or 0)
+    occ = float(kpis.get("occupancy_pct") or 0)
+    adr = float(kpis.get("adr") or 0)
+    rooms = _monto(lineas, "REV_ROOMS")
+    if not adr and ocup:
+        adr = rooms / ocup
+    total = _monto(lineas, "TOTAL_REVENUES")
+    return {
+        "units": round(disp / dias, 2) if dias else 0.0,
+        "rooms_available": disp,
+        "rooms_occupied": ocup,
+        "guests": float(kpis.get("guests") or 0),
+        "occupancy_pct": occ,
+        "adr": adr,
+        "rooms_revenue": rooms,
+        "total_revenue": total,
+        "adr_total": (total / ocup) if ocup else 0.0,
+        "revpar": float(kpis.get("revpar") or 0),
+        "revpar_rooms": adr * occ,
+    }
+
+
+@router.get("/consolidado/estadisticas/")
+async def consolidado_estadisticas(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Estadísticas de habitaciones por mes y del año, para el Excel en vivo.
+
+    Owner, 2026-11-11: *«un tab de estadísticas de rooms, total rooms
+    available, units, rooms occupied, % ocupación, ADR, ADR total revenue,
+    RevPAR»*. Reusa `pl_api._monthly_results` y `pl_api._aggregate`, lo mismo
+    que `/consolidado/propia/`: el Excel muestra los números del encabezado
+    del P&L, no otros.
+    """
+    import calendar
+
+    from app.api import pl_api
+
+    tipo = tipo.upper()
+    if tipo not in TIPOS:
+        raise ErrorApi(422, "consolidado.tipo_invalido", tipos=", ".join(TIPOS))
+    async with get_session() as session:
+        escenarios = (await session.execute(
+            select(Scenario).where(Scenario.hotel_id == HOTEL_ID, Scenario.year == year,
+                                   Scenario.type == tipo)
+            .order_by(Scenario.created_at.desc()))).scalars().all()
+        escenario = _escoger_escenario(list(escenarios), tipo, version)
+        if escenario is None:
+            if version:
+                raise ErrorApi(404, "consolidado.sin_escenario_version",
+                               propiedad=HOTEL_NAME, tipo=tipo, version=version, anio=year)
+            raise ErrorApi(404, "consolidado.sin_escenario", propiedad=HOTEL_NAME, tipo=tipo, anio=year)
+        mensual = await pl_api._monthly_results(session, escenario)
+        anual = pl_api._aggregate(mensual, 12)
+
+    por_mes = {m["month"]: indicadores_del_periodo(
+        m["kpis"] or {}, m["lines"], calendar.monthrange(year, m["month"])[1]) for m in mensual}
+    # Las unidades del año promedian solo los meses con habitaciones: un ACTUAL
+    # a mitad de año no tiene por qué «perder» habitaciones en los meses que aún
+    # no se cerraron.
+    dias_con_hab = sum(calendar.monthrange(year, m["month"])[1] for m in mensual
+                       if float((m["kpis"] or {}).get("rooms_available") or 0) > 0)
+    del_anio = indicadores_del_periodo(anual.get("kpis") or {}, anual["lines"], dias_con_hab)
+    return {
+        "contrato": CONTRATO,
+        "hotel_id": HOTEL_ID,
+        "hotel_name": HOTEL_NAME,
+        "year": year,
+        "tipo": tipo,
+        "escenario": {"id": escenario.id, "version": escenario.version,
+                      "status": escenario.status,
+                      "actuals_through": escenario.actuals_through or 0},
+        "indicadores": [{
+            "clave": k, "nombre": n, "unidad": u,
+            "meses": [round(por_mes.get(i, {}).get(k, 0.0), 4) for i in range(1, 13)],
+            "anual": round(del_anio[k], 4),
+        } for k, n, u in INDICADORES],
     }
