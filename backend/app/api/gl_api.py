@@ -408,6 +408,22 @@ async def _grilla(db: AsyncSession, esc: Scenario, *, catalogo: bool = False):
               if (f["dept_code"], f["account_code"]) not in con_movimiento]
     if catalogo:
         filas = filas + faltan
+    # Una fila CON movimiento puede venir sin descripción: la planilla no guarda
+    # el nombre de la cuenta (solo OPEX, costo y below-GOP lo traen), así que
+    # las 6xxx de checkbook bajaban con «Account name» vacío y no aparecían al
+    # filtrar o buscar por nombre (owner, 2026-11-10, Villas 0115). Se completa
+    # con el nombre del mapeo: primero el de la misma (depto, cuenta) y, si no,
+    # el de la cuenta en cualquier depto.
+    por_par = {(f["dept_code"], f["account_code"]): f["account_name"]
+               for f in del_catalogo if f["account_name"]}
+    por_cuenta: dict[str, str] = {}
+    for f in del_catalogo:
+        if f["account_name"]:
+            por_cuenta.setdefault(f["account_code"], f["account_name"])
+    for f in filas:
+        if not str(f.get("account_name") or "").strip():
+            f["account_name"] = (por_par.get((f["dept_code"], f["account_code"]))
+                                 or por_cuenta.get(f["account_code"], ""))
     lineas_cfg = await recalc.load_report_line_config(db)
     secciones = {l["line_code"]: (l.get("section") or "") for l in lineas_cfg}
     nombres_linea = {l["line_code"]: (l.get("line_name") or "") for l in lineas_cfg}

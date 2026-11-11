@@ -416,3 +416,16 @@ def test_el_ingreso_de_rooms_se_abre_por_el_depto_del_set():
     ap = inspect.getsource(gl_api._apertura_de_rooms)
     assert "get_revenue_by_room_type" in ap       # la apertura de los drivers, no un reparto nuevo
     assert 'rt.dept_code or "0110"' in ap
+
+
+def test_la_planilla_baja_con_el_nombre_de_su_cuenta():
+    """La planilla no guarda el nombre de la cuenta: las 6xxx con monto bajaban
+    con «Account name» vacío (Villas 0115, 2026-11-10). La grilla lo completa
+    del mapeo antes de armar las filas."""
+    import inspect
+    from app.api import gl_api
+    src = inspect.getsource(gl_api._grilla)
+    assert "por_par.get((f[\"dept_code\"], f[\"account_code\"]))" in src
+    assert "por_cuenta.get(f[\"account_code\"]" in src
+    # Se completa ANTES de armar las filas, para que el nombre viaje en la grilla.
+    assert src.index("por_cuenta.get(") < src.index("grilla = [_fila(")
