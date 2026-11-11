@@ -213,15 +213,11 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     #
     # Las claves ya presentes NO se pisan: los repartos entran por
     # `AllocationEntry` con su cuenta 4999 y no pueden contarse dos veces.
-    detalle_real = False
+    detalle: list[dict] = []
     for modelo in (RevenueAccountEntry, BelowGopAccountEntry):
-        filas_modelo = await _por_cuenta(db, modelo, esc.id)
-        if filas_modelo:
-            detalle_real = True
-        for f in filas_modelo:
-            clave = (f["dept_code"], f["account_code"])
-            if clave not in acumulado:
-                acumulado[clave] = f
+        for f in await _por_cuenta(db, modelo, esc.id):
+            if (f["dept_code"], f["account_code"]) not in acumulado:
+                detalle.append(f)
 
     # ── La liga contable del checkbook ───────────────────────────────────
     #
@@ -240,47 +236,79 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     # coincidencia. Entran las secciones que el checkbook no sube por cuenta:
     # ingreso y todo lo que vive debajo del GOP.
     #
-    # ⚠️ Si alguien cargó el detalle por cuenta de verdad
-    # (`revenue_account_entries`), ÉSE manda y el ancla no se usa: sumar los
-    # dos contaría el ingreso dos veces.
-    if not detalle_real:
-        ancla = gl.ancla_contable(
-            [_como_dict(m) for m in await _reglas_vigentes(db)])
-        secciones = {l["line_code"]: (l.get("section") or "")
-                     for l in await recalc.load_report_line_config(db)}
-        apertura = await _apertura_de_rooms(db, esc)
+    # ⚠️ Si alguien cargó el detalle por cuenta de verdad, ÉSE manda y el ancla
+    # no se usa en esa línea: sumar los dos contaría el monto dos veces.
+    #
+    # ⚠️ Pero manda LÍNEA POR LÍNEA, y solo si dice lo mismo que el P&L
+    # (encontrado en Amarena, 2026-11-11). Antes el detalle apagaba el ancla de
+    # TODAS las líneas en cuanto existía una sola fila: el Budget 2026 Final de
+    # Amarena tiene dos filas de below-GOP y la grilla perdía todo el ingreso y
+    # la renta — $452,657 de diferencia contra el P&L. Y el detalle de below-GOP de un
+    # checkbook no es lo que el P&L usa (lo siembra `NonOpEntry`), así que puede
+    # decir otra cifra. Ver `gl.lineas_con_detalle_fiel`.
+    ancla = gl.ancla_contable(
+        [_como_dict(m) for m in await _reglas_vigentes(db)])
+    secciones = {l["line_code"]: (l.get("section") or "")
+                 for l in await recalc.load_report_line_config(db)}
+    apertura = await _apertura_de_rooms(db, esc)
 
-        def asentar(dept: str, cuenta: str, nombre: str, mes: int, monto: Decimal) -> None:
-            if (dept, cuenta) in con_movimiento_real:
-                return
-            fila = acumulado.setdefault(
-                (dept, cuenta),
-                {"dept_code": dept, "account_code": cuenta,
-                 "account_name": nombre or nombres.get(cuenta, ""),
-                 "outlet": "", "por_linea": True,
-                 **{m: ZERO for m in gl.MESES}})
-            fila[gl.MESES[mes - 1]] += monto
+    lineas_pl = {mes: await recalc.compute_pl_month(db, esc, mes) for mes in range(1, 13)}
+    pl_por_linea: dict[str, list[Decimal]] = {}
+    for mes, lineas in lineas_pl.items():
+        for linea in lineas:
+            sec = (secciones.get(linea.line_code) or "").strip().upper()
+            if sec in SECCIONES_SEMBRADAS:
+                serie = pl_por_linea.setdefault(linea.line_code, [ZERO] * 12)
+                serie[mes - 1] += Decimal(str(linea.amount_usd or 0))
+    resolver = pl_engine.construir_resolvedor(
+        await recalc.load_active_account_mappings(db))
 
-        for mes in range(1, 13):
-            for linea in await recalc.compute_pl_month(db, esc, mes):
-                sec = (secciones.get(linea.line_code) or "").strip().upper()
-                if sec not in SECCIONES_SEMBRADAS:
-                    continue
-                destino = ancla.get(linea.line_code)
-                if destino is None:
-                    continue
-                dept, cuenta, nombre = destino
-                monto = Decimal(str(linea.amount_usd or 0))
-                # Rooms se abre por departamento con la apertura por set de
-                # habitaciones (Villas 0115, Residencias 0116): la parte de
-                # cada set va a SU depto y el resto queda en el ancla, así que
-                # la línea suma igual. Ver `_apertura_de_rooms`.
-                if linea.line_code == "REV_ROOMS":
-                    for d, v in (apertura.get(mes) or {}).items():
-                        if d != dept and v:
-                            asentar(d, cuenta, nombre, mes, v)
-                            monto -= v
-                asentar(dept, cuenta, nombre, mes, monto)
+    def linea_de(f: dict) -> str:
+        regla, _como = resolver(f["dept_code"], f["account_code"])
+        return str(regla.get("report_line_code") or "") if regla else ""
+
+    det_por_linea: dict[str, list[dict]] = {}
+    for f in detalle:
+        det_por_linea.setdefault(linea_de(f), []).append(f)
+    fieles = gl.lineas_con_detalle_fiel(det_por_linea, pl_por_linea)
+    for lc, filas_det in det_por_linea.items():
+        # Se queda el detalle que cuadra con su línea, y el que cae en una
+        # línea que el ancla no siembra (no hay con qué reemplazarlo).
+        if lc in fieles or lc not in pl_por_linea:
+            for f in filas_det:
+                acumulado.setdefault((f["dept_code"], f["account_code"]), f)
+
+    def asentar(dept: str, cuenta: str, nombre: str, mes: int, monto: Decimal) -> None:
+        if (dept, cuenta) in con_movimiento_real:
+            return
+        fila = acumulado.setdefault(
+            (dept, cuenta),
+            {"dept_code": dept, "account_code": cuenta,
+             "account_name": nombre or nombres.get(cuenta, ""),
+             "outlet": "", "por_linea": True,
+             **{m: ZERO for m in gl.MESES}})
+        fila[gl.MESES[mes - 1]] += monto
+
+    for mes in range(1, 13):
+        for linea in lineas_pl[mes]:
+            sec = (secciones.get(linea.line_code) or "").strip().upper()
+            if sec not in SECCIONES_SEMBRADAS or linea.line_code in fieles:
+                continue
+            destino = ancla.get(linea.line_code)
+            if destino is None:
+                continue
+            dept, cuenta, nombre = destino
+            monto = Decimal(str(linea.amount_usd or 0))
+            # Rooms se abre por departamento con la apertura por set de
+            # habitaciones (Villas 0115, Residencias 0116): la parte de
+            # cada set va a SU depto y el resto queda en el ancla, así que
+            # la línea suma igual. Ver `_apertura_de_rooms`.
+            if linea.line_code == "REV_ROOMS":
+                for d, v in (apertura.get(mes) or {}).items():
+                    if d != dept and v:
+                        asentar(d, cuenta, nombre, mes, v)
+                        monto -= v
+            asentar(dept, cuenta, nombre, mes, monto)
     return (list(acumulado.values()), "checkbook", False)
 
 

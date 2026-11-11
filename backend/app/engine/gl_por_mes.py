@@ -466,3 +466,38 @@ def conciliar(
         "clase_discrepa_total": sum((r["total"] for r in discrepan), ZERO),
         "por_linea": lineas,
     }
+
+
+#: Cuánto puede diferir, por mes, el detalle por cuenta de su línea del P&L y
+#: seguir contando como «el mismo número»: un centavo de redondeo.
+TOLERANCIA_DETALLE = Decimal("0.01")
+
+
+def lineas_con_detalle_fiel(det_por_linea: dict[str, list[dict]],
+                            pl_por_linea: dict[str, Sequence[Decimal]]) -> set[str]:
+    """Las líneas del P&L cuyo detalle por cuenta dice lo mismo que el P&L.
+
+    En un escenario de checkbook el ingreso y el below-GOP no llegan por cuenta:
+    el mayor por mes los ancla desde el P&L (`ancla_contable`). Si alguien cargó
+    el detalle por cuenta (`revenue_account_entries`, `belowgop_account_entries`)
+    ése es mejor —trae las cuentas de verdad—, pero SOLO si suma lo mismo que la
+    línea, mes a mes. Si no, se usa el P&L: la grilla tiene que cuadrar contra el
+    P&L por construcción, y un detalle a medio cargar (dos filas de below-GOP)
+    no puede apagar el ancla de las demás líneas.
+
+    `det_por_linea`: {línea: [filas con los doce meses en `MESES`]}.
+    `pl_por_linea`: {línea: [doce montos del P&L]}.
+    """
+    fieles: set[str] = set()
+    for linea, filas in det_por_linea.items():
+        pl = pl_por_linea.get(linea)
+        if not linea or pl is None:
+            continue
+        difs = [sum((Decimal(str(f.get(m) or 0)) for f in filas), ZERO)
+                - Decimal(str(pl[i] or 0)) for i, m in enumerate(MESES)]
+        # Mes a mes Y en el año: doce redondeos de menos de un centavo suman
+        # (seguro de Amarena 2026: 1,670.20 contra 1,670.13).
+        if (all(abs(d) <= TOLERANCIA_DETALLE for d in difs)
+                and abs(sum(difs, ZERO)) <= TOLERANCIA_DETALLE):
+            fieles.add(linea)
+    return fieles

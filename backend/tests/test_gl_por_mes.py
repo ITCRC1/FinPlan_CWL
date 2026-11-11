@@ -451,3 +451,52 @@ def test_villas_baja_en_su_depto_aunque_el_catalogo_la_cuelgue_de_rooms():
         assert pl_engine.consolidate_dept("0115") == "0110"
     finally:
         pl_engine.reset_dept_catalog()
+
+
+# ─── El detalle por cuenta manda línea por línea, y solo si cuadra (AMA) ─────
+
+def _meses(*v):
+    return {m: Decimal(str(x)) for m, x in zip(gl.MESES, list(v) + [0] * (12 - len(v)))}
+
+
+def test_el_detalle_que_cuadra_con_su_linea_manda():
+    det = {"MGMT_FEE_3": [_meses(100, 50), _meses(0, 50)]}
+    pl = {"MGMT_FEE_3": [Decimal("100"), Decimal("100")] + [ZERO] * 10}
+    assert gl.lineas_con_detalle_fiel(det, pl) == {"MGMT_FEE_3"}
+
+
+def test_el_detalle_que_no_cuadra_no_reemplaza_al_pl():
+    """Budget 2026 Final de Amarena: el detalle de below-GOP decía 18,915 de
+    honorarios y el P&L 68,337. La grilla usa el P&L."""
+    det = {"MGMT_FEE_3": [_meses(18915)]}
+    pl = {"MGMT_FEE_3": [Decimal("68337")] + [ZERO] * 11}
+    assert gl.lineas_con_detalle_fiel(det, pl) == set()
+
+
+def test_un_centavo_de_redondeo_sigue_siendo_el_mismo_numero():
+    det = {"RENT": [_meses("1000.004")]}
+    pl = {"RENT": [Decimal("1000")] + [ZERO] * 11}
+    assert gl.lineas_con_detalle_fiel(det, pl) == {"RENT"}
+
+
+def test_el_detalle_de_una_linea_no_apaga_el_ancla_de_las_demas():
+    """Antes una sola fila de detalle apagaba el ancla de TODAS las líneas y la
+    grilla perdía el ingreso entero ($452,657 en el Budget 2026 Final de AMA)."""
+    import inspect
+    from app.api import gl_api
+    src = inspect.getsource(gl_api._filas_del_mayor)
+    assert "if not detalle_real" not in src
+    assert "gl.lineas_con_detalle_fiel(det_por_linea, pl_por_linea)" in src
+    assert "linea.line_code in fieles" in src
+    det = {"PROPERTY_INSURANCE": [_meses(10)]}
+    pl = {"PROPERTY_INSURANCE": [Decimal("10")] + [ZERO] * 11,
+          "REV_ROOMS": [Decimal("5000")] + [ZERO] * 11}
+    assert gl.lineas_con_detalle_fiel(det, pl) == {"PROPERTY_INSURANCE"}   # REV_ROOMS se ancla
+
+
+def test_los_centavos_de_cada_mes_no_se_acumulan_en_el_anio():
+    """Seguro de Amarena 2026: 1,670.20 en el detalle contra 1,670.13 en el P&L,
+    menos de un centavo por mes. La grilla usa el P&L y cuadra en $0.00."""
+    det = {"PROPERTY_INSURANCE": [_meses(*([Decimal("139.1834")] * 12))]}
+    pl = {"PROPERTY_INSURANCE": [Decimal("139.1775")] * 12}
+    assert gl.lineas_con_detalle_fiel(det, pl) == set()
