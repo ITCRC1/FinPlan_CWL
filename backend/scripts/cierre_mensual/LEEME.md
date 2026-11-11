@@ -10,8 +10,8 @@ extraer. y que tenga maximo detalle checkbook de gastos y checkbook de opex, ing
 | Hoja | De dónde | Qué muestra |
 |---|---|---|
 | Config | — | `pURL` (backend), `pLlave` (vacía), `pCatalogo`, **`pMes` (C7)** y las seis versiones fijas (`tVersiones`) |
-| P&L Mes | fórmulas sobre `tGL` | SOLO el mes de C7: Actual 2024, Actual 2025, Pre-Cierre del mes anterior, Pre-Cierre del mes, Actual 2026, Forecast y Budget; varianza vs Budget y vs Forecast ($ y %) desde una base elegible (E3, por defecto Actual 2026) |
-| P&L YTD | fórmulas sobre `tGL` | acumulado enero → mes: Actual 2024/2025/2026, «2026 preliminar» (Actual a mes anterior + Pre-Cierre del mes), Forecast, Budget y las mismas varianzas |
+| P&L Mes | fórmulas sobre `tGL` | SOLO el mes de C7: Actual 2024, Actual 2025, Pre-Cierre del mes anterior, Pre-Cierre del mes, Forecast y Budget; varianza vs Budget y vs Forecast ($ y %) desde el Pre-Cierre del mes (E3, elegible) |
+| P&L YTD | fórmulas sobre `tGL` | acumulado enero → mes: Actual 2024/2025, «2026 cerrado + Pre-Cierre» (Actual a mes anterior + Pre-Cierre del mes; si el mes no tiene Pre-Cierre, su Actual), Forecast, Budget y las mismas varianzas |
 | Controles | fórmulas | lo que tiene que dar 0, por versión, mes y acumulado |
 | P&L USALI | fórmulas sobre `tGL` | doce meses de una versión (B3) |
 | GL | `/consolidado/gl/` | todo el detalle del mayor (universo del mapeo) |
@@ -62,3 +62,7 @@ mes 2024-2025-2026, precierre mes anterior, 2026 precierre mes de análisis y Fo
 y versus Forecast». Preguntado: «precierre mes anterior» = el Pre-Cierre del mes anterior; la varianza sale del Actual
 2026 del mes. Un mes todavía en pre-cierre no tiene Actual (la varianza da contra 0): por eso la base es la celda E3,
 que se cambia a «Pre-Cierre 2026» sin tocar fórmulas.
+
+Segunda revisión (v2, octubre): «este mes hay que quitarlo no aplica porque no se ha cerrado y el comparativo se hace
+versus esta columna debe ser versus precierre del mes». Se sacó el Actual 2026 del mes de P&L Mes y la base de la
+varianza pasó al Pre-Cierre del mes; en el YTD la columna de 2026 es «cerrado + Pre-Cierre».

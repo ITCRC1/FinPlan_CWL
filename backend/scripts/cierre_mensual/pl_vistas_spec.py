@@ -5,10 +5,15 @@ Owner, 2026-11-11, revisando la v1: *«necesito que si compara YTD pero en un ta
 aparte, y el analisis propiamente del mes sea solo del mes. quiero tener side to
 side mismo mes 2024-2025-2026 precierre mes anterior, 2026 precierre mes de
 analisis y Forecast y budget y varianza versus Budget y versus Forecast.»*
-Preguntado aparte: «precierre mes anterior» = el Pre-Cierre del mes anterior, y
-las varianzas salen del Actual 2026 del mes. Como un mes todavía en pre-cierre
-no tiene Actual, la BASE de la varianza es una celda elegible (por defecto
-«Actual 2026»), no un respaldo adivinado.
+Preguntado aparte: «precierre mes anterior» = el Pre-Cierre del mes anterior.
+
+Después, mirando la v2 en octubre: *«este mes hay que quitarlo no aplica porque
+no se ha cerrado y el comparativo se hace versus esta columna debe ser versus
+precierre del mes»*. Por eso P&L Mes NO lleva el Actual 2026 del mes y la base
+de la varianza (celda E3, elegible) es el Pre-Cierre del mes. En el YTD la
+columna de 2026 es «cerrado + Pre-Cierre»: el Actual hasta el mes anterior más
+el Pre-Cierre del mes — y si ese mes no tiene Pre-Cierre (ya se cerró sin él),
+su Actual, para no perder un mes entero del acumulado.
 
 Cada columna es una suma de tGL por etiqueta y por campo («Mes», «Mes anterior»,
 «Acumulado» — columnas calculadas de la tabla, ver mes_columnas.ps1). Lee la
@@ -57,14 +62,14 @@ VISTAS = {
         "hoja": "P&L Mes",
         "titulo": "Corcovado Wilderness Lodge · P&L del mes — Cierre Contable Mensual",
         "nota": "SOLO el mes de Config!C7, la misma columna de cada año. El acumulado está en la hoja P&L YTD. "
-                "Ingresos y gastos en positivo; utilidad = ingresos − gastos.",
+                "Varianzas: Pre-Cierre del mes − Budget y − Forecast. Ingresos y gastos en positivo.",
+        "base": "Pre-Cierre 2026",
         "columnas": [
             ("Actual 2024", f'=pMesNombre&" 2024"', lambda c: S("Mes", "Actual 2024", c)),
             ("Actual 2025", f'=pMesNombre&" 2025"', lambda c: S("Mes", "Actual 2025", c)),
             ("Pre-Cierre mes anterior", '="Pre-Cierre "&IF(pMes=1,"(no hay)",INDEX({"Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov"},pMes-1)&" 2026")',
              lambda c: S("Mes anterior", "Pre-Cierre 2026", c)),
             ("Pre-Cierre 2026", f'="Pre-Cierre "&pMesNombre&" 2026"', lambda c: S("Mes", "Pre-Cierre 2026", c)),
-            ("Actual 2026", f'="Actual "&pMesNombre&" 2026"', lambda c: S("Mes", "Actual 2026", c)),
             ("Forecast 2026", f'="Forecast "&pMesNombre', lambda c: S("Mes", "Forecast 2026", c)),
             ("Budget 2026", f'="Budget "&pMesNombre', lambda c: S("Mes", "Budget 2026", c)),
         ],
@@ -72,14 +77,17 @@ VISTAS = {
     "ytd": {
         "hoja": "P&L YTD",
         "titulo": "Corcovado Wilderness Lodge · P&L acumulado (YTD) — Cierre Contable Mensual",
-        "nota": "Acumulado enero → mes de Config!C7. «2026 preliminar» = Actual 2026 hasta el mes anterior + el "
-                "Pre-Cierre del mes. Ingresos y gastos en positivo.",
+        "nota": "Acumulado enero → mes de Config!C7. 2026 = Actual cerrado hasta el mes anterior + el Pre-Cierre del "
+                "mes (si el mes no tiene Pre-Cierre, su Actual). Ingresos y gastos en positivo.",
+        "base": "2026 cerrado + Pre-Cierre",
+        # Celda bandera: ¿el Pre-Cierre trae algo en el mes elegido?
+        "bandera": '=SUMPRODUCT((tGL[Etiqueta]="Pre-Cierre 2026")*(ABS(tGL[Mes])>0.004))>0',
         "columnas": [
             ("Actual 2024", '="YTD "&pMesNombre&" 2024"', lambda c: S("Acumulado", "Actual 2024", c)),
             ("Actual 2025", '="YTD "&pMesNombre&" 2025"', lambda c: S("Acumulado", "Actual 2025", c)),
-            ("Actual 2026", '="YTD "&pMesNombre&" 2026"', lambda c: S("Acumulado", "Actual 2026", c)),
-            ("2026 preliminar", '="YTD 2026 preliminar: Actual a mes ant. + Pre-Cierre "&pMesNombre',
-             lambda c: f'({S("Acumulado", "Actual 2026", c)}-{S("Mes", "Actual 2026", c)}+{S("Mes", "Pre-Cierre 2026", c)})'),
+            ("2026 cerrado + Pre-Cierre", '="YTD "&pMesNombre&" 2026: cerrado a mes ant. + Pre-Cierre "&pMesNombre',
+             lambda c: f'({S("Acumulado", "Actual 2026", c)}-{S("Mes", "Actual 2026", c)}'
+                       f'+IF($FLAG$4,{S("Mes", "Pre-Cierre 2026", c)},{S("Mes", "Actual 2026", c)}))'),
             ("Forecast 2026", '="Forecast YTD "&pMesNombre', lambda c: S("Acumulado", "Forecast 2026", c)),
             ("Budget 2026", '="Budget YTD "&pMesNombre', lambda c: S("Acumulado", "Budget 2026", c)),
         ],
@@ -92,7 +100,8 @@ def armar(clave):
     cols = v["columnas"]
     nd = len(cols)
     dl = LETRAS[:nd]                         # columnas de datos
-    sep = LETRAS[nd]                         # separador
+    sep = LETRAS[nd]                         # separador (fila 4: la bandera, si hay)
+    cols = [(k, h, (lambda fx: (lambda c: fx(c).replace("$FLAG$4", f"${sep}$4")))(fx)) for k, h, fx in cols]
     var = LETRAS[nd + 1: nd + 5]             # Var Budget $, %, Var Forecast $, %
     ultima_dato = dl[-1]
     cb = dl[[c[0] for c in cols].index("Budget 2026")]
@@ -227,7 +236,7 @@ def armar(clave):
 
     spec = {
         "hoja": v["hoja"], "filas": out, "neta": neta, "ncel": ncel,
-        "datos": list(dl), "sep": sep, "var": list(var), "base_defecto": "Actual 2026",
+        "datos": list(dl), "sep": sep, "var": list(var), "base_defecto": v["base"], "bandera": v.get("bandera", ""),
         "fijos": [c[0] for c in cols], "visibles": [c[1] for c in cols],
         "var_titulos": ["Var vs Budget", "Var %", "Var vs Forecast", "Var %"],
     }

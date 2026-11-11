@@ -53,6 +53,11 @@ try {
     $ws.Range("B3").Formula = '="Mes: "&pMesNombre&"  ("&pMes&")  · cambialo en Config!C7      Base de la varianza →"'
     $ws.Range("B3").Font.Bold = $true; $ws.Range("B3").Font.Color = 0x1F1F7F; $ws.Range("B3").HorizontalAlignment = -4152
     $ws.Range("E3").Value2 = [string]$cfg.base_defecto
+    if ([string]$cfg.bandera) {
+      # Bandera (¿el Pre-Cierre trae algo en el mes?) en la columna separadora, fila 4, en blanco sobre blanco.
+      $ws.Range("$($cfg.sep)4").Formula = [string]$cfg.bandera
+      $ws.Range("$($cfg.sep)4").Font.Color = 0xFFFFFF
+    }
     $ws.Range("E3").Interior.Color = 0xCCFFFF; $ws.Range("E3").Font.Bold = $true
     $lista = (@($cfg.fijos) | Where-Object { $_ -notmatch '^(Budget|Forecast)' }) -join ','
     $val = $ws.Range("E3").Validation; $val.Delete(); $val.Add(3, 1, 1, $lista) | Out-Null
