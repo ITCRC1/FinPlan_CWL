@@ -1189,6 +1189,31 @@ export interface StatsIntegrityVista {
 export async function getStatsIntegrity(anio: number): Promise<StatsIntegrityVista> {
   return api.get(`/stats-integrity/${anio}/`);
 }
+
+/** Plan (Budget / Forecast) al lado de Integrity: noches por tipo de habitación
+ *  —Rooms 0110, Villas 0115, Residencias 0116—, tratamientos de Spa y kilos. */
+type Meses = (number | null)[];
+export interface PlanTipoHab {
+  codigo: string; nombre: string; n7: string; unidades: number; cuenta: string;
+  disponibles: Meses; ocupadas: Meses; pax: Meses; ocupacion: Meses; real_ocupadas: Meses;
+}
+export interface PlanVsIntegrity {
+  anio: number;
+  escenario: { id: string; type: string; version: string; year: number; actuals_through: number };
+  fuente: "motor" | "forecast_rodante" | "actual" | "actual_sin_tipo";
+  habitaciones: { depto: string; rotulo: string; tipos: PlanTipoHab[];
+    total: { disponibles: Meses; ocupadas: Meses; pax: Meses; ocupacion: Meses; real_ocupadas: Meses } }[];
+  sin_tipo: { disponibles: Meses; ocupadas: Meses } | null;
+  spa: { plan: Meses; real: Meses; cuentas: string };
+  lavanderia: { plan: { area: string; rotulo: string; cuenta: string; plan: number[] }[];
+    real: Record<string, Meses> };
+  /** Horas regulares: plan = 240 × FTE por depto de planilla; real = 9980. */
+  horas?: { horas_mes: number; deptos: { depto: string; nombre: string; plan: Meses; real: Meses }[];
+    total: { plan: Meses; real: Meses } };
+}
+export async function getPlanVsIntegrity(anio: number, scenarioId: string): Promise<PlanVsIntegrity> {
+  return api.get(`/stats-integrity/${anio}/plan/${scenarioId}/`);
+}
 /** Baja el archivo. Por fetch y no por <a href> porque el endpoint pide token. */
 export async function bajarPlantillaEstadisticas(scenarioId: string): Promise<void> {
   const token = getToken();

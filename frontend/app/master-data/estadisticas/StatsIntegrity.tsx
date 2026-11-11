@@ -19,6 +19,8 @@ import { useTranslations } from "next-intl";
 import { getStatsIntegrity, type StatsIntegrityVista } from "@/lib/api";
 import { bajarCuadros, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 
+import PlanVsIntegrity from "./PlanVsIntegrity";
+
 const BTN: React.CSSProperties = {
   padding: "7px 14px", borderRadius: 6, cursor: "pointer",
   border: "1px solid var(--border-medium)", background: "var(--bg-surface)",
@@ -156,6 +158,10 @@ export default function StatsIntegrity() {
           </div>
         )}
       </div>
+
+      <PlanVsIntegrity anio={anio} />
+
+      <h3 style={{ fontSize: 15, fontWeight: 700, margin: "4px 0 10px" }}>{t("catalogoTitulo")}</h3>
 
       {error && (
         <div style={{ padding: "10px 12px", borderRadius: 6, marginBottom: 14, fontSize: 12.5,
