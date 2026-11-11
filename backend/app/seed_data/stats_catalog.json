@@ -490,6 +490,16 @@
    "agrega": "SUM"
   },
   {
+   "code": "9979",
+   "grupo": "9900",
+   "nombre_es": "Horas de la jornada (1 FTE)",
+   "nombre_en": "Standard hours (1 FTE)",
+   "unidad": "hours",
+   "dims": [],
+   "agrega": "SUM",
+   "nota": "La base del FTE (owner 2026-11-10): las horas de un FTE completo en el mes. Sin valor cargado vale los dias del mes x 8 (ene 248, feb 224). En Integrity se registra 8 por dia y el mes suma solo."
+  },
+  {
    "code": "9980",
    "grupo": "9980",
    "nombre_es": "Horas regulares",

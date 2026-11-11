@@ -76,6 +76,11 @@ from decimal import Decimal
 # horas del mes salen del calendario (`horas_del_mes`).
 HORAS_POR_DIA = Decimal("8")
 
+#: La cuenta donde se guarda la base (owner, 2026-11-10: «asignar una cuenta
+#: estadística para poner esta base»). Sin valor cargado, vale el calendario.
+#: En Integrity se registra 8 por día y el mes suma solo: 248, 224, 240…
+CUENTA_BASE = "9979"
+
 #: Las tres cuentas que tienen que sumar `horas_del_mes`. El mes se paga completo:
 #: las vacaciones y la incapacidad sustituyen horas, no se agregan.
 CUENTAS_DE_LA_JORNADA = ("9980", "9985", "9986")
@@ -101,22 +106,42 @@ def horas_del_mes(anio: int, mes: int, fte: Decimal | float = 1) -> Decimal:
     return Decimal(dias_del_mes(anio, mes)) * HORAS_POR_DIA * Decimal(str(fte))
 
 
-def fte_desde_horas(horas_regulares: Decimal | float, anio: int, mes: int) -> Decimal:
+def bases_del_anio(anio: int, cargadas: dict[int, Decimal | float] | None = None) -> list[Decimal]:
+    """Las horas de 1 FTE de los doce meses: lo cargado en la 9979 y, donde no
+    hay nada (o hay cero), los días del mes × 8.
+
+    Un cero no se respeta a propósito: una base de 0 horas haría infinito el FTE
+    de cualquiera que trabajó ese mes. Un mes cerrado se expresa con FTE 0, no
+    con una jornada de 0 horas.
+    """
+    cargadas = cargadas or {}
+    out = []
+    for m in range(1, 13):
+        v = cargadas.get(m)
+        out.append(Decimal(str(v)) if v else horas_del_mes(anio, m))
+    return out
+
+
+def fte_desde_horas(horas_regulares: Decimal | float, anio: int, mes: int,
+                    base: Decimal | float | None = None) -> Decimal:
     """El FTE que implican unas horas regulares: horas ÷ (días del mes × 8).
 
     La fórmula de `CLAUDE.md` §18.4 —FTE = horas regulares / horas del mes— con
     el divisor del calendario (owner, 2026-11-10). 248 horas en enero = 1 FTE;
     224 en febrero también.
     """
-    return Decimal(str(horas_regulares)) / horas_del_mes(anio, mes)
+    divisor = Decimal(str(base)) if base else horas_del_mes(anio, mes)
+    return Decimal(str(horas_regulares)) / divisor
 
 
 def cierra_la_jornada(horas: dict[str, Decimal | float], anio: int, mes: int,
-                      fte: Decimal | float = 1) -> tuple[bool, Decimal]:
+                      fte: Decimal | float = 1,
+                      base: Decimal | float | None = None) -> tuple[bool, Decimal]:
     """¿Las tres cuentas de la jornada suman el mes de esta posición?
 
     Devuelve `(cierra, diferencia)`. La diferencia es lo que sobra (positivo) o
-    lo que falta (negativo) contra `días del mes × 8 × FTE`.
+    lo que falta (negativo) contra `días del mes × 8 × FTE` —o contra la base
+    cargada en la 9979, si se pasa `base`—.
 
     Se AVISA, no se bloquea: puede haber un caso real que el sistema no conozca,
     y el dueño del dato es el owner. Pero se avisa siempre — una posición que no
@@ -124,5 +149,6 @@ def cierra_la_jornada(horas: dict[str, Decimal | float], anio: int, mes: int,
     """
     total = sum((Decimal(str(horas.get(c, 0) or 0))
                  for c in CUENTAS_DE_LA_JORNADA), Decimal("0"))
-    dif = total - horas_del_mes(anio, mes, fte)
+    mes_completo = Decimal(str(base)) if base else horas_del_mes(anio, mes)
+    dif = total - mes_completo * Decimal(str(fte))
     return abs(dif) <= TOLERANCIA, dif

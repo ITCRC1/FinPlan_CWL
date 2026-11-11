@@ -112,3 +112,34 @@ def test_el_redondeo_no_dispara_el_aviso():
 @pytest.mark.parametrize("fte,horas", [(1, 248), ("0.5", 124), ("0.25", 62)])
 def test_el_cierre_respeta_el_fte(fte, horas):
     assert j.cierra_la_jornada({"9980": horas}, 2027, 1, fte)[0]
+
+
+# ─── La 9979: la base guardada en una cuenta (owner, 2026-11-10) ─────────────
+
+def test_la_base_vive_en_la_9979():
+    assert j.CUENTA_BASE == "9979"
+    from app.seed_stats import leer_catalogo
+    c = {x["code"]: x for x in leer_catalogo()}["9979"]
+    assert c["dims"] == [] and c["unidad"] == "hours" and c["agrega"] == "SUM"
+
+
+def test_sin_valor_cargado_la_base_es_el_calendario():
+    b = j.bases_del_anio(2027)
+    assert b[0] == Decimal("248") and b[1] == Decimal("224") and sum(b) == Decimal("2920")
+
+
+def test_lo_cargado_en_la_9979_manda():
+    b = j.bases_del_anio(2027, {1: 240, 7: Decimal("200")})
+    assert b[0] == Decimal("240") and b[6] == Decimal("200")
+    assert b[1] == Decimal("224")        # febrero sin dato: calendario
+
+
+def test_un_cero_en_la_9979_no_vale():
+    """Una jornada de 0 horas haría infinito el FTE: el mes cerrado se dice con FTE 0."""
+    assert j.bases_del_anio(2027, {10: 0})[9] == Decimal("248")
+
+
+def test_el_cierre_y_el_fte_usan_la_base_cargada():
+    assert j.cierra_la_jornada({"9980": 240}, 2027, 1, base=240)[0]
+    assert not j.cierra_la_jornada({"9980": 240}, 2027, 1)[0]
+    assert j.fte_desde_horas(120, 2027, 1, base=240) == Decimal("0.5")

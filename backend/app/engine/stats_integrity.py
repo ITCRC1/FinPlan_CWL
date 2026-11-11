@@ -216,9 +216,13 @@ def armar_horas(horas_plan: dict[str, list[float]], nombres: dict[str, str],
     al lado de la 9980 de Integrity, por depto de planilla. Un depto que está en
     uno solo de los dos lados igual aparece: es justo lo que hay que mirar.
 
-    `horas_por_fte`: las horas de un FTE completo en cada mes (248, 224, 240…).
-    Con ellas sale el FTE de las dos columnas —horas ÷ horas de 1 FTE—: el del
-    plan devuelve lo cargado en la planilla, el de Integrity es el FTE real."""
+    `horas_por_fte`: las horas de un FTE completo en cada mes según el plan —la
+    9979 del escenario o, sin ella, días del mes × 8—. Con ellas sale el FTE del
+    plan, que devuelve lo cargado en la planilla.
+
+    El FTE real (el de Integrity) se divide por la 9979 que registre Integrity
+    ese mes; donde Integrity no la tenga, por la del plan. Así un mes en que
+    contabilidad cargó otra base se lee con SU base, no con la del presupuesto."""
     real = real_horas_por_depto(agregado_real)
     filas = []
     for d in sorted(set(horas_plan) | set(real)):
@@ -228,14 +232,17 @@ def armar_horas(horas_plan: dict[str, list[float]], nombres: dict[str, str],
     def suma(campo):
         return [sum(f[campo][i] for f in filas if f[campo][i] is not None)
                 if any(f[campo][i] is not None for f in filas) else None for i in range(12)]
-    def fte(meses):
-        return [None if h is None or not horas_por_fte[i] else h / horas_por_fte[i]
-                for i, h in enumerate(meses)]
+    base_integrity = real_por_grupos(agregado_real, {"9979"})
+    base_real = [b or horas_por_fte[i] for i, b in enumerate(base_integrity)]
+
+    def fte(meses, base):
+        return [None if h is None or not base[i] else h / base[i] for i, h in enumerate(meses)]
     for f in filas:
-        f["fte_plan"], f["fte_real"] = fte(f["plan"]), fte(f["real"])
+        f["fte_plan"], f["fte_real"] = fte(f["plan"], horas_por_fte), fte(f["real"], base_real)
     total = {"plan": suma("plan"), "real": suma("real")}
-    total["fte_plan"], total["fte_real"] = fte(total["plan"]), fte(total["real"])
-    return {"deptos": filas, "total": total, "horas_por_fte": list(horas_por_fte)}
+    total["fte_plan"], total["fte_real"] = fte(total["plan"], horas_por_fte), fte(total["real"], base_real)
+    return {"deptos": filas, "total": total, "horas_por_fte": list(horas_por_fte),
+            "horas_por_fte_real": base_integrity}
 
 
 def armar_plan(tipos: list[dict], por_tipo: dict, total_sin_tipo: dict,

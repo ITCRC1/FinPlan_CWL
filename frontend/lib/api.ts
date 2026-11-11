@@ -1210,7 +1210,7 @@ export interface PlanVsIntegrity {
     real: Record<string, Meses> };
   /** Horas regulares: plan = días del mes × 8 × FTE por depto de planilla; real = 9980.
    *  `horas_por_fte` = las horas de un FTE completo en cada mes (248, 224, 240…). */
-  horas?: { horas_por_fte?: Meses;
+  horas?: { horas_por_fte?: Meses; horas_por_fte_real?: Meses;
     deptos: { depto: string; nombre: string; plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses }[];
     total: { plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses } };
 }

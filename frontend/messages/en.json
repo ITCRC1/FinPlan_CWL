@@ -3274,7 +3274,7 @@
     "g9980": "Payroll · hours",
     "hojaCuentas": "Accounts",
     "intro": "What the hotel <b>counts</b>: nights, covers, kilos, hours, people. They carry no money — the P&L reports that. The <b>code never moves</b>; the name you can change. A new account is added in the repository catalogue, so that a new property is born with all of them.",
-    "jornada": "<b>The standard month.</b> Days in the month × {horas} hours: <b>31 days = 248, 30 = 240, February = 224</b> (232 in a leap year). It is the FTE base: FTE = regular hours ÷ the month's hours. Per position and per month, <b>regular + vacation taken + sick leave</b> hours have to add up to the month's hours × FTE. <b>Overtime</b>, the <b>day off worked</b> and the <b>holiday worked</b> go on top: they are extra time actually worked.",
+    "jornada": "<b>The standard month.</b> Days in the month × {horas} hours: <b>31 days = 248, 30 = 240, February = 224</b> (232 in a leap year). It is the FTE base: FTE = regular hours ÷ the month's hours. It lives in account <b>9979</b> “Standard hours”: whatever is loaded there wins; a month with no value uses days × {horas}. Per position and per month, <b>regular + vacation taken + sick leave</b> hours have to add up to the month's hours × FTE. <b>Overtime</b>, the <b>day off worked</b> and the <b>holiday worked</b> go on top: they are extra time actually worked.",
     "mes": "month",
     "no": "no",
     "noSeCargoNada": "Nothing was loaded.",
@@ -5601,7 +5601,7 @@
     "planSinTipoTotal": "Hotel total (no room-type split)",
     "planActualSinTipo": "This year <b>has no statistics by room type</b>: the room-type split starts in 2026. The hotel total by month is shown, which is what exists; no split is made up.",
     "planHoras": "Regular hours (days in month × 8 × FTE vs. 9980)",
-    "planHorasPorFte": "Hours per 1 FTE (days × 8)",
+    "planHorasPorFte": "Hours per 1 FTE (9979; if blank, days × 8)",
     "planFte": "Planned FTE (hours ÷ hours per 1 FTE)",
     "planFteReal": "FTE · Integrity (9980 ÷ hours per 1 FTE)",
     "planHorasTotal": "Hotel total · planned hours"

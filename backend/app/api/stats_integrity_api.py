@@ -122,6 +122,7 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
     from app.models.scenario import Scenario
     from app.models.scenario_stat import ScenarioStat
     from app.models.spa_budget import SpaBudget
+    from app.models.statistical_entry import StatisticalEntry
 
     esc = await db.get(Scenario, scenario_id)
     if esc is None:
@@ -239,11 +240,19 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
                 propio = fte_plan.get(d, [0.0] * 12)
                 real = fte_act.get(d, [0.0] * 12)
                 fte_plan[d] = [real[i] if i < corte else propio[i] for i in range(12)]
-    horas_plan = {d: [float(jornada.horas_del_mes(anio, m, f)) for m, f in enumerate(fila, 1)]
+    # La base: la 9979 del escenario donde esté cargada; si no, días del mes × 8.
+    cargadas: dict[int, float] = {}
+    for mes, valor in (await db.execute(
+            select(StatisticalEntry.month, StatisticalEntry.value).where(
+                StatisticalEntry.scenario_id == esc.id,
+                StatisticalEntry.account_code == jornada.CUENTA_BASE))).all():
+        cargadas[mes] = cargadas.get(mes, 0.0) + float(valor or 0)
+    bases = jornada.bases_del_anio(anio, cargadas)
+    horas_plan = {d: [float(bases[i] * Decimal(str(f))) for i, f in enumerate(fila)]
                   for d, fila in fte_plan.items() if any(fila)}
     nombres.update({c["depto"]: c["depto_nombre"] for c in si.leer_catalogo(HOTEL_ID)["cuentas"]
                     if c.get("depto") and c["depto"] not in nombres})
-    horas_por_fte = [float(jornada.horas_del_mes(anio, m)) for m in range(1, 13)]
+    horas_por_fte = [float(b) for b in bases]
     vista["horas"] = si.armar_horas(horas_plan, nombres, agregado, horas_por_fte)
 
     vista.update({"anio": anio, "escenario": {"id": esc.id, "type": esc.type, "version": esc.version,

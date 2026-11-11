@@ -365,6 +365,12 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
 
     # El control de la jornada: por posición y por mes, las tres cuentas que
     # cierran tienen que dar días del mes × 8 × FTE. Ver `engine/jornada.py`.
+    # La base de cada mes: la 9979 cargada en el escenario o días del mes × 8.
+    cargadas: dict[int, Decimal] = {}
+    for f in filas:
+        if f.account_code == jornada.CUENTA_BASE:
+            cargadas[f.month] = cargadas.get(f.month, Decimal("0")) + Decimal(str(f.value))
+    bases = jornada.bases_del_anio(e.year, cargadas)
     por_pos: dict = {}
     for f in filas:
         if f.account_code in jornada.CUENTAS_DE_LA_JORNADA and f.position_code:
@@ -372,7 +378,7 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
             por_pos.setdefault(k, {})[f.account_code] = f.value
     descuadres = []
     for (dep, pos, mes), horas in sorted(por_pos.items()):
-        cierra, dif = jornada.cierra_la_jornada(horas, e.year, mes)
+        cierra, dif = jornada.cierra_la_jornada(horas, e.year, mes, base=bases[mes - 1])
         if not cierra:
             descuadres.append({"dept_code": dep, "position_code": pos,
                                "month": mes, "diferencia": float(dif)})
@@ -390,4 +396,6 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
         # Se devuelve SIEMPRE, aunque esté vacío: una lista vacía dice «todo
         # cierra», que es información. Que no aparezca la sección no dice nada.
         "jornada_descuadres": descuadres,
+        # Las horas de 1 FTE de cada mes con que se controló: 9979 o días × 8.
+        "jornada_base": [float(b) for b in bases],
     }
