@@ -1,6 +1,27 @@
 # -*- coding: utf-8 -*-
 """La jornada: cuántas horas tiene un mes y cómo tienen que cerrar.
 
+**Regla vigente (owner, 2026-11-10): días naturales del mes × 8 horas.**
+
+    «configurar cada mes con un total de horas según el número de días que
+     tenga el mes, por 8 horas diarias» · «podemos poner esto como base para el
+     cálculo del FTE»
+
+    2027: ene 248 · feb 224 · mar 248 · abr 240 · … · total 2,920 (365 × 8)
+    En bisiesto, febrero da 232.
+
+Reemplaza a la base fija de 240 (30 días × 8) del 2026-08-14, que se cuenta
+abajo como historia. Lo que NO cambió de esa regla: el mes se trabaja completo
+(el día libre semanal ya está adentro), las vacaciones y la incapacidad
+sustituyen horas en vez de sumarse, y las extras van por encima.
+
+Por qué el calendario y no 240: la 9980 de Integrity se registra POR DÍA (el
+nivel 6 de la cuenta es el día). Alguien a tiempo completo en enero registra
+31 × 8 = 248. Con base 240 cada mes de 31 días se leía como 8 horas de más y un
+FTE de 1.03; con base 224 febrero se leía como un FTE de 0.93.
+
+─── Historia: la regla del 2026-08-14 (base fija de 240) ───
+
 **La regla, en palabras del owner (2026-08-14):**
 
     «Se trabajan 8 horas por día, y un día libre a la semana, en una base de
@@ -48,16 +69,14 @@ Es la primera vez que las estadísticas tienen una comprobación propia. Todo lo
 demás en este proyecto se verifica contra el P&L; las horas no tienen contra qué
 cuadrarse, así que su control es interno.
 """
+import calendar
 from decimal import Decimal
 
-# Los dos números que el owner dio. Todo lo demás se deriva.
+# Las horas de un día de trabajo. Es el único número fijo de la jornada: las
+# horas del mes salen del calendario (`horas_del_mes`).
 HORAS_POR_DIA = Decimal("8")
-DIAS_BASE_MES = Decimal("30")
 
-#: Las horas de un mes a tiempo completo. 30 × 8 = 240.
-HORAS_MES = DIAS_BASE_MES * HORAS_POR_DIA
-
-#: Las tres cuentas que tienen que sumar `HORAS_MES`. El mes se paga completo:
+#: Las tres cuentas que tienen que sumar `horas_del_mes`. El mes se paga completo:
 #: las vacaciones y la incapacidad sustituyen horas, no se agregan.
 CUENTAS_DE_LA_JORNADA = ("9980", "9985", "9986")
 
@@ -69,29 +88,35 @@ CUENTAS_SOBRE_LA_JORNADA = ("9981", "9982", "9983")
 TOLERANCIA = HORAS_POR_DIA / 2
 
 
-def horas_del_mes(fte: Decimal | float = 1) -> Decimal:
-    """Las horas que le corresponden a esa posición en el mes.
+def dias_del_mes(anio: int, mes: int) -> int:
+    """Los días naturales del mes: 31, 30, 28 o 29 (bisiesto)."""
+    return calendar.monthrange(anio, mes)[1]
 
-    Un FTE de 0.5 —media jornada— cierra en 120, no en 240.
+
+def horas_del_mes(anio: int, mes: int, fte: Decimal | float = 1) -> Decimal:
+    """Las horas que le corresponden a esa posición en el mes: días del mes × 8 × FTE.
+
+    Enero (31 días) da 248; con FTE 0.5, 124. Febrero 2027 da 224.
     """
-    return HORAS_MES * Decimal(str(fte))
+    return Decimal(dias_del_mes(anio, mes)) * HORAS_POR_DIA * Decimal(str(fte))
 
 
-def fte_desde_horas(horas_regulares: Decimal | float) -> Decimal:
-    """El FTE que implican unas horas regulares.
+def fte_desde_horas(horas_regulares: Decimal | float, anio: int, mes: int) -> Decimal:
+    """El FTE que implican unas horas regulares: horas ÷ (días del mes × 8).
 
-    La fórmula de `CLAUDE.md` §18.4 —FTE = horas regulares / horas del mes—, que
-    hasta hoy no tenía de dónde sacar el divisor.
+    La fórmula de `CLAUDE.md` §18.4 —FTE = horas regulares / horas del mes— con
+    el divisor del calendario (owner, 2026-11-10). 248 horas en enero = 1 FTE;
+    224 en febrero también.
     """
-    return Decimal(str(horas_regulares)) / HORAS_MES
+    return Decimal(str(horas_regulares)) / horas_del_mes(anio, mes)
 
 
-def cierra_la_jornada(horas: dict[str, Decimal | float],
+def cierra_la_jornada(horas: dict[str, Decimal | float], anio: int, mes: int,
                       fte: Decimal | float = 1) -> tuple[bool, Decimal]:
     """¿Las tres cuentas de la jornada suman el mes de esta posición?
 
     Devuelve `(cierra, diferencia)`. La diferencia es lo que sobra (positivo) o
-    lo que falta (negativo) contra `240 × FTE`.
+    lo que falta (negativo) contra `días del mes × 8 × FTE`.
 
     Se AVISA, no se bloquea: puede haber un caso real que el sistema no conozca,
     y el dueño del dato es el owner. Pero se avisa siempre — una posición que no
@@ -99,5 +124,5 @@ def cierra_la_jornada(horas: dict[str, Decimal | float],
     """
     total = sum((Decimal(str(horas.get(c, 0) or 0))
                  for c in CUENTAS_DE_LA_JORNADA), Decimal("0"))
-    dif = total - horas_del_mes(fte)
+    dif = total - horas_del_mes(anio, mes, fte)
     return abs(dif) <= TOLERANCIA, dif

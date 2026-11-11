@@ -225,8 +225,9 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
     agregado = si.agregar(filas)
     vista = si.armar_plan(tipos, por_tipo, total_sin_tipo, spa, kilos, agregado)
 
-    # Horas regulares: 240 × FTE (la jornada del owner, `engine/jornada.py`) por
-    # depto de planilla, contra la 9980. En un Forecast rodante los meses
+    # Horas regulares: días del mes × 8 × FTE (`jornada.horas_del_mes`, owner
+    # 2026-11-10) por depto de planilla, contra la 9980 —que Integrity registra
+    # por día, así que un mes de 31 días a tiempo completo da 248, no 240—. En un Forecast rodante los meses
     # cerrados son los del ACTUAL enlazado, igual que las noches.
     fte_plan, nombres = await _fte_por_depto(db, esc.id)
     if esc.type == "FORECAST" and corte > 0:
@@ -238,12 +239,12 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
                 propio = fte_plan.get(d, [0.0] * 12)
                 real = fte_act.get(d, [0.0] * 12)
                 fte_plan[d] = [real[i] if i < corte else propio[i] for i in range(12)]
-    horas_plan = {d: [float(jornada.horas_del_mes(f)) for f in fila] for d, fila in fte_plan.items()
-                  if any(fila)}
+    horas_plan = {d: [float(jornada.horas_del_mes(anio, m, f)) for m, f in enumerate(fila, 1)]
+                  for d, fila in fte_plan.items() if any(fila)}
     nombres.update({c["depto"]: c["depto_nombre"] for c in si.leer_catalogo(HOTEL_ID)["cuentas"]
                     if c.get("depto") and c["depto"] not in nombres})
-    vista["horas"] = si.armar_horas(horas_plan, nombres, agregado)
-    vista["horas"]["horas_mes"] = float(jornada.HORAS_MES)
+    horas_por_fte = [float(jornada.horas_del_mes(anio, m)) for m in range(1, 13)]
+    vista["horas"] = si.armar_horas(horas_plan, nombres, agregado, horas_por_fte)
 
     vista.update({"anio": anio, "escenario": {"id": esc.id, "type": esc.type, "version": esc.version,
                                               "year": esc.year, "actuals_through": corte},

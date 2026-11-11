@@ -165,8 +165,7 @@ export default function EstadisticasPage() {
     bajarCuadros("Catalogo_Estadisticas", [{
       titulo: t("excelTitulo"),
       subtitulo: t("excelSubtitulo", {
-        cuentas: cat.cuentas.length, dias: cat.jornada.dias_base,
-        horas: cat.jornada.horas_dia, horasMes: cat.jornada.horas_mes,
+        cuentas: cat.cuentas.length, horas: cat.jornada.horas_dia,
       }),
       hoja: t("hojaCuentas"), columnas, filas,
     }]).catch(e => setAviso(e instanceof Error ? e.message : t("noSePudoBajar")));
@@ -253,9 +252,7 @@ export default function EstadisticasPage() {
           border: `1px solid ${descuadres.length ? "rgba(230,168,23,0.45)" : "var(--border-medium)"}` }}>
           {t.rich("jornada", {
             b,
-            dias: cat.jornada.dias_base,
             horas: cat.jornada.horas_dia,
-            horasMes: cat.jornada.horas_mes,
           })}
           {datos && (descuadres.length ? (
             <div style={{ marginTop: 8 }}>

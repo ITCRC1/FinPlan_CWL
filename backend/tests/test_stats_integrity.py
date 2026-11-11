@@ -293,7 +293,7 @@ def test_horas_de_integrity_suman_las_posiciones_del_depto():
 def test_las_horas_del_plan_van_al_lado_de_la_9980():
     v = si.armar_horas({"0113": [3600.0] * 12, "0150": [240.0] * 12}, {"0113": "Housekeeping"},
                        _agr((1, "9980-0113-508-013-015-00-00", 3400),
-                            (1, "9980-0186-700-013-015-00-00", 480)))
+                            (1, "9980-0186-700-013-015-00-00", 480)), [240.0] * 12)
     d = {f["depto"]: f for f in v["deptos"]}
     assert d["0113"]["plan"][0] == 3600 and d["0113"]["real"][0] == 3400
     assert d["0113"]["nombre"] == "Housekeeping"
@@ -303,12 +303,24 @@ def test_las_horas_del_plan_van_al_lado_de_la_9980():
     assert v["total"]["plan"][0] == 3840 and v["total"]["real"][0] == 3880
 
 
-def test_las_horas_del_plan_son_240_por_fte():
-    """La jornada del owner: 30 días × 8 horas. No un segundo número."""
+def test_las_horas_del_plan_son_dias_del_mes_por_8():
+    """Owner, 2026-11-10: cada mes con sus días × 8 horas, no 240 fijo."""
     src = inspect.getsource(api.plan)
-    assert "jornada.horas_del_mes(" in src
+    assert "jornada.horas_del_mes(anio, m" in src
     import re
     assert not re.search(r"240\s*\*|\*\s*240|Decimal\(\"240\"\)", src)
+
+
+def test_el_fte_de_las_dos_columnas_sale_de_las_horas_del_mes():
+    """FTE = horas ÷ (días del mes × 8): 248 en enero y 224 en febrero son 1 FTE."""
+    h = [248.0, 224.0] + [240.0] * 10
+    agr = _agr((1, "9980-0113-508-013-015-00-00", 248), (2, "9980-0113-508-013-015-00-00", 112))
+    v = si.armar_horas({"0113": [496.0, 448.0] + [0.0] * 10}, {}, agr, h)
+    d = v["deptos"][0]
+    assert d["fte_plan"][:2] == [2.0, 2.0]
+    assert d["fte_real"][:2] == [1.0, 0.5] and d["fte_real"][2] is None
+    assert v["total"]["fte_real"][:2] == [1.0, 0.5]
+    assert v["horas_por_fte"] == h
 
 
 def test_cafeteria_y_lavanderia_cuentan_horas_aunque_sean_allocation():

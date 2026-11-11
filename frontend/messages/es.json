@@ -3261,7 +3261,7 @@
     "enllavado": "Este escenario está enllavado: se puede bajar, no subir.",
     "errorCatalogo": "Error cargando el catálogo",
     "excelCatalogo": "⬇ Excel del catálogo",
-    "excelSubtitulo": "{cuentas} cuentas · la jornada son {dias} días × {horas} horas = {horasMes} horas al mes",
+    "excelSubtitulo": "{cuentas} cuentas · la jornada son los días del mes × {horas} horas (31 días = 248, 30 = 240, febrero = 224)",
     "excelTitulo": "Cuentas estadísticas · clase 9",
     "g9000": "Habitaciones y comercial",
     "g9110": "Alimentos y bebidas",
@@ -3274,7 +3274,7 @@
     "g9980": "Planilla · horas",
     "hojaCuentas": "Cuentas",
     "intro": "Lo que el hotel <b>cuenta</b>: noches, covers, kilos, horas, personas. No llevan plata — esa la reporta el P&L. El <b>código no se mueve</b>; el nombre lo podés cambiar. Una cuenta nueva se agrega en el catálogo del repositorio, para que una propiedad nueva nazca con todas.",
-    "jornada": "<b>La jornada.</b> {dias} días × {horas} horas = <b>{horasMes} horas al mes</b>. Por posición y por mes, las horas <b>regulares + vacaciones tomadas + incapacidad</b> tienen que dar esas {horasMes} × FTE. Las <b>extras</b>, el <b>día libre laborado</b> y el <b>feriado laborado</b> van por encima: son tiempo que se trabajó además.",
+    "jornada": "<b>La jornada.</b> Los días del mes × {horas} horas: <b>31 días = 248, 30 = 240, febrero = 224</b> (232 en bisiesto). Es la base del FTE: FTE = horas regulares ÷ las horas del mes. Por posición y por mes, las horas <b>regulares + vacaciones tomadas + incapacidad</b> tienen que dar las horas del mes × FTE. Las <b>extras</b>, el <b>día libre laborado</b> y el <b>feriado laborado</b> van por encima: son tiempo que se trabajó además.",
     "mes": "mes",
     "no": "no",
     "noSeCargoNada": "No se cargó nada.",
@@ -5579,7 +5579,7 @@
     "nota": "<b>Solo lectura.</b> Esta pestaña no alimenta el P&L ni ningún escenario: muestra lo que contabilidad registró. Una cuenta marcada «crear en Integrity» es parte de la homologación y todavía no existe en el catálogo de Integrity (ver la lista de correcciones para contabilidad).",
     "catalogoTitulo": "Catálogo homologado (lo que registra Integrity)",
     "planTitulo": "Plan vs. Integrity",
-    "planIntro": "Lo que planifica o registra el escenario (Budget, Forecast o Actual) <b>al lado de lo que registra contabilidad</b>: noches <b>disponibles y ocupadas por tipo de habitación</b>, separadas en Rooms (0110), Villas (0115) y Residencias (0116); tratamientos de Spa, kilos de lavandería y <b>horas regulares</b> por depto. Nada se recalcula acá: las noches son las de «Ingresos por tipo» (o las de Room Stats en el Actual), el Spa es su ingreso ÷ el precio promedio, los kilos son los de la configuración del reparto y las horas son 240 × el FTE de la planilla.",
+    "planIntro": "Lo que planifica o registra el escenario (Budget, Forecast o Actual) <b>al lado de lo que registra contabilidad</b>: noches <b>disponibles y ocupadas por tipo de habitación</b>, separadas en Rooms (0110), Villas (0115) y Residencias (0116); tratamientos de Spa, kilos de lavandería y <b>horas regulares</b> por depto. Nada se recalcula acá: las noches son las de «Ingresos por tipo» (o las de Room Stats en el Actual), el Spa es su ingreso ÷ el precio promedio, los kilos son los de la configuración del reparto y las horas son los días del mes × 8 × el FTE de la planilla.",
     "planEscenario": "Escenario",
     "planSinEscenarios": "No hay Budget ni Forecast de {anio}",
     "planConcepto": "Concepto",
@@ -5600,7 +5600,10 @@
     "planNota": "Integrity todavía no trae <b>noches disponibles</b>: la clase 9 solo registra las ocupadas (9000), por eso la comparación es contra las ocupadas. Las columnas de Integrity se llenan a partir de la primera balanza de 2027 que traiga clase 9.",
     "planSinTipoTotal": "Total del hotel (sin apertura por tipo)",
     "planActualSinTipo": "Este año <b>no tiene la estadística por tipo de habitación</b>: la apertura por tipo empieza en 2026. Se muestra el total del hotel por mes, que es lo que hay; no se inventa un reparto.",
-    "planHoras": "Horas regulares ({horas} × FTE vs. 9980)",
+    "planHoras": "Horas regulares (días del mes × 8 × FTE vs. 9980)",
+    "planHorasPorFte": "Horas de 1 FTE (días × 8)",
+    "planFte": "FTE del plan (horas ÷ horas de 1 FTE)",
+    "planFteReal": "FTE · Integrity (9980 ÷ horas de 1 FTE)",
     "planHorasTotal": "Total hotel · horas del plan"
   }
 }

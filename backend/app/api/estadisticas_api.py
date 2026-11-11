@@ -57,9 +57,8 @@ async def catalogo(_=Depends(get_current_user)):
         # La regla de la jornada, para que la pantalla la muestre en vez de que
         # el owner tenga que acordarse.
         "jornada": {
-            "horas_mes": float(jornada.HORAS_MES),
+            # Las horas del mes salen del calendario: días del mes × 8.
             "horas_dia": float(jornada.HORAS_POR_DIA),
-            "dias_base": float(jornada.DIAS_BASE_MES),
             "cierran": list(jornada.CUENTAS_DE_LA_JORNADA),
             "por_encima": list(jornada.CUENTAS_SOBRE_LA_JORNADA),
         }}
@@ -365,7 +364,7 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
                    (await s.execute(select(StatAccount))).scalars()}
 
     # El control de la jornada: por posición y por mes, las tres cuentas que
-    # cierran tienen que dar 240. Ver `engine/jornada.py`.
+    # cierran tienen que dar días del mes × 8 × FTE. Ver `engine/jornada.py`.
     por_pos: dict = {}
     for f in filas:
         if f.account_code in jornada.CUENTAS_DE_LA_JORNADA and f.position_code:
@@ -373,7 +372,7 @@ async def valores(scenario_id: str, _=Depends(get_current_user)):
             por_pos.setdefault(k, {})[f.account_code] = f.value
     descuadres = []
     for (dep, pos, mes), horas in sorted(por_pos.items()):
-        cierra, dif = jornada.cierra_la_jornada(horas)
+        cierra, dif = jornada.cierra_la_jornada(horas, e.year, mes)
         if not cierra:
             descuadres.append({"dept_code": dep, "position_code": pos,
                                "month": mes, "diferencia": float(dif)})

@@ -30,15 +30,20 @@ const TD: React.CSSProperties = { padding: "4px 8px", fontSize: 12, whiteSpace: 
 const NUM: React.CSSProperties = { ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums" };
 
 type Meses = (number | null)[];
-type Tipo = "num" | "pct";
+type Tipo = "num" | "pct" | "fte";
 
 function fmt(v: number | null | undefined, tipo: Tipo = "num"): string {
   if (v === null || v === undefined) return "—";
   if (tipo === "pct") return `${(v * 100).toFixed(1)}%`;
+  if (tipo === "fte") return v.toFixed(2);
   return v.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 function sumar(m: Meses): number | null {
   return m.some(v => v !== null) ? m.reduce<number>((s, v) => s + (v ?? 0), 0) : null;
+}
+function promedio(m: Meses): number | null {
+  const v = m.filter((x): x is number => x !== null);
+  return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
 }
 /** Ocupación del año: suma de ocupadas ÷ suma de disponibles (no el promedio de %). */
 function ocupAnual(ocu: Meses, disp: Meses): number | null {
@@ -137,11 +142,16 @@ export default function PlanVsIntegrity({ anio }: { anio: number }) {
     }
     out.push({ titulo: t("planLavanderia"), filas: lav });
 
-    // Horas regulares por depto de planilla: el plan (240 × FTE) y la 9980.
+    // Horas regulares por depto de planilla: el plan (días del mes × 8 × FTE) y la 9980.
     // Sin `horas` (un backend anterior a esta sección, en medio de un deploy)
     // la sección no aparece; el resto de la tabla se dibuja igual.
     if (!vista.horas) return out;
     const hs: Fila[] = [];
+    // Las horas de un FTE completo en cada mes, para leer las de cada depto.
+    if (vista.horas.horas_por_fte) {
+      const h = vista.horas.horas_por_fte;
+      hs.push({ label: t("planHorasPorFte"), meses: h, anual: sumar(h), tipo: "num", nivel: 1, negrita: true });
+    }
     for (const d of vista.horas.deptos) {
       hs.push({ label: `${d.depto} · ${d.nombre}`.replace(/ · $/, ""), meses: d.plan, anual: sumar(d.plan),
         tipo: "num", nivel: 2 });
@@ -152,7 +162,13 @@ export default function PlanVsIntegrity({ anio }: { anio: number }) {
     hs.push({ label: t("planHorasTotal"), meses: ht.plan, anual: sumar(ht.plan), tipo: "num", nivel: 2, negrita: true });
     hs.push({ label: t("planRealCuentas", { cuentas: "9980" }), meses: ht.real, anual: sumar(ht.real),
       tipo: "num", nivel: 2, negrita: true, real: true });
-    out.push({ titulo: t("planHoras", { horas: vista.horas.horas_mes }), filas: hs });
+    // El FTE del hotel con la misma base: horas ÷ (días del mes × 8). El anual
+    // es el promedio de los meses con dato, no la suma.
+    if (ht.fte_plan) hs.push({ label: t("planFte"), meses: ht.fte_plan, anual: promedio(ht.fte_plan),
+      tipo: "fte", nivel: 2, negrita: true });
+    if (ht.fte_real) hs.push({ label: t("planFteReal"), meses: ht.fte_real, anual: promedio(ht.fte_real),
+      tipo: "fte", nivel: 2, negrita: true, real: true });
+    out.push({ titulo: t("planHoras"), filas: hs });
     return out;
   }, [vista, t]);
 

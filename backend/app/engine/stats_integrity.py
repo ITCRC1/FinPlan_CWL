@@ -211,10 +211,14 @@ def real_horas_por_depto(agregado: dict, grupo: str = "9980") -> dict[str, list[
 
 
 def armar_horas(horas_plan: dict[str, list[float]], nombres: dict[str, str],
-                agregado_real: dict) -> dict:
-    """Horas regulares del plan (240 × FTE, ver `engine/jornada.py`) al lado de
-    la 9980 de Integrity, por depto de planilla. Un depto que está en uno solo
-    de los dos lados igual aparece: es justo lo que hay que mirar."""
+                agregado_real: dict, horas_por_fte: list[float]) -> dict:
+    """Horas regulares del plan (días del mes × 8 × FTE, ver `engine/jornada.py`)
+    al lado de la 9980 de Integrity, por depto de planilla. Un depto que está en
+    uno solo de los dos lados igual aparece: es justo lo que hay que mirar.
+
+    `horas_por_fte`: las horas de un FTE completo en cada mes (248, 224, 240…).
+    Con ellas sale el FTE de las dos columnas —horas ÷ horas de 1 FTE—: el del
+    plan devuelve lo cargado en la planilla, el de Integrity es el FTE real."""
     real = real_horas_por_depto(agregado_real)
     filas = []
     for d in sorted(set(horas_plan) | set(real)):
@@ -224,7 +228,14 @@ def armar_horas(horas_plan: dict[str, list[float]], nombres: dict[str, str],
     def suma(campo):
         return [sum(f[campo][i] for f in filas if f[campo][i] is not None)
                 if any(f[campo][i] is not None for f in filas) else None for i in range(12)]
-    return {"deptos": filas, "total": {"plan": suma("plan"), "real": suma("real")}}
+    def fte(meses):
+        return [None if h is None or not horas_por_fte[i] else h / horas_por_fte[i]
+                for i, h in enumerate(meses)]
+    for f in filas:
+        f["fte_plan"], f["fte_real"] = fte(f["plan"]), fte(f["real"])
+    total = {"plan": suma("plan"), "real": suma("real")}
+    total["fte_plan"], total["fte_real"] = fte(total["plan"]), fte(total["real"])
+    return {"deptos": filas, "total": total, "horas_por_fte": list(horas_por_fte)}
 
 
 def armar_plan(tipos: list[dict], por_tipo: dict, total_sin_tipo: dict,

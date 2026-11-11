@@ -3261,7 +3261,7 @@
     "enllavado": "This scenario is locked: you can download, not upload.",
     "errorCatalogo": "Error loading the catalogue",
     "excelCatalogo": "↓ Catalogue Excel",
-    "excelSubtitulo": "{cuentas} accounts · the standard month is {dias} days × {horas} hours = {horasMes} hours",
+    "excelSubtitulo": "{cuentas} accounts · the standard month is the days in the month × {horas} hours (31 days = 248, 30 = 240, February = 224)",
     "excelTitulo": "Statistical accounts · class 9",
     "g9000": "Rooms and commercial",
     "g9110": "Food and beverage",
@@ -3274,7 +3274,7 @@
     "g9980": "Payroll · hours",
     "hojaCuentas": "Accounts",
     "intro": "What the hotel <b>counts</b>: nights, covers, kilos, hours, people. They carry no money — the P&L reports that. The <b>code never moves</b>; the name you can change. A new account is added in the repository catalogue, so that a new property is born with all of them.",
-    "jornada": "<b>The standard month.</b> {dias} days × {horas} hours = <b>{horasMes} hours a month</b>. Per position and per month, <b>regular + vacation taken + sick leave</b> hours have to add up to those {horasMes} × FTE. <b>Overtime</b>, the <b>day off worked</b> and the <b>holiday worked</b> go on top: they are extra time actually worked.",
+    "jornada": "<b>The standard month.</b> Days in the month × {horas} hours: <b>31 days = 248, 30 = 240, February = 224</b> (232 in a leap year). It is the FTE base: FTE = regular hours ÷ the month's hours. Per position and per month, <b>regular + vacation taken + sick leave</b> hours have to add up to the month's hours × FTE. <b>Overtime</b>, the <b>day off worked</b> and the <b>holiday worked</b> go on top: they are extra time actually worked.",
     "mes": "month",
     "no": "no",
     "noSeCargoNada": "Nothing was loaded.",
@@ -5579,7 +5579,7 @@
     "nota": "<b>Read only.</b> This tab feeds neither the P&L nor any scenario: it shows what accounting recorded. An account marked «create in Integrity» is part of the mapping and does not exist in Integrity's catalog yet (see the corrections list for accounting).",
     "catalogoTitulo": "Mapped catalog (what Integrity records)",
     "planTitulo": "Plan vs. Integrity",
-    "planIntro": "What the scenario plans or records (Budget, Forecast or Actual) <b>next to what accounting records</b>: <b>available and occupied nights by room type</b>, split into Rooms (0110), Villas (0115) and Residences (0116); Spa treatments, laundry kilos and <b>regular hours</b> by department. Nothing is recalculated here: the nights are those of “Revenue by room type” (or Room Stats for the Actual), Spa is its revenue ÷ the average price, the kilos come from the allocation setup and the hours are 240 × the payroll FTE.",
+    "planIntro": "What the scenario plans or records (Budget, Forecast or Actual) <b>next to what accounting records</b>: <b>available and occupied nights by room type</b>, split into Rooms (0110), Villas (0115) and Residences (0116); Spa treatments, laundry kilos and <b>regular hours</b> by department. Nothing is recalculated here: the nights are those of “Revenue by room type” (or Room Stats for the Actual), Spa is its revenue ÷ the average price, the kilos come from the allocation setup and the hours are days in the month × 8 × the payroll FTE.",
     "planEscenario": "Scenario",
     "planSinEscenarios": "No Budget or Forecast for {anio}",
     "planConcepto": "Item",
@@ -5600,7 +5600,10 @@
     "planNota": "Integrity does not record <b>available nights</b> yet: class 9 only has occupied nights (9000), so the comparison is against occupied. The Integrity columns fill in from the first 2027 trial balance that carries class 9.",
     "planSinTipoTotal": "Hotel total (no room-type split)",
     "planActualSinTipo": "This year <b>has no statistics by room type</b>: the room-type split starts in 2026. The hotel total by month is shown, which is what exists; no split is made up.",
-    "planHoras": "Regular hours ({horas} × FTE vs. 9980)",
+    "planHoras": "Regular hours (days in month × 8 × FTE vs. 9980)",
+    "planHorasPorFte": "Hours per 1 FTE (days × 8)",
+    "planFte": "Planned FTE (hours ÷ hours per 1 FTE)",
+    "planFteReal": "FTE · Integrity (9980 ÷ hours per 1 FTE)",
     "planHorasTotal": "Hotel total · planned hours"
   }
 }

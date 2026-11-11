@@ -1117,7 +1117,8 @@ export interface CuentaEstadistica {
 }
 export interface CatalogoEstadisticas {
   cuentas: CuentaEstadistica[];
-  jornada: { horas_mes: number; horas_dia: number; dias_base: number;
+  /** Las horas del mes son días del mes × `horas_dia` (owner 2026-11-10). */
+  jornada: { horas_dia: number;
              cierran: string[]; por_encima: string[] };
 }
 export interface EstadisticasValores {
@@ -1207,9 +1208,11 @@ export interface PlanVsIntegrity {
   spa: { plan: Meses; real: Meses; cuentas: string };
   lavanderia: { plan: { area: string; rotulo: string; cuenta: string; plan: number[] }[];
     real: Record<string, Meses> };
-  /** Horas regulares: plan = 240 × FTE por depto de planilla; real = 9980. */
-  horas?: { horas_mes: number; deptos: { depto: string; nombre: string; plan: Meses; real: Meses }[];
-    total: { plan: Meses; real: Meses } };
+  /** Horas regulares: plan = días del mes × 8 × FTE por depto de planilla; real = 9980.
+   *  `horas_por_fte` = las horas de un FTE completo en cada mes (248, 224, 240…). */
+  horas?: { horas_por_fte?: Meses;
+    deptos: { depto: string; nombre: string; plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses }[];
+    total: { plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses } };
 }
 export async function getPlanVsIntegrity(anio: number, scenarioId: string): Promise<PlanVsIntegrity> {
   return api.get(`/stats-integrity/${anio}/plan/${scenarioId}/`);
