@@ -232,6 +232,19 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
             [_como_dict(m) for m in await _reglas_vigentes(db)])
         secciones = {l["line_code"]: (l.get("section") or "")
                      for l in await recalc.load_report_line_config(db)}
+        apertura = await _apertura_de_rooms(db, esc)
+
+        def asentar(dept: str, cuenta: str, nombre: str, mes: int, monto: Decimal) -> None:
+            if (dept, cuenta) in con_movimiento_real:
+                return
+            fila = acumulado.setdefault(
+                (dept, cuenta),
+                {"dept_code": dept, "account_code": cuenta,
+                 "account_name": nombre or nombres.get(cuenta, ""),
+                 "outlet": "", "por_linea": True,
+                 **{m: ZERO for m in gl.MESES}})
+            fila[gl.MESES[mes - 1]] += monto
+
         for mes in range(1, 13):
             for linea in await recalc.compute_pl_month(db, esc, mes):
                 sec = (secciones.get(linea.line_code) or "").strip().upper()
@@ -241,16 +254,48 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
                 if destino is None:
                     continue
                 dept, cuenta, nombre = destino
-                if (dept, cuenta) in con_movimiento_real:
-                    continue
-                fila = acumulado.setdefault(
-                    (dept, cuenta),
-                    {"dept_code": dept, "account_code": cuenta,
-                     "account_name": nombre or nombres.get(cuenta, ""),
-                     "outlet": "", "por_linea": True,
-                     **{m: ZERO for m in gl.MESES}})
-                fila[gl.MESES[mes - 1]] += Decimal(str(linea.amount_usd or 0))
+                monto = Decimal(str(linea.amount_usd or 0))
+                # Rooms se abre por departamento con la apertura por set de
+                # habitaciones (Villas 0115, Residencias 0116): la parte de
+                # cada set va a SU depto y el resto queda en el ancla, así que
+                # la línea suma igual. Ver `_apertura_de_rooms`.
+                if linea.line_code == "REV_ROOMS":
+                    for d, v in (apertura.get(mes) or {}).items():
+                        if d != dept and v:
+                            asentar(d, cuenta, nombre, mes, v)
+                            monto -= v
+                asentar(dept, cuenta, nombre, mes, monto)
     return (list(acumulado.values()), "checkbook", False)
+
+
+async def _apertura_de_rooms(db: AsyncSession, esc: Scenario) -> dict[int, dict[str, Decimal]]:
+    """El ingreso de habitaciones de cada mes, por departamento del set.
+
+    Owner, 2026-11-10: *«no me está bajando a los GL el departamento 0115 en
+    ingresos»*. El checkbook guarda UNA línea de Rooms; la apertura por set
+    (Standard 0110 · Villas 0115 · Residencias 0116) sale de los drivers —la
+    misma que el Revenue Checkbook muestra debajo de la línea—: noches × tarifa
+    neta de cada tipo de habitación, sumada por el depto de su set.
+
+    No se inventa un reparto: cada set lleva lo que sus drivers calculan, y el
+    depto ancla se queda con el resto de la línea, así que el total de Rooms no
+    se mueve. Un tipo sin depto cuenta como 0110.
+    """
+    from app.api import revenue_api
+    from app.models.room_type_config import RoomTypeConfig
+
+    depto = {rt.id: (rt.dept_code or "0110") for rt in (await db.execute(
+        select(RoomTypeConfig).where(RoomTypeConfig.hotel_id == esc.hotel_id))).scalars()}
+    if set(depto.values()) <= {"0110"}:
+        return {}
+    datos = await revenue_api.get_revenue_by_room_type(esc.id, db)
+    out: dict[int, dict[str, Decimal]] = {}
+    for m in datos.get("months") or []:
+        por = out.setdefault(int(m["month"]), {})
+        for r in m.get("rows") or []:
+            d = depto.get(r.get("room_type_id"), "0110")
+            por[d] = por.get(d, ZERO) + Decimal(str(r.get("revenue") or 0))
+    return out
 
 
 def _fila(fila: dict, resolver, extremos, secciones, nombre_dept) -> dict:

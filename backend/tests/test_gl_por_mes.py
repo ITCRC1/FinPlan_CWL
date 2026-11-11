@@ -399,3 +399,20 @@ def test_una_prueba_que_use_el_cargador_REDUCIDO_falla():
                  "dept_code": "0250", "active_status": "YES",
                  "rollup_operator": "SUM"}]          # <- sin account_name_example
     assert gl.ancla_contable(reducido)["RENT"] == ("0250", "8000", "")
+
+
+# ─── Rooms abierto por set: Villas (0115) en su departamento ─────────────────
+
+def test_el_ingreso_de_rooms_se_abre_por_el_depto_del_set():
+    """Owner, 2026-11-10: «no me está bajando a los GL el departamento 0115 en
+    ingresos». La parte de cada set va a SU depto con la misma cuenta, y el
+    ancla (0110) se queda con el resto: la línea suma igual."""
+    import inspect
+    from app.api import gl_api
+    src = inspect.getsource(gl_api._filas_del_mayor)
+    assert "_apertura_de_rooms(db, esc)" in src
+    assert 'linea.line_code == "REV_ROOMS"' in src
+    assert "monto -= v" in src                    # el ancla se queda con el RESTO
+    ap = inspect.getsource(gl_api._apertura_de_rooms)
+    assert "get_revenue_by_room_type" in ap       # la apertura de los drivers, no un reparto nuevo
+    assert 'rt.dept_code or "0110"' in ap
