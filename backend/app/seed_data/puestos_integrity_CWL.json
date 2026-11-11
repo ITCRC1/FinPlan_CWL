@@ -1,0 +1,460 @@
+{
+ "_nota": [
+  "Que puesto de Integrity (nivel 3 de la 9980) corresponde a cada posicion de la planilla de FinPlan.",
+  "Owner, 2026-11-10: «el FTE debe ser por position y las horas deben ser por position que viene de la contabilidad».",
+  "La planilla usa codigos propios (0111-01) y nombres en ingles; Integrity registra las horas por PUESTO del catalogo (501 Agente Recepcion), sumando a todas las personas del puesto. Por eso varias posiciones caen en un mismo puesto.",
+  "La llave es depto + nombre de la posicion, sin mayusculas ni espacios de mas: el mismo nombre en otro escenario cae en el mismo puesto.",
+  "puesto vacio = no hay cuenta de horas en Integrity para esa posicion (se ve aparte en el reporte).",
+  "revisar = propuesta de Claude, no confirmada por el owner."
+ ],
+ "mapa": [
+  {
+   "depto": "0111",
+   "posicion": "Front Desk Agent",
+   "puesto": "501",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0111",
+   "posicion": "Front Desk Agent Supervisor",
+   "puesto": "503",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0111",
+   "posicion": "Front Desk Assistant",
+   "puesto": "501",
+   "revisar": true,
+   "nota": "No hay asistente de recepcion en Integrity: va como Agente Recepcion"
+  },
+  {
+   "depto": "0111",
+   "posicion": "Property Manager",
+   "puesto": "594",
+   "revisar": true,
+   "nota": "Director de Operaciones (594) o Gerente (500)"
+  },
+  {
+   "depto": "0111",
+   "posicion": "Property Assistant Manager",
+   "puesto": "595",
+   "revisar": true,
+   "nota": "Gerente de Operaciones (595) o Gerente (500)"
+  },
+  {
+   "depto": "0112",
+   "posicion": "Reservations Agent",
+   "puesto": "505",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0112",
+   "posicion": "Reservations Agent Supervisora",
+   "puesto": "504",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0113",
+   "posicion": "ROOM ATTENDANT",
+   "puesto": "508",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0113",
+   "posicion": "HOUSEKEEPING SUPERVISOR",
+   "puesto": "511",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0113",
+   "posicion": "CORRIDOR ATTENDANT (FLOOR RUNNER)",
+   "puesto": "510",
+   "revisar": true,
+   "nota": "Limpieza Areas Publicas (510) o Camarera (508)"
+  },
+  {
+   "depto": "0114",
+   "posicion": "Bellman",
+   "puesto": "514",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0114",
+   "posicion": "Concierge",
+   "puesto": "518",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0114",
+   "posicion": "Concierge (Drake Bay)",
+   "puesto": "518",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0114",
+   "posicion": "Manager",
+   "puesto": "516",
+   "revisar": true,
+   "nota": "Guest Relation Manager (516) o Experience Manager (515)"
+  },
+  {
+   "depto": "0114",
+   "posicion": "Guest Services (sin puesto en el archivo)",
+   "puesto": "",
+   "revisar": true,
+   "nota": "La planilla no dice que puesto es"
+  },
+  {
+   "depto": "0122",
+   "posicion": "BAKER",
+   "puesto": "533",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0122",
+   "posicion": "CHEF",
+   "puesto": "527",
+   "revisar": true,
+   "nota": "Chef Ejecutivo (527) o Chef de Cuisine (525)"
+  },
+  {
+   "depto": "0122",
+   "posicion": "COOK A",
+   "puesto": "529",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0122",
+   "posicion": "COOK A-SUPERVISOR",
+   "puesto": "529",
+   "revisar": true,
+   "nota": "Cocinero A (529) o Chef de Partie (526)"
+  },
+  {
+   "depto": "0122",
+   "posicion": "COOK B",
+   "puesto": "530",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0122",
+   "posicion": "STEWARD",
+   "puesto": "537",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "SERVER",
+   "puesto": "545",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "SERVER (WAITER/WAITRESS)",
+   "puesto": "545",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "SERVER CAPTAIN",
+   "puesto": "546",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0123",
+   "posicion": "F&B SUPERVISOR",
+   "puesto": "546",
+   "revisar": true,
+   "nota": "No hay supervisor en 0123: Capitan de Saloneros (546) o Gerente AyB (0121-521)"
+  },
+  {
+   "depto": "0123",
+   "posicion": "JORNALERO/CLARO BOSQUE",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Integrity no tiene jornalero en Restaurante"
+  },
+  {
+   "depto": "0132",
+   "posicion": "LEAD WELLNESS THERAPIST",
+   "puesto": "547",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0132",
+   "posicion": "SPA THERAPIST",
+   "puesto": "548",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0152",
+   "posicion": "Driver-PRADOS-INSUMOS-DRAKE",
+   "puesto": "550",
+   "revisar": true,
+   "nota": "Integrity solo tiene Jornalero/Peon (550) y Supervisor (551) en Transporte"
+  },
+  {
+   "depto": "0161",
+   "posicion": "Laundry Attendant",
+   "puesto": "552",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0161",
+   "posicion": "LAVANDERIA (sin puesto en el archivo)",
+   "puesto": "552",
+   "revisar": true,
+   "nota": "La planilla no dice el puesto; Integrity solo tiene Ayudante de Lavanderia"
+  },
+  {
+   "depto": "0181",
+   "posicion": "Gerencia Operaciones",
+   "puesto": "555",
+   "revisar": true,
+   "nota": "Resident Manager (555) o Gerente General (554)"
+  },
+  {
+   "depto": "0182",
+   "posicion": "INCOME AUDITOR",
+   "puesto": "561",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0182",
+   "posicion": "ACCOUNTING EXECUTIVE",
+   "puesto": "559",
+   "revisar": true,
+   "nota": "Contador (559) o Auxiliar Contabilidad (557)"
+  },
+  {
+   "depto": "0182",
+   "posicion": "FINANCE CONTROLLER",
+   "puesto": "562",
+   "revisar": true,
+   "nota": "Gerente Financiero (562) o Director Financiero (560)"
+  },
+  {
+   "depto": "0183",
+   "posicion": "PURCHASING CLERK",
+   "puesto": "564",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0183",
+   "posicion": "WAREHOUSE CLERK",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Bodeguero existe solo en Mantenimiento (0200-582), no en Compras"
+  },
+  {
+   "depto": "0184",
+   "posicion": "RRHH COORDINATOR-TRAINER",
+   "puesto": "567",
+   "revisar": true,
+   "nota": "Capacitacion y Desarrollo (567) o Encargada de RRHH (573)"
+  },
+  {
+   "depto": "0186",
+   "posicion": "SECURITY OFFICER",
+   "puesto": "575",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0186",
+   "posicion": "SECURITY OFFICER SUPERVISOR",
+   "puesto": "576",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0190",
+   "posicion": "DIRECTOR OF SALES & MARKETING",
+   "puesto": "579",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0190",
+   "posicion": "GROUP SALES COORDINATOR",
+   "puesto": "578",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0190",
+   "posicion": "DIGITAL MARKETING SPECIALIST",
+   "puesto": "581",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0190",
+   "posicion": "SOCIAL MEDIA COMMUNITY MANAGER",
+   "puesto": "581",
+   "revisar": true,
+   "nota": "Mercadeo Electronico (581) o Gerente de Mercadeo (580)"
+  },
+  {
+   "depto": "0190",
+   "posicion": "WEB MASTER",
+   "puesto": "581",
+   "revisar": true,
+   "nota": "Mercadeo Electronico (581)"
+  },
+  {
+   "depto": "0190",
+   "posicion": "REVENUE MANAGER",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Integrity no tiene Revenue Manager en Ventas"
+  },
+  {
+   "depto": "0200",
+   "posicion": "GARDENER",
+   "puesto": "591",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0200",
+   "posicion": "MAINTENANCE SUPERVISOR",
+   "puesto": "588",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0200",
+   "posicion": "POOL TECHNICIAN Jonathan",
+   "puesto": "586",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0200",
+   "posicion": "AIR CONDITIONING AGENT",
+   "puesto": "589",
+   "revisar": true,
+   "nota": "Tecnico de Mantenimiento (589) o Tecnico de Planta (590)"
+  },
+  {
+   "depto": "0200",
+   "posicion": "MECHANIC",
+   "puesto": "589",
+   "revisar": true,
+   "nota": "Tecnico de Mantenimiento (589)"
+  },
+  {
+   "depto": "0200",
+   "posicion": "PROPERTY SUPPORT",
+   "puesto": "589",
+   "revisar": true,
+   "nota": "Tecnico de Mantenimiento (589)"
+  },
+  {
+   "depto": "0200",
+   "posicion": "CONTRUCTION HELPER",
+   "puesto": "589",
+   "revisar": true,
+   "nota": "Integrity no tiene ayudante de construccion: Tecnico de Mantenimiento (589)"
+  },
+  {
+   "depto": "0230",
+   "posicion": "IT Support (Contract Labour)",
+   "puesto": "577",
+   "revisar": false,
+   "nota": ""
+  },
+  {
+   "depto": "0115",
+   "posicion": "Concierge Agent",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Villas (0115) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0115",
+   "posicion": "Housekeeping",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Villas (0115) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0115",
+   "posicion": "seguridad",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Villas (0115) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0150",
+   "posicion": "NATURE GUIDE",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Tours (0150) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0150",
+   "posicion": "BOAT CAPTAIN",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Tours (0150) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0150",
+   "posicion": "BOAT CAPTAIN SUPERVISOR",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Tours (0150) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0150",
+   "posicion": "DIVE MASTER",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Tours (0150) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0150",
+   "posicion": "ADVENTURE GUIDE",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Tours (0150) no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0205",
+   "posicion": "JORNALERO (sin puesto en el archivo)",
+   "puesto": "",
+   "revisar": true,
+   "nota": "0205 no tiene cuentas de horas en Integrity"
+  },
+  {
+   "depto": "0220",
+   "posicion": "STATION COOK 2 (COCINERO B)",
+   "puesto": "",
+   "revisar": true,
+   "nota": "Cafeteria (0220) no tiene cuentas de horas en Integrity"
+  }
+ ]
+}

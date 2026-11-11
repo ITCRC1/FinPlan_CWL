@@ -241,13 +241,7 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
                 real = fte_act.get(d, [0.0] * 12)
                 fte_plan[d] = [real[i] if i < corte else propio[i] for i in range(12)]
     # La base: la 9979 del escenario donde esté cargada; si no, días del mes × 8.
-    cargadas: dict[int, float] = {}
-    for mes, valor in (await db.execute(
-            select(StatisticalEntry.month, StatisticalEntry.value).where(
-                StatisticalEntry.scenario_id == esc.id,
-                StatisticalEntry.account_code == jornada.CUENTA_BASE))).all():
-        cargadas[mes] = cargadas.get(mes, 0.0) + float(valor or 0)
-    bases = jornada.bases_del_anio(anio, cargadas)
+    bases = await _base_del_escenario(db, esc.id, anio)
     horas_plan = {d: [float(bases[i] * Decimal(str(f))) for i, f in enumerate(fila)]
                   for d, fila in fte_plan.items() if any(fila)}
     nombres.update({c["depto"]: c["depto_nombre"] for c in si.leer_catalogo(HOTEL_ID)["cuentas"]
@@ -258,4 +252,65 @@ async def plan(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
     vista.update({"anio": anio, "escenario": {"id": esc.id, "type": esc.type, "version": esc.version,
                                               "year": esc.year, "actuals_through": corte},
                   "fuente": fuente})
+    return vista
+
+
+async def _base_del_escenario(db: AsyncSession, scenario_id: str, anio: int) -> list:
+    """Las horas de 1 FTE de cada mes: la 9979 del escenario o días del mes × 8."""
+    from app.models.statistical_entry import StatisticalEntry
+    cargadas: dict[int, float] = {}
+    for mes, valor in (await db.execute(
+            select(StatisticalEntry.month, StatisticalEntry.value).where(
+                StatisticalEntry.scenario_id == scenario_id,
+                StatisticalEntry.account_code == jornada.CUENTA_BASE))).all():
+        cargadas[mes] = cargadas.get(mes, 0.0) + float(valor or 0)
+    return jornada.bases_del_anio(anio, cargadas)
+
+
+@router.get("/stats-integrity/{anio}/fte/{scenario_id}/")
+async def reporte_fte(anio: int, scenario_id: str, db: AsyncSession = Depends(get_db),
+                      _=Depends(get_current_user)):
+    """El reporte de FTE por depto y puesto (owner, 2026-11-10).
+
+    El plan sale de la planilla del escenario: el FTE de cada posición y sus
+    horas (FTE × la base del mes). Las horas reales son las que registra
+    contabilidad en Integrity (9980-9986, por puesto), convertidas al set
+    9902-9905. El puente posición → puesto es `puestos_integrity_<hotel>.json`.
+    Solo lee.
+    """
+    from app.models.payroll_position import PayrollPosition, get_fte
+    from app.models.scenario import Scenario
+
+    esc = await db.get(Scenario, scenario_id)
+    if esc is None:
+        raise ErrorApi(404, "escenario.no_encontrado")
+
+    nombres: dict[str, str] = {}
+    posiciones = []
+    for p in (await db.execute(select(PayrollPosition).where(
+            PayrollPosition.scenario_id == scenario_id)
+            .order_by(PayrollPosition.dept_code, PayrollPosition.position_code))).scalars():
+        if p.dept_name:
+            nombres.setdefault(p.dept_code, p.dept_name)
+        # «GL» es la posición sintética de los actuales: no es una persona.
+        if p.position_code == "GL":
+            continue
+        posiciones.append({"depto": p.dept_code, "codigo": p.position_code or "",
+                           "nombre": p.position_name, "empleado": p.employee_name or "",
+                           "fte": [float(get_fte(p, m)) for m in range(1, 13)]})
+    catalogo = si.leer_catalogo(HOTEL_ID)
+    nombres.update({c["depto"]: c["depto_nombre"] for c in catalogo["cuentas"]
+                    if c.get("depto") and c["depto"] not in nombres})
+
+    bases = await _base_del_escenario(db, scenario_id, anio)
+    agregado = si.agregar((await db.execute(
+        select(MayorMovimiento.mes, MayorMovimiento.cuenta,
+               MayorMovimiento.debito, MayorMovimiento.credito)
+        .where(MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+               MayorMovimiento.seg1.like("99%")))).all())
+
+    vista = si.armar_fte(posiciones, nombres, bases, si.leer_mapa_puestos(HOTEL_ID),
+                         si.nombres_de_puestos(catalogo), si.horas_integrity_por_puesto(agregado))
+    vista.update({"anio": anio, "escenario": {"id": esc.id, "type": esc.type,
+                                              "version": esc.version, "year": esc.year}})
     return vista

@@ -490,6 +490,50 @@
    "agrega": "SUM"
   },
   {
+   "code": "9902",
+   "grupo": "9900",
+   "nombre_es": "FTE trabajado",
+   "nombre_en": "Worked FTE",
+   "unidad": "fte",
+   "dims": ["DEPT", "POSITION"],
+   "agrega": "SUM",
+   "formula": "9980 / 9979",
+   "nota": "Horas regulares / base. Lo que se trabajo dentro de la jornada."
+  },
+  {
+   "code": "9903",
+   "grupo": "9900",
+   "nombre_es": "FTE pagado (jornada)",
+   "nombre_en": "Paid FTE (standard month)",
+   "unidad": "fte",
+   "dims": ["DEPT", "POSITION"],
+   "agrega": "SUM",
+   "formula": "(9980+9985+9986) / 9979",
+   "nota": "Regulares + vacaciones + incapacidad / base. El FTE que se paga: debe dar el FTE de la planilla."
+  },
+  {
+   "code": "9904",
+   "grupo": "9900",
+   "nombre_es": "FTE en horas extra",
+   "nombre_en": "Overtime FTE",
+   "unidad": "fte",
+   "dims": ["DEPT", "POSITION"],
+   "agrega": "SUM",
+   "formula": "(9981+9982+9983) / 9979",
+   "nota": "Extras + dia libre laborado + feriado laborado / base. Tiempo trabajado ADEMAS de la jornada."
+  },
+  {
+   "code": "9905",
+   "grupo": "9900",
+   "nombre_es": "FTE en ausencias",
+   "nombre_en": "Absence FTE",
+   "unidad": "fte",
+   "dims": ["DEPT", "POSITION"],
+   "agrega": "SUM",
+   "formula": "(9985+9986) / 9979",
+   "nota": "Vacaciones + incapacidad / base. Jornada pagada que no se trabajo."
+  },
+  {
    "code": "9979",
    "grupo": "9900",
    "nombre_es": "Horas de la jornada (1 FTE)",

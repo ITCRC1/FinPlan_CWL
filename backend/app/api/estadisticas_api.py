@@ -52,7 +52,7 @@ async def catalogo(_=Depends(get_current_user)):
         "nombre_en": c.nombre_en, "unidad": c.unidad,
         "dims": c.dims_permitidas() and sorted(c.dims_permitidas()) or [],
         "deptos": c.deptos_propios(), "agrega": c.agrega,
-        "legado": c.legado, "activa": c.activa,
+        "legado": c.legado, "activa": c.activa, "formula": c.formula or "",
     } for c in filas],
         # La regla de la jornada, para que la pantalla la muestre en vez de que
         # el owner tenga que acordarse.

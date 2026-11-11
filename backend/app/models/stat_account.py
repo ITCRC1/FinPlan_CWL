@@ -71,6 +71,10 @@ class StatAccount(Base):
     deptos: Mapped[str] = mapped_column(String(200), default="")
 
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Vacía = la cuenta se CARGA. Con fórmula («(9980+9985+9986) / 9979») se
+    # CALCULA de otras: la plantilla no la ofrece y una subida no la acepta.
+    # Ver migración 162 y `jornada.SET_FTE`.
+    formula: Mapped[str] = mapped_column(String(80), default="")
 
     def deptos_propios(self) -> list[str]:
         return [d for d in (self.deptos or "").split(",") if d]

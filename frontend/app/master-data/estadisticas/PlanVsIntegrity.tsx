@@ -150,12 +150,12 @@ export default function PlanVsIntegrity({ anio }: { anio: number }) {
     // Las horas de un FTE completo en cada mes, para leer las de cada depto.
     if (vista.horas.horas_por_fte) {
       const h = vista.horas.horas_por_fte;
-      hs.push({ label: t("planHorasPorFte"), meses: h, anual: sumar(h), tipo: "num", nivel: 1, negrita: true });
+      hs.push({ label: t("planHorasPorFte"), meses: h, anual: sumar(h), tipo: "num", nivel: 2, negrita: true });
     }
     if (vista.horas.horas_por_fte_real) {
       const h = vista.horas.horas_por_fte_real;
       hs.push({ label: t("planRealCuentas", { cuentas: "9979" }), meses: h, anual: sumar(h), tipo: "num",
-        nivel: 1, negrita: true, real: true });
+        nivel: 2, negrita: true, real: true });
     }
     for (const d of vista.horas.deptos) {
       hs.push({ label: `${d.depto} · ${d.nombre}`.replace(/ · $/, ""), meses: d.plan, anual: sumar(d.plan),

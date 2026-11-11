@@ -28,6 +28,7 @@ import { useEscenarioDe } from "@/lib/escenarioPreferido";
 import { bajarCuadros, type ColumnaCuadro, type FilaCuadro } from "@/lib/exportCuadro";
 import IrA from "@/components/IrA";
 import StatsIntegrity from "./StatsIntegrity";
+import FteReport from "./FteReport";
 
 const BTN: React.CSSProperties = {
   padding: "7px 14px", borderRadius: 6, cursor: "pointer",
@@ -72,8 +73,11 @@ export default function EstadisticasPage() {
   const archivo = useRef<HTMLInputElement>(null);
   // Dos pestañas que no se mezclan (owner, 2026-11-10): el catálogo propio de
   // FinPlan y las estadísticas de Integrity tal como las registra contabilidad.
-  const [pestana, setPestana] = useState<"finplan" | "stats">(() => {
-    try { return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "stats" ? "stats" : "finplan"; }
+  const [pestana, setPestana] = useState<"finplan" | "stats" | "fte">(() => {
+    try {
+      const tab = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+      return tab === "stats" || tab === "fte" ? tab : "finplan";
+    }
     catch { return "finplan"; }
   });
 
@@ -186,7 +190,7 @@ export default function EstadisticasPage() {
         {t("titulo")}
       </h1>
       <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-medium)", margin: "10px 0 16px" }}>
-        {([["finplan", t("tabFinplan")], ["stats", t("tabStats")]] as const).map(([k, label]) => (
+        {([["finplan", t("tabFinplan")], ["stats", t("tabStats")], ["fte", t("tabFte")]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setPestana(k)}
             style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "none",
               border: "none", borderBottom: `2px solid ${pestana === k ? "var(--brand)" : "transparent"}`,
@@ -195,7 +199,7 @@ export default function EstadisticasPage() {
           </button>
         ))}
       </div>
-      {pestana === "stats" ? <StatsIntegrity /> : (<>
+      {pestana === "fte" ? <FteReport /> : pestana === "stats" ? <StatsIntegrity /> : (<>
       <p style={{ fontSize: 12.5, color: "var(--text-secondary)", maxWidth: 900, marginBottom: 18 }}>
         {t.rich("intro", { b })}
       </p>

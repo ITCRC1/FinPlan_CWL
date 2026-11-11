@@ -3300,7 +3300,8 @@
     "uTreatments": "tratamientos",
     "uTrips": "viajes",
     "tabFinplan": "Catálogo FinPlan",
-    "tabStats": "Stats (Integrity)"
+    "tabStats": "Stats (Integrity)",
+    "tabFte": "FTE"
   },
   "opexCheckbook": {
     "bajarCheckbook": "⬇ Bajar checkbook",
@@ -5602,6 +5603,19 @@
     "planActualSinTipo": "Este año <b>no tiene la estadística por tipo de habitación</b>: la apertura por tipo empieza en 2026. Se muestra el total del hotel por mes, que es lo que hay; no se inventa un reparto.",
     "planHoras": "Horas regulares (días del mes × 8 × FTE vs. 9980)",
     "planHorasPorFte": "Horas de 1 FTE (9979; sin cargar, días × 8)",
+    "fteIntro": "El FTE de cada <b>posición de la planilla de FinPlan</b> agrupado en su <b>puesto de Integrity</b>, y al lado lo que registra contabilidad para ese puesto. Plan: el FTE de la posición y sus horas (FTE × las horas del mes: la 9979 o los días × 8). Real: las horas 9980-9986 de Integrity, convertidas al set <b>9902 trabajado · 9903 pagado · 9904 extras · 9905 ausencias</b> (horas ÷ horas del mes). Qué posición cae en qué puesto lo dice la homologación de posiciones; ⚠ = propuesta sin confirmar.",
+    "fteVerPosiciones": "Ver posiciones",
+    "fteFtePlan": "FTE del plan",
+    "fteHorasPlan": "Horas del plan",
+    "fteHorasReales": "Horas regulares · Integrity (9980)",
+    "fteSinNombre": "(sin nombre en el catálogo)",
+    "fteRevisar": "homologación por confirmar",
+    "fteSinPuesto": "Sin puesto de Integrity",
+    "fteTotalDepto": "Total depto · FTE del plan",
+    "fteTotalHotel": "Total hotel",
+    "fteSinHoras": "Contabilidad todavía no registró horas de {anio} (cuentas 9980-9986): el reporte muestra solo el plan. Las filas de Integrity aparecen con la primera balanza que las traiga.",
+    "fteExcelTitulo": "FTE por puesto — {tipo} {version} {anio}",
+    "fteExcelSubtitulo": "Plan: posiciones de FinPlan · Real: horas de Integrity por puesto ÷ horas del mes (9979 o días × 8)",
     "planFte": "FTE del plan (horas ÷ horas de 1 FTE)",
     "planFteReal": "FTE · Integrity (9980 ÷ horas de 1 FTE)",
     "planHorasTotal": "Total hotel · horas del plan"

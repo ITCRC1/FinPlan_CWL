@@ -89,6 +89,41 @@ CUENTAS_DE_LA_JORNADA = ("9980", "9985", "9986")
 #: NO entra en la identidad — si entrara, quien trabaja extras «no cerraría».
 CUENTAS_SOBRE_LA_JORNADA = ("9981", "9982", "9983")
 
+#: El set de FTE (owner, 2026-11-10: «crea un set de estadísticas para FTE»).
+#: Cada uno es una suma de cuentas de horas dividida por la base (9979). Son
+#: cuentas CALCULADAS: viven en el catálogo con su fórmula, pero nadie las carga.
+#: Lo que va en el catálogo se genera de acá (`formula_de`) y una prueba lo exige:
+#: dos lugares que dicen cómo se calcula el FTE terminan diciendo cosas distintas.
+SET_FTE: dict[str, tuple[str, tuple[str, ...]]] = {
+    "9902": ("FTE trabajado", ("9980",)),
+    "9903": ("FTE pagado (jornada)", CUENTAS_DE_LA_JORNADA),
+    "9904": ("FTE en horas extra", CUENTAS_SOBRE_LA_JORNADA),
+    "9905": ("FTE en ausencias", ("9985", "9986")),
+}
+
+
+def formula_de(code: str) -> str:
+    """El texto de la fórmula, igual al del catálogo: «(9980+9985+9986) / 9979»."""
+    cuentas = SET_FTE[code][1]
+    num = cuentas[0] if len(cuentas) == 1 else "(" + "+".join(cuentas) + ")"
+    return f"{num} / {CUENTA_BASE}"
+
+
+def calcular_set_fte(horas: dict[str, Decimal | float | None],
+                     base: Decimal | float) -> dict[str, Decimal | None]:
+    """Las cuatro cuentas del set para un mes. `None` donde no hay ninguna hora
+    de las que suma esa cuenta: «sin dato» no es «cero FTE»."""
+    out: dict[str, Decimal | None] = {}
+    b = Decimal(str(base))
+    for code, (_, cuentas) in SET_FTE.items():
+        vals = [horas.get(c) for c in cuentas]
+        if all(v is None for v in vals) or not b:
+            out[code] = None
+            continue
+        out[code] = sum((Decimal(str(v)) for v in vals if v is not None), Decimal("0")) / b
+    return out
+
+
 #: Colchón para no gritar por un redondeo. Media jornada.
 TOLERANCIA = HORAS_POR_DIA / 2
 

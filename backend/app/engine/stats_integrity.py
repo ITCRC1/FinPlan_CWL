@@ -313,3 +313,140 @@ def armar_plan(tipos: list[dict], por_tipo: dict, total_sin_tipo: dict,
                 "cuentas": "9201–9209"},
         "lavanderia": {"plan": lav, "real": real_kilos},
     }
+
+
+# ─── El reporte de FTE por puesto (owner, 2026-11-10) ────────────────────────
+#
+# «Ocupo que me generes un reporte de FTE basado en las horas que se reportan en
+#  la planilla o en Budget» · «el FTE debe ser por position y las horas deben ser
+#  por position que viene de la contabilidad».
+#
+# Integrity registra las horas por PUESTO del catálogo (nivel 3 de la 9980:
+# 501 Agente Recepción), sumando a todas las personas del puesto. La planilla de
+# FinPlan tiene una fila por persona con códigos propios (0111-01). El puente es
+# `seed_data/puestos_integrity_<hotel>.json`; con él, cada puesto lleva:
+#   - el FTE de las posiciones de la planilla que caen en él, y sus horas
+#     (FTE × la base del mes: 9979 o días × 8);
+#   - las horas que registró contabilidad para ese puesto (9980-9986), y el set
+#     de FTE 9902-9905 que sale de ellas.
+
+HORAS_DEL_SET = ("9980", "9981", "9982", "9983", "9985", "9986")
+
+
+def _norm(nombre: str) -> str:
+    return " ".join((nombre or "").split()).upper()
+
+
+def leer_mapa_puestos(hotel_id: str) -> dict[tuple[str, str], dict]:
+    """{(depto, NOMBRE DE POSICIÓN): {"puesto","revisar","nota"}}."""
+    archivo = pathlib.Path(__file__).resolve().parent.parent / "seed_data" / f"puestos_integrity_{hotel_id}.json"
+    if not archivo.exists():
+        return {}
+    datos = json.loads(archivo.read_text(encoding="utf-8"))
+    return {(m["depto"], _norm(m["posicion"])): m for m in datos["mapa"]}
+
+
+def nombres_de_puestos(catalogo: dict) -> dict[tuple[str, str], str]:
+    """{(depto, puesto): «AGENTE RECEPCION»} de las 9980 del catálogo homologado."""
+    out = {}
+    for c in catalogo["cuentas"]:
+        if c.get("grupo") == "9980":
+            n3 = c["clave"].split("-")[2]
+            out[(c["depto"], n3)] = (c.get("nivel3") or "").split(":", 1)[-1].strip()
+    return out
+
+
+def horas_integrity_por_puesto(agregado: dict) -> dict[tuple[str, str], dict[str, list]]:
+    """{(depto, puesto): {cuenta: 12 meses}}. Suma clases y categorías (expat,
+    local, temporal) del mismo puesto: el reporte es por puesto."""
+    out: dict[tuple[str, str], dict[str, list]] = {}
+    for (mes, k), a in agregado.items():
+        p = k.split("-")
+        if p[0] not in HORAS_DEL_SET or len(p) < 3:
+            continue
+        fila = out.setdefault((p[1], p[2]), {}).setdefault(p[0], [None] * 12)
+        fila[mes - 1] = (fila[mes - 1] or 0.0) + float(a["valor"])
+    return out
+
+
+def _sumar(destino: list, origen: list) -> None:
+    for i, v in enumerate(origen):
+        if v is not None:
+            destino[i] = (destino[i] or 0.0) + v
+
+
+def armar_fte(posiciones: list[dict], nombres: dict[str, str], bases: list,
+              mapa: dict[tuple[str, str], dict], nombres_puesto: dict[tuple[str, str], str],
+              horas: dict[tuple[str, str], dict[str, list]]) -> dict:
+    """Arma el reporte por depto → puesto. Pura: la usan las pruebas sin base.
+
+    `posiciones`: [{"depto","codigo","nombre","empleado","fte": 12}] (sin «GL»).
+    `mapa`: de `leer_mapa_puestos`. `horas`: de `horas_integrity_por_puesto`.
+    """
+    from app.engine import jornada
+
+    def set_de(h: dict[str, list]) -> dict[str, list]:
+        out = {c: [None] * 12 for c in jornada.SET_FTE}
+        for i in range(12):
+            for c, v in jornada.calcular_set_fte({k: h.get(k, [None] * 12)[i] for k in HORAS_DEL_SET},
+                                                 bases[i]).items():
+                out[c][i] = None if v is None else float(v)
+        return out
+
+    def vacias():
+        return {c: [None] * 12 for c in HORAS_DEL_SET}
+
+    puestos: dict[tuple[str, str], dict] = {}
+    sin_puesto: dict[str, list] = {}
+    for p in posiciones:
+        m = mapa.get((p["depto"], _norm(p["nombre"])))
+        fila = {**p, "horas_plan": [float(bases[i]) * p["fte"][i] for i in range(12)],
+                "revisar": bool(m and m.get("revisar")), "nota": (m or {}).get("nota", ""),
+                "mapeada": m is not None}
+        if not m or not m.get("puesto"):
+            sin_puesto.setdefault(p["depto"], []).append(fila)
+            continue
+        k = (p["depto"], m["puesto"])
+        puestos.setdefault(k, {"posiciones": []})["posiciones"].append(fila)
+    for k in horas:                      # puestos con horas y sin nadie en la planilla
+        puestos.setdefault(k, {"posiciones": []})
+
+    deptos = sorted({k[0] for k in puestos} | set(sin_puesto))
+    filas = []
+    tot = {"fte_plan": [0.0] * 12, "horas": vacias()}
+    for d in deptos:
+        lista = []
+        dep = {"fte_plan": [0.0] * 12, "horas": vacias()}
+        for (dd, n3) in sorted(k for k in puestos if k[0] == d):
+            pos = puestos[(dd, n3)]["posiciones"]
+            fte = [sum(x["fte"][i] for x in pos) for i in range(12)]
+            h = horas.get((dd, n3), {})
+            hh = {c: list(h.get(c, [None] * 12)) for c in HORAS_DEL_SET}
+            lista.append({"puesto": n3, "nombre": nombres_puesto.get((dd, n3), ""), "posiciones": pos,
+                          "revisar": any(x["revisar"] for x in pos),
+                          "fte_plan": fte, "horas_plan": [float(bases[i]) * fte[i] for i in range(12)],
+                          "horas": hh, "set": set_de(hh)})
+            for i in range(12):
+                dep["fte_plan"][i] += fte[i]
+            for c in HORAS_DEL_SET:
+                _sumar(dep["horas"][c], hh[c])
+        sp = sin_puesto.get(d, [])
+        for i in range(12):
+            dep["fte_plan"][i] += sum(x["fte"][i] for x in sp)
+        if not any(dep["fte_plan"]) and all(v is None for c in dep["horas"].values() for v in c):
+            continue
+        for i in range(12):
+            tot["fte_plan"][i] += dep["fte_plan"][i]
+        for c in HORAS_DEL_SET:
+            _sumar(tot["horas"][c], dep["horas"][c])
+        filas.append({"depto": d, "nombre": nombres.get(d, ""), "puestos": lista, "sin_puesto": sp,
+                      "fte_plan": dep["fte_plan"],
+                      "horas_plan": [float(bases[i]) * dep["fte_plan"][i] for i in range(12)],
+                      "horas": dep["horas"], "set": set_de(dep["horas"])})
+    return {"deptos": filas, "base": [float(b) for b in bases],
+            "set_nombres": {c: n for c, (n, _) in jornada.SET_FTE.items()},
+            "set_formulas": {c: jornada.formula_de(c) for c in jornada.SET_FTE},
+            "hay_horas": any(v is not None for c in tot["horas"].values() for v in c),
+            "total": {"fte_plan": tot["fte_plan"],
+                      "horas_plan": [float(bases[i]) * tot["fte_plan"][i] for i in range(12)],
+                      "horas": tot["horas"], "set": set_de(tot["horas"])}}

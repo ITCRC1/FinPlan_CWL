@@ -306,8 +306,9 @@ def test_las_horas_del_plan_van_al_lado_de_la_9980():
 def test_las_horas_del_plan_son_dias_del_mes_por_8():
     """Owner, 2026-11-10: cada mes con sus días × 8 horas, no 240 fijo."""
     src = inspect.getsource(api.plan)
-    assert "jornada.bases_del_anio(anio" in src
-    assert "jornada.CUENTA_BASE" in src
+    assert "_base_del_escenario(db, esc.id, anio)" in src
+    base = inspect.getsource(api._base_del_escenario)
+    assert "jornada.bases_del_anio(anio" in base and "jornada.CUENTA_BASE" in base
     import re
     assert not re.search(r"240\s*\*|\*\s*240|Decimal\(\"240\"\)", src)
 
@@ -347,3 +348,97 @@ def test_cafeteria_y_lavanderia_cuentan_horas_aunque_sean_allocation():
     assert "ALLOC_EXCL" not in src and "allocation_en_overhead" not in src
     assert 'p.position_code == "GL"' in src
     assert "_dept_fte_override" in src
+
+
+# ─── El reporte de FTE por puesto ────────────────────────────────────────────
+
+_BASES_2027 = [248.0, 224.0, 248.0, 240.0, 248.0, 240.0, 248.0, 248.0, 240.0, 248.0, 240.0, 248.0]
+_MAPA = {("0113", "ROOM ATTENDANT"): {"puesto": "508", "revisar": False, "nota": ""},
+         ("0113", "CORRIDOR ATTENDANT"): {"puesto": "510", "revisar": True, "nota": "x"},
+         ("0150", "NATURE GUIDE"): {"puesto": "", "revisar": True, "nota": "sin cuenta"}}
+_NOMBRES_PUESTO = {("0113", "508"): "CAMARERA (O)", ("0113", "510"): "LIMPIEZA AREAS PUBLICAS"}
+
+
+def _pos(depto, codigo, nombre, fte):
+    return {"depto": depto, "codigo": codigo, "nombre": nombre, "empleado": "", "fte": fte}
+
+
+def test_varias_posiciones_caen_en_un_puesto_de_integrity():
+    """Tres room attendants de la planilla son UN puesto (508) en Integrity."""
+    pos = [_pos("0113", f"0113-0{i}", "Room  attendant", [1.0] * 12) for i in range(3)]
+    v = si.armar_fte(pos, {"0113": "Ama de llaves"}, _BASES_2027, _MAPA, _NOMBRES_PUESTO, {})
+    d = v["deptos"][0]
+    assert len(d["puestos"]) == 1
+    p = d["puestos"][0]
+    assert p["puesto"] == "508" and p["nombre"] == "CAMARERA (O)"
+    assert p["fte_plan"][0] == 3.0 and p["horas_plan"][0] == 744.0      # 3 × 248
+    assert p["horas_plan"][1] == 672.0                                  # 3 × 224
+    assert all(x is None for x in p["set"]["9902"])                     # sin horas: sin dato
+    assert v["hay_horas"] is False
+
+
+def test_las_horas_de_contabilidad_dan_el_fte_real_del_puesto():
+    pos = [_pos("0113", "0113-01", "ROOM ATTENDANT", [1.0] * 12),
+           _pos("0113", "0113-02", "ROOM ATTENDANT", [1.0] * 12)]
+    horas = {("0113", "508"): {"9980": [400.0] + [None] * 11, "9985": [96.0] + [None] * 11,
+                               "9981": [24.8] + [None] * 11}}
+    v = si.armar_fte(pos, {}, _BASES_2027, _MAPA, _NOMBRES_PUESTO, horas)
+    s = v["deptos"][0]["puestos"][0]["set"]
+    assert s["9902"][0] == 400 / 248                     # trabajado
+    assert s["9903"][0] == 2.0                           # pagado: 496 / 248 = las 2 posiciones
+    assert abs(s["9904"][0] - 0.1) < 1e-9                # extras
+    assert s["9905"][0] == 96 / 248                      # ausencias
+    assert v["total"]["set"]["9903"][0] == 2.0 and v["hay_horas"]
+
+
+def test_la_clave_de_integrity_suma_clase_y_categoria_del_puesto():
+    agr = _agr((1, "9980-0113-508-013-010-00-00", 100), (1, "9980-0113-508-013-015-00-00", 148),
+               (1, "9980-0113-511-012-015-00-00", 248))
+    h = si.horas_integrity_por_puesto(agr)
+    assert h[("0113", "508")]["9980"][0] == 248 and h[("0113", "511")]["9980"][0] == 248
+
+
+def test_un_puesto_con_horas_y_sin_planilla_igual_aparece():
+    horas = {("0113", "511"): {"9980": [248.0] + [None] * 11}}
+    v = si.armar_fte([], {}, _BASES_2027, _MAPA, _NOMBRES_PUESTO, horas)
+    p = v["deptos"][0]["puestos"][0]
+    assert p["puesto"] == "511" and p["fte_plan"][0] == 0 and p["set"]["9902"][0] == 1.0
+
+
+def test_lo_que_no_tiene_puesto_va_aparte_pero_suma_al_depto():
+    pos = [_pos("0150", "0150-01", "NATURE GUIDE", [1.0] * 12),
+           _pos("0150", "0150-02", "BOAT CAPTAIN", [1.0] * 12)]      # sin mapa
+    v = si.armar_fte(pos, {}, _BASES_2027, _MAPA, _NOMBRES_PUESTO, {})
+    d = v["deptos"][0]
+    assert d["puestos"] == [] and len(d["sin_puesto"]) == 2
+    assert d["fte_plan"][0] == 2.0
+    assert {x["mapeada"] for x in d["sin_puesto"]} == {True, False}
+
+
+def test_el_mapa_de_cwl_apunta_a_puestos_que_existen():
+    """Cada puesto del mapa tiene que ser una 9980 del catálogo homologado de su depto."""
+    mapa = si.leer_mapa_puestos("CWL")
+    existentes = si.nombres_de_puestos(si.leer_catalogo("CWL"))
+    assert mapa
+    for (depto, nombre), m in mapa.items():
+        if m["puesto"]:
+            assert (depto, m["puesto"]) in existentes, (depto, nombre, m["puesto"])
+        else:
+            assert m["revisar"], f"{depto} {nombre}: sin puesto tiene que quedar marcado"
+
+
+def test_el_set_del_catalogo_es_el_del_motor():
+    """Las fórmulas del catálogo se escriben desde `jornada.SET_FTE`: si alguien
+    cambia una sola de las dos, el FTE quedaría definido dos veces."""
+    from app.engine import jornada
+    from app.seed_stats import leer_catalogo
+    cat = {c["code"]: c for c in leer_catalogo()}
+    for code in jornada.SET_FTE:
+        assert cat[code].get("formula") == jornada.formula_de(code), code
+        assert cat[code]["grupo"] == "9900" and cat[code]["unidad"] == "fte"
+    assert jornada.formula_de("9903") == "(9980+9985+9986) / 9979"
+
+
+def test_las_calculadas_no_entran_en_la_plantilla():
+    src = inspect.getsource(__import__("app.engine.estadisticas_grilla", fromlist=["x"]).construir)
+    assert 'StatAccount.formula == ""' in src

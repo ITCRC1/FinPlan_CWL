@@ -74,6 +74,7 @@ def _campos(c: dict) -> dict:
         "deptos": ",".join(c.get("deptos", [])),
         "legado": c.get("legado", ""),
         "activa": bool(c.get("activa", True)),
+        "formula": c.get("formula", ""),
     }
 
 

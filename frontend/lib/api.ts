@@ -1214,6 +1214,27 @@ export interface PlanVsIntegrity {
     deptos: { depto: string; nombre: string; plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses }[];
     total: { plan: Meses; real: Meses; fte_plan?: Meses; fte_real?: Meses } };
 }
+/** El reporte de FTE por depto y puesto de Integrity (owner, 2026-11-10). */
+export interface FtePosicion { depto: string; codigo: string; nombre: string; empleado: string;
+  fte: number[]; horas_plan: number[]; revisar: boolean; nota: string; mapeada: boolean }
+export interface ReporteFte {
+  anio: number;
+  escenario: { id: string; type: string; version: string; year: number };
+  /** Horas de 1 FTE de cada mes: 9979 del escenario o días del mes × 8. */
+  base: number[];
+  set_nombres: Record<string, string>; set_formulas: Record<string, string>;
+  /** ¿Contabilidad registró alguna hora (9980-9986) ese año? */
+  hay_horas: boolean;
+  deptos: { depto: string; nombre: string;
+    puestos: { puesto: string; nombre: string; revisar: boolean; posiciones: FtePosicion[];
+      fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> }[];
+    sin_puesto: FtePosicion[];
+    fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> }[];
+  total: { fte_plan: number[]; horas_plan: number[]; horas: Record<string, Meses>; set: Record<string, Meses> };
+}
+export async function getReporteFte(anio: number, scenarioId: string): Promise<ReporteFte> {
+  return api.get(`/stats-integrity/${anio}/fte/${scenarioId}/`);
+}
 export async function getPlanVsIntegrity(anio: number, scenarioId: string): Promise<PlanVsIntegrity> {
   return api.get(`/stats-integrity/${anio}/plan/${scenarioId}/`);
 }

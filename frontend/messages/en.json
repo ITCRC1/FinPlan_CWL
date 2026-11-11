@@ -3300,7 +3300,8 @@
     "uTreatments": "treatments",
     "uTrips": "trips",
     "tabFinplan": "FinPlan catalog",
-    "tabStats": "Stats (Integrity)"
+    "tabStats": "Stats (Integrity)",
+    "tabFte": "FTE"
   },
   "opexCheckbook": {
     "bajarCheckbook": "⬇ Download checkbook",
@@ -5602,6 +5603,19 @@
     "planActualSinTipo": "This year <b>has no statistics by room type</b>: the room-type split starts in 2026. The hotel total by month is shown, which is what exists; no split is made up.",
     "planHoras": "Regular hours (days in month × 8 × FTE vs. 9980)",
     "planHorasPorFte": "Hours per 1 FTE (9979; if blank, days × 8)",
+    "fteIntro": "The FTE of each <b>FinPlan payroll position</b> grouped under its <b>Integrity job</b>, next to what accounting records for that job. Plan: the position's FTE and its hours (FTE × the month's hours: 9979 or days × 8). Actual: Integrity hours 9980-9986, turned into the set <b>9902 worked · 9903 paid · 9904 overtime · 9905 absence</b> (hours ÷ the month's hours). Which position falls in which job comes from the position mapping; ⚠ = proposal not yet confirmed.",
+    "fteVerPosiciones": "Show positions",
+    "fteFtePlan": "Planned FTE",
+    "fteHorasPlan": "Planned hours",
+    "fteHorasReales": "Regular hours · Integrity (9980)",
+    "fteSinNombre": "(no name in the catalog)",
+    "fteRevisar": "mapping to be confirmed",
+    "fteSinPuesto": "No Integrity job",
+    "fteTotalDepto": "Dept total · planned FTE",
+    "fteTotalHotel": "Hotel total",
+    "fteSinHoras": "Accounting has not recorded any {anio} hours yet (accounts 9980-9986): the report shows the plan only. The Integrity rows appear with the first trial balance that carries them.",
+    "fteExcelTitulo": "FTE by job — {tipo} {version} {anio}",
+    "fteExcelSubtitulo": "Plan: FinPlan positions · Actual: Integrity hours by job ÷ the month's hours (9979 or days × 8)",
     "planFte": "Planned FTE (hours ÷ hours per 1 FTE)",
     "planFteReal": "FTE · Integrity (9980 ÷ hours per 1 FTE)",
     "planHorasTotal": "Hotel total · planned hours"

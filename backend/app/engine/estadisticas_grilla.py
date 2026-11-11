@@ -143,7 +143,9 @@ async def construir(session, scenario, cuentas: list[StatAccount] | None = None
     """
     if cuentas is None:
         cuentas = list((await session.execute(
-            select(StatAccount).where(StatAccount.activa.is_(True))
+            # Las calculadas (el set de FTE) no se llenan: salen de las horas.
+            select(StatAccount).where(StatAccount.activa.is_(True),
+                                      StatAccount.formula == "")
             .order_by(StatAccount.grupo, StatAccount.code))).scalars().all())
 
     posiciones = await _posiciones(session, scenario.id)
