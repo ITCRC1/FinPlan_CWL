@@ -501,3 +501,28 @@ def lineas_con_detalle_fiel(det_por_linea: dict[str, list[dict]],
                 and abs(sum(difs, ZERO)) <= TOLERANCIA_DETALLE):
             fieles.add(linea)
     return fieles
+
+
+def mezclar_por_corte(propias: list[dict], reales: list[dict], corte: int) -> list[dict]:
+    """La grilla de un forecast rodante: meses `1..corte` del ACTUAL, el resto propio.
+
+    Se junta por (depto, cuenta, outlet) para que una cuenta que aparece en los
+    dos lados sea UNA fila con sus doce meses, no dos. Una fila que queda en
+    cero los doce meses se descarta: era movimiento del lado que no manda.
+    """
+    cerrados = set(MESES[:max(0, min(corte, 12))])
+    acumulado: dict[tuple[str, str, str], dict] = {}
+    for origen, manda in ((propias, lambda m: m not in cerrados),
+                          (reales, lambda m: m in cerrados)):
+        for f in origen:
+            clave = (str(f.get("dept_code") or ""), str(f.get("account_code") or ""),
+                     str(f.get("outlet") or ""))
+            fila = acumulado.get(clave)
+            if fila is None:
+                fila = acumulado[clave] = {**f, **{m: Decimal("0") for m in MESES}}
+            elif not str(fila.get("account_name") or "").strip():
+                fila["account_name"] = f.get("account_name") or ""
+            for m in MESES:
+                if manda(m):
+                    fila[m] += Decimal(str(f.get(m) or 0))
+    return [f for f in acumulado.values() if any(f[m] for m in MESES)]

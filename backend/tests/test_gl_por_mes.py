@@ -409,7 +409,7 @@ def test_el_ingreso_de_rooms_se_abre_por_el_depto_del_set():
     ancla (0110) se queda con el resto: la línea suma igual."""
     import inspect
     from app.api import gl_api
-    src = inspect.getsource(gl_api._filas_del_mayor)
+    src = inspect.getsource(gl_api._filas_propias)
     assert "_apertura_de_rooms(db, esc)" in src
     assert 'linea.line_code == "REV_ROOMS"' in src
     assert "monto -= v" in src                    # el ancla se queda con el RESTO
@@ -440,7 +440,7 @@ def test_villas_baja_en_su_depto_aunque_el_catalogo_la_cuelgue_de_rooms():
     from app.api import gl_api
     from app.engine import pl_engine, recalculate as recalc
     assert gl_api.DEPTOS_PROPIOS_EN_EL_MAYOR == frozenset({"0115", "0116"})
-    assert "respetar=DEPTOS_PROPIOS_EN_EL_MAYOR" in inspect.getsource(gl_api._filas_del_mayor)
+    assert "respetar=DEPTOS_PROPIOS_EN_EL_MAYOR" in inspect.getsource(gl_api._filas_propias)
     firma = inspect.signature(recalc.checkbook_account_rows_for_month)
     assert firma.parameters["respetar"].default == frozenset()     # el P&L no cambia
     # Con el catálogo de producción cargado, el padre de Villas es Rooms.
@@ -484,7 +484,7 @@ def test_el_detalle_de_una_linea_no_apaga_el_ancla_de_las_demas():
     grilla perdía el ingreso entero ($452,657 en el Budget 2026 Final de AMA)."""
     import inspect
     from app.api import gl_api
-    src = inspect.getsource(gl_api._filas_del_mayor)
+    src = inspect.getsource(gl_api._filas_propias)
     assert "if not detalle_real" not in src
     assert "gl.lineas_con_detalle_fiel(det_por_linea, pl_por_linea)" in src
     assert "linea.line_code in fieles" in src

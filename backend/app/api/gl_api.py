@@ -163,6 +163,28 @@ DEPTOS_PROPIOS_EN_EL_MAYOR = frozenset({"0115", "0116"})
 async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict], str, bool]:
     """Las filas por cuenta × departamento, y de dónde salieron.
 
+    ⚠️ **Un FORECAST con corte arma sus meses cerrados con el mayor del ACTUAL.**
+    Es la misma regla que ya sigue el P&L (`_compute_pl_month_core`: un mes
+    `<= actuals_through` se calcula del ACTUAL enlazado). Antes la grilla leía
+    esos meses de los checkbooks del propio forecast —el presupuesto viejo de
+    enero a julio— mientras el P&L mostraba lo real, y el mayor no pegaba con
+    la utilidad: Amarena 2026-11-11, Final-August −$62,311.92 y Working
+    −$22,845.96. Con la mezcla los dos dan $0.00.
+    """
+    filas, fuente, completo = await _filas_propias(db, esc)
+    corte = (esc.actuals_through or 0) if esc.type == "FORECAST" else 0
+    if corte <= 0:
+        return filas, fuente, completo
+    actual = await recalc.linked_actual_scenario(db, esc)
+    if actual is None:
+        return filas, fuente, completo
+    reales, _fuente_real, _completo_real = await _filas_propias(db, actual)
+    return gl.mezclar_por_corte(filas, reales, corte), "mezcla", completo
+
+
+async def _filas_propias(db: AsyncSession, esc: Scenario) -> tuple[list[dict], str, bool]:
+    """Las filas por cuenta × departamento del propio escenario, sin mezcla.
+
     Devuelve `(filas, fuente, completo)`. `completo` es False cuando la fuente
     no puede traer el ingreso por cuenta — el caso de los checkbooks.
     """
@@ -587,14 +609,27 @@ async def validar_gl(scenario_id: str, db: AsyncSession = Depends(get_db)):
     # 2028-2035, que no tienen una sola fila. Una tranquilidad falsa es peor
     # que una alarma: la alarma se mira.
     vacio = not grilla
-    mezcla = esc.type == "FORECAST" and (esc.actuals_through or 0) > 0
-    aplica = completo and not mezcla and not vacio
+    # Un forecast con corte cuya grilla YA trae los meses cerrados del ACTUAL
+    # (fuente "mezcla") se puede conciliar entero. Sólo queda fuera si no hay
+    # ACTUAL enlazado con qué armar esos meses.
+    mezcla = (esc.type == "FORECAST" and (esc.actuals_through or 0) > 0
+              and fuente != "mezcla")
 
     rev = None if esc.type == "ACTUAL" else await recalc.load_revenue_results(db, esc)
     por_linea: dict[str, Decimal] = {}
     for mes in range(1, 13):
         for ln in await recalc.compute_pl_month(db, esc, mes, rev):
             por_linea[ln.line_code] = por_linea.get(ln.line_code, ZERO) + ln.amount_usd
+
+    # Mismo criterio que `listar_gl`: un escenario de checkbook está completo
+    # cuando la grilla trae TODO el ingreso del P&L (ver la liga contable de
+    # `_filas_propias`). Decirle "incompleto" por ser de checkbook, con el
+    # ingreso entero adentro, dejaba la igualdad sin probar en todo presupuesto.
+    ingreso_grilla = -sum((r["total"] for r in grilla
+                           if r["categoria"] == "REVENUE"), ZERO)
+    completo = completo or abs(
+        por_linea.get("TOTAL_REVENUES", ZERO) - ingreso_grilla) <= Decimal("0.01")
+    aplica = completo and not mezcla and not vacio
 
     res = gl.conciliar(
         grilla,
