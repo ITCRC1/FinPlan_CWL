@@ -398,7 +398,7 @@ async def actual_pl_lines_for_month(session, scenario_id: str, month: int) -> di
 
 # ─── Checkbook → account-level rows (budget/forecast built from scratch) ──────
 async def checkbook_account_rows_for_month(
-    session, scenario_id: str, month: int
+    session, scenario_id: str, month: int, *, respetar: frozenset[str] = frozenset()
 ) -> list[dict]:
     """
     Roll the in-app checkbooks up to account-level rows
@@ -433,7 +433,13 @@ async def checkbook_account_rows_for_month(
     base del próximo reparto.
     """
     rows: list[dict] = []
-    cd = pl_engine.consolidate_dept  # sub-dept → P&L parent (Rooms/F&B/Spa/Admin)
+
+    # sub-dept → P&L parent (Rooms/F&B/Spa/Admin). `respetar` deja en SU depto
+    # los que se piden aparte: el P&L no lo usa (Villas suma en Rooms), el
+    # mayor por mes sí (`gl_api.DEPTOS_PROPIOS_EN_EL_MAYOR`).
+    def cd(dept: str) -> str:
+        d = (dept or "").strip()
+        return d if d in respetar else pl_engine.consolidate_dept(d)
 
     opex = (await session.execute(
         select(OpexEntry).where(OpexEntry.scenario_id == scenario_id)

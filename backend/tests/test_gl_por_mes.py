@@ -429,3 +429,25 @@ def test_la_planilla_baja_con_el_nombre_de_su_cuenta():
     assert "por_cuenta.get(f[\"account_code\"]" in src
     # Se completa ANTES de armar las filas, para que el nombre viaje en la grilla.
     assert src.index("por_cuenta.get(") < src.index("grilla = [_fila(")
+
+
+def test_villas_baja_en_su_depto_aunque_el_catalogo_la_cuelgue_de_rooms():
+    """En producción el catálogo de departamentos cuelga 0115 de 0110, y el armado
+    de los checkbooks subía su planilla y su OPEX al padre: el Excel recibía el
+    ingreso en 0115 y el gasto en 0110 (owner, 2026-11-10). La grilla del mayor
+    pide esos deptos aparte; el P&L no (Villas sigue sumando en Rooms)."""
+    import inspect
+    from app.api import gl_api
+    from app.engine import pl_engine, recalculate as recalc
+    assert gl_api.DEPTOS_PROPIOS_EN_EL_MAYOR == frozenset({"0115", "0116"})
+    assert "respetar=DEPTOS_PROPIOS_EN_EL_MAYOR" in inspect.getsource(gl_api._filas_del_mayor)
+    firma = inspect.signature(recalc.checkbook_account_rows_for_month)
+    assert firma.parameters["respetar"].default == frozenset()     # el P&L no cambia
+    # Con el catálogo de producción cargado, el padre de Villas es Rooms.
+    pl_engine.set_dept_catalog([
+        {"dept_code": "0110", "default_pl_group": "ROOMS", "parent_dept_code": ""},
+        {"dept_code": "0115", "default_pl_group": "ROOMS", "parent_dept_code": "0110"}])
+    try:
+        assert pl_engine.consolidate_dept("0115") == "0110"
+    finally:
+        pl_engine.reset_dept_catalog()

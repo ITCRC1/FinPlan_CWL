@@ -145,6 +145,21 @@ async def _por_cuenta(db: AsyncSession, modelo, scenario_id: str) -> list[dict]:
     } for f in filas]
 
 
+#: Sub-departamentos que el mayor por mes muestra en SU depto aunque el P&L los
+#: sume en el padre. Owner, 2026-11-10: *«no me está bajando a los GL el
+#: departamento 0115 en ingresos, gastos y planilla»*.
+#:
+#: El armado de los checkbooks sube cada sub-depto a su padre (0115 → 0110) para
+#: el P&L. En producción el mapa sale del catálogo de departamentos, y ahí
+#: Villas y Residencias cuelgan de Rooms: su planilla y su OPEX llegaban al
+#: Excel como 0110, mientras el ingreso —que asienta esta grilla— ya iba a 0115.
+#:
+#: Solo estos dos: son sets que se planifican aparte y tienen reglas propias en
+#: el mapeo. 0181 y 0184 también las tienen, pero el Actual los trae dentro del
+#: 0180 y separarlos sólo en el Budget descuadraría la comparación.
+DEPTOS_PROPIOS_EN_EL_MAYOR = frozenset({"0115", "0116"})
+
+
 async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict], str, bool]:
     """Las filas por cuenta × departamento, y de dónde salieron.
 
@@ -171,7 +186,8 @@ async def _filas_del_mayor(db: AsyncSession, esc: Scenario) -> tuple[list[dict],
     acumulado: dict[tuple[str, str], dict] = {}
     con_movimiento_real: set[tuple[str, str]] = set()
     for mes in range(1, 13):
-        for r in await recalc.checkbook_account_rows_for_month(db, esc.id, mes):
+        for r in await recalc.checkbook_account_rows_for_month(
+                db, esc.id, mes, respetar=DEPTOS_PROPIOS_EN_EL_MAYOR):
             cuenta = str(r.get("account_code") or "").strip()
             dept = str(r.get("dept_code") or "").strip()
             if not cuenta:
