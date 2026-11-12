@@ -405,3 +405,232 @@ async def consolidado_habitaciones(
             cargar(por_tipo, r["months"])
 
     return {**_cabecera(esc, tipo), "filas": filas_habitaciones(tipos, por_tipo, sin_tipo)}
+
+
+# ── Repartos (Cafetería, Lavandería, salarios) ───────────────────────────────
+#
+# Owner, 2026-11-12: «yo quiero ver cafetería como un verdadero departamento de
+# costos que acumula y después reparte y que al final queda en 0» · «igual que
+# lavandería». El reparto ya existe (`allocation_entries`): el CRÉDITO en el
+# centro (4999) y un CARGO en cada depto que lo recibe, por su cuenta. Esta ruta
+# lo entrega tal cual, mes a mes, para que el libro en vivo arme el centro de
+# costo: lo que acumula (del GL), lo que reparte y a quién.
+#
+# Solo lee. No recalcula el reparto: entrega el último que guardó el Recalcular.
+
+def filas_repartos(entradas, nombres_dept: dict[str, str]) -> list[dict]:
+    """Una fila por (tipo, centro, depto que recibe, cuenta) con los 12 meses.
+
+    El crédito del centro (su 4999) va como una fila más, con `rol` = «crédito»:
+    así la suma de cada tipo da 0 cuando el centro quedó en cero.
+    """
+    from app.api.gl_api import DEPTOS_PROPIOS_EN_EL_MAYOR
+    from app.engine import pl_engine
+
+    def dept_gl(d: str) -> str:
+        d = (d or "").strip()
+        return d if d in DEPTOS_PROPIOS_EN_EL_MAYOR else pl_engine.consolidate_dept(d)
+
+    acum: dict[tuple, list[float]] = {}
+    for e in entradas:
+        k = ((e.allocation_type or "").upper(), (e.source_dept or "").strip(),
+             (e.target_dept or "").strip(), (e.account or "").strip())
+        fila = acum.setdefault(k, [0.0] * 12)
+        if 1 <= int(e.month or 0) <= 12:
+            fila[int(e.month) - 1] += float(e.amount_usd or 0)
+    out = []
+    for (tipo, origen, destino, cuenta), meses in sorted(acum.items()):
+        meses = [round(v, 2) for v in meses]
+        out.append({
+            "tipo": tipo, "origen": origen, "origen_nombre": nombres_dept.get(origen, ""),
+            "destino": destino, "destino_nombre": nombres_dept.get(destino, ""),
+            "destino_gl": dept_gl(destino), "cuenta": cuenta,
+            # Salarios: la salida del depto que presta a la persona es «sale» y su
+            # contraparte «entra» — nunca un negativo suelto rotulado «cargo».
+            "rol": ("crédito" if destino == origen and cuenta.startswith("4")
+                    else ("sale" if destino == origen else "entra") if tipo == "SALARY"
+                    else "cargo"),
+            "meses": meses, "anual": round(sum(meses), 2),
+        })
+    return out
+
+
+def filas_reparto_salarios(reglas: list[dict], guardado: dict, nombres: dict[str, str]) -> list[dict]:
+    """El reparto de salarios regla por regla, para verlo de punta a punta.
+
+    Owner, 2026-11-12: «una mucama que da servicios a cafetería de empleados. se
+    hace la salida de housekeeping y entra en cafetería, esto debe verse muy
+    transparente. no deben quedar líneas negativas perdidas» · «recrear en un tab
+    el allocation de salarios para ver si es necesario hacer cambios».
+
+    `reglas`: una por regla activa, ya calculada mes a mes con las mismas piezas
+    del recálculo (`_reparto_salarios_recreado`). Cada regla deja sus renglones:
+    lo que cuesta la posición, cómo se arma el costo cargado, lo que SALE del
+    origen y lo que ENTRA a cada destino — la salida y su entrada, juntas.
+    `guardado`: {(destino, mes): monto} de lo que el recálculo dejó en la base,
+    para el control final (recreado − guardado, debe dar 0).
+    """
+    def fila(n, r, concepto, destino, meses, pct=None, nota=""):
+        meses = [round(float(v), 2) for v in meses]
+        return {"regla": n, "origen": r["origen"], "origen_nombre": nombres.get(r["origen"], ""),
+                "posicion": r["posicion"], "puesto": r["puesto"], "empleados": r["empleados"],
+                "destino": destino, "destino_nombre": nombres.get(destino, "") if destino else "",
+                "cuenta": r["cuenta"], "concepto": concepto, "pct": pct, "nota": nota,
+                "meses": meses, "anual": round(sum(meses), 2)}
+
+    out: list[dict] = []
+    recreado: dict[tuple, float] = {}
+    for n, r in enumerate(reglas, 1):
+        out.append(fila(n, r, "0 · Planilla completa de la posición (17 conceptos)", "", r["planilla"]))
+        out.append(fila(n, r, "1 · Salario usado (SW)", "", r["sw"],
+                        nota="salario manual" if any(r["override"]) else ""))
+        out.append(fila(n, r, "1 · + CCSS", "", r["ccss"]))
+        out.append(fila(n, r, "1 · + Aguinaldo", "", r["aguinaldo"]))
+        out.append(fila(n, r, "1 · + Cafetería (% del salario)", "", r["cafeteria"], pct=r["cafeteria_pct"]))
+        out.append(fila(n, r, "1 · + Ajuste manual", "", r["dummy"]))
+        out.append(fila(n, r, "1 · = Costo cargado", "", r["cargado"]))
+        out.append(fila(n, r, "2 · SALE del origen", r["origen"], r["sale"], pct=r["portion_pct"]))
+        for d, meses in sorted(r["entra"].items()):
+            out.append(fila(n, r, "2 · ENTRA al destino", d, meses))
+            for m, v in enumerate(meses, 1):
+                recreado[(d, m)] = recreado.get((d, m), 0.0) + float(v)
+        for m, v in enumerate(r["sale"], 1):
+            recreado[(r["origen"], m)] = recreado.get((r["origen"], m), 0.0) + float(v)
+        neto = [sum(float(x) for x in col) for col in zip(r["sale"], *r["entra"].values())]
+        out.append(fila(n, r, "3 · Sale + entra (debe dar 0)", "", neto))
+        if not r["entra"]:
+            out.append(fila(n, r, "3 · No se movió nada: los destinos no tienen FTE", "", [0] * 12))
+
+    vacia = {"origen": "", "posicion": "", "puesto": "", "empleados": "", "cuenta": ""}
+    for d in sorted({k[0] for k in list(recreado) + list(guardado)}):
+        rec = [recreado.get((d, m), 0.0) for m in range(1, 13)]
+        gua = [float(guardado.get((d, m), 0)) for m in range(1, 13)]
+        out.append(fila(0, vacia, "4 · Control: recreado − guardado en la base", d,
+                        [a - b for a, b in zip(rec, gua)]))
+    return out
+
+
+async def _reparto_salarios_recreado(session, esc) -> tuple[list[dict], dict]:
+    """Vuelve a calcular cada regla de salarios con las MISMAS piezas del
+    recálculo (calc_sw, loaded_salary_breakdown, calculate_salary_distribution).
+    Solo lee: no escribe ni toca el reparto guardado."""
+    from decimal import Decimal
+    from app.engine.allocation_calculator import (
+        calculate_salary_distribution, loaded_salary_breakdown)
+    from app.engine.payroll_calculator import AGUINALDO_DIVISOR, CCSS_RATE, calc_sw
+    from app.models.allocation_entry import AllocationEntry
+    from app.models.exchange_rate import ExchangeRate, get_tc_for_month
+    from app.models.payroll_concept_entry import PayrollConceptEntry
+    from app.models.payroll_params import PayrollParams
+    from app.engine.recalculate import MONTH_ATTRS
+    from app.models.payroll_position import PayrollPosition
+    from app.models.salary_allocation_config import SalaryAllocationConfig
+
+    sid = esc.id
+    cfgs = [c for c in (await session.execute(select(SalaryAllocationConfig).where(
+        SalaryAllocationConfig.scenario_id == sid))).scalars() if c.active]
+    positions = (await session.execute(select(PayrollPosition).where(
+        PayrollPosition.scenario_id == sid))).scalars().all()
+    rates = (await session.execute(select(ExchangeRate).where(
+        ExchangeRate.scenario_id == sid))).scalars().all()
+    pp = (await session.execute(select(PayrollParams).where(
+        PayrollParams.scenario_id == sid))).scalar_one_or_none()
+    ccss_rate = pp.ccss_rate if pp else CCSS_RATE
+    agu_div = pp.aguinaldo_divisor if pp else AGUINALDO_DIVISOR
+    conceptos = (await session.execute(select(PayrollConceptEntry).where(
+        PayrollConceptEntry.scenario_id == sid))).scalars().all()
+    claves = [c.key for c in PayrollConceptEntry.__table__.columns if c.key.startswith("c6")]
+    planilla_pos: dict[tuple, float] = {}
+    for e in conceptos:
+        k = (e.position_id, int(e.month))
+        planilla_pos[k] = planilla_pos.get(k, 0.0) + sum(float(getattr(e, c) or 0) for c in claves)
+
+    Z = Decimal("0")
+    reglas = []
+    for cfg in cfgs:
+        fuente = [p for p in positions
+                  if p.dept_code == cfg.source_dept and p.position_code == cfg.position_code]
+        ov = list(getattr(cfg, "salary_override", None) or [])
+        dm = list(getattr(cfg, "dummy_monthly", None) or [])
+        targets = [t for t in (cfg.target_depts or []) if t]
+        r = {"origen": cfg.source_dept, "posicion": cfg.position_code,
+             "puesto": cfg.position_name or (fuente[0].position_name if fuente else ""),
+             "empleados": ", ".join(sorted({(p.employee_name or "").strip() for p in fuente})),
+             "cuenta": cfg.account or "6000",
+             "portion_pct": float(cfg.portion_pct or 0),
+             "cafeteria_pct": float(getattr(cfg, "cafeteria_pct", 0) or 0),
+             "override": [bool(ov[i]) if i < len(ov) else False for i in range(12)],
+             "planilla": [], "sw": [], "ccss": [], "aguinaldo": [], "cafeteria": [],
+             "dummy": [], "cargado": [], "sale": [], "entra": {}}
+        for month in range(1, 13):
+            tc = get_tc_for_month(rates, month)
+            if month - 1 < len(ov) and ov[month - 1]:
+                sw = Decimal(str(ov[month - 1]))
+            else:
+                sw = sum((calc_sw(p, month, tc) for p in fuente), Z)
+            b = loaded_salary_breakdown(sw, ccss_rate, agu_div, getattr(cfg, "cafeteria_pct", Z))
+            dummy = Decimal(str(dm[month - 1])) if month - 1 < len(dm) and dm[month - 1] else Z
+            cargado = b["total"] + dummy
+            fte_attr = f"fte_{MONTH_ATTRS[month - 1]}"
+            tgt_fte: dict[str, Decimal] = {}
+            for p in positions:
+                if p.dept_code in targets:
+                    tgt_fte[p.dept_code] = tgt_fte.get(p.dept_code, Z) + (getattr(p, fte_attr) or Z)
+            filas = calculate_salary_distribution(
+                cargado, cfg.portion_pct, tgt_fte, cfg.source_dept, cfg.account or "6000")
+            r["planilla"].append(sum(planilla_pos.get((p.id, month), 0.0) for p in fuente))
+            for k in ("sw", "ccss", "aguinaldo", "cafeteria"):
+                r[k].append(b[k])
+            r["dummy"].append(dummy)
+            r["cargado"].append(cargado)
+            r["sale"].append(sum((f["amount_usd"] for f in filas if f["basis_type"] == "CREDIT"), Z))
+            for f in filas:
+                if f["basis_type"] != "CREDIT":
+                    r["entra"].setdefault(f["target_dept"], [Z] * 12)[month - 1] += f["amount_usd"]
+        reglas.append(r)
+
+    guardado: dict[tuple, float] = {}
+    for e in (await session.execute(select(AllocationEntry).where(
+            AllocationEntry.scenario_id == sid,
+            AllocationEntry.allocation_type == "SALARY"))).scalars():
+        k = ((e.target_dept or "").strip(), int(e.month))
+        guardado[k] = guardado.get(k, 0.0) + float(e.amount_usd or 0)
+    return reglas, guardado
+
+
+@router.get("/consolidado/reparto-salarios/")
+async def consolidado_reparto_salarios(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast)"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Reparto de salarios regla por regla: lo que sale de cada depto y entra a cada destino."""
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with get_session() as session:
+        esc = await _escenario(session, year, tipo, version)
+        reglas, guardado = await _reparto_salarios_recreado(session, esc)
+        nombres = dict((await session.execute(
+            select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
+    return {**_cabecera(esc, tipo), "lineas": filas_reparto_salarios(reglas, guardado, nombres)}
+
+
+@router.get("/consolidado/repartos/")
+async def consolidado_repartos(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Repartos de Cafetería, Lavandería y salarios: centro → depto × cuenta × mes."""
+    from app.models.allocation_entry import AllocationEntry
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with get_session() as session:
+        esc = await _escenario(session, year, tipo, version)
+        entradas = (await session.execute(
+            select(AllocationEntry).where(AllocationEntry.scenario_id == esc.id))).scalars().all()
+        nombres = dict((await session.execute(
+            select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
+    return {**_cabecera(esc, tipo), "lineas": filas_repartos(entradas, nombres)}

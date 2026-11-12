@@ -95,3 +95,85 @@ def test_la_planilla_trae_el_depto_con_que_la_muestra_el_gl():
     finally:
         pl_engine.reset_dept_catalog()
     assert [f["dept_gl"] for f in out] == ["0110", "0115"]
+
+
+# ── Repartos: Cafetería y Lavandería como centros de costo (owner, 2026-11-12) ─
+
+def test_los_repartos_suman_cero_con_la_4999():
+    """«queda en 0 con la cuenta 4999»: el crédito del centro y los cargos a los
+    deptos salen en filas separadas y suman 0 por tipo."""
+    from types import SimpleNamespace as N
+    ent = [N(allocation_type="CAFETERIA", source_dept="0220", target_dept="0220", account="4999", month=1, amount_usd=-300),
+           N(allocation_type="CAFETERIA", source_dept="0220", target_dept="0113", account="6025", month=1, amount_usd=200),
+           N(allocation_type="CAFETERIA", source_dept="0220", target_dept="0150", account="6025", month=1, amount_usd=100)]
+    pl_engine.set_dept_catalog([
+        {"dept_code": "0110", "default_pl_group": "ROOMS", "parent_dept_code": ""},
+        {"dept_code": "0113", "default_pl_group": "ROOMS", "parent_dept_code": "0110"}])
+    try:
+        filas = cp.filas_repartos(ent, {"0220": "Cafeteria"})
+    finally:
+        pl_engine.reset_dept_catalog()
+    assert sum(f["anual"] for f in filas) == 0
+    cred = [f for f in filas if f["rol"] == "crédito"]
+    assert len(cred) == 1 and cred[0]["cuenta"] == "4999" and cred[0]["anual"] == -300
+    hk = next(f for f in filas if f["destino"] == "0113")
+    assert hk["destino_gl"] == "0110" and hk["rol"] == "cargo" and hk["meses"][0] == 200
+
+
+def test_la_ruta_de_repartos_solo_lee_con_la_llave():
+    i = FUENTE.index('@router.get("/consolidado/repartos/")')
+    cuerpo = FUENTE[i:]
+    assert "lector_del_consolidado" in cuerpo
+    assert "session.add" not in cuerpo and "commit" not in cuerpo
+
+
+# ── Reparto de salarios regla por regla (owner, 2026-11-12) ──────────────────
+
+def _regla(origen="0113", destinos=None, sale=-100.0):
+    destinos = destinos if destinos is not None else {"0220": [100.0] + [0.0] * 11}
+    return {"origen": origen, "posicion": "0113-04", "puesto": "ROOM ATTENDANT", "empleados": "X",
+            "cuenta": "6000", "portion_pct": 1.0, "cafeteria_pct": 0.2, "override": [False] * 12,
+            "planilla": [90.0] + [0.0] * 11, "sw": [70.0] + [0.0] * 11, "ccss": [0.0] * 12,
+            "aguinaldo": [0.0] * 12, "cafeteria": [0.0] * 12, "dummy": [0.0] * 12,
+            "cargado": [100.0] + [0.0] * 11, "sale": [sale] + [0.0] * 11, "entra": destinos}
+
+
+def test_cada_salida_va_con_su_entrada_y_netean():
+    """«se hace la salida de housekeeping y entra en cafetería»: la regla trae su
+    SALE y su ENTRA juntos, y la suma da 0."""
+    filas = cp.filas_reparto_salarios([_regla()], {("0113", 1): -100.0, ("0220", 1): 100.0},
+                                      {"0113": "Housekeeping", "0220": "Employee Dining"})
+    sale = next(f for f in filas if f["concepto"] == "2 · SALE del origen")
+    entra = next(f for f in filas if f["concepto"] == "2 · ENTRA al destino")
+    assert (sale["destino"], sale["anual"]) == ("0113", -100.0)
+    assert (entra["destino"], entra["destino_nombre"], entra["anual"]) == ("0220", "Employee Dining", 100.0)
+    assert next(f for f in filas if f["concepto"].startswith("3 · Sale + entra"))["anual"] == 0
+    assert all(f["anual"] == 0 for f in filas if f["concepto"].startswith("4 · Control"))
+
+
+def test_el_control_muestra_si_lo_guardado_no_es_lo_que_dice_la_regla():
+    filas = cp.filas_reparto_salarios([_regla()], {("0113", 1): -100.0, ("0220", 1): 80.0}, {})
+    ctl = {f["destino"]: f["anual"] for f in filas if f["concepto"].startswith("4 · Control")}
+    assert ctl == {"0113": 0.0, "0220": 20.0}
+
+
+def test_una_regla_sin_fte_en_el_destino_lo_dice():
+    filas = cp.filas_reparto_salarios([_regla(destinos={}, sale=0.0)], {}, {})
+    assert any("No se movió nada" in f["concepto"] for f in filas)
+
+
+def test_en_repartos_el_salario_sale_y_entra_no_es_cargo():
+    from types import SimpleNamespace as N
+    ent = [N(allocation_type="SALARY", source_dept="0113", target_dept="0113", account="6000", month=1, amount_usd=-50),
+           N(allocation_type="SALARY", source_dept="0113", target_dept="0220", account="6000", month=1, amount_usd=50)]
+    roles = {f["destino"]: f["rol"] for f in cp.filas_repartos(ent, {})}
+    assert roles == {"0113": "sale", "0220": "entra"}
+
+
+def test_la_ruta_de_salarios_solo_lee_y_usa_las_piezas_del_recalculo():
+    i = FUENTE.index("async def _reparto_salarios_recreado")
+    cuerpo = FUENTE[i:FUENTE.index('@router.get("/consolidado/repartos/")')]
+    assert "lector_del_consolidado" in cuerpo
+    assert "session.add" not in cuerpo and "commit" not in cuerpo and "delete(" not in cuerpo
+    for pieza in ("calc_sw", "loaded_salary_breakdown", "calculate_salary_distribution"):
+        assert pieza in cuerpo
