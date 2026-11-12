@@ -49,7 +49,11 @@ let
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
                 // 401/403 no se pueden atrapar: Power Query los trata como error
                 // de credenciales y los muestra como tal.
-                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503, 504},
+                // Con «Actualizar todo» llegan ~70 pedidos juntos y el servidor los
+                // atiende de a uno: el GL completo tardaba mas de los 100 s que Power
+                // Query espera por defecto y la consulta entera caia (owner, 2026-11-12).
+                Timeout = #duration(0, 0, 10, 0)
             ]),
             Estado = Value.Metadata(Resp)[Response.Status],
             Salida =
@@ -92,7 +96,11 @@ let
             R = Web.Contents(Url, [
                 RelativePath = "api/consolidado/escenarios/",
                 Headers = [#"x-api-key" = Llave, Accept = "application/json"],
-                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503, 504},
+                // Con «Actualizar todo» llegan ~70 pedidos juntos y el servidor los
+                // atiende de a uno: el GL completo tardaba mas de los 100 s que Power
+                // Query espera por defecto y la consulta entera caia (owner, 2026-11-12).
+                Timeout = #duration(0, 0, 10, 0)
             ])
         in
             if Llave = "" or Value.Metadata(R)[Response.Status] <> 200
@@ -124,7 +132,10 @@ let
     Expandidas = Table.FromRecords(List.Combine(
         Table.TransformRows(Versiones, each Abrir(_)))),
 
-    ConDatos = Table.AddColumn(Expandidas, "Datos", each Traer([E], [A], [T], [V])),
+    // Si UNA version no llega, solo esa baja con el aviso y las demas cargan.
+    // Table.Buffer obliga a leer la respuesta ADENTRO del try: sin el, la tabla
+    // es perezosa y el error escapa al expandir.
+    ConDatos = Table.AddColumn(Expandidas, "Datos", each try Table.Buffer(Traer([E], [A], [T], [V])) otherwise Fallo([E], "FinPlan no respondio a tiempo para esta version: Datos > Actualizar esta consulta de nuevo")),
     Solo = Table.SelectColumns(ConDatos, {"Datos"}),
     Unido = Table.ExpandTableColumn(Solo, "Datos", Cols),
     Tipado = Table.TransformColumnTypes(Unido,
