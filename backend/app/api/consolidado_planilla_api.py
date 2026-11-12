@@ -102,6 +102,19 @@ def filas_planilla(reporte: dict) -> list[dict]:
     Solo los conceptos con alguna cifra en el año: los 17 conceptos de cada
     posición, la mayoría en cero, harían una tabla de miles de filas vacías.
     """
+    # El depto con que la MISMA plata aparece en el GL: el checkbook guarda el
+    # sub-depto (0111 Front Desk) y el mayor por mes lo sube a su padre (0110),
+    # salvo los que muestra aparte (Villas 0115). Sin esto el control
+    # «checkbook vs GL» del libro en vivo no podría cruzar fila contra fila
+    # (owner, 2026-11-12: «los checkbooks de planilla con el gl para poder
+    # auditar los datos calculados»).
+    from app.api.gl_api import DEPTOS_PROPIOS_EN_EL_MAYOR
+    from app.engine import pl_engine
+
+    def dept_gl(d: str) -> str:
+        d = (d or "").strip()
+        return d if d in DEPTOS_PROPIOS_EN_EL_MAYOR else pl_engine.consolidate_dept(d)
+
     out = []
     for f in reporte["rows"]:
         for c in reporte["conceptos"]:
@@ -110,6 +123,7 @@ def filas_planilla(reporte: dict) -> list[dict]:
                 continue
             out.append({
                 "dept": f["dept_code"], "dept_name": f["dept_name"],
+                "dept_gl": dept_gl(f["dept_code"]),
                 "codigo": f["position_code"], "puesto": f["position_name"],
                 "empleado": f["employee_name"],
                 "cuenta": c["code"], "concepto": c["label"], "grupo": c["grupo"],
@@ -247,3 +261,147 @@ async def consolidado_costos(
         nombres = dict((await session.execute(
             select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
     return {**_cabecera(escenario, tipo), "lineas": filas_costos(entradas, nombres)}
+
+
+# ── Estadísticas por tipo de habitación y por set ────────────────────────────
+#
+# Owner, 2026-11-12: «las estadísticas que traigan también máximo detalle para
+# habitaciones estándares y para villas». `/consolidado/estadisticas/` da el
+# total del hotel (el encabezado del P&L); esta ruta lo abre por SET (0110
+# estándar · 0115 Villas · 0116 Residencias) y por TIPO de habitación, mes a mes.
+#
+# Las cifras salen de donde ya salen en la app, con la misma regla que Plan vs.
+# Integrity (`stats_integrity_api.plan`):
+#   - ACTUAL: la estadística real por tipo (`actual_room_stats`, la de Room
+#     Stats). 2024 y 2025 no la tienen: va el total del mes, «sin tipo».
+#   - FORECAST con corte: meses cerrados del ACTUAL enlazado por tipo; los
+#     propios solo tienen el total, «sin tipo».
+#   - BUDGET y el resto: «Ingresos por tipo» de los drivers (noches × neta).
+
+ROTULO_SET = {"0110": "Habitaciones estándar", "0115": "Villas", "0116": "Residencias"}
+
+
+def _kpis(d: float, o: float, ing: float | None) -> dict:
+    """Ocupación, ADR y RevPAR de las SUMAS, nunca promediando porcentajes."""
+    return {"ocupacion": (o / d) if d else None,
+            "adr": (ing / o) if o and ing is not None else None,
+            "revpar": (ing / d) if d and ing is not None else None}
+
+
+def filas_habitaciones(tipos: list[dict], por_tipo: dict, sin_tipo: dict) -> list[dict]:
+    """Filas largas (una por tipo × mes), más el subtotal de cada set y el del hotel.
+
+    `tipos`: [{"codigo","nombre","depto","unidades"}] en el orden del inventario.
+    `por_tipo`: {(codigo, mes): {"disponibles","ocupadas","pax","ingreso"}}.
+    `sin_tipo`: {mes: {...}} para los meses que el escenario solo trae en total
+        (no se inventa un reparto por tipo).
+    """
+    out: list[dict] = []
+    acum: dict[tuple[str, str, int], dict] = {}
+
+    def sumar(clave, d, o, p, ing, unidades):
+        a = acum.setdefault(clave, {"disponibles": 0.0, "ocupadas": 0.0, "pax": 0.0,
+                                    "ingreso": 0.0, "unidades": 0})
+        a["disponibles"] += d
+        a["ocupadas"] += o
+        a["pax"] += p
+        a["ingreso"] += ing or 0.0
+        a["unidades"] += unidades or 0
+
+    for t in tipos:
+        for m in range(1, 13):
+            v = por_tipo.get((t["codigo"], m))
+            if v is None:
+                continue
+            d, o, p, ing = v["disponibles"], v["ocupadas"], v["pax"], v.get("ingreso")
+            out.append({"nivel": "Tipo", "depto": t["depto"],
+                        "set": ROTULO_SET.get(t["depto"], t["depto"]),
+                        "codigo": t["codigo"], "tipo": t["nombre"], "unidades": t["unidades"],
+                        "mes": m, "disponibles": d, "ocupadas": o, "pax": p, "ingreso": ing,
+                        **_kpis(d, o, ing)})
+            sumar(("Set", t["depto"], m), d, o, p, ing, t["unidades"])
+            sumar(("Hotel", "", m), d, o, p, ing, t["unidades"])
+    for m, v in sorted(sin_tipo.items()):
+        d, o, p, ing = v["disponibles"], v["ocupadas"], v.get("pax", 0.0), v.get("ingreso")
+        out.append({"nivel": "Sin tipo", "depto": "",
+                    "set": "Total del mes (el escenario no lo abre por tipo)",
+                    "codigo": "", "tipo": "", "unidades": None, "mes": m,
+                    "disponibles": d, "ocupadas": o, "pax": p, "ingreso": ing, **_kpis(d, o, ing)})
+        sumar(("Hotel", "", m), d, o, p, ing, 0)
+    for (nivel, depto, m), a in sorted(acum.items(), key=lambda x: (x[0][0] != "Set", x[0][1], x[0][2])):
+        out.append({"nivel": nivel, "depto": depto,
+                    "set": ROTULO_SET.get(depto, depto) if nivel == "Set" else "Total hotel",
+                    "codigo": "", "tipo": "", "unidades": a["unidades"] or None, "mes": m,
+                    "disponibles": a["disponibles"], "ocupadas": a["ocupadas"], "pax": a["pax"],
+                    "ingreso": a["ingreso"], **_kpis(a["disponibles"], a["ocupadas"], a["ingreso"])})
+    return out
+
+
+@router.get("/consolidado/habitaciones/")
+async def consolidado_habitaciones(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Estadísticas de habitaciones por tipo y por set (estándar · Villas), mes a mes."""
+    from app.api import revenue_api
+    from app.engine import recalculate as rc
+    from app.models.room_type_config import RoomTypeConfig
+    from app.models.scenario_stat import ScenarioStat
+
+    async with get_session() as session:
+        esc = await _escenario(session, year, tipo, version)
+        rts = (await session.execute(select(RoomTypeConfig).where(RoomTypeConfig.hotel_id == HOTEL_ID)
+                                     .order_by(RoomTypeConfig.sort_order))).scalars().all()
+        tipos = [{"codigo": rt.code or "", "nombre": rt.name, "depto": rt.dept_code or "0110",
+                  "unidades": rt.units}
+                 for rt in rts
+                 if rt.active and (rt.vigente_desde_anio is None or rt.vigente_desde_anio <= esc.year)]
+        codigo_de_id = {rt.id: (rt.code or "") for rt in rts}
+
+        def cargar(destino: dict, meses_rev: list, solo: set | None = None) -> None:
+            for m in meses_rev:
+                if solo is not None and m["month"] not in solo:
+                    continue
+                for r in m["rows"]:
+                    c = r.get("room_type_code") or codigo_de_id.get(r.get("room_type_id"), "")
+                    if c:
+                        destino[(c, m["month"])] = {
+                            "disponibles": float(r.get("nights_available") or 0),
+                            "ocupadas": float(r.get("nights_occupied") or 0),
+                            "pax": float(r.get("pax") or 0),
+                            "ingreso": float(r.get("revenue") or 0)}
+
+        async def totales(scenario_id: str, desde: int = 1) -> dict:
+            out = {}
+            for st in (await session.execute(select(ScenarioStat).where(
+                    ScenarioStat.scenario_id == scenario_id))).scalars():
+                if st.month >= desde:
+                    o = float(st.rooms_occupied or 0)
+                    out[st.month] = {"disponibles": float(st.rooms_available or 0), "ocupadas": o,
+                                     "pax": float(st.guests or 0),
+                                     "ingreso": o * float(st.adr) if st.adr is not None else None}
+            return out
+
+        por_tipo: dict = {}
+        sin_tipo: dict = {}
+        corte = int(esc.actuals_through or 0)
+        if esc.type == "ACTUAL":
+            ra = await revenue_api._room_stats_from_actuals(esc.id, esc.year, session)
+            if ra:
+                cargar(por_tipo, ra["months"])
+            else:
+                sin_tipo = await totales(esc.id)
+        elif esc.type == "FORECAST" and corte > 0:
+            actual = await rc.linked_actual_scenario(session, esc)
+            if actual is not None:
+                ra = await revenue_api._room_stats_from_actuals(actual.id, actual.year, session)
+                if ra:
+                    cargar(por_tipo, ra["months"], set(range(1, corte + 1)))
+            sin_tipo = await totales(esc.id, desde=corte + 1)
+        else:
+            r = await revenue_api.get_revenue_by_room_type(esc.id, session)
+            cargar(por_tipo, r["months"])
+
+    return {**_cabecera(esc, tipo), "filas": filas_habitaciones(tipos, por_tipo, sin_tipo)}
