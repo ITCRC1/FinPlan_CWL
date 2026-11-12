@@ -1,65 +1,133 @@
 let
-    // Centros de costo: Cafeteria (0220) y Lavanderia interna (0161), como
-    // departamentos que ACUMULAN su costo, lo REPARTEN y quedan en 0.
+    // Centros de costo: Cafeteria (0220) y Lavanderia interna (0161) como
+    // departamentos que ACUMULAN su costo, lo REPARTEN con la 4999 y quedan en 0.
     // Owner, 2026-11-12: «quiero ver cafeteria como un verdadero departamento de
-    // costos que acumula y despues reparte y que al final queda en 0» · «igual
-    // que lavanderia».
+    // costos que acumula y despues reparte y que al final queda en 0».
     //
-    // Sale de dos consultas del libro, sin otra lectura:
-    //   - GL: lo que el centro acumula (costo de ventas, planilla, opex) y su
-    //     credito de reparto (categoria ALLOCATIONS, la 4999).
-    //   - Repartos: a que departamento fue cada dolar, con su cuenta.
-    // Controles: Neto = acumulado + credito (debe dar 0) y cargos + credito = 0.
+    // ⚠️ Lo arma el SERVIDOR (/consolidado/centros-costo/). Armado aca, la consulta
+    // volvia a bajar el GL y los repartos completos dentro de si misma y con
+    // «Actualizar todo» en paralelo quedaba en «Download did not complete».
+    // Celdas con nombre de la hoja Config.
+    P = (n as text) => Excel.CurrentWorkbook(){[Name = n]}[Content]{0}[Column1],
+    // Celda vacía -> "" (nunca null): una fila a medio llenar no tumba la consulta.
+    T = (v) => if v = null then "" else Text.Trim(Text.From(v)),
+    Url = T(P("pURL")),
+    LlaveCruda = P("pLlave"),
+    Llave = T(LlaveCruda),
+
+    // La LISTA de versiones vive en una tabla del libro, no en el codigo: agregar
+    // un Draft es escribir un renglon, no editar la consulta.
+    TodasLasFilas = Excel.CurrentWorkbook(){[Name = "tVersiones"]}[Content],
+    // Solo las prendidas. Apagar una fila es escribir NO, no borrarla.
+    Versiones = Table.SelectRows(TodasLasFilas, each
+        Text.Upper(T(Record.FieldOrDefault(_, "Usar", "SI"))) <> "NO"
+        and T(Record.FieldOrDefault(_, "Anio", null)) <> ""
+        and T(Record.FieldOrDefault(_, "Tipo", null)) <> ""),
+
     Meses = {"M01","M02","M03","M04","M05","M06","M07","M08","M09","M10","M11","M12"},
-    Todos = Meses & {"Annual"},
+    // Columnas de la pestana, con la version adelante: sin eso no se sabe
+    // de que escenario es la fila.
+    Cols = {"Etiqueta","Version","Centro","Bloque","Concepto","Depto"} & Meses & {"Annual","Leido"},
     Num = (v) => if v = null then 0 else v,
-    Centros = {[Depto = "0220", Nombre = "Cafeteria (0220)", Tipo = "CAFETERIA"],
-               [Depto = "0161", Nombre = "Lavanderia interna (0161)", Tipo = "LAUNDRY"]},
-    Gl = Table.SelectRows(GL, each [Version] <> "ERROR"),
-    Rep = Table.SelectRows(Repartos, each [Version] <> "ERROR"),
-    Etiquetas = List.Distinct(Gl[Etiqueta]),
 
-    // Sin filas, List.Sum da null: se fuerza 0 para que el control nunca quede vacio.
-    Sumar = (t as table) as list => List.Transform(Todos, (m) => Num(List.Sum(List.Transform(Table.Column(t, m), Num)))),
-    Fila = (etq, centro, bloque, concepto, depto, valores as list) =>
-        Record.FromList({etq, centro, bloque, concepto, depto} & valores,
-                        {"Etiqueta", "Centro", "Bloque", "Concepto", "Depto"} & Todos),
-    Mas = (a as list, b as list) => List.Transform(List.Positions(a), (i) => a{i} + b{i}),
+    // Un error NO tumba el libro entero: esa version baja con una fila que lo dice
+    // y las demas siguen. Un refresh que falla del todo se lee como "no hay datos".
+    Fallo = (etiqueta as text, msg as text) =>
+        #table(Cols, {{etiqueta, "ERROR", msg} & List.Repeat({null}, List.Count(Cols) - 3)}),
 
-    UnCentro = (etq as text, c as record) as list =>
+    Traer = (etiqueta as text, anio as text, tipoArg as text, versionArg as text) =>
         let
-            delCentro = Table.SelectRows(Gl, each [Etiqueta] = etq and [Dept code] = c[Depto]),
-            cat = (k) => Sumar(Table.SelectRows(delCentro, each [Category] = k)),
-            costo = cat("COST_OF_SALES"), planilla = cat("PAYROLL"), opex = cat("OPERATING_EXPENSES"),
-            acumulado = Mas(Mas(costo, planilla), opex),
-            credito = cat("ALLOCATIONS"),
-            neto = Mas(acumulado, credito),
-            cargosT = Table.SelectRows(Rep, each [Etiqueta] = etq and [Tipo] = c[Tipo] and [Rol] = "cargo"),
-            porDepto = Table.Group(cargosT, {"Depto GL"}, List.Transform(Todos, (m) =>
-                           {m, (t) => List.Sum(List.Transform(Table.Column(t, m), Num)), type number})),
-            cargos = Table.TransformRows(Table.Sort(porDepto, {{"Annual", Order.Descending}}), (r) =>
-                         Fila(etq, c[Nombre], "3 · A donde fue", "Cargo a departamento", r[Depto GL],
-                              List.Transform(Todos, (m) => Num(Record.Field(r, m))))),
-            totalCargos = Sumar(cargosT),
-            control = Mas(totalCargos, credito)
+            // ⚠️ Los parametros NO pueden llamarse igual que los campos del
+            // registro. Con `[tipo = tipo]` Power Query no distingue el campo
+            // del parametro y falla con «We found one or more unbound names
+            // when recompiling a function internally ... tipo, version».
+            Filtro = [year = anio, tipo = tipoArg]
+                     & (if versionArg = "" then [] else [version = versionArg]),
+            Resp = Web.Contents(Url, [
+                RelativePath = "api/consolidado/centros-costo/",
+                Query = Filtro,
+                Headers = [#"x-api-key" = Llave, Accept = "application/json"],
+                // 401/403 no se pueden atrapar: Power Query los trata como error
+                // de credenciales y los muestra como tal.
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+            ]),
+            Estado = Value.Metadata(Resp)[Response.Status],
+            Salida =
+                if Llave = "" then Fallo(etiqueta, "Falta la llave de solo lectura en Config")
+                else if Estado = 404 then
+                    Fallo(etiqueta, "No existe " & tipoArg & " " & anio
+                          & (if versionArg = "" then "" else " version '" & versionArg & "'"))
+                else if Estado <> 200 then Fallo(etiqueta, "El servidor respondio HTTP " & Text.From(Estado))
+                else
+                    let
+                        j = Json.Document(Resp),
+                        ver = j[escenario][version],
+                        leido = DateTime.ToText(DateTime.LocalNow(), "dd/MM/yyyy HH:mm"),
+                        filas = List.Transform(j[lineas], each
+                            {etiqueta, ver, [centro], [bloque], [concepto], [depto]}
+                            & List.Transform([meses], Num) & {Num([anual]), leido})
+                    in
+                        if List.Count(filas) = 0
+                        then Fallo(etiqueta, "El servidor no devolvio filas de centros de costo")
+                        else #table(Cols, filas)
         in
-            {Fila(etq, c[Nombre], "1 · Acumula", "Costo de ventas", c[Depto], costo),
-             Fila(etq, c[Nombre], "1 · Acumula", "Planilla", c[Depto], planilla),
-             Fila(etq, c[Nombre], "1 · Acumula", "OPEX", c[Depto], opex),
-             Fila(etq, c[Nombre], "1 · Acumula", "Total acumulado", c[Depto], acumulado),
-             Fila(etq, c[Nombre], "2 · Reparte", "Reparto (credito 4999)", c[Depto], credito),
-             Fila(etq, c[Nombre], "2 · Reparte", "NETO DEL CENTRO (debe dar 0)", c[Depto], neto)}
-            & cargos
-            // El Actual y el Forecast no guardan el reparto: viene hecho en el mayor.
-            // Sin cargos guardados el control no prueba nada -- se dice, no se
-            // muestra el credito entero como si fuera un descuadre.
-            & (if Table.RowCount(cargosT) = 0
-               then {Fila(etq, c[Nombre], "3 · A donde fue", "Sin detalle por departamento: el reparto viene hecho en el mayor", "", List.Repeat({0}, List.Count(Todos)))}
-               else {Fila(etq, c[Nombre], "3 · A donde fue", "Total cargado a departamentos", "", totalCargos),
-                     Fila(etq, c[Nombre], "4 · Control", "Cargos + credito (debe dar 0)", "", control)}),
+            Salida,
 
-    Filas = List.Combine(List.Transform(Etiquetas, (e) => List.Combine(List.Transform(Centros, (c) => UnCentro(e, c))))),
-    Tabla = Table.FromRecords(Filas),
-    Tipado = Table.TransformColumnTypes(Tabla, List.Transform(Todos, each {_, type number}))
+    // ── Las versiones las dice FinPlan, no el libro ─────────────────────
+    //
+    // Owner, 2026-11-10: *«puede el archivo de excel actualizar las versiones
+    // directamente desde finplan una vez que se conecta»*.
+    //
+    // Si en la columna Version se escribe `*`, esa fila se abre en TODAS las
+    // versiones que el sistema tenga de ese anio y ese tipo. Un Draft4 que se
+    // cree manana aparece solo en el proximo refresh, sin tocar el libro -- y
+    // un nombre mal escrito deja de ser posible.
+    //
+    // ⚠️ Se deja ELEGIR en vez de traer todo siempre a proposito: cada version
+    // es un P&L completo de doce meses del lado del servidor. Pedir de una el
+    // universo entero de escenarios -- budgets 2028 a 2035 incluidos -- hace
+    // del refresh una espera larga para datos que nadie estaba mirando.
+    ListaEscenarios =
+        let
+            R = Web.Contents(Url, [
+                RelativePath = "api/consolidado/escenarios/",
+                Headers = [#"x-api-key" = Llave, Accept = "application/json"],
+                ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+            ])
+        in
+            if Llave = "" or Value.Metadata(R)[Response.Status] <> 200
+            then {}
+            else Json.Document(R)[escenarios],
+
+    // Una fila de Config -> una o varias filas {Etiqueta, Anio, Tipo, Version}.
+    Abrir = (fila as record) as list =>
+        let
+            anio = T(fila[Anio]),
+            tipo = Text.Upper(T(fila[Tipo])),
+            etq = let e = T(fila[Etiqueta]) in if e = "" then T(fila[Tipo]) & " " & T(fila[Anio]) else e,
+            crudo = T(fila[Version])
+        in
+            if crudo <> "*" then {[E = etq, A = anio, T = tipo, V = crudo]}
+            else
+                let
+                    hay = List.Select(ListaEscenarios, each
+                        Text.From([year]) = anio and Text.Upper(Text.From([tipo])) = tipo),
+                    nombres = List.Distinct(List.Transform(hay, each
+                        let v = [version] in if v = null then "" else Text.From(v)))
+                in
+                    if List.Count(nombres) = 0
+                    then {[E = etq, A = anio, T = tipo, V = ""]}
+                    else List.Transform(nombres, (v) =>
+                        [E = etq & " · " & (if v = "" then "(sin version)" else v),
+                         A = anio, T = tipo, V = v]),
+
+    Expandidas = Table.FromRecords(List.Combine(
+        Table.TransformRows(Versiones, each Abrir(_)))),
+
+    ConDatos = Table.AddColumn(Expandidas, "Datos", each Traer([E], [A], [T], [V])),
+    Solo = Table.SelectColumns(ConDatos, {"Datos"}),
+    Unido = Table.ExpandTableColumn(Solo, "Datos", Cols),
+    Tipado = Table.TransformColumnTypes(Unido,
+        List.Transform(Meses & {"Annual"}, each {_, type number}))
 in
     Tipado

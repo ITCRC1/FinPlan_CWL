@@ -455,6 +455,90 @@ def filas_repartos(entradas, nombres_dept: dict[str, str]) -> list[dict]:
     return out
 
 
+CENTROS_DE_COSTO = (("0220", "Cafeteria (0220)", "CAFETERIA"),
+                     ("0161", "Lavanderia interna (0161)", "LAUNDRY"))
+
+
+def filas_centros_costo(grilla: list[dict], repartos: list[dict]) -> list[dict]:
+    """Cafetería y Lavandería como centros de costo: acumulan, reparten con la
+    4999 y quedan en 0 (owner, 2026-11-12: «quiero ver cafetería como un
+    verdadero departamento de costos que acumula y después reparte y que al
+    final queda en 0» · «igual que lavandería» · «queda en 0 con la cuenta 4999»).
+
+    Se arma ACÁ y no en Power Query: armado en el libro, la consulta volvía a
+    bajar el GL entero y los repartos de todas las versiones, y con «Actualizar
+    todo» corriendo en paralelo no terminaba («Download did not complete»).
+
+    `grilla`: filas de `gl_api._grilla` (las mismas del GL). `repartos`: filas de
+    `filas_repartos`.
+    """
+    def suma(filas, k=None):
+        tot = [0.0] * 12
+        for f in filas:
+            for i, v in enumerate(f[k] if k else f["meses"]):
+                tot[i] += float(v or 0)
+        return tot
+
+    def fila(centro, bloque, concepto, depto, meses):
+        meses = [round(v, 2) for v in meses]
+        return {"centro": centro, "bloque": bloque, "concepto": concepto, "depto": depto,
+                "meses": meses, "anual": round(sum(meses), 2)}
+
+    mas = lambda a, b: [x + y for x, y in zip(a, b)]
+    out = []
+    for depto, nombre, tipo in CENTROS_DE_COSTO:
+        del_centro = [r for r in grilla if (r.get("dept_code") or "").strip() == depto]
+        cat = lambda k: suma([r for r in del_centro if (r.get("categoria") or "") == k])
+        costo, planilla, opex = cat("COST_OF_SALES"), cat("PAYROLL"), cat("OPERATING_EXPENSES")
+        acumulado = mas(mas(costo, planilla), opex)
+        credito = cat("ALLOCATIONS")
+        out += [fila(nombre, "1 · Acumula", "Costo de ventas", depto, costo),
+                fila(nombre, "1 · Acumula", "Planilla", depto, planilla),
+                fila(nombre, "1 · Acumula", "OPEX", depto, opex),
+                fila(nombre, "1 · Acumula", "Total acumulado", depto, acumulado),
+                fila(nombre, "2 · Reparte", "Reparto (credito 4999)", depto, credito),
+                fila(nombre, "2 · Reparte", "NETO DEL CENTRO (debe dar 0)", depto, mas(acumulado, credito))]
+        cargos = [r for r in repartos if r["tipo"] == tipo and r["rol"] == "cargo"]
+        if not cargos:
+            # El Actual y el Forecast no guardan el reparto: viene hecho en el
+            # mayor. Sin cargos el control no prueba nada, y se dice.
+            out.append(fila(nombre, "3 · A donde fue",
+                            "Sin detalle por departamento: el reparto viene hecho en el mayor", "", [0.0] * 12))
+            continue
+        por_depto: dict[str, list[float]] = {}
+        for r in cargos:
+            por_depto[r["destino_gl"]] = mas(por_depto.get(r["destino_gl"], [0.0] * 12), r["meses"])
+        for d, meses in sorted(por_depto.items(), key=lambda kv: -sum(kv[1])):
+            out.append(fila(nombre, "3 · A donde fue", "Cargo a departamento", d, meses))
+        total = suma(cargos)
+        out += [fila(nombre, "3 · A donde fue", "Total cargado a departamentos", "", total),
+                fila(nombre, "4 · Control", "Cargos + credito (debe dar 0)", "", mas(total, credito))]
+    return out
+
+
+@router.get("/consolidado/centros-costo/")
+async def consolidado_centros_costo(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST · ACTUAL"),
+    version: str | None = Query(None, description="Versión exacta; por defecto ★ Current (forecast) o el real"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Cafetería y Lavandería: acumula, reparte con la 4999, neto en 0 y a dónde fue."""
+    from app.api import gl_api
+    from app.models.allocation_entry import AllocationEntry
+    from app.models.department_catalog import DepartmentCatalog
+
+    async with get_session() as session:
+        esc = await _escenario(session, year, tipo, version)
+        grilla = (await gl_api._grilla(session, esc, catalogo=False))[0]
+        entradas = (await session.execute(
+            select(AllocationEntry).where(AllocationEntry.scenario_id == esc.id))).scalars().all()
+        nombres = dict((await session.execute(
+            select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
+    return {**_cabecera(esc, tipo),
+            "lineas": filas_centros_costo(grilla, filas_repartos(entradas, nombres))}
+
+
 def filas_reparto_salarios(reglas: list[dict], guardado: dict, nombres: dict[str, str]) -> list[dict]:
     """El reparto de salarios regla por regla, para verlo de punta a punta.
 

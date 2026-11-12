@@ -124,6 +124,6 @@ let
     Solo = Table.SelectColumns(ConDatos, {"Datos"}),
     Unido = Table.ExpandTableColumn(Solo, "Datos", Cols),
     Tipado = Table.TransformColumnTypes(Unido,
-        List.Transform(Meses & {"Annual","Pct"}, each {_, type number}) & {{"Regla", Int64.Type}})
+        List.Transform(Meses & {"Annual"}, each {_, type number}))
 in
     Tipado

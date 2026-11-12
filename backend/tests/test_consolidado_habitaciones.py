@@ -177,3 +177,39 @@ def test_la_ruta_de_salarios_solo_lee_y_usa_las_piezas_del_recalculo():
     assert "session.add" not in cuerpo and "commit" not in cuerpo and "delete(" not in cuerpo
     for pieza in ("calc_sw", "loaded_salary_breakdown", "calculate_salary_distribution"):
         assert pieza in cuerpo
+
+
+# ── Centros de costo armados en el servidor (owner, 2026-11-12) ──────────────
+# En Power Query la consulta volvía a bajar el GL entero y con «Actualizar todo»
+# quedaba en «Download did not complete».
+
+def _gl(dept, cat, v):
+    return {"dept_code": dept, "categoria": cat, "meses": [v] + [0.0] * 11}
+
+
+def test_el_centro_acumula_reparte_y_queda_en_cero():
+    grilla = [_gl("0220", "COST_OF_SALES", 60.0), _gl("0220", "PAYROLL", 30.0),
+              _gl("0220", "OPERATING_EXPENSES", 10.0), _gl("0220", "ALLOCATIONS", -100.0),
+              _gl("0110", "PAYROLL", 999.0)]
+    rep = [{"tipo": "CAFETERIA", "rol": "cargo", "destino_gl": "0110", "meses": [70.0] + [0.0] * 11},
+           {"tipo": "CAFETERIA", "rol": "cargo", "destino_gl": "0150", "meses": [30.0] + [0.0] * 11},
+           {"tipo": "CAFETERIA", "rol": "crédito", "destino_gl": "0220", "meses": [-100.0] + [0.0] * 11}]
+    f = {(r["centro"][:4], r["concepto"], r["depto"]): r["anual"] for r in cp.filas_centros_costo(grilla, rep)}
+    assert f[("Cafe", "Total acumulado", "0220")] == 100.0
+    assert f[("Cafe", "NETO DEL CENTRO (debe dar 0)", "0220")] == 0
+    assert f[("Cafe", "Cargo a departamento", "0110")] == 70.0
+    assert f[("Cafe", "Cargos + credito (debe dar 0)", "")] == 0
+
+
+def test_sin_reparto_guardado_lo_dice_en_vez_de_mostrar_un_descuadre():
+    filas = cp.filas_centros_costo([_gl("0161", "PAYROLL", 5.0), _gl("0161", "ALLOCATIONS", -5.0)], [])
+    lav = [r for r in filas if r["centro"].startswith("Lav")]
+    assert any("viene hecho en el mayor" in r["concepto"] for r in lav)
+    assert not any(r["concepto"].startswith("Cargos +") for r in lav)
+
+
+def test_la_consulta_del_libro_no_rebaja_el_gl():
+    m = (pathlib.Path(__file__).resolve().parents[1] / "scripts" / "gl_en_vivo"
+         / "centros_costo.m").read_text(encoding="utf-8")
+    assert "api/consolidado/centros-costo/" in m
+    assert "Table.SelectRows(GL" not in m and "Repartos," not in m
