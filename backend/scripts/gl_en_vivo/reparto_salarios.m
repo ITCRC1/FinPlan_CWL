@@ -64,7 +64,7 @@ let
                             & List.Transform([meses], Num) & {Num([anual]), leido})
                     in
                         if List.Count(filas) = 0
-                        then Fallo(etiqueta, "Esta version no tiene reglas de reparto de salarios (el Actual viene ya repartido en el mayor)")
+                        then #table(Cols, {{etiqueta, "SIN DATOS"} & List.Repeat({null}, 6) & {"Esta version no tiene reglas de reparto de salarios: el Actual y el Forecast lo traen hecho en el mayor"} & List.Repeat({null}, List.Count(Cols) - 9)})
                         else #table(Cols, filas)
         in
             Salida,

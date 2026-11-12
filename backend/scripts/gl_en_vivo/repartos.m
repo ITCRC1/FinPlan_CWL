@@ -24,6 +24,8 @@ let
 
     // Un error NO tumba el libro entero: esa version baja con una fila que lo dice
     // y las demas siguen. Un refresh que falla del todo se lee como "no hay datos".
+    // ERROR = algo fallo (llave, servidor). «SIN DATOS» = la version no tiene
+    // repartos guardados, que es lo normal en el Actual y el Forecast: no es un error.
     Fallo = (etiqueta as text, msg as text) =>
         #table(Cols, {{etiqueta, "ERROR", msg} & List.Repeat({null}, List.Count(Cols) - 3)}),
 
@@ -60,7 +62,7 @@ let
                             & List.Transform([meses], Num) & {Num([anual]), leido})
                     in
                         if List.Count(filas) = 0
-                        then Fallo(etiqueta, "Sin repartos guardados: el Actual y el Forecast se cargan del mayor y la regla de allocation deja Cafeteria y Lavanderia fuera; solo el Pre-Cierre las muestra")
+                        then #table(Cols, {{etiqueta, "SIN DATOS", "Sin repartos guardados: el Actual y el Forecast traen el reparto hecho en el mayor; el detalle por destino solo existe en los Budget y el Pre-Cierre"} & List.Repeat({null}, List.Count(Cols) - 3)})
                         else #table(Cols, filas)
         in
             Salida,
