@@ -1,4 +1,4 @@
-﻿param([string]$Libro, [string]$Spec)
+﻿param([string]$Libro, [string]$Spec, [switch]$DejarVisibles)
 # Escribe el Master File (hojas AM + Reporte) en un libro en vivo que YA tiene las
 # tablas (tGL, tMotor, tHabitaciones, tEstadisticas). Via COM de Excel: las
 # formulas con referencias estructuradas solo se pueden escribir cuando la tabla
@@ -117,8 +117,12 @@ try {
   $ps.CenterFooter = 'CWL · Owners report · page &P of &N'
 
   # 6) Las tablas de datos quedan ocultas; Config y Escenarios a la vista (la llave va ahi).
+  #    -DejarVisibles: el libro de trabajo completo (owner, 2026-11-12: validar los
+  #    checkbooks junto a la presentacion), no se oculta nada.
+  if (-not $DejarVisibles) {
   foreach ($n in @('GL','P&L Motor','Habitaciones por tipo','Estadisticas Rooms','Posiciones','Checkbook Ingresos','Checkbook Costos','Checkbook Gastos','Checkbook Planilla','Control Planilla','Checkbook Propietario')) {
     foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq $n) { $s.Visible = 0 } }
+  }
   }
   $wb.Worksheets.Item('00 Index').Activate()
   $wb.Save(); $wb.Close($false)
