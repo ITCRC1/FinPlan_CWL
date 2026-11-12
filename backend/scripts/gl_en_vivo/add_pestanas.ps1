@@ -3,6 +3,14 @@
 # Propietario (management fees y gastos de duenos) y Estadisticas (owner, 2026-11-11 y 2026-11-12).
 # Misma mecanica que add_queries.ps1: una consulta por pestana que lee tVersiones.
 $ErrorActionPreference = "Stop"
+# Los formatos se escriben en el idioma de ESTE Excel (NumberFormatLocal): con
+# NumberFormat, un Excel en espanol llamado desde PowerShell leia '#,##0' con la
+# coma como decimal y el reporte salia «5041101,712» y 44.7% como «4.5%».
+# Se le pregunta a Excel sus separadores y se traduce el formato escrito en ingles.
+function Formato-Local($xl, [string]$fmt) {
+  $dec = $xl.International(3); $mil = $xl.International(4)
+  return ($fmt -replace ',', [char]1 -replace '\.', [char]2) -replace [char]1, $mil -replace [char]2, $dec
+}
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $defs = @(
   @{ q = "CheckbookIngresos";   hoja = "Checkbook Ingresos";   tabla = "tIngresos";   m = "ingresos.m";    d = "Checkbook de ingresos: depto x cuenta x mes (USD, positivo), desde el GL" },
@@ -16,6 +24,8 @@ $defs = @(
   @{ q = "Habitaciones";        hoja = "Habitaciones por tipo"; tabla = "tHabitaciones"; m = "habitaciones.m"; d = "Estadisticas por tipo de habitacion y por set (estandar, Villas): disponibles, ocupadas, pax, ocupacion, ingreso, ADR, RevPAR" },
   @{ q = "Estadisticas";        hoja = "Estadisticas Rooms";   tabla = "tEstadisticas"; m = "estadisticas.m"; d = "Estadisticas de habitaciones por mes: disponibles, ocupadas, ocupacion, ADR, RevPAR" }
 )
+# Con -File, PowerShell pasa "A,B,C" como UN solo texto: se parte aca.
+$Solo = @($Solo | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Solo.Count -gt 0) { $defs = @($defs | Where-Object { $Solo -contains $_.q }) }
 $xl = New-Object -ComObject Excel.Application
 $xl.DisplayAlerts = $false; $xl.Visible = $false
@@ -45,9 +55,9 @@ try {
     if ($Refrescar) {
       $qt.Refresh($false) | Out-Null
       foreach ($c in $lo.ListColumns) {
-        if ($c.Name -match '^(M\d\d|Annual|Anio|Costo|Salario|Devengado|Cargas|Beneficios|Dif |Checkbook anual|GL anual|Diferencia|Disponibles|Ocupadas|Pax|Ingreso|ADR|RevPAR)') { $c.DataBodyRange.NumberFormat = '#,##0.00;[Red](#,##0.00);"-"' }
-        elseif ($c.Name -match '%') { $c.DataBodyRange.NumberFormat = '0.0' }
-        elseif ($c.Name -match '^FTE') { $c.DataBodyRange.NumberFormat = '0.00' }
+        if ($c.Name -match '^(M\d\d|Annual|Anio|Costo|Salario|Devengado|Cargas|Beneficios|Dif |Checkbook anual|GL anual|Diferencia|Disponibles|Ocupadas|Pax|Ingreso|ADR|RevPAR)') { $c.DataBodyRange.NumberFormatLocal = (Formato-Local $xl '#,##0.00;(#,##0.00);"-"') }
+        elseif ($c.Name -match '%') { $c.DataBodyRange.NumberFormatLocal = (Formato-Local $xl '0.0') }
+        elseif ($c.Name -match '^FTE') { $c.DataBodyRange.NumberFormatLocal = (Formato-Local $xl '0.00') }
       }
       "{0,-20} filas = {1}" -f $x.hoja, $lo.ListRows.Count
     }

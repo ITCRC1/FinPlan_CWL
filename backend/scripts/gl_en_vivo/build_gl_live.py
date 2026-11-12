@@ -78,7 +78,8 @@ def _nota(ws, fila, texto, ancho=6):
     ws.row_dimensions[fila].height = 28
 
 
-def construir(salida: str) -> None:
+def construir(salida: str, versiones=None, titulo=None) -> None:
+    versiones = versiones or VERSIONES
     wb = Workbook()
 
     # ── Config ───────────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ def construir(salida: str) -> None:
     for col, ancho in zip("ABCDEF", (8, 30, 10, 14, 20, 16)):
         cfg.column_dimensions[col].width = ancho
 
-    _titulo(cfg, 1, "CWL · Cuentas del mayor por mes y checkbooks — en vivo")
+    _titulo(cfg, 1, titulo or "CWL · Cuentas del mayor por mes y checkbooks — en vivo")
     _nota(cfg, 2,
           "Datos → Actualizar todo. Cada versión se baja de FinPlan con la llave de "
           "solo lectura. El ingreso viene NEGATIVO (es crédito): la suma de todas las "
@@ -142,7 +143,7 @@ def construir(salida: str) -> None:
         c.font = Font(bold=True, color=TINTA)
         c.fill = PatternFill("solid", fgColor=BANDA)
         c.border = Border(bottom=Side(style="medium", color=TINTA))
-    for i, (usar, etq, anio, tipo, ver) in enumerate(VERSIONES, start=1):
+    for i, (usar, etq, anio, tipo, ver) in enumerate(versiones, start=1):
         c = cfg.cell(fila0 + i, 1, usar)
         c.alignment = Alignment(horizontal="center")
         c.font = Font(bold=True, color=("1B6B3A" if usar == "SI" else "A33A3A"))
@@ -151,7 +152,7 @@ def construir(salida: str) -> None:
         cfg.cell(fila0 + i, 4, tipo)
         cfg.cell(fila0 + i, 5, ver)
 
-    ref = f"A{fila0}:E{fila0 + len(VERSIONES)}"
+    ref = f"A{fila0}:E{fila0 + len(versiones)}"
     t = Table(displayName="tVersiones", ref=ref)
     t.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=True)
     cfg.add_table(t)
@@ -171,7 +172,7 @@ def construir(salida: str) -> None:
     datos.column_dimensions["A"].width = 60
 
     wb.save(salida)
-    print(f"libro escrito: {salida}  ·  {len(VERSIONES)} versiones")
+    print(f"libro escrito: {salida}  ·  {len(versiones)} versiones")
 
 
 if __name__ == "__main__":
