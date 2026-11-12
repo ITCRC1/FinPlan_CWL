@@ -21,12 +21,17 @@ try {
 
   # 1) Hojas vacias, en el orden del reporte y al principio del libro.
   $hojas = @($plano.hojas)
-  foreach ($h in $hojas) { foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq $h.nombre) { $s.Delete() } } }
+  # Hojas CONSERVADAS (p. ej. «OTB Input»): el owner escribe en ellas. Si ya existen no se
+  # borran ni se reescriben; solo se crean la primera vez.
+  $existen = @{}; foreach ($s in @($wb.Worksheets)) { $existen[$s.Name] = $true }
+  $saltar = @{}; foreach ($h in $hojas) { if ($h.conservar -and $existen.ContainsKey($h.nombre)) { $saltar[$h.nombre] = $true } }
+  foreach ($h in $hojas) { if ($saltar.ContainsKey($h.nombre)) { continue }; foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq $h.nombre) { $s.Delete() } } }
   # Y las de una corrida anterior aunque se llamaran distinto (p. ej. en otro idioma): todo
   # lo que sea reporte se rehace; las tablas de datos y Config no se tocan.
   foreach ($s in @($wb.Worksheets)) { if ($s.Name -match '^(AM\d\d |00 |Report)') { $s.Delete() } }
   $ant = $null
   foreach ($h in $hojas) {
+    if ($saltar.ContainsKey($h.nombre)) { $ant = $wb.Worksheets.Item($h.nombre); continue }
     if ($ant -eq $null) { $ws = $wb.Worksheets.Add($wb.Worksheets.Item(1)) }
     else { $ws = $wb.Worksheets.Add([Type]::Missing, $ant) }
     $ws.Name = $h.nombre
@@ -44,6 +49,7 @@ try {
   # 3) Filas.
   $letra = { param($i) $s = ''; while ($i -gt 0) { $m = ($i - 1) % 26; $s = [char](65 + $m) + $s; $i = [int](($i - $m - 1) / 26) }; $s }
   foreach ($h in $hojas) {
+    if ($saltar.ContainsKey($h.nombre)) { continue }
     $ws = $wb.Worksheets.Item($h.nombre)
     $j = 1; foreach ($a in @($h.anchos)) { $ws.Columns.Item($j).ColumnWidth = $a; $j++ }
     $ultCol = @($h.anchos).Count
@@ -69,6 +75,7 @@ try {
         'resto'      { $fila.Font.Italic = $true; $fila.Font.Color = 0x808080 }
         'control'    { $fila.Font.Italic = $true; $fila.Font.Color = 0x808080 }
         'aux'        { $ws.Rows.Item($r).Hidden = $true }
+        'entrada'    { $ws.Range("C$($r):N$($r)").Interior.Color = 0x99FFFF; $ws.Range("C$($r):N$($r)").NumberFormatLocal = (Formato-Local $xl '#,##0;(#,##0);""'); $fila.Font.Bold = $true }
         'pct'        { $ws.Range("C$($r):" + (& $letra $ultCol) + "$r").NumberFormatLocal = (Formato-Local $xl '0.0%;-0.0%;""') }
         'usd2'       { $ws.Range("C$($r):" + (& $letra $ultCol) + "$r").NumberFormatLocal = (Formato-Local $xl '#,##0.00;(#,##0.00);"-"') }
       }

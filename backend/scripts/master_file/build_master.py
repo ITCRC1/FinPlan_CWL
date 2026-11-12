@@ -39,6 +39,8 @@ VERSIONES = [
     ("A26", "Actual 2026", "2026 actual"),
     ("F26", "Forecast 2026", "FinPlan ★ Current: the latest forecast marked"),
     ("B27", "Budget 2027 Working", "Budget 2027 work in progress"),
+    # Al final: agregar una versión no corre las filas de las demás en AM98.
+    ("B26", "Budget 2026 Final", "Budget 2026 approved (FTE reference: the Actual and Forecast carry no FTE)"),
 ]
 
 # ── Las secciones del P&L de CWL (códigos de tMotor) ─────────────────────────
@@ -157,6 +159,7 @@ class Hoja:
         self.nombre, self.anchos = nombre, anchos
         self.filas, self.graficos, self.formatos = [], [], []
         self.horizontal, self.ocultar_a = horizontal, ocultar_a
+        self.conservar = False   # True = aplicar.ps1 la crea una vez y nunca la rehace
         self.r = 0
 
     def fila(self, estilo, celdas, alto=None):
@@ -178,7 +181,8 @@ class Hoja:
     def json(self):
         return {"nombre": self.nombre, "anchos": self.anchos, "filas": self.filas,
                 "graficos": self.graficos, "formatos": self.formatos,
-                "horizontal": self.horizontal, "ocultar_a": self.ocultar_a}
+                "horizontal": self.horizontal, "ocultar_a": self.ocultar_a,
+                "conservar": self.conservar}
 
 
 USD = '#,##0;(#,##0);"-"'
@@ -630,6 +634,588 @@ def hoja_reporte(res_filas, tot, sets_filas, flow_r=None):
     return h
 
 
+# ══ Análisis para decidir (owner, 2026-11-12) ════════════════════════════════
+# «metamos un tab de key indicators y necesito un tab de decisiones: cuando crece
+# ingresos versus budget, cuánto crece opex y salarios, el FTE, cuánto crece en
+# noches, separado Standard Rooms y Villas… márgenes por departamento… en overhead
+# igual» · «un tab solo de análisis de Rate por mes, cuartos» · «un tab solo de
+# volumen por mes, por cuartos y full year comparativo side by side».
+
+K = "13"   # columna del año en tMotor/tGL/tEstadisticas
+
+# Columnas del P&L por departamento, por departamento del GL. «Other (not
+# listed)» = total operado − lo listado: un depto nuevo cae ahí y el total cuadra.
+DEPTOS_OPERADOS = [
+    ("Standard rooms", ["0110"]),
+    ("Villas", ["0115", "0116"]),
+    ("F&B", ["0120", "0121"]),
+    ("Spa", ["0130", "0140"]),
+    ("Tours", ["0150"]),
+    ("Transportation", ["0152"]),
+    ("Gift shop / store", ["0151", "0165"]),
+    ("Laundry", ["0161", "0162"]),
+    ("Innoceana & Crowther", ["0155", "0156"]),
+    ("Other income", ["280"]),
+]
+DEPTOS_OVERHEAD = [
+    ("Administrative & General", ["0180"]),
+    ("Sales & Marketing", ["0190"]),
+    ("Maintenance", ["0200"]),
+    ("Utilities", ["0210"]),
+    ("Information systems (IT)", ["0230"]),
+    ("Claro del Bosque (Huerta)", ["0205"]),
+    ("Staff cafeteria (allocated, net)", ["0220"]),
+]
+OH_CODIGOS = [d for _, ds in DEPTOS_OVERHEAD for d in ds]
+CENTROS = ["0220", "0161"]          # acumulan y reparten: su costo bruto ya está en los deptos
+
+TIPOS = [   # código de tipo en tHabitaciones (Opera) · nombre corto · set
+    ("BL01", "Corcovado Deluxe King", "Standard"),
+    ("BI02", "Carate Deluxe Double", "Standard"),
+    ("PO03", "Agujas Villa 2 Queen", "Standard"),
+    ("RO04", "Sirena Suites", "Standard"),
+    ("BI05", "Treehouse King", "Standard"),
+    ("BL06", "5 Elements Treehouse", "Standard"),
+    ("SH07", "Villas Deluxe", "Villas"),
+    ("SH08", "Residencia", "Villas"),
+]
+
+
+def glt(v, cat, col_k, deptos=None, signo=1):
+    """tGL por categoría; sin deptos = todo el hotel."""
+    if deptos is None:
+        s = "-" if signo < 0 else ""
+        return (f'IFERROR({s}SUMIFS(INDEX(tGL[[M01]:[Annual]],0,{col_k}),tGL[Etiqueta],{v},'
+                f'tGL[Category],"{cat}"),0)')
+    return gl(v, cat, deptos, col_k, signo)
+
+
+def gl_costo(v, deptos, col_k):
+    """Todo lo de esos deptos (payroll + costo + opex + reparto): para overhead, sin ingreso."""
+    dep = f'"{deptos[0]}"' if len(deptos) == 1 else _lista(deptos)
+    f = f'SUMIFS(INDEX(tGL[[M01]:[Annual]],0,{col_k}),tGL[Etiqueta],{v},tGL[Dept code],{dep})'
+    return f'IFERROR(SUM({f}),0)'
+
+
+def hab_t(v, campo, codigo, mes_celda):
+    """tHabitaciones de UN tipo de habitación; mes_celda None = el año."""
+    mes = "" if mes_celda is None else f",tHabitaciones[Mes],{mes_celda}"
+    return (f'IFERROR(SUMIFS(tHabitaciones[{campo}],tHabitaciones[Etiqueta],{v},'
+            f'tHabitaciones[Nivel],"Tipo",tHabitaciones[Codigo],"{codigo}"{mes}),0)')
+
+
+def var_cols(n, c_ant="D", c_nue="E", pct=False):
+    """Δ y Δ% (o Δ en puntos si la fila es un %)."""
+    if pct:
+        return [f'=IF(OR({c_ant}{n}="",{c_nue}{n}=""),"",{c_nue}{n}-{c_ant}{n})', ""]
+    return [f'=IF(OR({c_ant}{n}="",{c_nue}{n}=""),"",{c_nue}{n}-{c_ant}{n})',
+            f'=IF(OR({c_ant}{n}="",{c_nue}{n}="",ABS(N({c_ant}{n}))<1),"",({c_nue}{n}-{c_ant}{n})/ABS({c_ant}{n}))']
+
+
+# ── AM09 Key Indicators ──────────────────────────────────────────────────────
+
+def hoja_ki(rooms_filas):
+    h = Hoja("AM09 Key Indicators", [8, 46, 16, 16, 16, 15, 11], ocultar_a=True)
+    h.fila("titulo", ["", "CWL · Key indicators — full year"])
+    h.fila("nota", ["", "PAR = per available room night · POR = per occupied room night · pp = percentage points. "
+                        "Payroll, cost of sales and opex exclude the gross cost of the staff cafeteria (0220) and "
+                        "internal laundry (0161): it is already inside the departments that receive it."])
+    h.saltar()
+    h.fila("encabezado", ["", "Indicator", "=" + rotulo("A25"), "=" + rotulo("F26"), "=" + rotulo("B27"),
+                          "Var. B27 − F26", "Var. %"])
+    rf = rooms_filas
+    A1 = "'AM01 Rooms KPIs'!O"
+    f = {}
+
+    def ind(nombre, fv, estilo="normal", clave=None):
+        n = h.r + 1
+        h.fila(estilo, ["", nombre] + ["=" + fv(c) for c in ("A25", "F26", "B27")] +
+               var_cols(n, pct=(estilo == "pct")))
+        f[clave or nombre] = n
+        return n
+
+    m = lambda c, cs: motor(f"ver_{c}", cs, K)
+    pay = lambda c: f"({glt(f'ver_{c}', 'PAYROLL', K)}-{glt(f'ver_{c}', 'PAYROLL', K, CENTROS)})"
+    cos = lambda c: f"({glt(f'ver_{c}', 'COST_OF_SALES', K)}-{glt(f'ver_{c}', 'COST_OF_SALES', K, CENTROS)})"
+    opx = lambda c: f"({glt(f'ver_{c}', 'OPERATING_EXPENSES', K)}-{glt(f'ver_{c}', 'OPERATING_EXPENSES', K, CENTROS)})"
+    disp = lambda c: f"{A1}{rf[(c, 'hotel')]['disp']}"
+    ocu = lambda c: f"{A1}{rf[(c, 'hotel')]['ocu']}"
+    rev = lambda c: m(c, ["TOTAL_REVENUES"])
+    rrev = lambda c: m(c, ["REV_ROOMS", "REV_ROOMS_OTHER"])
+
+    h.fila("seccion", ["", "Volume"])
+    ind("Rooms available (room nights)", disp)
+    ind("Rooms sold (occupied)", ocu)
+    ind("Occupancy %", lambda c: f"{A1}{rf[(c, 'hotel')]['occ']}", "pct")
+    ind("Guests", lambda c: f"{A1}{rf[(c, 'hotel')]['pax']}")
+    ind("Guests per occupied room", lambda c: div(f"{A1}{rf[(c, 'hotel')]['pax']}", ocu(c)), "usd2")
+    h.fila("seccion", ["", "Rate"])
+    ind("Average rate (ADR)", lambda c: f"{A1}{rf[(c, 'hotel')]['adr']}", "usd2")
+    ind("RevPAR", lambda c: f"{A1}{rf[(c, 'hotel')]['revpar']}", "usd2")
+    ind("Rooms total PAR (P&L rooms revenue / available)", lambda c: div(rrev(c), disp(c)), "usd2")
+    ind("TRevPAR (total revenue / available)", lambda c: div(rev(c), disp(c)), "usd2")
+    h.fila("seccion", ["", "Revenue"])
+    ind("Gross operating revenue", rev, clave="rev")
+    ind("Rooms revenue", rrev)
+    ind("F&B revenue", lambda c: m(c, ["REV_FB", "REV_FB_BEV", "REV_FB_MISC", "REV_PRIVATE_BAR"]))
+    ind("Spa revenue", lambda c: m(c, ["REV_SPA"]))
+    ind("Tours revenue", lambda c: m(c, ["REV_TOURS"]))
+    ind("Non-room revenue %", lambda c: div(f"{rev(c)}-{rrev(c)}", rev(c)), "pct")
+    ind("F&B revenue POR", lambda c: div(m(c, ["REV_FB", "REV_FB_BEV", "REV_FB_MISC", "REV_PRIVATE_BAR"]), ocu(c)), "usd2")
+    ind("Total revenue per guest", lambda c: div(rev(c), f"{A1}{rf[(c, 'hotel')]['pax']}"), "usd2")
+    h.fila("seccion", ["", "Profitability"])
+    g = ind("Gross operating profit (GOP)", lambda c: m(c, ["TOTAL_GOP"]), "subtotal")
+    ind("GOP %", lambda c: div(m(c, ["TOTAL_GOP"]), rev(c)), "pct")
+    ind("GOP PAR", lambda c: div(m(c, ["TOTAL_GOP"]), disp(c)), "usd2")
+    n = h.r + 1
+    h.fila("pct", ["", "GOP flow-through (Δ GOP ÷ Δ revenue, B27 vs F26)", "", "", "",
+                   f'=IF(ABS(F{f["rev"]})<1,"",F{g}/F{f["rev"]})', ""])
+    e = ind("EBITDA before capital", lambda c: m(c, ["EBITDA_BEFORE_CAPITAL"]), "subtotal")
+    ind("EBITDA %", lambda c: div(m(c, ["EBITDA_BEFORE_CAPITAL"]), rev(c)), "pct")
+    ind("Net profit", lambda c: m(c, ["NET_PROFIT"]), "total")
+    ind("Rooms profit %", lambda c: div(m(c, ["PROFIT_ROOMS"]), rrev(c)), "pct")
+    ind("F&B retention (F&B profit / F&B revenue)",
+        lambda c: div(m(c, ["PROFIT_FB", "PROFIT_PRIVATE_BAR"]), m(c, ["REV_FB", "REV_FB_BEV", "REV_FB_MISC", "REV_PRIVATE_BAR"])), "pct")
+    h.fila("seccion", ["", "Departmental cost & productivity"])
+    ind("Food cost %", lambda c: div(m(c, ["COS_FB_FOOD"]), m(c, ["REV_FB"])), "pct")
+    ind("Beverage cost %", lambda c: div(m(c, ["COS_FB_BEV"]), m(c, ["REV_FB_BEV"])), "pct")
+    ind("Rooms cost % (rooms expenses / rooms revenue)", lambda c: div(m(c, ["OPEX_ROOMS"]), rrev(c)), "pct")
+    ind("Rooms expenses POR", lambda c: div(m(c, ["OPEX_ROOMS"]), ocu(c)), "usd2")
+    ind("F&B total cost POR", lambda c: div(m(c, ["OPEX_FB", "OPEX_PRIVATE_BAR", "COS_FB_FOOD", "COS_FB_BEV",
+                                                   "COS_FB_MISC", "COS_PRIVATE_BAR"]), ocu(c)), "usd2")
+    h.fila("seccion", ["", "Undistributed expenses"])
+    ind("Admin & General PAR (incl. credit card commissions)", lambda c: div(m(c, ["OH_ADMIN", "OH_EMPLOYEE_BENEFITS", "COH_EMPLOYEE_BENEFITS", "OH_CC_COMMISSIONS"]), disp(c)), "usd2")
+    ind("Sales & Marketing PAR", lambda c: div(m(c, ["OH_SALES_MARKETING"]), disp(c)), "usd2")
+    ind("Sales & Marketing % of revenue", lambda c: div(m(c, ["OH_SALES_MARKETING"]), rev(c)), "pct")
+    ind("IT / telecom PAR", lambda c: div(m(c, ["OH_INFORMATION_SYSTEM", "COH_INFORMATION_SYSTEM"]), disp(c)), "usd2")
+    ind("Maintenance PAR", lambda c: div(m(c, ["OH_MAINTENANCE"]), disp(c)), "usd2")
+    ind("Utilities PAR", lambda c: div(m(c, ["OH_UTILITIES"]), disp(c)), "usd2")
+    ind("Total overhead % of revenue", lambda c: div(m(c, ["TOTAL_OVERHEAD_EXPENSES"]), rev(c)), "pct")
+    h.fila("seccion", ["", "Payroll & cost structure"])
+    ind("Payroll % of revenue", lambda c: div(pay(c), rev(c)), "pct")
+    ind("Payroll POR", lambda c: div(pay(c), ocu(c)), "usd2")
+    ind("Cost of sales % of revenue", lambda c: div(cos(c), rev(c)), "pct")
+    ind("Operating expenses % of revenue", lambda c: div(opx(c), rev(c)), "pct")
+    h.formato(f"C5:F{h.r}", USD)
+    h.formato(f"G5:G{h.r}", PCT)
+    return h
+
+
+# ── AM10 Decisions ──────────────────────────────────────────────────────────
+
+def hoja_decisiones(rooms_filas):
+    h = Hoja("AM10 Decisions", [8, 46] + [14] * 12, ocultar_a=True)
+    h.fila("titulo", ["", "CWL · Decisions — what grows, how much, and what each area contributes"])
+    h.fila("nota", ["", "Budget 2027 against Forecast 2026 (Actual 2025 as reference). «x revenue growth» = the line's "
+                        "% growth ÷ the revenue % growth: above 1.00 it grows FASTER than revenue, below 1.00 slower. "
+                        "Expenses by department come from the GL (Dept code × category) and tie to the P&L GOP "
+                        "(check at the end of section 2)."])
+    A1 = "'AM01 Rooms KPIs'!O"
+    rf = rooms_filas
+    # ── 1. Qué crece ────────────────────────────────────────────────────────
+    h.saltar()
+    h.fila("seccion", ["", "1 · GROWTH: revenue, volume, payroll, opex and FTE"])
+    h.fila("encabezado", ["", "Line", "=" + rotulo("A25"), "=" + rotulo("F26"), "=" + rotulo("B27"),
+                          "Δ B27 − F26", "Δ %", "x revenue growth"])
+    f = {}
+
+    def lin(nombre, fv, estilo="normal", clave=None, multiplo=True):
+        n = h.r + 1
+        celdas = ["", nombre] + ["=" + fv(c) for c in ("A25", "F26", "B27")] + var_cols(n, pct=(estilo == "pct"))
+        if multiplo and estilo != "pct" and "rev" in f:
+            celdas.append(f'=IF(OR(G{n}="",G${f["rev"]}="",N(G${f["rev"]})=0),"",G{n}/G${f["rev"]})')
+        h.fila(estilo, celdas)
+        f[clave or nombre] = n
+        return n
+
+    m = lambda c, cs: motor(f"ver_{c}", cs, K)
+    v = lambda c: f"ver_{c}"
+    lin("Total revenue", lambda c: m(c, ["TOTAL_REVENUES"]), "subtotal", clave="rev")
+    lin("Rooms revenue — Standard", lambda c: glt(v(c), "REVENUE", K, ["0110"], -1))
+    lin("Rooms revenue — Villas", lambda c: glt(v(c), "REVENUE", K, ["0115", "0116"], -1))
+    lin("Non-room revenue", lambda c: f"{m(c, ['TOTAL_REVENUES'])}-{m(c, ['REV_ROOMS', 'REV_ROOMS_OTHER'])}")
+    on = lin("Occupied room nights — hotel", lambda c: f"{A1}{rf[(c, 'hotel')]['ocu']}", clave="ocu")
+    lin("Occupied room nights — Standard",
+        lambda c: f"{A1}{rf[(c, 'hotel')]['ocu']}-{A1}{rf[(c, '0115')]['ocu']}" if c != "A25" else f"{A1}{rf[(c, 'hotel')]['ocu']}")
+    lin("Occupied room nights — Villas", lambda c: f"{A1}{rf[(c, '0115')]['ocu']}" if c != "A25" else "0")
+    lin("Available room nights", lambda c: f"{A1}{rf[(c, 'hotel')]['disp']}", clave="disp")
+    lin("Guests", lambda c: f"{A1}{rf[(c, 'hotel')]['pax']}", clave="pax")
+    lin("ADR", lambda c: f"{A1}{rf[(c, 'hotel')]['adr']}", "usd2")
+    lin("Occupancy %", lambda c: f"{A1}{rf[(c, 'hotel')]['occ']}", "pct")
+    pay = lambda c: f"({glt(v(c), 'PAYROLL', K)}-{glt(v(c), 'PAYROLL', K, CENTROS)})"
+    cos = lambda c: f"({glt(v(c), 'COST_OF_SALES', K)}-{glt(v(c), 'COST_OF_SALES', K, CENTROS)})"
+    opx = lambda c: f"({glt(v(c), 'OPERATING_EXPENSES', K)}-{glt(v(c), 'OPERATING_EXPENSES', K, CENTROS)})"
+    lin("Payroll (all departments)", pay, clave="pay")
+    lin("Cost of sales", cos, clave="cos")
+    lin("Operating expenses (opex)", opx, clave="opx")
+    lin("Undistributed expenses (overhead, P&L)", lambda c: m(c, ["TOTAL_OVERHEAD_EXPENSES"]))
+    lin("Departmental profit", lambda c: m(c, ["OPERATING_PROFIT"]), "subtotal")
+    lin("GOP", lambda c: m(c, ["TOTAL_GOP"]), "total")
+    fte = lambda c: f'IF(SUMIFS(tPosiciones[FTE prom],tPosiciones[Etiqueta],{v(c)})=0,"",SUMIFS(tPosiciones[FTE prom],tPosiciones[Etiqueta],{v(c)}))'
+    lin("FTE (average for the year) ¹", fte, "usd2", clave="fte")
+    n = h.r + 1
+    h.fila("usd2", ["", "FTE — Budget 2026 Final (reference) ¹", "", "=" + fte("B26"), "=E" + str(f["fte"]),
+                    f'=IF(OR(D{n}="",E{n}=""),"",E{n}-D{n})', f'=IF(OR(D{n}="",E{n}="",N(D{n})=0),"",(E{n}-D{n})/D{n})'])
+    h.fila("seccion", ["", "Per unit"])
+    lin("Payroll per occupied night", lambda c: div(pay(c), f"{A1}{rf[(c, 'hotel')]['ocu']}"), "usd2")
+    lin("Payroll per guest", lambda c: div(pay(c), f"{A1}{rf[(c, 'hotel')]['pax']}"), "usd2")
+    lin("Opex per occupied night", lambda c: div(opx(c), f"{A1}{rf[(c, 'hotel')]['ocu']}"), "usd2")
+    lin("Revenue per guest", lambda c: div(m(c, ["TOTAL_REVENUES"]), f"{A1}{rf[(c, 'hotel')]['pax']}"), "usd2")
+    lin("Payroll % of revenue", lambda c: div(pay(c), m(c, ["TOTAL_REVENUES"])), "pct")
+    lin("Occupied nights per FTE", lambda c: f'IFERROR({A1}{rf[(c, "hotel")]["ocu"]}/{fte(c)},"")', "usd2")
+    lin("Payroll per FTE (annual)", lambda c: f'IFERROR({pay(c)}/{fte(c)},"")', "usd2")
+    h.fila("nota", ["", "¹ FTE exists only where the budget is built by position (Budget 2026 and 2027). The Actual and "
+                        "the Forecast take payroll from the GL, with no FTE: compare FTE Budget 2027 vs Budget 2026."])
+    p1 = 6
+    h.formato(f"C{p1}:F{h.r}", USD)
+    h.formato(f"G{p1}:G{h.r}", PCT)
+    h.formato(f"H{p1}:H{h.r}", '0.00"x";-0.00"x";""')
+
+    # ── 2. Márgenes por departamento ────────────────────────────────────────
+    nombres = [n for n, _ in DEPTOS_OPERADOS] + ["Other (not listed)", "Total operated"]
+    cols = "CDEFGHIJKLMN"
+    bloques = {}
+    for cod in ("F26", "B27"):
+        vv = v(cod)
+        h.saltar()
+        h.fila("seccion", ["", "=\"2 · DEPARTMENTAL MARGINS — \"&" + rotulo(cod)])
+        h.fila("encabezado", ["", "USD"] + nombres)
+        filas = {}
+
+        def cat_fila(etq, cat, signo, estilo="normal"):
+            n = h.r + 1
+            celdas = ["", etq]
+            for nom, deps in DEPTOS_OPERADOS:
+                celdas.append("=" + glt(vv, cat, K, deps, signo))
+            listado = f"SUM(C{n}:L{n})"
+            total = f"({glt(vv, cat, K, None, signo)})-({glt(vv, cat, K, OH_CODIGOS + ['0250'], signo)})"
+            celdas += [f"=N{n}-{listado}", "=" + total]
+            return h.fila(estilo, celdas)
+
+        filas["rev"] = cat_fila("Revenue", "REVENUE", -1, "subtotal")
+        filas["pay"] = cat_fila("Payroll", "PAYROLL", 1)
+        filas["cos"] = cat_fila("Cost of sales", "COST_OF_SALES", 1)
+        filas["opx"] = cat_fila("Operating expenses", "OPERATING_EXPENSES", 1)
+        filas["alo"] = cat_fila("Allocation credit (laundry centre)", "ALLOCATIONS", 1)
+        n = h.r + 1
+        filas["gas"] = h.fila("normal", ["", "Departmental expenses"] +
+                              [f"={c}{filas['pay']}+{c}{filas['cos']}+{c}{filas['opx']}+{c}{filas['alo']}" for c in cols])
+        n = h.r + 1
+        filas["pro"] = h.fila("total", ["", "Departmental profit"] + [f"={c}{filas['rev']}-{c}{filas['gas']}" for c in cols])
+        h.fila("pct", ["", "Margin (profit / revenue)"] + [f'=IF(ABS({c}{filas["rev"]})<1,"",{c}{filas["pro"]}/{c}{filas["rev"]})' for c in cols])
+        h.fila("pct", ["", "Share of revenue"] + [f'=IF(ABS($N{filas["rev"]})<1,"",{c}{filas["rev"]}/$N{filas["rev"]})' for c in cols])
+        h.fila("pct", ["", "Contribution to departmental profit"] + [f'=IF(ABS($N{filas["pro"]})<1,"",{c}{filas["pro"]}/$N{filas["pro"]})' for c in cols])
+        h.fila("pct", ["", "Payroll % of revenue"] + [f'=IF(ABS({c}{filas["rev"]})<1,"",{c}{filas["pay"]}/{c}{filas["rev"]})' for c in cols])
+        h.fila("pct", ["", "Cost of sales % of revenue"] + [f'=IF(ABS({c}{filas["rev"]})<1,"",{c}{filas["cos"]}/{c}{filas["rev"]})' for c in cols])
+        h.fila("pct", ["", "Opex % of revenue"] + [f'=IF(ABS({c}{filas["rev"]})<1,"",{c}{filas["opx"]}/{c}{filas["rev"]})' for c in cols])
+        oh = h.fila("normal", ["", "Undistributed expenses (overhead departments, GL)", "", "", "", "", "", "", "", "", "", "", "",
+                               "=" + gl_costo(vv, OH_CODIGOS, K)])
+        h.fila("total", ["", "GOP (departmental profit − overhead)"] + [""] * 11 + [f"=N{filas['pro']}-N{oh}"])
+        h.fila("control", ["", "Check: against the P&L GOP (must be 0)"] + [""] * 11 +
+               [f"=ROUND(N{h.r}-{motor(vv, ['TOTAL_GOP'], K)},0)"])
+        h.formato(f"C{filas['rev']}:N{h.r}", USD)
+        bloques[cod] = filas
+
+    # Δ por departamento
+    h.saltar()
+    h.fila("seccion", ["", "2b · CHANGE BY DEPARTMENT — Budget 2027 vs Forecast 2026"])
+    h.fila("encabezado", ["", "USD"] + nombres)
+    a, b = bloques["F26"], bloques["B27"]
+    d0 = h.r + 1
+    dr = h.fila("normal", ["", "Δ revenue"] + [f"={c}{b['rev']}-{c}{a['rev']}" for c in cols])
+    dp = h.fila("normal", ["", "Δ payroll"] + [f"={c}{b['pay']}-{c}{a['pay']}" for c in cols])
+    h.fila("normal", ["", "Δ cost of sales"] + [f"={c}{b['cos']}-{c}{a['cos']}" for c in cols])
+    do = h.fila("normal", ["", "Δ opex"] + [f"={c}{b['opx']}-{c}{a['opx']}" for c in cols])
+    dpro = h.fila("total", ["", "Δ departmental profit"] + [f"={c}{b['pro']}-{c}{a['pro']}" for c in cols])
+    h.fila("pct", ["", "Δ revenue %"] + [f'=IF(ABS({c}{a["rev"]})<1,"",{c}{dr}/ABS({c}{a["rev"]}))' for c in cols])
+    h.fila("pct", ["", "Δ payroll %"] + [f'=IF(ABS({c}{a["pay"]})<1,"",{c}{dp}/ABS({c}{a["pay"]}))' for c in cols])
+    h.fila("pct", ["", "Δ opex %"] + [f'=IF(ABS({c}{a["opx"]})<1,"",{c}{do}/ABS({c}{a["opx"]}))' for c in cols])
+    h.fila("pct", ["", "Flow-through (Δ profit / Δ revenue)"] + [f'=IF(ABS({c}{dr})<1,"",{c}{dpro}/{c}{dr})' for c in cols])
+    h.fila("pct", ["", "Margin change (pp)"] + [f'=IF(OR(ABS({c}{a["rev"]})<1,ABS({c}{b["rev"]})<1),"",{c}{b["pro"]}/{c}{b["rev"]}-{c}{a["pro"]}/{c}{a["rev"]})' for c in cols])
+    h.formato(f"C{d0}:N{h.r}", USD)
+
+    # ── 3. Overhead contra el negocio ───────────────────────────────────────
+    h.saltar()
+    h.fila("seccion", ["", "3 · OVERHEAD — does it grow faster than the business?"])
+    h.fila("encabezado", ["", "Department", "=" + rotulo("A25"), "=" + rotulo("F26"), "=" + rotulo("B27"),
+                          "Δ B27 − F26", "Δ %", "x revenue growth", "% revenue F26", "% revenue B27",
+                          "PAR B27", "Per occ. night F26", "Per occ. night B27", "Reading"])
+    o0 = h.r + 1
+    rev_r = f["rev"]
+    for i, (nom, deps) in enumerate(DEPTOS_OVERHEAD + [("Total overhead (GL)", OH_CODIGOS)]):
+        n = h.r + 1
+        estilo = "total" if i == len(DEPTOS_OVERHEAD) else "normal"
+        celdas = ["", nom] + ["=" + gl_costo(v(c), deps, K) for c in ("A25", "F26", "B27")] + var_cols(n)
+        celdas += [f'=IF(OR(G{n}="",N(G${rev_r})=0),"",G{n}/G${rev_r})',
+                   f'=IF(N(D${rev_r})=0,"",D{n}/D${rev_r})', f'=IF(N(E${rev_r})=0,"",E{n}/E${rev_r})',
+                   f'=IF(N(E${f["disp"]})=0,"",E{n}/E${f["disp"]})',
+                   f'=IF(N(D${f["ocu"]})=0,"",D{n}/D${f["ocu"]})', f'=IF(N(E${f["ocu"]})=0,"",E{n}/E${f["ocu"]})',
+                   f'=IF(OR(H{n}="",ABS(F{n})<1),"",IF(H{n}>1.05,"grows faster than revenue",IF(H{n}<0.95,"grows slower than revenue","grows with revenue")))']
+        h.fila(estilo, celdas)
+    h.fila("control", ["", "Check: GL overhead − P&L undistributed expenses (difference in the mapping)"] +
+           [f"=ROUND({c}{h.r}-{motor(v(cod), ['TOTAL_OVERHEAD_EXPENSES'], K)},0)" for c, cod in zip("CDE", ("A25", "F26", "B27"))])
+    h.fila("seccion", ["", "Business drivers for reference"])
+    for etq, clave in (("Total revenue", "rev"), ("Occupied room nights", "ocu"), ("Guests", "pax"),
+                       ("Available room nights", "disp")):
+        n = h.r + 1
+        h.fila("normal", ["", etq, f"=C{f[clave]}", f"=D{f[clave]}", f"=E{f[clave]}"] + var_cols(n))
+    h.formato(f"C{o0}:F{h.r}", USD)
+    h.formato(f"G{o0}:G{h.r}", PCT)
+    h.formato(f"H{o0}:H{h.r}", '0.00"x";-0.00"x";""')
+    h.formato(f"I{o0}:J{h.r}", PCT)
+    h.formato(f"K{o0}:M{h.r}", USD2)
+    return h
+
+
+# ── AM11 Rate by month · AM12 Volume by month ────────────────────────────────
+#
+# ⚠️ Por tipo de habitación el Forecast solo trae los meses que ya cerraron con
+# Room Stats (hoy ene–sep); sus meses propios vienen «Sin tipo». Comparar por tipo
+# 9 meses del Forecast contra 12 del Budget infla todas las variaciones. Por eso
+# la tabla por tipo compara LOS MISMOS MESES en las dos versiones (hasta el último
+# mes que el Forecast tiene por tipo, que se calcula solo), y el año completo va
+# aparte con hotel, Standard (= hotel − Villas) y Villas.
+
+def hab_hasta(v, campo, nivel, filtro, hasta):
+    """tHabitaciones de enero hasta el mes `hasta` (celda). filtro = ('Codigo'|'Depto', valor) o None."""
+    extra = "" if filtro is None else f',tHabitaciones[{filtro[0]}],"{filtro[1]}"'
+    return (f'IFERROR(SUMIFS(tHabitaciones[{campo}],tHabitaciones[Etiqueta],{v},tHabitaciones[Nivel],"{nivel}"'
+            f'{extra},tHabitaciones[Mes],"<="&{hasta}),0)')
+
+
+def _grupos():
+    """(rótulo, nivel, filtro) de cada renglón por tipo: tipos, los dos sets y el hotel."""
+    g = [(f"{n} ({cd})", "Tipo", ("Codigo", cd), "normal") for cd, n, _ in TIPOS]
+    g += [("Standard rooms (set)", "Set", ("Depto", "0110"), "subtotal"),
+          ("Villas (set)", "Set", ("Depto", "0115"), "subtotal"),
+          ("Hotel", "Hotel", None, "total")]
+    return g
+
+
+def _celda_hasta(h):
+    """Último mes que el Forecast tiene por tipo: el período comparable."""
+    r = h.fila("normal", ["", "Months compared by room type: January through month",
+                          '=IFERROR(MAXIFS(tHabitaciones[Mes],tHabitaciones[Etiqueta],ver_F26,tHabitaciones[Nivel],"Tipo"),12)',
+                          '=CHOOSE(C{R},"January","February","March","April","May","June","July","August","September","October","November","December")'])
+    h.filas[-1]["celdas"] = [c.replace("{R}", str(r)) for c in h.filas[-1]["celdas"]]
+    return f"$C${r}"
+
+
+def _anio_completo(h, que):
+    """Hotel, Standard (= hotel − Villas) y Villas, el año completo de cada versión."""
+    A1 = None
+    h.saltar()
+    h.fila("seccion", ["", "FULL YEAR — hotel, standard and Villas (all twelve months)"])
+    if que == "rate":
+        h.fila("encabezado", ["", "", "=" + rotulo("A25"), "=" + rotulo("F26"), "=" + rotulo("B27"), "Δ B27 − F26", "Δ %"])
+    else:
+        h.fila("encabezado", ["", "", "=" + rotulo("A25"), "=" + rotulo("F26"), "=" + rotulo("B27"), "Δ B27 − F26", "Δ %"])
+    p0 = h.r + 1
+    hot = lambda c, k: hab(f"ver_{c}", k, "Hotel", None, None)
+    vil = lambda c, k: hab(f"ver_{c}", k, "Set", "0115", None)
+    fil = {}
+    for etq, fn in (("Hotel", hot), ("Standard rooms", lambda c, k: f"{hot(c, k)}-{vil(c, k)}"), ("Villas", vil)):
+        for campo, nombre in (("Disponibles", "available nights"), ("Ocupadas", "occupied nights"),
+                              ("Pax", "guests"), ("Ingreso habitaciones", "rooms revenue")):
+            n = h.r + 1
+            fil[(etq, campo)] = h.fila("normal", ["", f"{etq} · {nombre}"] + ["=" + fn(c, campo) for c in ("A25", "F26", "B27")]
+                                       + var_cols(n))
+        n = h.r + 1
+        d, o, i = fil[(etq, "Disponibles")], fil[(etq, "Ocupadas")], fil[(etq, "Ingreso habitaciones")]
+        h.fila("pct", ["", f"{etq} · occupancy"] + [f'=IF(N({c}{d})=0,"",{c}{o}/{c}{d})' for c in "CDE"] + var_cols(n, pct=True))
+        n = h.r + 1
+        h.fila("usd2", ["", f"{etq} · ADR"] + [f'=IF(N({c}{o})=0,"",{c}{i}/{c}{o})' for c in "CDE"] + var_cols(n))
+        n = h.r + 1
+        h.fila("usd2", ["", f"{etq} · RevPAR"] + [f'=IF(N({c}{d})=0,"",{c}{i}/{c}{d})' for c in "CDE"] + var_cols(n))
+    h.formato(f"C{p0}:F{h.r}", NUM)
+    h.formato(f"G{p0}:G{h.r}", PCT)
+
+
+def hoja_rate():
+    h = Hoja("AM11 Rate by month", [8, 40] + [11] * 12 + [13], ocultar_a=True)
+    h.fila("titulo", ["", "CWL · Rate analysis — ADR by room type and by month"])
+    h.fila("nota", ["", "ADR = rooms revenue ÷ occupied nights of that type. The Actual 2025 and the Forecast's own months "
+                        "are not split by room type: the table by type compares the SAME months in both versions, and "
+                        "the full year (hotel, standard, Villas) is at the end."])
+    h.saltar()
+    aux = fila_aux(h)
+    hasta = _celda_hasta(h)
+    h.saltar()
+    h.fila("seccion", ["", "=\"BY ROOM TYPE — January to \"&CHOOSE(" + hasta + ",\"January\",\"February\",\"March\",\"April\",\"May\",\"June\",\"July\",\"August\",\"September\",\"October\",\"November\",\"December\")&\", same months in both versions\""])
+    h.fila("encabezado", ["", "Room type", "ADR F26", "ADR B27", "Δ ADR", "Δ %", "RevPAR F26", "RevPAR B27",
+                          "Rooms rev. F26", "Rooms rev. B27", "Δ revenue", "Rate effect ²", "Volume effect ²"])
+    t0 = h.r + 1
+    for etq, nivel, filtro, estilo in _grupos():
+        n = h.r + 1
+        rev = lambda c: hab_hasta(f"ver_{c}", "Ingreso habitaciones", nivel, filtro, hasta)
+        ocu = lambda c: hab_hasta(f"ver_{c}", "Ocupadas", nivel, filtro, hasta)
+        dsp = lambda c: hab_hasta(f"ver_{c}", "Disponibles", nivel, filtro, hasta)
+        h.fila(estilo, ["", etq,
+                        "=" + div(rev("F26"), ocu("F26")), "=" + div(rev("B27"), ocu("B27")),
+                        f'=IF(OR(C{n}="",D{n}=""),"",D{n}-C{n})', f'=IF(OR(C{n}="",D{n}=""),"",(D{n}-C{n})/C{n})',
+                        "=" + div(rev("F26"), dsp("F26")), "=" + div(rev("B27"), dsp("B27")),
+                        "=" + rev("F26"), "=" + rev("B27"), f"=J{n}-I{n}",
+                        f'=IF(E{n}="","",E{n}*({ocu("B27")}))', f'=IF(L{n}="","",K{n}-L{n})'])
+    h.fila("nota", ["", "² Rate effect = Δ ADR × Budget occupied nights; volume effect = the rest of the revenue change."])
+    h.formato(f"C{t0}:E{h.r}", USD2)
+    h.formato(f"F{t0}:F{h.r}", PCT)
+    h.formato(f"G{t0}:H{h.r}", USD2)
+    h.formato(f"I{t0}:M{h.r}", USD)
+    _anio_completo(h, "rate")
+    # Mensual, por tipo
+    mk = lambda col: f"{col}${aux}" if col != "O" else None
+    for etq, nivel, filtro, _ in _grupos():
+        h.saltar()
+        h.fila("encabezado", ["", etq] + MESES + ["FY"])
+        cods = ("A25", "F26", "B27") if nivel == "Hotel" else ("F26", "B27")
+        dep = None if filtro is None else filtro[1]
+        def campo(cod, k, col):
+            if nivel == "Tipo":
+                return hab_t(f"ver_{cod}", k, filtro[1], mk(col))
+            return hab(f"ver_{cod}", k, nivel, dep, mk(col))
+        fv = {}
+        for cod in cods:
+            fv[cod] = h.fila("usd2", ["", "=\"ADR · \"&" + rotulo(cod)] +
+                             ["=" + div(campo(cod, "Ingreso habitaciones", col), campo(cod, "Ocupadas", col)) for col in COLS + "O"])
+        a, b = fv["F26"], fv["B27"]
+        h.fila("usd2", ["", "Δ ADR (B27 − F26)"] + [f'=IF(OR({c}{a}="",{c}{b}=""),"",{c}{b}-{c}{a})' for c in COLS + "O"])
+        h.fila("pct", ["", "Δ %"] + [f'=IF(OR({c}{a}="",{c}{b}=""),"",({c}{b}-{c}{a})/{c}{a})' for c in COLS + "O"])
+    return h
+
+
+def hoja_volumen():
+    h = Hoja("AM12 Volume by month", [8, 40] + [11] * 12 + [13, 11, 11], ocultar_a=True)
+    h.fila("titulo", ["", "CWL · Volume analysis — room nights and occupancy by room type and by month"])
+    h.fila("nota", ["", "Occupancy comes from the TOTALS (never an average of percentages). The table by room type "
+                        "compares the SAME months in both versions; the full year (hotel, standard, Villas) is below it."])
+    h.saltar()
+    aux = fila_aux(h)
+    hasta = _celda_hasta(h)
+    h.saltar()
+    h.fila("seccion", ["", "=\"BY ROOM TYPE — January to \"&CHOOSE(" + hasta + ",\"January\",\"February\",\"March\",\"April\",\"May\",\"June\",\"July\",\"August\",\"September\",\"October\",\"November\",\"December\")&\", same months in both versions\""])
+    h.fila("encabezado", ["", "Room type", "Units B27", "Avail. F26", "Avail. B27", "Occ. nights F26", "Occ. nights B27",
+                          "Δ nights", "Δ %", "Occ. % F26", "Occ. % B27", "Δ (pp)", "Guests F26", "Guests B27", "Δ guests",
+                          "Share of B27 nights"])
+    t0 = h.r + 1
+    hotel_r = t0 + len(_grupos()) - 1
+    for etq, nivel, filtro, estilo in _grupos():
+        n = h.r + 1
+        val = lambda c, k: hab_hasta(f"ver_{c}", k, nivel, filtro, hasta)
+        crit = "" if filtro is None else f',tHabitaciones[{filtro[0]}],"{filtro[1]}"'
+        h.fila(estilo, ["", etq,
+                        f'=IFERROR(MAXIFS(tHabitaciones[Unidades],tHabitaciones[Etiqueta],ver_B27,tHabitaciones[Nivel],"{nivel}"{crit}),0)',
+                        "=" + val("F26", "Disponibles"), "=" + val("B27", "Disponibles"),
+                        "=" + val("F26", "Ocupadas"), "=" + val("B27", "Ocupadas"),
+                        f"=G{n}-F{n}", f'=IF(F{n}=0,"",(G{n}-F{n})/F{n})',
+                        f'=IF(D{n}=0,"",F{n}/D{n})', f'=IF(E{n}=0,"",G{n}/E{n})',
+                        f'=IF(OR(J{n}="",K{n}=""),"",K{n}-J{n})',
+                        "=" + val("F26", "Pax"), "=" + val("B27", "Pax"), f"=N{n}-M{n}",
+                        f'=IF(N(G${hotel_r})=0,"",G{n}/G${hotel_r})'])
+    h.formato(f"C{t0}:H{h.r}", NUM)
+    h.formato(f"I{t0}:L{h.r}", PCT)
+    h.formato(f"M{t0}:O{h.r}", NUM)
+    h.formato(f"P{t0}:P{h.r}", PCT)
+    _anio_completo(h, "volumen")
+    # Mensual
+    mk = lambda col: f"{col}${aux}" if col != "O" else None
+    for etq, nivel, filtro, _ in _grupos():
+        h.saltar()
+        h.fila("encabezado", ["", etq] + MESES + ["FY"])
+        cods = ("A25", "F26", "B27") if nivel == "Hotel" else ("F26", "B27")
+        dep = None if filtro is None else filtro[1]
+        def fn(cod, k, col):
+            if nivel == "Tipo":
+                return hab_t(f"ver_{cod}", k, filtro[1], mk(col))
+            return hab(f"ver_{cod}", k, nivel, dep, mk(col))
+        oc, ds = {}, {}
+        p0 = h.r + 1
+        for cod in cods:
+            oc[cod] = h.fila("normal", ["", "=\"Occupied nights · \"&" + rotulo(cod)] + ["=" + fn(cod, "Ocupadas", col) for col in COLS + "O"])
+        h.fila("normal", ["", "Δ nights (B27 − F26)"] + [f"={c}{oc['B27']}-{c}{oc['F26']}" for c in COLS + "O"])
+        for cod in cods:
+            ds[cod] = h.fila("aux", ["", "available"] + ["=" + fn(cod, "Disponibles", col) for col in COLS + "O"])
+        for cod in cods:
+            h.fila("pct", ["", "=\"Occupancy · \"&" + rotulo(cod)] + [f'=IF({c}{ds[cod]}=0,"",{c}{oc[cod]}/{c}{ds[cod]})' for c in COLS + "O"])
+        h.fila("pct", ["", "Δ occupancy (pp)"] + [f'=IF(OR({c}{ds["F26"]}=0,{c}{ds["B27"]}=0),"",{c}{oc["B27"]}/{c}{ds["B27"]}-{c}{oc["F26"]}/{c}{ds["F26"]})' for c in COLS + "O"])
+        if nivel != "Tipo":
+            for cod in ("F26", "B27"):
+                h.fila("normal", ["", "=\"Guests · \"&" + rotulo(cod)] + ["=" + fn(cod, "Pax", col) for col in COLS + "O"])
+        h.formato(f"C{p0}:O{h.r}", NUM)
+    return h
+
+
+# ── On the Books 2027 (Opera, a mano) ────────────────────────────────────────
+# Owner, 2026-11-12: «un tab de análisis On the Books: Forecast 2026, Budget 2027 y
+# on the books 2027 que viene de Opera. Rooms only y full revenue… lo dejás listo
+# para llenar, yo lo hago manual» · «también Budget 2026 total revenue y rooms only».
+#
+# ⚠️ Lo que el owner escribe vive en «OTB Input», hoja CONSERVADA: aplicar.ps1 la
+# crea una sola vez y no la vuelve a tocar. Si viviera en una hoja AM, el próximo
+# armado del libro le borraría lo cargado.
+OTB_FILAS = [   # fila de OTB Input · qué se carga
+    (7, "Rooms revenue on the books (USD)"),
+    (8, "Room nights on the books"),
+    (9, "Total revenue on the books (USD) — optional"),
+]
+
+
+def hoja_otb_input():
+    h = Hoja("OTB Input", [4, 46] + [12] * 12 + [14])
+    h.conservar = True
+    h.fila("titulo", ["", "On the Books 2027 — Opera (manual input)"])
+    h.fila("nota", ["", "Type or paste the Opera figures in the yellow cells, one month per column. This sheet is "
+                        "never rebuilt: what you type here stays. Sheet AM13 reads it."])
+    h.fila("normal", ["", "As of (date of the Opera report)", ""])
+    h.saltar()
+    h.fila("encabezado", ["", "On the books 2027"] + MESES + ["FY"])
+    h.saltar()
+    for r, etq in OTB_FILAS:
+        while h.r < r - 1:
+            h.saltar()
+        h.fila("entrada", ["", etq] + [""] * 12 + [f"=SUM(C{r}:N{r})"])
+    return h
+
+
+def hoja_otb():
+    h = Hoja("AM13 On the Books", [8, 46] + [11] * 12 + [13], ocultar_a=True)
+    h.fila("titulo", ["", "CWL · On the Books 2027 (Opera) against Budget 2027, Forecast 2026 and Budget 2026"])
+    h.fila("nota", ["", "=\"OTB from sheet «OTB Input» (Opera, manual)\"&IF('OTB Input'!C3=\"\",\"\",\" · as of \"&TEXT('OTB Input'!C3,\"dd-mmm-yyyy\"))"
+                        "&\". Pace = OTB ÷ Budget 2027: what is already sold of what the budget expects.\""])
+    h.saltar()
+    aux = fila_aux(h)
+    k = lambda col: f"{col}${aux}"
+    otb = lambda r: [f"='OTB Input'!{c}{r}" for c in COLS] + [f"=SUM(C{{R}}:N{{R}})"]
+
+    def bloque(titulo, linea_fn, otb_r, estilo_val="normal"):
+        h.saltar()
+        h.fila("encabezado", ["", titulo] + MESES + ["FY"])
+        filas = {}
+        for cod in ("B26", "F26", "B27"):
+            filas[cod] = h.fila(estilo_val, ["", "=" + rotulo(cod)] + ["=" + linea_fn(cod, k(c)) for c in COLS + "O"])
+        n = h.r + 1
+        filas["OTB"] = h.fila("subtotal", ["", "On the books 2027 (Opera)"] +
+                              [c.replace("{R}", str(n)) for c in otb(otb_r)])
+        o, b, f = filas["OTB"], filas["B27"], filas["F26"]
+        h.fila("pct", ["", "Pace: OTB % of Budget 2027"] + [f'=IF(N({c}{b})=0,"",{c}{o}/{c}{b})' for c in COLS + "O"])
+        h.fila("normal", ["", "Still to sell to reach Budget 2027"] + [f'=IF(N({c}{b})=0,"",{c}{b}-{c}{o})' for c in COLS + "O"])
+        h.fila("pct", ["", "OTB % of Forecast 2026 (same month)"] + [f'=IF(N({c}{f})=0,"",{c}{o}/{c}{f})' for c in COLS + "O"])
+        h.fila("pct", ["", "Budget 2027 vs Forecast 2026"] + [f'=IF(N({c}{f})=0,"",{c}{b}/{c}{f}-1)' for c in COLS + "O"])
+        h.fila("pct", ["", "Budget 2027 vs Budget 2026"] + [f'=IF(N({c}{filas["B26"]})=0,"",{c}{b}/{c}{filas["B26"]}-1)' for c in COLS + "O"])
+        return filas
+
+    p0 = h.r + 1
+    rr = bloque("ROOMS ONLY — rooms revenue", lambda c, kk: motor(f"ver_{c}", ["REV_ROOMS", "REV_ROOMS_OTHER"], kk), 7)
+    nn = bloque("ROOM NIGHTS", lambda c, kk: est(f"ver_{c}", "Rooms occupied", kk), 8)
+    h.saltar()
+    h.fila("encabezado", ["", "ADR"] + MESES + ["FY"])
+    for cod in ("B26", "F26", "B27", "OTB"):
+        h.fila("usd2", ["", ("ADR · On the books 2027" if cod == "OTB" else "=\"ADR · \"&" + rotulo(cod))] +
+               [f'=IF(N({c}{nn[cod]})=0,"",{c}{rr[cod]}/{c}{nn[cod]})' for c in COLS + "O"])
+    bloque("FULL REVENUE — total revenue", lambda c, kk: motor(f"ver_{c}", ["TOTAL_REVENUES"], kk), 9)
+    h.formato(f"C{p0}:O{h.r}", USD)
+    return h
+
+
 def construir(salida):
     versiones = hoja_versiones()
     pl, pl_aux, pl_marcas = hoja_pl()
@@ -639,6 +1225,12 @@ def construir(salida):
     flow = hoja_flow()
     controles = hoja_controles()
     reporte = hoja_reporte(res_filas, tot, sets_filas)
+    ki = hoja_ki(rooms_filas)
+    decisiones = hoja_decisiones(rooms_filas)
+    rate = hoja_rate()
+    volumen = hoja_volumen()
+    otb_in = hoja_otb_input()
+    otb = hoja_otb()
 
     # Rangos con nombre para los gráficos: la fila del total y del GOP de cada versión en AM03.
     rangos = {}
@@ -676,12 +1268,18 @@ def construir(salida):
         ("AM03 Monthly P&L", "Monthly USALI income statement by version"),
         ("AM07 Flow-through", "Flow-through by department, EBITDA bridge and break-even"),
         ("AM08 Standard vs Villas", "The two Rooms products: revenue, payroll, opex, profit and statistics"),
+        ("AM09 Key Indicators", "All key indicators in one place, full year: Actual 2025, Forecast 2026, Budget 2027"),
+        ("AM10 Decisions", "What grows vs revenue (payroll, opex, FTE, nights), margins by department, overhead vs the business"),
+        ("AM11 Rate by month", "ADR by room type and month, side by side, with rate and volume effects"),
+        ("AM12 Volume by month", "Room nights, occupancy and guests by room type and month, full year side by side"),
+        ("AM13 On the Books", "On the Books 2027 from Opera (sheet OTB Input, manual) vs Budget 2027, Forecast 2026, Budget 2026"),
+        ("OTB Input", "Where you type the Opera on-the-books figures (never rebuilt)"),
         ("AM97 Controls", "Checks that must be 0 before sending"),
         ("AM98 Versions", "Which version each column is (the current forecast is picked automatically)"),
     ]):
         indice.fila("normal", [str(i), n, d])
 
-    hojas = [indice, reporte, rooms, resumen, pl, flow, sets, controles, versiones]
+    hojas = [indice, reporte, rooms, resumen, pl, flow, sets, ki, decisiones, rate, volumen, otb, otb_in, controles, versiones]
     spec = {"hojas": [h.json() for h in hojas], "nombres": nombres}
     with open(salida, "w", encoding="utf-8") as f:
         json.dump(spec, f, ensure_ascii=False, indent=1)
