@@ -3,10 +3,10 @@
   "ANALISIS DEL INFORME OPERATIVO - OCTUBRE 2026.",
   "",
   "Reescrito el 2026-11-13 contra «Precierre Octubre 2026v1.xlsx» (TC 456,04),",
-  "re-subido el 2026-11-13 17:13 UTC (checksum 1b19b2...), y el mayor «Audit",
-  "October 2026.xlsx» re-subido 17:14 UTC con 5.310 lineas: las dos quincenas",
-  "de planilla y la depreciacion. Las subidas anteriores de octubre estan",
-  "descartadas; el analisis del 2026-11-03/06 se escribio contra ellas.",
+  "re-subido el 2026-11-13 18:09:28 UTC despues del arreglo del signo (commit",
+  "9310a2e), y el mayor «Audit October 2026.xlsx» re-subido 18:09:55 UTC con",
+  "5.310 lineas. Las subidas anteriores de octubre estan descartadas; el",
+  "analisis del 2026-11-03/06 se escribio contra ellas.",
   "",
   "Fuentes: ACT = ACTUAL Pre-Cierre · BUD = BUDGET Final 2026 · FCT = FORECAST",
   "October. Mayor: «Audit October 2026.xlsx», 5.310 lineas. Octubre 2025 =",
@@ -24,18 +24,18 @@
  "_contra": {
   "checksum": "1b19b2d42a7a823962f38b73362073c317bc40ba5bd62f90eda24d4aa6074318",
   "archivo": "Precierre Octubre 2026v1.xlsx",
-  "fecha": "2026-11-13 17:13:42",
+  "fecha": "2026-11-13 18:09:28",
   "tc": 456.04,
   "estado": "borrador",
-  "cifras_fijas": 213,
+  "cifras_fijas": 198,
   "_por_que": "Las cifras escritas a mano son de octubre 2025 (el ACTUAL del ano anterior no tiene marca), de agosto y setiembre del Pre-Cierre, del mayor «Audit October 2026.xlsx» (proveedores y asientos, que no tienen marca) y el impuesto de renta que el motor calcula para el Budget. Ninguna cambia si se vuelve a subir el Pre-Cierre de octubre; las del mayor cambian si se vuelve a subir el MAYOR, y entonces hay que releer las secciones 10, 13 y 14."
  },
  "propiedad": "Corcovado Wilderness Lodge",
  "resumen": [
-  "Octubre cerro con un GOP de {{gop ACT}} contra {{gop BUD}} presupuestados y {{gop FCT}} en el Forecast October. El gasto operativo quedo {{var ACT BUD gasto}} contra el presupuesto: se gasto menos de lo previsto. Contra octubre 2025 la lectura es la contraria: aquel mes cerro con un GOP de -$192.708,12, asi que tener el hotel cerrado este ano costo $74.435,37 mas que el ano pasado.",
-  "El mes termino por debajo del presupuesto por una sola partida: Mantenimiento ejecuto {{dept \"Mantenimiento\" ACT opex}} de los {{dept \"Mantenimiento\" BUD opex}} de opex que el presupuesto concentraba en la ventana de cierre. Sin esa partida octubre habria cerrado peor que el plan. La planilla fue {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados ({{var ACT BUD payroll}}) y contra $125.165,91 en octubre 2025: es la misma planilla de agosto, cuando el hotel facturo $277.856,92.",
+  "Octubre cerro con un GOP de {{gop ACT}} contra {{gop BUD}} presupuestados y {{gop FCT}} en el Forecast October. El gasto operativo quedo {{var ACT BUD gasto}} contra el presupuesto: se gasto menos de lo previsto. Contra octubre 2025 la lectura es la contraria: aquel mes cerro con un GOP de -$192.708,12, asi que tener el hotel cerrado este ano costo $67.033,21 mas que el ano pasado.",
+  "El mes termino por debajo del presupuesto por una sola partida: Mantenimiento ejecuto {{dept \"Mantenimiento\" ACT opex}} de los {{dept \"Mantenimiento\" BUD opex}} de opex que el presupuesto concentraba en la ventana de cierre. Sin esa partida octubre habria cerrado peor que el plan. La planilla fue {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados ({{var ACT BUD payroll}}) y contra $125.165,91 en octubre 2025: es casi la misma planilla de agosto, cuando el hotel facturo $277.856,92.",
   "El ingreso fue {{tot ACT revenue}}: el lodge no opera en octubre y no se vendio ninguna de las {{kpi disp}} noches. En octubre 2025 todavia se facturaron $34.655,18, de ellos $16.028,54 de habitaciones; por eso el contraste contra el ano anterior hay que leerlo en el gasto, que paso de $227.363,30 a {{tot ACT gasto}}.",
-  "Dos cosas no son de gestion y se separan antes de cualquier reunion. El mayor ya es el mismo corte que el Pre-Cierre —5.310 lineas, las dos quincenas de planilla y la depreciacion— y cuadra cuenta por cuenta salvo en dos puntos de sistema: el Pre-Cierre invierte el signo de las cuentas cuyo movimiento del mes va en sentido contrario a su acumulado (hallazgo 6), lo que deja el GOP del Pre-Cierre unos $7.390 peor que el del mayor; y la depreciacion, el seguro y los permisos se convierten al tipo de cambio del mes y no al historico. Los dos estan en la seccion 10."
+  "Lo que es registro y no gestion esta en la seccion 10. El mayor y el Pre-Cierre son el mismo corte —5.310 lineas, las dos quincenas de planilla y la depreciacion— y cuadran cuenta por cuenta. Las once cuentas que el Pre-Cierre tomaba con el signo del acumulado (6023 en ocho departamentos, 5201, 7400 y 4000) ya entran corregidas contra el mayor desde la subida de las 18:09 del 13-nov. Queda una diferencia de sistema: la depreciacion, el seguro y los permisos se convierten al tipo de cambio del mes y no al historico, debajo del GOP."
  ],
  "hallazgos": [
   [
@@ -46,7 +46,7 @@
   [
    "La planilla no bajo con el hotel cerrado",
    "{{var ACT BUD payroll}}",
-   "Planilla real {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados, {{tot FCT payroll}} en el Forecast y $125.165,91 en octubre 2025. De esa cifra, $7.210,10 son el 6023 con el signo invertido en el Pre-Cierre (hallazgo 6): segun el mayor la planilla del mes es $167.642,86, que sigue estando unos $44.000 por encima del presupuesto. En el Pre-Cierre la planilla de agosto, setiembre y octubre es practicamente la misma —$175.300,71, $169.864,11 y {{tot ACT payroll}}— mientras el ingreso caia de $277.856,92 a $40.193,92 y a {{tot ACT revenue}}. El presupuesto si bajaba la planilla en octubre; la realidad no. El exceso real esta en el salario base ({{conc 6000 ACT}} contra {{conc 6000 BUD}}), en el cargo de cafeteria ({{conc 6025 ACT}} contra {{conc 6025 BUD}}, hallazgo 4), en las cargas que corren sobre la base y en horas extra ({{conc 6001 ACT}}, presupuesto cero). Las vacaciones NO son parte del exceso: en el mayor el costo neto del mes (6023 mas 6024) es $4.401,98, igual que en setiembre. Por departamento pesan Rooms, Alimentos y Bebidas, Mantenimiento y Tours —este junto con Transportacion, porque el presupuesto puso parte de la tripulacion en 0152 y el real la registra en 0150—."
+   "Planilla real {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados ({{var ACT BUD payroll}}), {{tot FCT payroll}} en el Forecast y $125.165,91 en octubre 2025. En el Pre-Cierre la planilla de agosto, setiembre y octubre casi no se mueve —$175.300,71, $169.864,11 y {{tot ACT payroll}}— mientras el ingreso caia de $277.856,92 a $40.193,92 y a {{tot ACT revenue}}. El presupuesto si bajaba la planilla en octubre; la realidad no. El exceso esta en el salario base ({{conc 6000 ACT}} contra {{conc 6000 BUD}}), en el cargo de cafeteria ({{conc 6025 ACT}} contra {{conc 6025 BUD}}, hallazgo 4), en las cargas que corren sobre la base y en horas extra ({{conc 6001 ACT}}, presupuesto cero). Las vacaciones NO son parte del exceso: el disfrute ({{conc 6024 ACT}}) se descargo contra la provision ({{conc 6023 ACT}}), y el costo neto del mes es parecido al de setiembre. Por departamento pesan Rooms, Alimentos y Bebidas, Mantenimiento y Tours —este junto con Transportacion, porque el presupuesto puso parte de la tripulacion en 0152 y el real la registra en 0150—."
   ],
   [
    "Ventas y Mercadeo no compro pauta ni fue a ferias",
@@ -62,11 +62,6 @@
    "Administracion y Sistemas: servicios sin presupuesto y Booking en sistemas",
    "{{deptvar \"Administracion\" ACT BUD opex}} y {{deptvar \"Sistemas (IT)\" ACT BUD opex}}",
    "A&G Contract Services registro {{cta 0180 7105 ACT}} sin presupuesto: Consultants Costa Rica $3.863,00 de bookkeeping y servicio de pagos, VEINTICUATRO SIETE MAS MEDICAL ASSISTANCE $2.400,00, RONALD DAVID FALLAS BERMUDEZ $1.250,00 por «Servicios Generales» y Alta Batalla $900,00. Payroll Processing fue {{cta 0180 7465 ACT}} contra {{cta 0180 7465 BUD}} (SDG RH, una factura de ₡5.000.000). Las comisiones de tarjeta ({{cta 0180 7120 ACT}} contra {{cta 0180 7120 BUD}}) estan en linea con el plan: son cobros de BAC, BN y LAFISE sobre depositos de la temporada, no un ahorro por no operar. Centralized Accounting no se cargo ({{cta 0180 7050 ACT}} de {{cta 0180 7050 BUD}}): diferimiento probable de un cargo intercompania fijo. En Sistemas, System Expenses {{cta 0230 7625 ACT}} contra {{cta 0230 7625 BUD}}: BOOKING.COM $1.766,70 por «Reservas» y The Costa Rica Collection $1.714,40 de software compartido."
-  ],
-  [
-   "El Pre-Cierre invierte el signo cuando el mes va contra el acumulado",
-   "unos -$7.390 sobre el GOP",
-   "Integrity entrega la columna del mes en valor absoluto y el cargador del Pre-Cierre le pone el signo del ACUMULADO del ano. Cuando el movimiento de octubre va en sentido contrario al acumulado, el signo sale al reves. Pasa en el 6023 de ocho departamentos —el asiento «Ajuste disfrute vacaciones contra 6023» dejo el mes en credito y el Pre-Cierre lo muestra como cargo: $7.210,10 de planilla de mas—, en la 5201 del Gift Shop (+{{cta 0165 5201 ACT}} contra un credito en el mayor), en la 7400 de Lavanderia ({{cta 0161 7400 ACT}} contra compras de BLUETECH en el mayor) y en la 4000 de Rooms. El neto deja el GOP del Pre-Cierre unos $7.390 peor que el del mayor. No es de ningun gerente: es una regla del sistema, y se va a repetir cada mes en que una cuenta se mueva al reves de su saldo del ano."
   ],
   [
    "Combustible por encima del plan con el hotel cerrado",
@@ -95,7 +90,7 @@
  ],
  "contexto_nota": [
   "La pregunta de setiembre volvio, como se anticipo",
-  "El informe de setiembre cerraba diciendo que octubre traeria la misma pregunta con el ingreso en cero. Llego: la planilla de octubre es la de agosto, que facturo $277.856,92. Si existe un protocolo de dotacion para el mes de cierre, no se ve en los numeros. Y el unico mes del ano con el hotel vacio —la ventana natural para el mantenimiento pesado— cerro con el opex de Mantenimiento casi sin ejecutar."
+  "El informe de setiembre cerraba diciendo que octubre traeria la misma pregunta con el ingreso en cero. Llego: la planilla de octubre es casi la de agosto, que facturo $277.856,92. Si existe un protocolo de dotacion para el mes de cierre, no se ve en los numeros. Y el unico mes del ano con el hotel vacio —la ventana natural para el mantenimiento pesado— cerro con el opex de Mantenimiento casi sin ejecutar."
  ],
  "dept_resumen": [
   "Con el hotel cerrado, los departamentos operativos no tienen ingreso que explicar. Lo que se revisa es su estructura: que planilla y que gasto siguieron corriendo, y si era lo que el presupuesto preveia.",
@@ -104,7 +99,7 @@
  "dept": {
   "Rooms": {
    "comentario": [
-    "Ingreso {{dept \"Rooms\" ACT revenue}}, que no es venta: en el mayor la 4000 tiene un credito «REPOSICION DE COSTOS DE AGOSTO» y un debito «Ajuste payment house charge» que netean en -$50,11; el Pre-Cierre lo muestra en positivo por la regla del signo (hallazgo 6). Octubre 2025 facturo $16.028,54 de habitaciones.",
+    "Ingreso {{dept \"Rooms\" ACT revenue}}, que no es venta: en la 4000 un credito «REPOSICION DE COSTOS DE AGOSTO» y un debito «Ajuste payment house charge» netean en negativo. Octubre 2025 facturo $16.028,54 de habitaciones.",
     "Planilla {{dept \"Rooms\" ACT payroll}} contra {{dept \"Rooms\" BUD payroll}} presupuestados y $31.601,63 en octubre 2025. Incluye $2.373,82 de facturas de The Costa Rica Collection por «Planning & Operation» registradas en el 6000 de Reservas, y $733,74 de «Comision sobre venta» del mismo proveedor en el 6010: una comision sobre ventas en un mes sin ventas.",
     "Opex {{dept \"Rooms\" ACT opex}} contra {{dept \"Rooms\" BUD opex}}: Guest Supplies {{cta 0110 7250 ACT}} contra {{cta 0110 7250 BUD}} (AMAZON, una «bed bridge» de $547,51), Contract Services {{cta 0110 7105 ACT}} sin presupuesto, Uniform Costs {{cta 0110 7680 ACT}} de {{cta 0110 7680 BUD}} y lavanderia recibida {{cta 0110 7310 ACT}}."
    ],
@@ -146,10 +141,10 @@
   },
   "Gift Shop": {
    "comentario": [
-    "Ingreso {{dept \"Gift Shop\" ACT revenue}} y costo {{dept \"Gift Shop\" ACT cost}}: el costo supera al ingreso, pero es un asiento de ajuste de costo de tienda que en el mayor tiene el signo contrario (seccion 10)."
+    "Ingreso {{dept \"Gift Shop\" ACT revenue}} y costo {{dept \"Gift Shop\" ACT cost}}: un asiento de ajuste de costo de tienda que devuelve costo. Sin venta en el mes, no hay margen que leer."
    ],
    "preguntas": [
-    "Sin preguntas al gerente: el punto es de registro y esta en la seccion 10."
+    "Sin preguntas este mes: el movimiento es un ajuste de costo."
    ]
   },
   "Transportacion": {
@@ -163,11 +158,11 @@
   },
   "Lavanderia": {
    "comentario": [
-    "Planilla {{dept \"Lavanderia\" ACT payroll}} y opex {{dept \"Lavanderia\" ACT opex}}, que incluye el credito de reparto {{cta 0161 4999 ACT}}. El departamento deberia netear a cero y queda en {{dept \"Lavanderia\" ACT gasto}}, porque la 7400 Operating Supplies aparece en el Pre-Cierre en {{cta 0161 7400 ACT}} y en el mayor con el signo contrario (compras de BLUETECH). Es registro: seccion 10.",
+    "Planilla {{dept \"Lavanderia\" ACT payroll}} y opex {{dept \"Lavanderia\" ACT opex}}, que incluye el credito de reparto {{cta 0161 4999 ACT}}. El departamento netea a cero: {{dept \"Lavanderia\" ACT gasto}}.",
     "Lo que se reparte va a Rooms ({{cta 0110 7310 ACT}}) y a Cafeteria ({{cta 0220 7310 ACT}}): con el hotel cerrado, la ropa de la cafeteria pesa mas que la de las habitaciones."
    ],
    "preguntas": [
-    "Sin preguntas al gerente: la diferencia es de signo, no de gestion."
+    "Sin preguntas este mes: el departamento netea por reparto."
    ]
   },
   "Innoceana": {
@@ -188,7 +183,7 @@
   },
   "Cafeteria de empleados": {
    "comentario": [
-    "Gasto bruto: alimentos {{cta 0220 5420 ACT}}, planilla propia {{dept \"Cafeteria de empleados\" ACT payroll}} y lavanderia {{cta 0220 7310 ACT}}. El credito de reparto ({{cta 0220 4999 ACT}}) llega a los departamentos como 6025 ({{conc 6025 ACT}}). Neto del departamento: {{dept \"Cafeteria de empleados\" ACT gasto}}, lo que no se repartio.",
+    "Gasto bruto: alimentos {{cta 0220 5420 ACT}}, planilla propia {{dept \"Cafeteria de empleados\" ACT payroll}} y lavanderia {{cta 0220 7310 ACT}}. El credito de reparto ({{cta 0220 4999 ACT}}) llega a los departamentos como 6025 ({{conc 6025 ACT}}). El departamento netea a cero: {{dept \"Cafeteria de empleados\" ACT gasto}}.",
     "Con el credito dentro del reporte, la comparacion contra el presupuesto ya no se hace en la 5420 —el presupuesto tenia la cafeteria en la 5700, fuera del perimetro—: se hace en el 6025 de los departamentos, que si es comparable (hallazgo 4).",
     "El alimento subio contra setiembre con el hotel cerrado. Proveedores: CENTRO INTERNACIONAL DE INVERSIONES $6.543,85 (abarrotes y carne molida), WALTER ALEXANDER ELIZONDO MATAMOROS $2.849,82 (133 lineas de verdura), JOSE MIGUEL PRENDAS CHAVES $1.694,78 (filet de congrio) y COOPERATIVA AUTOGESTIONARIA $1.278,16 (pollo)."
    ],
@@ -245,7 +240,7 @@
   "Utilities / Energia": {
    "comentario": [
     "Opex {{dept \"Utilities / Energia\" ACT opex}} contra {{dept \"Utilities / Energia\" BUD opex}} presupuestados y $15.801,64 en octubre 2025: por encima del plan en el mes sin huespedes y por encima del ano anterior.",
-    "El desvio es la 7395 (hallazgo 7): {{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}}. Gas LP {{cta 0210 7230 ACT}} y electricidad {{cta 0210 7160 ACT}}.",
+    "El desvio es la 7395 (hallazgo 6): {{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}}. Gas LP {{cta 0210 7230 ACT}} y electricidad {{cta 0210 7160 ACT}}.",
     "Nota de mapeo: el presupuesto rotula la 7395 «Oil (Boat and Equipment)» y el real «UTILITIES - OIL». Es la misma cuenta y el informe agrupa por numero."
    ],
    "preguntas": [
@@ -259,7 +254,7 @@
  ],
  "payroll_conceptos": [
   "Salario base {{conc 6000 ACT}} contra {{conc 6000 BUD}} presupuestados y $81.762,14 en octubre 2025. Sobre esa base corren la CCSS ({{conc 6020 ACT}} contra {{conc 6020 BUD}}) y el aguinaldo ({{conc 6021 ACT}} contra {{conc 6021 BUD}}). La base incluye unos $11.700 de facturas de terceros que no generan cargas (seccion 10).",
-  "Vacaciones: disfrutadas {{conc 6024 ACT}} contra {{conc 6024 BUD}}, y provision {{conc 6023 ACT}} contra {{conc 6023 BUD}}. El asiento «Ajuste disfrute vacaciones contra 6023» descarga el disfrute contra la provision —Tours $3.754,40, A&B $2.770,66, Rooms $1.603,37, Mantenimiento $1.443,30—, asi que en ocho departamentos el 6023 del mes queda en credito. En el mayor el 6023 cierra en -$7.188,98 y el costo neto de vacaciones (6023 mas 6024) es $4.401,98, igual que setiembre. El Pre-Cierre muestra el 6023 en {{conc 6023 ACT}} porque invierte el signo de esos ocho departamentos (hallazgo 6): el exceso aparente de vacaciones es del cargador, no de la operacion.",
+  "Vacaciones: disfrutadas {{conc 6024 ACT}} contra {{conc 6024 BUD}}, y provision {{conc 6023 ACT}} contra {{conc 6023 BUD}}. El asiento «Ajuste disfrute vacaciones contra 6023» descarga el disfrute contra la provision —Tours $3.754,40, A&B $2.770,66, Rooms $1.603,37, Mantenimiento $1.443,30—, asi que el 6023 del mes queda en credito y el costo neto de vacaciones es la suma de los dos conceptos, parecido al de setiembre ($4.404,74 en el mayor). Octubre es el mes en que se liquidan: el presupuesto deberia mostrar el disfrute en octubre aunque el costo neto sea la provision.",
   "Horas extra {{conc 6001 ACT}} y dia libre laborado {{conc 6002 ACT}}, los dos sin presupuesto. En el mayor se concentran en el supervisor de mantenimiento ($1.057,09), los oficiales de seguridad ($876,60) y su supervisor, y los capitanes de barco.",
   "Cafeteria {{conc 6025 ACT}} contra {{conc 6025 BUD}}: es el reparto del departamento 0220 (hallazgo 4). En octubre 2025 el mismo cargo estaba en 6030 Otros beneficios ($15.073,84): comparar 6025 contra 6025 entre anos acusa un aumento que en parte es cambio de cuenta.",
   "Comisiones {{conc 6010 ACT}} contra {{conc 6010 BUD}}: incluye $733,74 de The Costa Rica Collection."
@@ -322,7 +317,7 @@
     "Gift Shop (0165/5201)",
     "{{cta 0165 5201 ACT}}",
     "{{cta 0165 5201 BUD}}",
-    "Signo invertido por la regla del acumulado"
+    "Ajuste de costo de tienda (credito)"
    ]
   ],
   "nota": "Las cuentas se agrupan por departamento y numero, nunca por nombre.",
@@ -475,7 +470,7 @@
   "8005 Owners fee ({{cta 0250 8005 ACT}} contra {{cta 0250 8005 BUD}}) y 8015 seguro ({{cta 0250 8015 ACT}} contra {{cta 0250 8015 BUD}}): en linea o por debajo."
  ],
  "clasificacion": {
-  "intro": "Variaciones que son de registro y no de gestion. No se le llevan al gerente. Con el mayor completo, el mayor y el Pre-Cierre cuadran cuenta por cuenta; lo que queda son dos reglas del sistema —el signo del mes y el tipo de cambio de lo que se amortiza— y los casos de cuenta que vienen de setiembre.",
+  "intro": "Variaciones que son de registro y no de gestion. No se le llevan al gerente. El mayor y el Pre-Cierre cuadran cuenta por cuenta; lo que queda es el tipo de cambio de lo que se amortiza, una partida de Ventas sin respaldo y los casos de cuenta que vienen de setiembre.",
   "cabeceras": [
    "Caso",
    "Pre-Cierre",
@@ -485,7 +480,7 @@
   "filas": [
    [
     [
-     "Signo del mes tomado del acumulado",
+     "Corregido en esta subida",
      "sec"
     ],
     "",
@@ -493,28 +488,10 @@
     ""
    ],
    [
-    "6023 Provision vacaciones (8 deptos)",
-    "{{conc 6023 ACT}}",
-    "-$7.188,98",
-    "Planilla $7.210,10 de mas en el Pre-Cierre"
-   ],
-   [
-    "5201 Gift Shop ajuste de costo",
-    "{{cta 0165 5201 ACT}}",
-    "-$403,61",
-    "El costo de la tienda supera su ingreso"
-   ],
-   [
-    "7400 Lavanderia Operating Supplies",
-    "{{cta 0161 7400 ACT}}",
-    "+$263,08 (BLUETECH)",
-    "Lavanderia no netea a cero"
-   ],
-   [
-    "4000 Rooms ajustes",
-    "{{cta 0110 4000 ACT}}",
-    "-$50,11",
-    "Ingreso positivo donde el mayor tiene un neto debito"
+    "Signo del mes tomado del acumulado",
+    "11 cuentas",
+    "corregidas contra el mayor",
+    "6023 (8 deptos), 5201, 7400 y 4000; -$7.609,15 en el total del mes"
    ],
    [
     [
@@ -604,7 +581,7 @@
     "Cuatro variaciones donde hay una"
    ]
   ],
-  "nota": "La regla del signo vive en `integrity_final.monto_mes`: Integrity entrega el mes en valor absoluto y el signo se toma del acumulado. Se corrige en el cargador o en el archivo, y despues se vuelve a extraer el informe con --extraer. Los casos de cuenta se resuelven en el mapeo. La cafeteria (5420 contra 5700) dejo de ser un caso: con el credito 4999 dentro del reporte se compara en el 6025."
+  "nota": "Hasta la subida de las 18:09 del 13-nov el cargador tomaba el signo del mes del acumulado (Integrity entrega el mes en valor absoluto); desde el commit 9310a2e lo toma del mayor. El tipo de cambio de lo amortizado y la 7110 se resuelven antes de pasar a Final; los casos de cuenta, en el mapeo. La cafeteria (5420 contra 5700) dejo de ser un caso: con el credito 4999 dentro del reporte se compara en el 6025."
  },
  "sin_presupuesto": {
   "intro": "Partidas con movimiento real y presupuesto en cero en el mes. No todas son un problema —algunas son reclasificacion—, pero todas salen como variacion desfavorable completa.",
@@ -680,10 +657,10 @@
  },
  "brechas": [
   "El GOP del reporte y el del motor COINCIDEN: {{gop ACT}} por los dos caminos. Los creditos de reparto 4999 de cafeteria ({{cta 0220 4999 ACT}}) y lavanderia ({{cta 0161 4999 ACT}}) entran al reporte.",
-  "El mayor re-subido el 13-nov a las 17:14 UTC («Audit October 2026.xlsx», 5.310 lineas) ya es el mismo corte que el Pre-Cierre: trae las dos quincenas de planilla y la depreciacion, y cuadra cuenta por cuenta salvo los casos de signo y de tipo de cambio de la seccion 10 y la 7110 de Ventas. Las secciones 13 y 14 salen completas.",
+  "El mayor re-subido el 13-nov a las 18:09 UTC («Audit October 2026.xlsx», 5.310 lineas) es el mismo corte que el Pre-Cierre y cuadra cuenta por cuenta, salvo el tipo de cambio de lo amortizado (8040, 8010, 8015) y la 7110 de Ventas. Las secciones 13 y 14 salen completas.",
   "Octubre esta en BORRADOR: el escenario ACTUAL tiene octubre en $0 y los numeros son los del Pre-Cierre en revision. Las subidas anteriores del mes estan descartadas; la del 6-nov usaba TC 451,85 y la vigente 456,04, y la mayor parte de las diferencias chicas entre una y otra es solo tipo de cambio.",
-  "Lavanderia no netea a cero ({{dept \"Lavanderia\" ACT gasto}}) por el signo de la 7400. Cafeteria deja {{dept \"Cafeteria de empleados\" ACT gasto}} sin repartir.",
-  "⚠️ La regla del signo (hallazgo 6) no es de octubre: cualquier mes en que una cuenta se mueva al reves de su acumulado sale invertida en el Pre-Cierre, y el total sigue cuadrando contra si mismo. Este mes cuesta unos $7.390 de GOP. Vale revisarla antes de pasar a Final cualquier mes, no solo este.",
+  "Cafeteria ({{dept \"Cafeteria de empleados\" ACT gasto}}) y Lavanderia ({{dept \"Lavanderia\" ACT gasto}}) netean a cero.",
+  "La regla del signo quedo corregida: el Pre-Cierre toma el signo del mes del mayor (commit 9310a2e). En octubre movia once cuentas y $7.609,15 del total del mes.",
   "El total de la clase 8 del Budget incluye un impuesto de renta calculado por el motor que no esta en el checkbook: el cuadro por cuenta y el total de la seccion 9 no suman lo mismo.",
   "La estadistica de habitaciones NO viene en el espejo del Pre-Cierre: sale del escenario ACTUAL.",
   "De la lista de setiembre siguen vivos el costo de tours (0150 contra 0152), el internet (5400/5401 contra 5700-5704) y las horas extra sin presupuesto. El Spa se sigue comparando sumando 0130 y 0140. La cafeteria dejo de ser un caso: se compara en el 6025."
@@ -694,7 +671,7 @@
    "El costo de tener el hotel cerrado",
    [
     "El presupuesto esperaba {{tot BUD gasto}} de gasto operativo en octubre y se gastaron {{tot ACT gasto}}; octubre 2025 costo $227.363,30. La mejora contra el plan viene de obra de mantenimiento no ejecutada, no de menor estructura. ¿Que decision hubo sobre dotacion para el mes de cierre?",
-    "La planilla de octubre ({{tot ACT payroll}}) es la misma que la de agosto, cuando se facturaron $277.856,92. ¿Existe un protocolo de dotacion para el mes cerrado, y quien lo aprueba?",
+    "La planilla de octubre ({{tot ACT payroll}}) es casi la misma que la de agosto, cuando se facturaron $277.856,92. ¿Existe un protocolo de dotacion para el mes cerrado, y quien lo aprueba?",
     "La obra que el presupuesto ponia en la ventana de cierre no paso por opex. ¿Se hizo como capital, se pospuso a 2027 o se cancelo?"
    ]
   ],
@@ -754,7 +731,6 @@
    "Administracion / Contabilidad",
    "Lo que es registro y no gestion",
    [
-    "El Pre-Cierre invierte el signo cuando el mes va contra el acumulado: 6023 en ocho departamentos ($7.210,10 de planilla de mas), 5201 del Gift Shop, 7400 de Lavanderia y 4000 de Rooms. ¿Se corrige en el archivo de Integrity o en el cargador antes de pasar octubre a Final?",
     "La depreciacion (8040), el seguro (8015) y los permisos (8010) se amortizan al TC historico 504,88 en el mayor y el Pre-Cierre los convierte a 456,04. ¿Cual de los dos manda para el P&L?",
     "La 7110 de Ventas tiene {{cta 0190 7110 ACT}} en el Pre-Cierre y en el mayor solo una factura de SCP Hospitality y su anulacion. ¿De donde sale esa cifra?",
     "The Costa Rica Collection y Seed Collaborative facturan $12.480,35 contra 6000 y 6010. ¿Es deliberado? Si lo es, hay que escribirlo en el mapeo; si no, esta inflando la planilla.",
@@ -767,7 +743,7 @@
    "Debajo del GOP y el cierre",
    [
     "El presupuesto tenia un credito de renta de $96.852,79 en octubre y el real fue {{cta 0250 8060 ACT}}. ¿Con que criterio se presupuesto el impuesto mensual, y se corrige en el presupuesto 2027?",
-    "Octubre sigue en borrador. ¿Cuando se pasa a Final, una vez resuelta la regla del signo?"
+    "Octubre sigue en borrador. ¿Cuando se pasa a Final, una vez decidido el tipo de cambio de lo amortizado y aclarada la 7110 de Ventas?"
    ]
   ]
  ],
