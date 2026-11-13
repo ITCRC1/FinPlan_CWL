@@ -235,6 +235,13 @@ async def corregir_signos_del_borrador(db: AsyncSession, pc: Precierre) -> dict:
             if modelo is PrecierreFila:
                 corregidas.append({**c, "_total": v["_total"]})
 
+    # ⚠️ Sin correcciones NUEVAS no se toca el hallazgo: la segunda pasada (subir
+    # el mayor después del Pre-Cierre) ya no encuentra nada que corregir —la
+    # primera lo corrigió— y borrarlo dejaba el mes corregido sin el aviso que
+    # dice qué se corrigió (octubre 2026, 18:09). Un Pre-Cierre nuevo arranca con
+    # sus hallazgos de cero, así que un aviso viejo nunca sobrevive a otro archivo.
+    if not corregidas:
+        return {"verificado": True, "corregidas": 0, "cuentas": []}
     otros = [h for h in json.loads(pc.hallazgos_archivo or "[]") if h.get("clave") != CLAVE_SIGNOS]
     if corregidas:
         efecto = sum((Decimal(str(c["despues_usd"])) - Decimal(str(c["antes_usd"] or 0))

@@ -80,3 +80,12 @@ def test_corre_en_las_dos_puertas_y_antes_del_espejo():
     ag = (API / "auditoria_gl_api.py").read_text(encoding="utf-8")
     assert "_corregir_el_precierre_del_mes(db, anio, mes)" in ag
     assert "corregir_signos_del_borrador" in ag and "_reflejar" in ag
+
+
+def test_una_pasada_sin_nada_nuevo_no_borra_el_aviso_de_la_anterior():
+    """Pre-Cierre 18:09:28 corrigió 11 cuentas; el mayor 18:09:55 no encontró nada
+    nuevo y borraba el aviso. Sin correcciones nuevas el hallazgo no se toca."""
+    pc = (API / "precierre_api.py").read_text(encoding="utf-8")
+    cuerpo = pc[pc.index("async def corregir_signos_del_borrador"):pc.index("async def _reflejar")]
+    i_salida = cuerpo.index('if not corregidas:\n        return')
+    assert i_salida < cuerpo.index("pc.hallazgos_archivo = json.dumps")
