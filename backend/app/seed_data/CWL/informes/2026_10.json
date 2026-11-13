@@ -1,0 +1,786 @@
+{
+ "_nota": [
+  "ANALISIS DEL INFORME OPERATIVO - OCTUBRE 2026.",
+  "",
+  "Reescrito el 2026-11-13 contra «Precierre Octubre 2026v1.xlsx» (TC 456,04),",
+  "re-subido el 2026-11-13 17:13 UTC (checksum 1b19b2...), y el mayor «Audit",
+  "October 2026.xlsx» re-subido 17:14 UTC con 5.310 lineas: las dos quincenas",
+  "de planilla y la depreciacion. Las subidas anteriores de octubre estan",
+  "descartadas; el analisis del 2026-11-03/06 se escribio contra ellas.",
+  "",
+  "Fuentes: ACT = ACTUAL Pre-Cierre · BUD = BUDGET Final 2026 · FCT = FORECAST",
+  "October. Mayor: «Audit October 2026.xlsx», 5.310 lineas. Octubre 2025 =",
+  "escenario ACTUAL 2025 (fcb1ab27), leido con _por_mes y",
+  "_por_cuenta_del_escenario con el catalogo de departamentos cargado.",
+  "",
+  "Las cifras del mes van como marcas {{...}}. Las que quedan escritas a mano",
+  "son las de OCTUBRE 2025 (no tiene marca), las de agosto/setiembre del",
+  "Pre-Cierre, las del MAYOR (proveedores, asientos) y el impuesto de renta",
+  "que calcula el motor para el Budget: todas historicas o de otra fuente, y",
+  "declaradas en _contra.cifras_fijas.",
+  "",
+  "El cuadre dio: GOP reporte - GOP motor = 0,00 (coincide)."
+ ],
+ "_contra": {
+  "checksum": "1b19b2d42a7a823962f38b73362073c317bc40ba5bd62f90eda24d4aa6074318",
+  "archivo": "Precierre Octubre 2026v1.xlsx",
+  "fecha": "2026-11-13 17:13:42",
+  "tc": 456.04,
+  "estado": "borrador",
+  "cifras_fijas": 213,
+  "_por_que": "Las cifras escritas a mano son de octubre 2025 (el ACTUAL del ano anterior no tiene marca), de agosto y setiembre del Pre-Cierre, del mayor «Audit October 2026.xlsx» (proveedores y asientos, que no tienen marca) y el impuesto de renta que el motor calcula para el Budget. Ninguna cambia si se vuelve a subir el Pre-Cierre de octubre; las del mayor cambian si se vuelve a subir el MAYOR, y entonces hay que releer las secciones 10, 13 y 14."
+ },
+ "propiedad": "Corcovado Wilderness Lodge",
+ "resumen": [
+  "Octubre cerro con un GOP de {{gop ACT}} contra {{gop BUD}} presupuestados y {{gop FCT}} en el Forecast October. El gasto operativo quedo {{var ACT BUD gasto}} contra el presupuesto: se gasto menos de lo previsto. Contra octubre 2025 la lectura es la contraria: aquel mes cerro con un GOP de -$192.708,12, asi que tener el hotel cerrado este ano costo $74.435,37 mas que el ano pasado.",
+  "El mes termino por debajo del presupuesto por una sola partida: Mantenimiento ejecuto {{dept \"Mantenimiento\" ACT opex}} de los {{dept \"Mantenimiento\" BUD opex}} de opex que el presupuesto concentraba en la ventana de cierre. Sin esa partida octubre habria cerrado peor que el plan. La planilla fue {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados ({{var ACT BUD payroll}}) y contra $125.165,91 en octubre 2025: es la misma planilla de agosto, cuando el hotel facturo $277.856,92.",
+  "El ingreso fue {{tot ACT revenue}}: el lodge no opera en octubre y no se vendio ninguna de las {{kpi disp}} noches. En octubre 2025 todavia se facturaron $34.655,18, de ellos $16.028,54 de habitaciones; por eso el contraste contra el ano anterior hay que leerlo en el gasto, que paso de $227.363,30 a {{tot ACT gasto}}.",
+  "Dos cosas no son de gestion y se separan antes de cualquier reunion. El mayor ya es el mismo corte que el Pre-Cierre —5.310 lineas, las dos quincenas de planilla y la depreciacion— y cuadra cuenta por cuenta salvo en dos puntos de sistema: el Pre-Cierre invierte el signo de las cuentas cuyo movimiento del mes va en sentido contrario a su acumulado (hallazgo 6), lo que deja el GOP del Pre-Cierre unos $7.390 peor que el del mayor; y la depreciacion, el seguro y los permisos se convierten al tipo de cambio del mes y no al historico. Los dos estan en la seccion 10."
+ ],
+ "hallazgos": [
+  [
+   "Mantenimiento no ejecuto la obra de la ventana de cierre",
+   "{{deptvar \"Mantenimiento\" ACT BUD opex}}",
+   "El presupuesto ponia en octubre el trabajo que solo se hace con el hotel vacio: Vehicle Repair {{cta 0200 7700 BUD}}, Grounds Maintenance {{cta 0200 7240 BUD}}, Contract Services {{cta 0200 7105 BUD}}, Floor Covering {{cta 0200 7200 BUD}}, Laundry Equipment {{cta 0200 7315 BUD}} y Plumbing {{cta 0200 7480 BUD}}. Se registraron {{cta 0200 7700 ACT}}, {{cta 0200 7240 ACT}}, {{cta 0200 7105 ACT}}, {{cta 0200 7200 ACT}}, {{cta 0200 7315 ACT}} y {{cta 0200 7480 ACT}}. No es un diferimiento con fecha: ni el Budget ni el Forecast October vuelven a poner esas cuentas en noviembre o diciembre (Vehicle Repair sigue en su nivel normal de $2.800 por mes y Grounds en $100). Parte de la obra si se hizo, pero no paso por opex: la 8020 Capital Reserve recibio reparaciones y materiales —EVELYN VALLEJOS MIRANDA $9.706,23 por reparacion estructural y pintura, CARLOS MANUEL GOMEZ NARANJO $4.450,00, JOSE MAURICIO CONCEPCION VINJETS $4.372,45 en 39 lineas de ferreteria, Enertek Solutions, Roludi por un motor de trim— y tambien $4.274,18 de SDG RH por personal suplementario y el asiento «AJUSTE RESERVA CAPITAL OCT 2026» saco $25.147,39 de esa cuenta hacia el balance. Lo que el sistema no dice es cuanto de la obra presupuestada se hizo por esa via y cuanto no se hizo."
+  ],
+  [
+   "La planilla no bajo con el hotel cerrado",
+   "{{var ACT BUD payroll}}",
+   "Planilla real {{tot ACT payroll}} contra {{tot BUD payroll}} presupuestados, {{tot FCT payroll}} en el Forecast y $125.165,91 en octubre 2025. De esa cifra, $7.210,10 son el 6023 con el signo invertido en el Pre-Cierre (hallazgo 6): segun el mayor la planilla del mes es $167.642,86, que sigue estando unos $44.000 por encima del presupuesto. En el Pre-Cierre la planilla de agosto, setiembre y octubre es practicamente la misma —$175.300,71, $169.864,11 y {{tot ACT payroll}}— mientras el ingreso caia de $277.856,92 a $40.193,92 y a {{tot ACT revenue}}. El presupuesto si bajaba la planilla en octubre; la realidad no. El exceso real esta en el salario base ({{conc 6000 ACT}} contra {{conc 6000 BUD}}), en el cargo de cafeteria ({{conc 6025 ACT}} contra {{conc 6025 BUD}}, hallazgo 4), en las cargas que corren sobre la base y en horas extra ({{conc 6001 ACT}}, presupuesto cero). Las vacaciones NO son parte del exceso: en el mayor el costo neto del mes (6023 mas 6024) es $4.401,98, igual que en setiembre. Por departamento pesan Rooms, Alimentos y Bebidas, Mantenimiento y Tours —este junto con Transportacion, porque el presupuesto puso parte de la tripulacion en 0152 y el real la registra en 0150—."
+  ],
+  [
+   "Ventas y Mercadeo no compro pauta ni fue a ferias",
+   "{{deptvar \"Ventas y Mercadeo\" ACT BUD opex}}",
+   "Opex {{dept \"Ventas y Mercadeo\" ACT opex}} contra {{dept \"Ventas y Mercadeo\" BUD opex}} presupuestados y $32.978,28 en octubre 2025. Trade Shows {{cta 0190 7660 ACT}} de {{cta 0190 7660 BUD}}, Media {{cta 0190 7370 ACT}} de {{cta 0190 7370 BUD}} —solo GOOGLE ADS y FACEBOOK—, Travel-Other {{cta 0190 7675 ACT}} de {{cta 0190 7675 BUD}} y Fam Trips {{cta 0190 7190 ACT}} de {{cta 0190 7190 BUD}}. El Forecast October no las recupera: deja Trade Shows en cero en noviembre y diciembre y Media en su nivel mensual. Es ahorro de ejecucion, no diferimiento, salvo que la gerencia diga que la pauta de temporada se pago por otra via. La planilla del departamento, en cambio, incluye $9.372,79 de facturas de The Costa Rica Collection y Seed Collaborative registradas como salario (seccion 10)."
+  ],
+  [
+   "Cafeteria de empleados: mas comida que en setiembre con el hotel cerrado",
+   "{{conc 6025 ACT}} contra {{conc 6025 BUD}}",
+   "El cargo de cafeteria que reciben los departamentos (6025) fue {{conc 6025 ACT}} contra {{conc 6025 BUD}} presupuestados. Es el reparto completo del departamento 0220 —credito 4999 de {{cta 0220 4999 ACT}}—: alimentos {{cta 0220 5420 ACT}}, planilla propia {{dept \"Cafeteria de empleados\" ACT payroll}} y lavanderia {{cta 0220 7310 ACT}}. El alimento de cafeteria fue $10.678,46 en setiembre, con el hotel abierto parte del mes, y {{cta 0220 5420 ACT}} en octubre con el hotel cerrado; en octubre 2025 fue $7.065,15. El mayor lo respalda en 287 lineas: CENTRO INTERNACIONAL DE INVERSIONES $6.543,85 de abarrotes y carne, WALTER ALEXANDER ELIZONDO MATAMOROS $2.849,82 de verdura y JOSE MIGUEL PRENDAS CHAVES $1.694,78 de filet de congrio. A eso se suma comida comprada en la 7375 de A&B, con el restaurante cerrado (seccion 10)."
+  ],
+  [
+   "Administracion y Sistemas: servicios sin presupuesto y Booking en sistemas",
+   "{{deptvar \"Administracion\" ACT BUD opex}} y {{deptvar \"Sistemas (IT)\" ACT BUD opex}}",
+   "A&G Contract Services registro {{cta 0180 7105 ACT}} sin presupuesto: Consultants Costa Rica $3.863,00 de bookkeeping y servicio de pagos, VEINTICUATRO SIETE MAS MEDICAL ASSISTANCE $2.400,00, RONALD DAVID FALLAS BERMUDEZ $1.250,00 por «Servicios Generales» y Alta Batalla $900,00. Payroll Processing fue {{cta 0180 7465 ACT}} contra {{cta 0180 7465 BUD}} (SDG RH, una factura de ₡5.000.000). Las comisiones de tarjeta ({{cta 0180 7120 ACT}} contra {{cta 0180 7120 BUD}}) estan en linea con el plan: son cobros de BAC, BN y LAFISE sobre depositos de la temporada, no un ahorro por no operar. Centralized Accounting no se cargo ({{cta 0180 7050 ACT}} de {{cta 0180 7050 BUD}}): diferimiento probable de un cargo intercompania fijo. En Sistemas, System Expenses {{cta 0230 7625 ACT}} contra {{cta 0230 7625 BUD}}: BOOKING.COM $1.766,70 por «Reservas» y The Costa Rica Collection $1.714,40 de software compartido."
+  ],
+  [
+   "El Pre-Cierre invierte el signo cuando el mes va contra el acumulado",
+   "unos -$7.390 sobre el GOP",
+   "Integrity entrega la columna del mes en valor absoluto y el cargador del Pre-Cierre le pone el signo del ACUMULADO del ano. Cuando el movimiento de octubre va en sentido contrario al acumulado, el signo sale al reves. Pasa en el 6023 de ocho departamentos —el asiento «Ajuste disfrute vacaciones contra 6023» dejo el mes en credito y el Pre-Cierre lo muestra como cargo: $7.210,10 de planilla de mas—, en la 5201 del Gift Shop (+{{cta 0165 5201 ACT}} contra un credito en el mayor), en la 7400 de Lavanderia ({{cta 0161 7400 ACT}} contra compras de BLUETECH en el mayor) y en la 4000 de Rooms. El neto deja el GOP del Pre-Cierre unos $7.390 peor que el del mayor. No es de ningun gerente: es una regla del sistema, y se va a repetir cada mes en que una cuenta se mueva al reves de su saldo del ano."
+  ],
+  [
+   "Combustible por encima del plan con el hotel cerrado",
+   "{{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}}",
+   "La 7395 de Utilities cerro en {{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}} presupuestados y $14.477,05 en octubre 2025. En el mayor, SERVICENTRO LA PALMA factura $17.556,17 de diesel y gasolina en doce lineas, y un asiento «AJUSTE POR CONSUMOS DE COMBUSTIBLE CAPEX GENERADOR» ya movio $2.010,48 al proyecto del generador. El mayor y el Pre-Cierre cuadran en esta cuenta. Con el hotel sin huespedes esto no es consumo de habitaciones: es planta electrica, vehiculos y obra. La discusion con el gerente se hace en litros y horas de planta, no en dolares."
+  ],
+  [
+   "Debajo del GOP: el presupuesto esperaba un credito de renta de $96.852,79",
+   "{{cta 0250 8060 ACT}}",
+   "No mueve el GOP pero si el resultado final. La clase 8 cerro en {{tot ACT property}} contra {{tot BUD property}} presupuestados: el presupuesto es negativo porque el motor calcula para octubre un impuesto de renta de -$96.852,79 que no esta en el checkbook de la clase 8 (por eso el cuadro por cuenta de la seccion 9 suma distinto que su total). El real es una reversion de provision de {{cta 0250 8060 ACT}} y el Forecast tenia {{cta 0250 8060 FCT}}. La depreciacion fue {{cta 0250 8040 ACT}} contra {{cta 0250 8040 BUD}} y $15.998,99 en octubre 2025. No se lleva a ningun gerente: es tema de la direccion financiera."
+  ]
+ ],
+ "contexto": [
+  "Octubre es el mes en que Corcovado Wilderness Lodge no opera. Hubo {{kpi disp}} noches de inventario y {{kpi occ}} vendidas. El informe no mide eficiencia por noche ocupada —con cero noches cualquier indicador por unidad es una division por cero—: mide cuanto cuesta tener el hotel cerrado y si ese costo es el que el presupuesto preveia.",
+  "El presupuesto esperaba {{tot BUD gasto}} de gasto operativo, el Forecast October {{tot FCT gasto}}, y se gastaron {{tot ACT gasto}}. En octubre 2025 el gasto operativo fue $227.363,30 con $34.655,18 de ingreso. El ACTUAL 2025 no tiene estadistica de habitaciones, asi que el contraste contra el ano anterior es de gasto e ingreso, no de noches."
+ ],
+ "contexto_kpi": [
+  "Ocupacion {{kpi ocupacion}} sobre {{kpi disp}} noches de inventario. ADR y RevPAR no se muestran porque sin noches vendidas no tienen denominador. La estadistica sale del escenario ACTUAL, no del Pre-Cierre (advertencia D)."
+ ],
+ "contexto_tipos": [
+  "Las seis categorias aparecen con su inventario y sin ocupacion: es el comportamiento esperado del mes de cierre."
+ ],
+ "contexto_secuencial": [
+  "El cuadro de arriba es el trimestre del cierre de temporada. El ingreso se va a cero; la planilla no se mueve en los tres meses (hallazgo 2). Lo que si bajo contra setiembre es el opex, sobre todo en Ventas y Mercadeo —setiembre llevo las ferias— y en Utilities.",
+  "El costo de ventas subio contra setiembre con ingreso cero: no es costo de venta, es comida del personal (hallazgo 4), entradas de SINAC y servicios contratados de tours, y el alquiler de un vehiculo."
+ ],
+ "contexto_nota": [
+  "La pregunta de setiembre volvio, como se anticipo",
+  "El informe de setiembre cerraba diciendo que octubre traeria la misma pregunta con el ingreso en cero. Llego: la planilla de octubre es la de agosto, que facturo $277.856,92. Si existe un protocolo de dotacion para el mes de cierre, no se ve en los numeros. Y el unico mes del ano con el hotel vacio —la ventana natural para el mantenimiento pesado— cerro con el opex de Mantenimiento casi sin ejecutar."
+ ],
+ "dept_resumen": [
+  "Con el hotel cerrado, los departamentos operativos no tienen ingreso que explicar. Lo que se revisa es su estructura: que planilla y que gasto siguieron corriendo, y si era lo que el presupuesto preveia.",
+  "El exceso de planilla contra presupuesto se concentra en Rooms ({{deptvar \"Rooms\" ACT BUD payroll}}), Alimentos y Bebidas ({{deptvar \"Alimentos y Bebidas\" ACT BUD payroll}}) y Tours ({{deptvar \"Tours / Actividades\" ACT BUD payroll}}), y en overhead en Mantenimiento ({{deptvar \"Mantenimiento\" ACT BUD payroll}}). Tours se lee junto con Transportacion ({{deptvar \"Transportacion\" ACT BUD payroll}}): el presupuesto puso parte de la tripulacion en 0152 y el real la registra en 0150."
+ ],
+ "dept": {
+  "Rooms": {
+   "comentario": [
+    "Ingreso {{dept \"Rooms\" ACT revenue}}, que no es venta: en el mayor la 4000 tiene un credito «REPOSICION DE COSTOS DE AGOSTO» y un debito «Ajuste payment house charge» que netean en -$50,11; el Pre-Cierre lo muestra en positivo por la regla del signo (hallazgo 6). Octubre 2025 facturo $16.028,54 de habitaciones.",
+    "Planilla {{dept \"Rooms\" ACT payroll}} contra {{dept \"Rooms\" BUD payroll}} presupuestados y $31.601,63 en octubre 2025. Incluye $2.373,82 de facturas de The Costa Rica Collection por «Planning & Operation» registradas en el 6000 de Reservas, y $733,74 de «Comision sobre venta» del mismo proveedor en el 6010: una comision sobre ventas en un mes sin ventas.",
+    "Opex {{dept \"Rooms\" ACT opex}} contra {{dept \"Rooms\" BUD opex}}: Guest Supplies {{cta 0110 7250 ACT}} contra {{cta 0110 7250 BUD}} (AMAZON, una «bed bridge» de $547,51), Contract Services {{cta 0110 7105 ACT}} sin presupuesto, Uniform Costs {{cta 0110 7680 ACT}} de {{cta 0110 7680 BUD}} y lavanderia recibida {{cta 0110 7310 ACT}}."
+   ],
+   "preguntas": [
+    "La planilla de Rooms fue {{dept \"Rooms\" ACT payroll}} contra {{dept \"Rooms\" BUD payroll}} con {{kpi occ}} noches vendidas. ¿Cuantos colaboradores estuvieron activos en octubre, en que tareas, y cuantos dias de vacaciones se tomaron?",
+    "The Costa Rica Collection facturo $733,74 de «Comision sobre venta» contra el 6010 de Reservas en un mes sin ventas. ¿Sobre que ventas se calcula —reservas tomadas en octubre para la temporada— y como esta pactada en el contrato?"
+   ]
+  },
+  "Alimentos y Bebidas": {
+   "comentario": [
+    "Sin ingreso (octubre 2025: $7.299,07). Planilla {{dept \"Alimentos y Bebidas\" ACT payroll}} contra {{dept \"Alimentos y Bebidas\" BUD payroll}} presupuestados y $16.183,19 en octubre 2025: es el mayor exceso de planilla del hotel en dolares. El desvio esta en salario base y vacaciones disfrutadas (cuadro de la seccion 6).",
+    "Costo de ventas {{dept \"Alimentos y Bebidas\" ACT cost}} sin ingreso, casi todo Beverage Cost ({{cta 0120 5150 ACT}}): frutas congeladas y un ajuste de costo de bar.",
+    "Opex {{dept \"Alimentos y Bebidas\" ACT opex}} contra {{dept \"Alimentos y Bebidas\" BUD opex}}. La 7375 MENUS AND BEVERAGE LISTS cierra en {{cta 0120 7375 ACT}} sin presupuesto. En el mayor esa cuenta tiene 444 lineas de compras de alimento —CENTRO INTERNACIONAL DE INVERSIONES $3.947,03, WALTER ALEXANDER ELIZONDO MATAMOROS $3.140,18, BRAYAN ERNESTO BARRANTES FERNANDEZ $780,80 de pulpo y camaron, EXPORTADORA PMT $763,43, JOSE MIGUEL PRENDAS CHAVES $712,05 de mejillon y pargo— y un asiento «AJUSTE DE COSTOS FOOD EN MENU» de -$6.899,86 que devolvio $4.440,60 al inventario y repartio el resto a fam trips, visitas y la reserva de capital. Lo que queda es comida comprada con el restaurante cerrado y registrada como gasto de menus."
+   ],
+   "preguntas": [
+    "La 7375 recibio en octubre compras de alimento en 444 lineas (pulpo, camaron, mejillon, pargo, pasta miso) con el restaurante cerrado. ¿Para que servicio se compraron —fam trips, visitas, eventos del personal— y quien autorizo la compra?",
+    "La planilla de A&B fue {{dept \"Alimentos y Bebidas\" ACT payroll}} contra {{dept \"Alimentos y Bebidas\" BUD payroll}} sin servicio que dar. ¿Cuantos cocineros y saloneros estuvieron activos en octubre y en que trabajaron?"
+   ]
+  },
+  "Spa": {
+   "comentario": [
+    "Planilla {{dept \"Spa\" ACT payroll}} contra {{dept \"Spa\" BUD payroll}} presupuestados y opex {{dept \"Spa\" ACT opex}} de {{dept \"Spa\" BUD opex}}. En linea con un mes de cierre."
+   ],
+   "preguntas": [
+    "Sin preguntas este mes: planilla y opex por debajo del presupuesto."
+   ]
+  },
+  "Tours / Actividades": {
+   "comentario": [
+    "Ingreso {{dept \"Tours / Actividades\" ACT revenue}}, residual (octubre 2025: $3.603,87).",
+    "Planilla {{dept \"Tours / Actividades\" ACT payroll}} contra {{dept \"Tours / Actividades\" BUD payroll}}. Se lee junto con Transportacion ({{dept \"Transportacion\" ACT payroll}} contra {{dept \"Transportacion\" BUD payroll}}): juntos el exceso es menor que separados. Tours carga el mayor monto de vacaciones disfrutadas del hotel ($3.754,40), que el asiento de ajuste descarga contra la provision.",
+    "Costo de ventas {{cta 0150 5351 ACT}} en la 5351 Contract Services, sin presupuesto en Tours (el presupuesto lo tenia en Transportacion, {{cta 0152 5350 BUD}} en la 5350). El mayor lo respalda completo: SINAC $3.924,27 por «Servicio de reservacion», JUNO R & M $1.307,62 por «servicio de mantenimiento» y COSTA RICA JUNKIES $250,00. SINAC son entradas a parque nacional: en un mes sin huespedes, lo mas probable es que sean reservas de cupos para la temporada."
+   ],
+   "preguntas": [
+    "La planilla de Tours y Transportacion fue {{dept \"Tours / Actividades\" ACT payroll}} y {{dept \"Transportacion\" ACT payroll}} sin un tour vendido. ¿Que hizo el equipo de capitanes y guias en octubre —mantenimiento de botes, capacitacion, vacaciones— y cuantos estuvieron activos?",
+    "SINAC cobro $3.924,27 por «Servicio de reservacion» en octubre, con el hotel cerrado. ¿Son cupos de parque nacional para noviembre y diciembre? Si lo son, es un pago anticipado y su lugar es el mes en que se usan, no octubre.",
+    "JUNO R & M facturo $1.307,62 de «servicio de mantenimiento» contra el costo de actividades 5351. ¿Es mantenimiento de embarcaciones? Si lo es, ¿por que va a costo de ventas y no a mantenimiento?"
+   ]
+  },
+  "Gift Shop": {
+   "comentario": [
+    "Ingreso {{dept \"Gift Shop\" ACT revenue}} y costo {{dept \"Gift Shop\" ACT cost}}: el costo supera al ingreso, pero es un asiento de ajuste de costo de tienda que en el mayor tiene el signo contrario (seccion 10)."
+   ],
+   "preguntas": [
+    "Sin preguntas al gerente: el punto es de registro y esta en la seccion 10."
+   ]
+  },
+  "Transportacion": {
+   "comentario": [
+    "Planilla {{dept \"Transportacion\" ACT payroll}} contra {{dept \"Transportacion\" BUD payroll}} presupuestados y $10.131,52 en octubre 2025; se lee con Tours.",
+    "Costo {{cta 0152 5360 ACT}} en la 5360 sin presupuesto: es ANC RENTING, «T/M Renting 18 M», el alquiler de un vehiculo. El mismo proveedor factura $3.990,00 en la 8000 Rent, debajo del GOP, incluido un «auto sustituto»: el alquiler de vehiculos entra por dos renglones distintos del P&L. Los {{cta 0152 5350 BUD}} que el presupuesto tenia en la 5350 no se usaron."
+   ],
+   "preguntas": [
+    "ANC RENTING cobra $1.610,00 en costo de transporte y $3.990,00 en Rent en el mismo mes, con un «auto sustituto» incluido. ¿Que vehiculo es cada contrato, por que hizo falta un sustituto con el hotel cerrado, y por que uno es costo de ventas y el otro gasto de propietario?"
+   ]
+  },
+  "Lavanderia": {
+   "comentario": [
+    "Planilla {{dept \"Lavanderia\" ACT payroll}} y opex {{dept \"Lavanderia\" ACT opex}}, que incluye el credito de reparto {{cta 0161 4999 ACT}}. El departamento deberia netear a cero y queda en {{dept \"Lavanderia\" ACT gasto}}, porque la 7400 Operating Supplies aparece en el Pre-Cierre en {{cta 0161 7400 ACT}} y en el mayor con el signo contrario (compras de BLUETECH). Es registro: seccion 10.",
+    "Lo que se reparte va a Rooms ({{cta 0110 7310 ACT}}) y a Cafeteria ({{cta 0220 7310 ACT}}): con el hotel cerrado, la ropa de la cafeteria pesa mas que la de las habitaciones."
+   ],
+   "preguntas": [
+    "Sin preguntas al gerente: la diferencia es de signo, no de gestion."
+   ]
+  },
+  "Innoceana": {
+   "comentario": [
+    "Sin movimiento en el mes, como en el presupuesto. En octubre 2025 tuvo $1.114,80 de ingreso y un contrato de $3.522,27 en la 7105. El programa sigue facturando $3.500,00 mensuales de «Monthly Program Fee» en la 7150 de Ventas y Mercadeo."
+   ],
+   "preguntas": [
+    "Sin preguntas este mes."
+   ]
+  },
+  "Sostenibilidad y otros": {
+   "comentario": [
+    "Cancellation fee {{cta 280 4820 ACT}} e intereses y otros {{cta 280 4860 ACT}}: practicamente todo el ingreso del mes. Octubre 2025: $2.371,86."
+   ],
+   "preguntas": [
+    "Sin preguntas este mes."
+   ]
+  },
+  "Cafeteria de empleados": {
+   "comentario": [
+    "Gasto bruto: alimentos {{cta 0220 5420 ACT}}, planilla propia {{dept \"Cafeteria de empleados\" ACT payroll}} y lavanderia {{cta 0220 7310 ACT}}. El credito de reparto ({{cta 0220 4999 ACT}}) llega a los departamentos como 6025 ({{conc 6025 ACT}}). Neto del departamento: {{dept \"Cafeteria de empleados\" ACT gasto}}, lo que no se repartio.",
+    "Con el credito dentro del reporte, la comparacion contra el presupuesto ya no se hace en la 5420 —el presupuesto tenia la cafeteria en la 5700, fuera del perimetro—: se hace en el 6025 de los departamentos, que si es comparable (hallazgo 4).",
+    "El alimento subio contra setiembre con el hotel cerrado. Proveedores: CENTRO INTERNACIONAL DE INVERSIONES $6.543,85 (abarrotes y carne molida), WALTER ALEXANDER ELIZONDO MATAMOROS $2.849,82 (133 lineas de verdura), JOSE MIGUEL PRENDAS CHAVES $1.694,78 (filet de congrio) y COOPERATIVA AUTOGESTIONARIA $1.278,16 (pollo)."
+   ],
+   "preguntas": [
+    "El alimento de cafeteria fue {{cta 0220 5420 ACT}} con el hotel cerrado, contra $10.678,46 en setiembre. ¿Cuantos colaboradores comieron en octubre y cuantos dias? Con ese dato sale el costo por comida y se compara contra los meses de operacion.",
+    "En la compra de cafeteria hay $1.694,78 de filet de congrio. ¿Es para el comedor del personal o se esta usando la cafeteria para comprar insumo de otro servicio?"
+   ]
+  },
+  "Administracion": {
+   "comentario": [
+    "Opex {{dept \"Administracion\" ACT opex}} contra {{dept \"Administracion\" BUD opex}} presupuestados y $20.893,34 en octubre 2025. Los renglones estan en el hallazgo 5: servicios contratados sin presupuesto, procesamiento de planilla por encima, Centralized Accounting sin cargar.",
+    "Credit Card Commissions ({{cta 0180 7120 ACT}} contra {{cta 0180 7120 BUD}}) esta en el plan. El analisis anterior la daba como ahorro por no operar; con la subida del 13-nov entraron las comisiones de BAC, BN y LAFISE y la lectura ya no se sostiene.",
+    "Planilla {{dept \"Administracion\" ACT payroll}} contra {{dept \"Administracion\" BUD payroll}} y $26.230,64 en octubre 2025, con horas extra de Seguridad (oficiales y supervisor)."
+   ],
+   "preguntas": [
+    "A&G Contract Services registro {{cta 0180 7105 ACT}} sin presupuesto: Consultants Costa Rica $3.863,00, VEINTICUATRO SIETE MAS MEDICAL ASSISTANCE $2.400,00 («Servicios puesto de…»), RONALD DAVID FALLAS BERMUDEZ $1.250,00 («Servicios Generales») y Alta Batalla $900,00. ¿Son contratos mensuales fijos? ¿Por que ninguno estaba en el presupuesto 2026?",
+    "Centralized Accounting quedo en {{cta 0180 7050 ACT}} de {{cta 0180 7050 BUD}}. ¿El cargo de octubre se va a facturar junto con noviembre?",
+    "Seguridad pago horas extra en el mes de cierre (oficiales y supervisor). ¿Fue por la custodia del hotel vacio y estaba planificado?"
+   ]
+  },
+  "Ventas y Mercadeo": {
+   "comentario": [
+    "Opex {{dept \"Ventas y Mercadeo\" ACT opex}} contra {{dept \"Ventas y Mercadeo\" BUD opex}} presupuestados: la segunda favorabilidad del mes, clasificada como ahorro de ejecucion (hallazgo 3). Octubre 2025 gasto $32.978,28, con $13.748,64 de promocion y $14.556,11 de servicios contratados.",
+    "Lo que si se gasto: Agency Fees {{cta 0190 7000 ACT}} contra {{cta 0190 7000 BUD}} (PREFERRED TRAVEL GROUP), Dues and Subscriptions {{cta 0190 7150 ACT}} contra {{cta 0190 7150 BUD}} (INNOCEANA $3.500,00) y S&M Complimentary {{cta 0190 7100 ACT}}, que es un ajuste de fam trips pendiente de setiembre.",
+    "Planilla {{dept \"Ventas y Mercadeo\" ACT payroll}} contra {{dept \"Ventas y Mercadeo\" BUD payroll}}: incluye $9.372,79 de facturas de The Costa Rica Collection («Sales & Marketing») y Seed Collaborative («Monthly Payroll Cost») registradas en 6000. Son terceros, no empleados."
+   ],
+   "preguntas": [
+    "Media quedo en {{cta 0190 7370 ACT}} de {{cta 0190 7370 BUD}}, solo GOOGLE ADS y FACEBOOK, y el Forecast no la recupera en noviembre ni diciembre. ¿La pauta de temporada se cancelo, se pago antes, o esta pendiente de factura?",
+    "Trade Shows ({{cta 0190 7660 BUD}}) y Travel-Other ({{cta 0190 7675 BUD}}) no se ejecutaron. ¿Que ferias y viajes eran, y quedaron cancelados o se movieron a 2027?"
+   ]
+  },
+  "Mantenimiento": {
+   "comentario": [
+    "Opex {{dept \"Mantenimiento\" ACT opex}} contra {{dept \"Mantenimiento\" BUD opex}} presupuestados y {{dept \"Mantenimiento\" FCT opex}} en el Forecast: la favorabilidad mas grande del informe (hallazgo 1). Octubre 2025 gasto $9.663,65, asi que contra el ano anterior el nivel es el mismo: lo que no paso fue el plan de obra del presupuesto.",
+    "Lo que si se ejecuto en opex: Miscellaneous {{cta 0200 7380 ACT}} sin presupuesto —EL COLONO LA JUNGLA, 33 lineas de cemento, tomas y material electrico— y Electrical and Mechanical {{cta 0200 7155 ACT}} contra {{cta 0200 7155 BUD}} (Roludi mano de obra, JOSE MAURICIO CONCEPCION VINJETS, LAS VEGAS DEL RIO SIERPE).",
+    "Planilla {{dept \"Mantenimiento\" ACT payroll}} contra {{dept \"Mantenimiento\" BUD payroll}} y $17.021,74 en octubre 2025, con horas extra del supervisor y de los operadores de campo. El equipo estuvo completo y con extras en un mes en que el opex de materiales casi no se movio."
+   ],
+   "preguntas": [
+    "El presupuesto concentraba en octubre {{dept \"Mantenimiento\" BUD opex}} de opex —vehiculos, jardines, contratos, pisos, equipo de lavanderia, plomeria— y se registraron {{dept \"Mantenimiento\" ACT opex}}. ¿Que trabajos se hicieron, cuales no, y cuando se hacen los pendientes si el hotel abre en noviembre?",
+    "Las reparaciones de EVELYN VALLEJOS MIRANDA (reparacion estructural y pintura), CARLOS MANUEL GOMEZ NARANJO y los materiales de JOSE MAURICIO CONCEPCION VINJETS se cargaron a la reserva de capital 8020, junto con $4.274,18 de personal suplementario de SDG RH. ¿Que obra es cada una, y quien decidio que era capital y no mantenimiento?",
+    "La planilla fue {{dept \"Mantenimiento\" ACT payroll}} contra {{dept \"Mantenimiento\" BUD payroll}} con horas extra. ¿El equipo trabajo en la obra de capital? ¿Cuantas horas?"
+   ]
+  },
+  "Sistemas (IT)": {
+   "comentario": [
+    "Opex {{dept \"Sistemas (IT)\" ACT opex}} contra {{dept \"Sistemas (IT)\" BUD opex}} presupuestados y $2.294,93 en octubre 2025. System Expenses {{cta 0230 7625 ACT}} contra {{cta 0230 7625 BUD}}: BOOKING.COM $1.766,70 por «Reservas», The Costa Rica Collection $1.714,40 de software compartido, Fundacion Fernando Ortuño $500,00 y Hotel Competence $485,00.",
+    "Costo {{dept \"Sistemas (IT)\" ACT cost}} en 5400 y 5401 (STARLINK $945,79) contra el presupuesto en 5700, 5702 y 5704: mismo gasto en otras cuentas (seccion 10). Planilla {{dept \"Sistemas (IT)\" ACT payroll}} contra {{dept \"Sistemas (IT)\" BUD payroll}}."
+   ],
+   "preguntas": [
+    "BOOKING.COM cobro $1.766,70 por «Reservas» y quedo en System Expenses. ¿Es la comision por reservas de temporada tomadas en octubre? Si lo es, va a comisiones de Rooms, no a sistemas.",
+    "The Costa Rica Collection cobra $1.714,40 de «Shared Software Cost». ¿Que licencias incluye, y por que no estaba en el presupuesto de la 7625 ({{cta 0230 7625 BUD}})?"
+   ]
+  },
+  "Utilities / Energia": {
+   "comentario": [
+    "Opex {{dept \"Utilities / Energia\" ACT opex}} contra {{dept \"Utilities / Energia\" BUD opex}} presupuestados y $15.801,64 en octubre 2025: por encima del plan en el mes sin huespedes y por encima del ano anterior.",
+    "El desvio es la 7395 (hallazgo 7): {{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}}. Gas LP {{cta 0210 7230 ACT}} y electricidad {{cta 0210 7160 ACT}}.",
+    "Nota de mapeo: el presupuesto rotula la 7395 «Oil (Boat and Equipment)» y el real «UTILITIES - OIL». Es la misma cuenta y el informe agrupa por numero."
+   ],
+   "preguntas": [
+    "El combustible fue {{cta 0210 7395 ACT}} contra {{cta 0210 7395 BUD}} con el hotel cerrado; SERVICENTRO LA PALMA facturo $17.556,17 de combustible en doce lineas. ¿Cuantos litros y cuantas horas de planta hubo en octubre, y cuanto fue para la obra del generador, ademas de los $2.010,48 que ya se pasaron a CAPEX?"
+   ]
+  }
+ },
+ "overhead_resumen": [
+  "El overhead es donde el mes se salva y donde se lee distinto de lo que parece. Mantenimiento y Ventas dejaron de ejecutar {{deptvar \"Mantenimiento\" ACT BUD opex}} y {{deptvar \"Ventas y Mercadeo\" ACT BUD opex}} de opex; Administracion, Sistemas y Utilities gastaron por encima.",
+  "Ninguna de las dos favorabilidades grandes es un diferimiento con fecha: el Forecast October no devuelve esas cuentas en noviembre ni diciembre. Mantenimiento es en parte obra llevada a la reserva de capital y en parte obra no hecha; Ventas es pauta y ferias que no se compraron."
+ ],
+ "payroll_conceptos": [
+  "Salario base {{conc 6000 ACT}} contra {{conc 6000 BUD}} presupuestados y $81.762,14 en octubre 2025. Sobre esa base corren la CCSS ({{conc 6020 ACT}} contra {{conc 6020 BUD}}) y el aguinaldo ({{conc 6021 ACT}} contra {{conc 6021 BUD}}). La base incluye unos $11.700 de facturas de terceros que no generan cargas (seccion 10).",
+  "Vacaciones: disfrutadas {{conc 6024 ACT}} contra {{conc 6024 BUD}}, y provision {{conc 6023 ACT}} contra {{conc 6023 BUD}}. El asiento «Ajuste disfrute vacaciones contra 6023» descarga el disfrute contra la provision —Tours $3.754,40, A&B $2.770,66, Rooms $1.603,37, Mantenimiento $1.443,30—, asi que en ocho departamentos el 6023 del mes queda en credito. En el mayor el 6023 cierra en -$7.188,98 y el costo neto de vacaciones (6023 mas 6024) es $4.401,98, igual que setiembre. El Pre-Cierre muestra el 6023 en {{conc 6023 ACT}} porque invierte el signo de esos ocho departamentos (hallazgo 6): el exceso aparente de vacaciones es del cargador, no de la operacion.",
+  "Horas extra {{conc 6001 ACT}} y dia libre laborado {{conc 6002 ACT}}, los dos sin presupuesto. En el mayor se concentran en el supervisor de mantenimiento ($1.057,09), los oficiales de seguridad ($876,60) y su supervisor, y los capitanes de barco.",
+  "Cafeteria {{conc 6025 ACT}} contra {{conc 6025 BUD}}: es el reparto del departamento 0220 (hallazgo 4). En octubre 2025 el mismo cargo estaba en 6030 Otros beneficios ($15.073,84): comparar 6025 contra 6025 entre anos acusa un aumento que en parte es cambio de cuenta.",
+  "Comisiones {{conc 6010 ACT}} contra {{conc 6010 BUD}}: incluye $733,74 de The Costa Rica Collection."
+ ],
+ "payroll_nota": [
+  "Lo que el mes de cierre dice de la planilla",
+  "La planilla de octubre es la de un mes operando. Hay dos cosas distintas con dueno distinto: la dotacion activa con el hotel cerrado, que es decision de cada gerente y se discute con ellos; y el cargo de vacaciones, cafeteria y facturas de terceros, que es registro y reparto y se discute con el controller. Presentarlas juntas pierde las dos."
+ ],
+ "margenes": [
+  "Sin ingreso no hay margen. Los porcentajes del cuadro no se interpretan en octubre y se muestran por continuidad de formato.",
+  "Lo que si se lee es el costo absoluto: {{tot ACT cost}} contra {{tot BUD cost}} presupuestados y $10.688,59 en octubre 2025. La mayor parte es alimento de cafeteria, que no es costo de venta: se reparte por la 4999 y vuelve a los departamentos como 6025. El resto es costo de tours contratado, alquiler de vehiculo e internet."
+ ],
+ "margen_detalle": {
+  "titulo": "El costo de ventas de un mes sin ventas",
+  "intro": "Las partidas de clase 5 que se registraron en octubre, con su presupuesto y lo que el mayor respalda.",
+  "cabeceras": [
+   "Partida",
+   "Actual",
+   "Budget",
+   "Lectura"
+  ],
+  "filas": [
+   [
+    "Cafeteria empleados (0220/5420)",
+    "{{cta 0220 5420 ACT}}",
+    "fuera del perimetro",
+    "Se reparte via 4999; comparar en el 6025"
+   ],
+   [
+    "Activity Cost contratado (0150/5351)",
+    "{{cta 0150 5351 ACT}}",
+    "{{cta 0150 5351 BUD}}",
+    "SINAC $3.924,27 de reservas, JUNO R & M y CR Junkies"
+   ],
+   [
+    "Tours presupuestado (0152/5350)",
+    "{{cta 0152 5350 ACT}}",
+    "{{cta 0152 5350 BUD}}",
+    "El presupuesto quedo sin usar en su departamento"
+   ],
+   [
+    "Transportacion (0152/5360)",
+    "{{cta 0152 5360 ACT}}",
+    "{{cta 0152 5360 BUD}}",
+    "ANC RENTING, alquiler de vehiculo"
+   ],
+   [
+    "Internet y celular (0230/5400-5401)",
+    "{{dept \"Sistemas (IT)\" ACT cost}}",
+    "{{dept \"Sistemas (IT)\" BUD cost}}",
+    "Mismo gasto, presupuesto en 5700-5704"
+   ],
+   [
+    "Beverage Cost (0120/5150)",
+    "{{cta 0120 5150 ACT}}",
+    "{{cta 0120 5150 BUD}}",
+    "Compra y ajuste de costo de bar sin venta"
+   ],
+   [
+    "Gift Shop (0165/5201)",
+    "{{cta 0165 5201 ACT}}",
+    "{{cta 0165 5201 BUD}}",
+    "Signo invertido por la regla del acumulado"
+   ]
+  ],
+  "nota": "Las cuentas se agrupan por departamento y numero, nunca por nombre.",
+  "cierre": [
+   "El neto de la clase es {{var ACT BUD cost}}. Casi todo es comida del personal, que no deberia leerse como costo de venta.",
+   "Corregir el mapeo del costo de tours y del internet quitaria variaciones falsas de todos los informes del ano."
+  ]
+ },
+ "opex_favorables": {
+  "cabeceras": [
+   "Partida",
+   "Actual",
+   "Budget",
+   "Lectura"
+  ],
+  "filas": [
+   [
+    "Mant. Vehicle Repair (0200/7700)",
+    "{{cta 0200 7700 ACT}}",
+    "{{cta 0200 7700 BUD}}",
+    "No ejecutado — el Forecast no lo reprograma"
+   ],
+   [
+    "Mant. Grounds Maintenance (0200/7240)",
+    "{{cta 0200 7240 ACT}}",
+    "{{cta 0200 7240 BUD}}",
+    "No ejecutado — el Forecast no lo reprograma"
+   ],
+   [
+    "Mant. Contract Services (0200/7105)",
+    "{{cta 0200 7105 ACT}}",
+    "{{cta 0200 7105 BUD}}",
+    "Reclasificacion parcial — obra cargada a la 8020"
+   ],
+   [
+    "S&M Trade Shows (0190/7660)",
+    "{{cta 0190 7660 ACT}}",
+    "{{cta 0190 7660 BUD}}",
+    "Ahorro de ejecucion — Forecast en cero nov-dic"
+   ],
+   [
+    "S&M Media (0190/7370)",
+    "{{cta 0190 7370 ACT}}",
+    "{{cta 0190 7370 BUD}}",
+    "Ahorro de ejecucion — el Forecast no lo recupera"
+   ],
+   [
+    "S&M Travel Other (0190/7675)",
+    "{{cta 0190 7675 ACT}}",
+    "{{cta 0190 7675 BUD}}",
+    "Ahorro de ejecucion"
+   ],
+   [
+    "Admin Centralized Acctg (0180/7050)",
+    "{{cta 0180 7050 ACT}}",
+    "{{cta 0180 7050 BUD}}",
+    "Diferimiento probable — cargo intercompania fijo"
+   ],
+   [
+    "Mant. Floor Covering (0200/7200)",
+    "{{cta 0200 7200 ACT}}",
+    "{{cta 0200 7200 BUD}}",
+    "No ejecutado"
+   ],
+   [
+    "Mant. Laundry Equipment (0200/7315)",
+    "{{cta 0200 7315 ACT}}",
+    "{{cta 0200 7315 BUD}}",
+    "No ejecutado"
+   ],
+   [
+    "Rooms Uniform Costs (0110/7680)",
+    "{{cta 0110 7680 ACT}}",
+    "{{cta 0110 7680 BUD}}",
+    "Ahorro — lo cargado es reposicion de setiembre"
+   ]
+  ],
+  "nota": "La prueba del diferimiento es el Forecast: si la cuenta reaparece despues, fue postergacion. En octubre ninguna de las partidas grandes reaparece en noviembre ni diciembre.",
+  "cierre": [
+   "La mejora de {{var ACT BUD opex}} en el opex es, en su mayor parte, obra de mantenimiento no ejecutada en la unica ventana sin huespedes del ano y pauta comercial no comprada. Ninguna de las dos es eficiencia.",
+   "El total incluye los creditos de reparto de cafeteria ({{cta 0220 4999 ACT}}) y lavanderia ({{cta 0161 4999 ACT}}), cuya contraparte esta en la planilla (6025) y en la 7310: sin ellos la mejora del opex es menor."
+  ]
+ },
+ "opex_impactos": {
+  "cabeceras": [
+   "Partida",
+   "Actual",
+   "Budget",
+   "Lectura"
+  ],
+  "filas": [
+   [
+    "Utilities combustible (0210/7395)",
+    "{{cta 0210 7395 ACT}}",
+    "{{cta 0210 7395 BUD}}",
+    "Diesel con el hotel cerrado: planta, vehiculos y obra"
+   ],
+   [
+    "Admin Contract Services (0180/7105)",
+    "{{cta 0180 7105 ACT}}",
+    "{{cta 0180 7105 BUD}}",
+    "Cuatro proveedores, ninguno presupuestado"
+   ],
+   [
+    "IT System Expenses (0230/7625)",
+    "{{cta 0230 7625 ACT}}",
+    "{{cta 0230 7625 BUD}}",
+    "Incluye BOOKING.COM por reservas"
+   ],
+   [
+    "Mant. Miscellaneous (0200/7380)",
+    "{{cta 0200 7380 ACT}}",
+    "{{cta 0200 7380 BUD}}",
+    "EL COLONO LA JUNGLA, materiales"
+   ],
+   [
+    "A&B Menus (0120/7375)",
+    "{{cta 0120 7375 ACT}}",
+    "{{cta 0120 7375 BUD}}",
+    "Compra de alimento en cuenta de menus"
+   ],
+   [
+    "Admin Payroll Processing (0180/7465)",
+    "{{cta 0180 7465 ACT}}",
+    "{{cta 0180 7465 BUD}}",
+    "SDG RH, una factura"
+   ],
+   [
+    "Rooms Guest Supplies (0110/7250)",
+    "{{cta 0110 7250 ACT}}",
+    "{{cta 0110 7250 BUD}}",
+    "AMAZON y compras menores sin huespedes"
+   ],
+   [
+    "S&M Agency Fees (0190/7000)",
+    "{{cta 0190 7000 ACT}}",
+    "{{cta 0190 7000 BUD}}",
+    "PREFERRED TRAVEL GROUP mas fees"
+   ]
+  ]
+ },
+ "propiedad_notas": [
+  "La clase 8 cerro en {{tot ACT property}} contra {{tot BUD property}} presupuestados. ⚠️ El total del presupuesto incluye un impuesto de renta de -$96.852,79 que calcula el motor y que no esta en el checkbook de la clase 8: por eso el cuadro por cuenta de arriba suma distinto que el total del parrafo. El Forecast October si lo tiene cargado: {{cta 0250 8060 FCT}}.",
+  "8060 Impuesto de renta: {{cta 0250 8060 ACT}}, un unico asiento «REVERSION PROVISION IMP RENTA OCT 2026».",
+  "8020 Reserva de capital: {{cta 0250 8020 ACT}} en el Pre-Cierre, sin presupuesto, y cuadra con el mayor. Es el neto de mas de $25.000 de obra —EVELYN VALLEJOS MIRANDA, CARLOS MANUEL GOMEZ NARANJO, JOSE MAURICIO CONCEPCION VINJETS, Enertek, $4.274,18 de personal suplementario de SDG RH— menos el asiento «AJUSTE RESERVA CAPITAL OCT 2026» que saco $25.147,39 hacia la cuenta 2000.",
+  "8040 Depreciacion: {{cta 0250 8040 ACT}} contra {{cta 0250 8040 BUD}} y $15.998,99 en octubre 2025. ⚠️ El mayor la registra en $26.559,23: los mismos ₡13,4 millones convertidos al tipo de cambio historico del activo (504,88) y no al del mes (456,04). El presupuesto esta hecho con el historico; el Pre-Cierre la infla $2.844 solo por tipo de cambio (seccion 10).",
+  "8000 Rent: {{cta 0250 8000 ACT}} contra {{cta 0250 8000 BUD}}: ANC RENTING ($3.990,00, dos vehiculos y un auto sustituto), un alquiler comercial ($700,00) y FRANKLIN ARAYA HERNANDEZ.",
+  "8010 Impuestos y permisos: {{cta 0250 8010 ACT}} sin presupuesto en el mes. Es la porcion mensual de BIM y patente y la inspeccion ZMT: gasto recurrente que deberia estar presupuestado. Igual que la depreciacion y el seguro (8015), se amortiza en colones al TC historico 504,88 y el Pre-Cierre la convierte al del mes.",
+  "8025 Multas y no deducibles: {{cta 0250 8025 ACT}} contra {{cta 0250 8025 BUD}}, con CONSTRUPLAZA (tiras y bombillos LED) y compras informales (ChatGPT, comida de staff). Ninguna parece no deducible por naturaleza: vale confirmar el criterio.",
+  "8005 Owners fee ({{cta 0250 8005 ACT}} contra {{cta 0250 8005 BUD}}) y 8015 seguro ({{cta 0250 8015 ACT}} contra {{cta 0250 8015 BUD}}): en linea o por debajo."
+ ],
+ "clasificacion": {
+  "intro": "Variaciones que son de registro y no de gestion. No se le llevan al gerente. Con el mayor completo, el mayor y el Pre-Cierre cuadran cuenta por cuenta; lo que queda son dos reglas del sistema —el signo del mes y el tipo de cambio de lo que se amortiza— y los casos de cuenta que vienen de setiembre.",
+  "cabeceras": [
+   "Caso",
+   "Pre-Cierre",
+   "Mayor / Budget",
+   "Efecto en el reporte"
+  ],
+  "filas": [
+   [
+    [
+     "Signo del mes tomado del acumulado",
+     "sec"
+    ],
+    "",
+    "",
+    ""
+   ],
+   [
+    "6023 Provision vacaciones (8 deptos)",
+    "{{conc 6023 ACT}}",
+    "-$7.188,98",
+    "Planilla $7.210,10 de mas en el Pre-Cierre"
+   ],
+   [
+    "5201 Gift Shop ajuste de costo",
+    "{{cta 0165 5201 ACT}}",
+    "-$403,61",
+    "El costo de la tienda supera su ingreso"
+   ],
+   [
+    "7400 Lavanderia Operating Supplies",
+    "{{cta 0161 7400 ACT}}",
+    "+$263,08 (BLUETECH)",
+    "Lavanderia no netea a cero"
+   ],
+   [
+    "4000 Rooms ajustes",
+    "{{cta 0110 4000 ACT}}",
+    "-$50,11",
+    "Ingreso positivo donde el mayor tiene un neto debito"
+   ],
+   [
+    [
+     "Tipo de cambio de lo amortizado",
+     "sec"
+    ],
+    "",
+    "",
+    ""
+   ],
+   [
+    "8040 Depreciacion",
+    "{{cta 0250 8040 ACT}}",
+    "$26.559,23 (TC 504,88)",
+    "$2.844 de mas, debajo del GOP"
+   ],
+   [
+    "8010 y 8015 permisos y seguro",
+    "{{cta 0250 8010 ACT}} / {{cta 0250 8015 ACT}}",
+    "$2.455,03 / $2.407,67",
+    "Unos $520 de mas, debajo del GOP"
+   ],
+   [
+    [
+     "Sin respaldo en el mayor",
+     "sec"
+    ],
+    "",
+    "",
+    ""
+   ],
+   [
+    "S&M Corporate Office Reimb. (0190/7110)",
+    "{{cta 0190 7110 ACT}}",
+    "$0,00 (factura y su anulacion)",
+    "Una partida del Pre-Cierre que el mayor no tiene"
+   ],
+   [
+    [
+     "Cuenta o concepto",
+     "sec"
+    ],
+    "",
+    "",
+    ""
+   ],
+   [
+    "Terceros en planilla 6000/6010",
+    "TCRC y Seed Collaborative",
+    "$12.480,35",
+    "Infla la planilla; la posicion 579 no es un empleado"
+   ],
+   [
+    "SDG RH en reserva de capital 8020",
+    "personal suplementario",
+    "$4.274,18",
+    "Planilla tercerizada fuera de la planilla"
+   ],
+   [
+    "Booking.com en 7625",
+    "IT System Expenses",
+    "$1.766,70",
+    "Comision de reservas en sistemas"
+   ],
+   [
+    "SINAC en 5351 de octubre",
+    "{{cta 0150 5351 ACT}}",
+    "$3.924,27",
+    "Posible pago anticipado de temporada cargado al mes"
+   ],
+   [
+    "Alimento en 7375 Menus",
+    "{{cta 0120 7375 ACT}}",
+    "{{cta 0120 7375 BUD}}",
+    "Compra de insumo fuera de la clase 5"
+   ],
+   [
+    "Costo de tours",
+    "0150 · 5351",
+    "0152 · 5350 ({{cta 0152 5350 BUD}})",
+    "Tours desfavorable y Transportacion favorable por el mismo hecho"
+   ],
+   [
+    "Internet y celular",
+    "0230 · 5400/5401",
+    "0230 · 5700/5702/5704",
+    "Cuatro variaciones donde hay una"
+   ]
+  ],
+  "nota": "La regla del signo vive en `integrity_final.monto_mes`: Integrity entrega el mes en valor absoluto y el signo se toma del acumulado. Se corrige en el cargador o en el archivo, y despues se vuelve a extraer el informe con --extraer. Los casos de cuenta se resuelven en el mapeo. La cafeteria (5420 contra 5700) dejo de ser un caso: con el credito 4999 dentro del reporte se compara en el 6025."
+ },
+ "sin_presupuesto": {
+  "intro": "Partidas con movimiento real y presupuesto en cero en el mes. No todas son un problema —algunas son reclasificacion—, pero todas salen como variacion desfavorable completa.",
+  "cabeceras": [
+   "Partida",
+   "Real",
+   "Budget",
+   "Naturaleza"
+  ],
+  "filas": [
+   [
+    "Admin Contract Services (0180/7105)",
+    "{{cta 0180 7105 ACT}}",
+    "{{cta 0180 7105 BUD}}",
+    "Servicios contratados fijos sin plan"
+   ],
+   [
+    "Tours Activity Cost (0150/5351)",
+    "{{cta 0150 5351 ACT}}",
+    "{{cta 0150 5351 BUD}}",
+    "Presupuestado en otro departamento; incluye SINAC"
+   ],
+   [
+    "Mant. Miscellaneous (0200/7380)",
+    "{{cta 0200 7380 ACT}}",
+    "{{cta 0200 7380 BUD}}",
+    "Materiales de obra"
+   ],
+   [
+    "A&B Menus (0120/7375)",
+    "{{cta 0120 7375 ACT}}",
+    "{{cta 0120 7375 BUD}}",
+    "Compra de alimento mal clasificada"
+   ],
+   [
+    "Reserva de capital (8020)",
+    "{{cta 0250 8020 ACT}}",
+    "{{cta 0250 8020 BUD}}",
+    "Obra llevada a capital"
+   ],
+   [
+    "Impuestos y permisos (8010)",
+    "{{cta 0250 8010 ACT}}",
+    "{{cta 0250 8010 BUD}}",
+    "Gasto recurrente sin presupuesto mensual"
+   ],
+   [
+    "Transportacion (0152/5360)",
+    "{{cta 0152 5360 ACT}}",
+    "{{cta 0152 5360 BUD}}",
+    "Alquiler de vehiculo"
+   ],
+   [
+    "Rooms Contract Services (0110/7105)",
+    "{{cta 0110 7105 ACT}}",
+    "{{cta 0110 7105 BUD}}",
+    "Servicio contratado sin plan"
+   ],
+   [
+    "Horas extra (6001)",
+    "{{conc 6001 ACT}}",
+    "{{conc 6001 BUD}}",
+    "La linea no existe en el Budget 2026"
+   ],
+   [
+    "Dia libre laborado (6002)",
+    "{{conc 6002 ACT}}",
+    "{{conc 6002 BUD}}",
+    "La linea no existe en el Budget 2026"
+   ]
+  ],
+  "nota": "Mientras 6001 y 6002 sigan sin presupuesto y 6023 con uno simbolico, la planilla sale desfavorable todos los meses por construccion y la variacion deja de servir como senal."
+ },
+ "brechas": [
+  "El GOP del reporte y el del motor COINCIDEN: {{gop ACT}} por los dos caminos. Los creditos de reparto 4999 de cafeteria ({{cta 0220 4999 ACT}}) y lavanderia ({{cta 0161 4999 ACT}}) entran al reporte.",
+  "El mayor re-subido el 13-nov a las 17:14 UTC («Audit October 2026.xlsx», 5.310 lineas) ya es el mismo corte que el Pre-Cierre: trae las dos quincenas de planilla y la depreciacion, y cuadra cuenta por cuenta salvo los casos de signo y de tipo de cambio de la seccion 10 y la 7110 de Ventas. Las secciones 13 y 14 salen completas.",
+  "Octubre esta en BORRADOR: el escenario ACTUAL tiene octubre en $0 y los numeros son los del Pre-Cierre en revision. Las subidas anteriores del mes estan descartadas; la del 6-nov usaba TC 451,85 y la vigente 456,04, y la mayor parte de las diferencias chicas entre una y otra es solo tipo de cambio.",
+  "Lavanderia no netea a cero ({{dept \"Lavanderia\" ACT gasto}}) por el signo de la 7400. Cafeteria deja {{dept \"Cafeteria de empleados\" ACT gasto}} sin repartir.",
+  "⚠️ La regla del signo (hallazgo 6) no es de octubre: cualquier mes en que una cuenta se mueva al reves de su acumulado sale invertida en el Pre-Cierre, y el total sigue cuadrando contra si mismo. Este mes cuesta unos $7.390 de GOP. Vale revisarla antes de pasar a Final cualquier mes, no solo este.",
+  "El total de la clase 8 del Budget incluye un impuesto de renta calculado por el motor que no esta en el checkbook: el cuadro por cuenta y el total de la seccion 9 no suman lo mismo.",
+  "La estadistica de habitaciones NO viene en el espejo del Pre-Cierre: sale del escenario ACTUAL.",
+  "De la lista de setiembre siguen vivos el costo de tours (0150 contra 0152), el internet (5400/5401 contra 5700-5704) y las horas extra sin presupuesto. El Spa se sigue comparando sumando 0130 y 0140. La cafeteria dejo de ser un caso: se compara en el 6025."
+ ],
+ "agenda": [
+  [
+   "Gerencia General",
+   "El costo de tener el hotel cerrado",
+   [
+    "El presupuesto esperaba {{tot BUD gasto}} de gasto operativo en octubre y se gastaron {{tot ACT gasto}}; octubre 2025 costo $227.363,30. La mejora contra el plan viene de obra de mantenimiento no ejecutada, no de menor estructura. ¿Que decision hubo sobre dotacion para el mes de cierre?",
+    "La planilla de octubre ({{tot ACT payroll}}) es la misma que la de agosto, cuando se facturaron $277.856,92. ¿Existe un protocolo de dotacion para el mes cerrado, y quien lo aprueba?",
+    "La obra que el presupuesto ponia en la ventana de cierre no paso por opex. ¿Se hizo como capital, se pospuso a 2027 o se cancelo?"
+   ]
+  ],
+  [
+   "Gerencia de Mantenimiento / Utilities",
+   "La ventana de cierre y el combustible",
+   [
+    "Vehicle Repair ({{cta 0200 7700 BUD}}), Grounds ({{cta 0200 7240 BUD}}), Contract Services ({{cta 0200 7105 BUD}}) y Floor Covering ({{cta 0200 7200 BUD}}) quedaron sin ejecutar y el Forecast no los reprograma. ¿Que se hizo, que no, y cuando se hace lo pendiente?",
+    "EVELYN VALLEJOS MIRANDA (reparacion estructural y pintura), CARLOS MANUEL GOMEZ NARANJO, JOSE MAURICIO CONCEPCION VINJETS y $4.274,18 de personal suplementario de SDG RH se cargaron a la reserva de capital. ¿Que obra es cada una?",
+    "SERVICENTRO LA PALMA facturo $17.556,17 de combustible con el hotel cerrado. ¿Litros, horas de planta, y cuanto fue para la obra del generador?"
+   ]
+  ],
+  [
+   "Gerencia de A&B",
+   "Comida comprada con el restaurante cerrado",
+   [
+    "La 7375 recibio compras de alimento en 444 lineas (pulpo, camaron, mejillon, pargo). ¿Para que servicio fueron y quien las autorizo?",
+    "El alimento de cafeteria fue {{cta 0220 5420 ACT}} con el hotel cerrado, contra $10.678,46 en setiembre. ¿Cuantos colaboradores comieron y cuantos dias? ¿Por que hay filet de congrio ($1.694,78) en la compra de cafeteria?",
+    "La planilla de A&B fue {{dept \"Alimentos y Bebidas\" ACT payroll}} contra {{dept \"Alimentos y Bebidas\" BUD payroll}}. ¿Cuantos estuvieron activos y en que?"
+   ]
+  ],
+  [
+   "Gerencia de Tours / Actividades",
+   "Planilla y costo sin tours",
+   [
+    "Tours y Transportacion juntos pagaron {{dept \"Tours / Actividades\" ACT payroll}} y {{dept \"Transportacion\" ACT payroll}} de planilla sin un tour vendido. ¿Que hizo el equipo en octubre?",
+    "JUNO R & M facturo $1.307,62 de mantenimiento contra el costo de actividades. ¿Es mantenimiento de botes, y por que va a costo de ventas?",
+    "SINAC cobro $3.924,27 por «Servicio de reservacion» en octubre. ¿Son cupos para la temporada, y para que meses?"
+   ]
+  ],
+  [
+   "Gerencia de Rooms",
+   "Dotacion y comision",
+   [
+    "La planilla de Rooms fue {{dept \"Rooms\" ACT payroll}} contra {{dept \"Rooms\" BUD payroll}} con {{kpi occ}} noches vendidas. ¿Cuantos estuvieron activos y en que?",
+    "The Costa Rica Collection cobro $733,74 de comision sobre venta en un mes sin ventas. ¿Sobre que reservas se calcula?"
+   ]
+  ],
+  [
+   "Ventas y Mercadeo",
+   "La pauta y las ferias de temporada",
+   [
+    "Media quedo en {{cta 0190 7370 ACT}} de {{cta 0190 7370 BUD}} y el Forecast no la recupera. ¿La pauta de temporada se cancelo, se pago antes o esta pendiente de factura?",
+    "Trade Shows ({{cta 0190 7660 BUD}}) y Travel-Other ({{cta 0190 7675 BUD}}) no se ejecutaron. ¿Que ferias eran y a donde se movieron?",
+    "BOOKING.COM cobro $1.766,70 por «Reservas» en octubre. ¿Es comision de reservas de temporada?"
+   ]
+  ],
+  [
+   "Recursos Humanos",
+   "Vacaciones y horas extra",
+   [
+    "Las vacaciones disfrutadas fueron {{conc 6024 ACT}} y se descargaron contra la provision. ¿Cuantos dias se liquidaron en octubre y por departamento? Si octubre es el mes de vacaciones, el presupuesto 2027 tiene que reflejarlo en el disfrute, aunque el costo neto del mes sea la provision.",
+    "Se pagaron {{conc 6001 ACT}} de horas extra con el hotel cerrado, sobre todo en mantenimiento y seguridad. ¿Que trabajo las genero y quien las autorizo?"
+   ]
+  ],
+  [
+   "Administracion / Contabilidad",
+   "Lo que es registro y no gestion",
+   [
+    "El Pre-Cierre invierte el signo cuando el mes va contra el acumulado: 6023 en ocho departamentos ($7.210,10 de planilla de mas), 5201 del Gift Shop, 7400 de Lavanderia y 4000 de Rooms. ¿Se corrige en el archivo de Integrity o en el cargador antes de pasar octubre a Final?",
+    "La depreciacion (8040), el seguro (8015) y los permisos (8010) se amortizan al TC historico 504,88 en el mayor y el Pre-Cierre los convierte a 456,04. ¿Cual de los dos manda para el P&L?",
+    "La 7110 de Ventas tiene {{cta 0190 7110 ACT}} en el Pre-Cierre y en el mayor solo una factura de SCP Hospitality y su anulacion. ¿De donde sale esa cifra?",
+    "The Costa Rica Collection y Seed Collaborative facturan $12.480,35 contra 6000 y 6010. ¿Es deliberado? Si lo es, hay que escribirlo en el mapeo; si no, esta inflando la planilla.",
+    "¿Con que criterio se llevaron las reparaciones a la reserva de capital 8020 y se sacaron $25.147,39 hacia la 2000?",
+    "SDG RH cargo $4.274,18 de personal suplementario a la reserva de capital 8020. ¿Es planilla tercerizada de la obra, y debe ir a la obra o a la planilla?"
+   ]
+  ],
+  [
+   "Direccion Financiera",
+   "Debajo del GOP y el cierre",
+   [
+    "El presupuesto tenia un credito de renta de $96.852,79 en octubre y el real fue {{cta 0250 8060 ACT}}. ¿Con que criterio se presupuesto el impuesto mensual, y se corrige en el presupuesto 2027?",
+    "Octubre sigue en borrador. ¿Cuando se pasa a Final, una vez resuelta la regla del signo?"
+   ]
+  ]
+ ],
+ "proveedores_analisis": [
+  "En octubre la lista deja 14 facturas por $45.920,60 en cuentas 5-6-7-8, de ocho de los diez proveedores. Detoxigen y el Instituto Nacional de Seguros no tienen cargos en cuentas de gasto este mes: lo que aparece de ellos esta en balance.",
+  "Los contratos fijos siguen fijos: SDG RH factura ₡5.000.000 de procesamiento de planilla ($10.852,34); Seed Collaborative $5.842,29, el mismo monto de agosto y setiembre; Consultants Costa Rica $3.863,00 mas una personeria de $144. Son los que se renegocian con un numero y no con una discusion.",
+  "SDG RH tiene ademas $4.274,18 en la reserva de capital 8020 por personal suplementario, y The Costa Rica Collection reparte $9.120,77 en cinco renglones: 6000 de Ventas ($3.530,50), 6000 de Reservas ($2.373,83), 7625 de Sistemas ($1.714,40), 7265 de Mantenimiento ($768,31) y una comision en 6010 ($733,74). Entre los dos hay mas de $10.900 de personal tercerizado que no se ve como planilla o que se ve como planilla sin serlo.",
+  "SINAC aparece por primera vez en el trimestre con cargo a gasto: $3.924,27 de «Servicio de reservacion» en la 5351 de Tours, con el hotel cerrado. Y ANC Renting entra por dos renglones del mismo mes: 5360 costo de transporte ($1.610,00) y 8000 Rent ($3.990,00, con un auto sustituto) debajo del GOP. Sigue sin haber un reporte donde se vean juntos."
+ ],
+ "varianza_mes_anterior": [
+  "Con el mayor completo la comparacion contra setiembre es valida. La planilla del mayor baja apenas $3.769,52 —un 2%— con el ingreso yendose a cero; el opex cae $68.740,64 y la propiedad $29.104,27; el costo de ventas sube $2.804,98.",
+  "En planilla el neto esconde compensaciones en los dos sentidos. Bajan Agente de Reservas ($3.369,77), Cocinero B ($2.646,92), Guia Naturista ($1.872,37) y Agente de Ventas ($1.792,79); suben Cocinero A ($2.403,66), Ayudante de Construccion ($2.255,87), Camarero ($1.848,28) y Oficial de Seguridad ($1.693,56). Que Cocinero A suba casi lo mismo que baja Cocinero B, en la misma cocina, se lee como una sustitucion de puesto y no como un ahorro; y que Ayudante de Construccion y Operador de Campo suban es coherente con la obra que se llevo a la reserva de capital.",
+  "En gastos, la caida se concentra en cuentas que no se repitieron: la 7110 del departamento 0191 cae $25.893,55 a cero, la depreciacion $25.248,12 (setiembre traia el ajuste por retiro de activos), el combustible $11.133,85, Media $8.311,27 y viajes de Ventas $6.175,86. Del otro lado suben el costo de tours ($3.578,30, SINAC), la reserva de capital ($3.379,20), el alimento de cafeteria ($3.291,78), la 7375 de A&B ($3.273,63, que en setiembre estaba en cero) y los materiales de Mantenimiento en la 7380 ($2.832,71).",
+  "Octubre y setiembre no traen reclasificaciones de allocation, asi que la comparacion por departamento esta limpia: lo que se ve moverse se movio de verdad."
+ ]
+}

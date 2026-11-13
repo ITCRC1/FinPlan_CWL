@@ -47,7 +47,7 @@ try {
         }
         "GL                   filas = {0}" -f $lo.ListRows.Count
     }
-    $ws.Activate(); $xl.ActiveWindow.SplitRow = 1; $xl.ActiveWindow.FreezePanes = $true
+    try { $ws.Activate(); $xl.ActiveWindow.SplitRow = 1; $xl.ActiveWindow.FreezePanes = $true } catch { }  # cosmetico: Excel oculto a veces no lo deja
 
     $me = Get-Content -Raw -Encoding UTF8 (Join-Path $here "escenarios.m")
     $wb.Queries.Add("Escenarios", $me, "Escenarios y versiones disponibles en FinPlan CWL") | Out-Null

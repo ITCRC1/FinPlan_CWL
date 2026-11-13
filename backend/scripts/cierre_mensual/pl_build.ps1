@@ -44,7 +44,7 @@ try {
   $ws.Range("B2").WrapText = $false
   $ws.Range("C:D").EntireColumn.Hidden = $true
   $ws.Activate(); $xl.ActiveWindow.DisplayGridlines = $false
-  $ws.Range("E7").Select(); $xl.ActiveWindow.FreezePanes = $true
+  try { $ws.Range("E7").Select(); $xl.ActiveWindow.FreezePanes = $true } catch { }  # cosmetico: Excel oculto a veces no lo deja
   $xl.Calculation = -4105
   $xl.CalculateFull()
   # VerificaciÃ³n: correr cada versiÃ³n y leer utilidad neta y controles

@@ -8,7 +8,10 @@ let
     Resp = Web.Contents(Url, [
         RelativePath = "api/consolidado/escenarios/",
         Headers = [#"x-api-key" = Llave, Accept = "application/json"],
-        ManualStatusHandling = {400, 404, 422, 500, 502, 503}
+        ManualStatusHandling = {400, 404, 422, 500, 502, 503, 504},
+                // «Actualizar todo» manda todos los pedidos juntos: el GL completo pasaba
+                // los 100 s que Power Query espera por defecto (owner, 2026-11-12).
+                Timeout = #duration(0, 0, 10, 0)
     ]),
     Estado = Value.Metadata(Resp)[Response.Status],
     Salida =

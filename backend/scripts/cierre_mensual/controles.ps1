@@ -80,7 +80,7 @@ try {
   }
   $ws.Cells.Item(13, 1).Font.Bold = $true
   $ws.Activate(); $xl.ActiveWindow.DisplayGridlines = $false
-  $ws.Range("B6").Select() | Out-Null; $xl.ActiveWindow.FreezePanes = $true
+  try { $ws.Range("B6").Select() | Out-Null; $xl.ActiveWindow.FreezePanes = $true } catch { }  # cosmetico: Excel oculto a veces no lo deja
   $xl.CalculateFull()
   if ($Verificar) {
     $mesCel = $wb.Worksheets.Item('Config').Range('pMes'); $orig = [int]$mesCel.Value2

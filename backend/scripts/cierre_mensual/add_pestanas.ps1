@@ -60,7 +60,7 @@ try {
       }
       "{0,-20} filas = {1}" -f $x.hoja, $lo.ListRows.Count
     }
-    $ws.Activate(); $xl.ActiveWindow.SplitRow = 1; $xl.ActiveWindow.FreezePanes = $true
+    try { $ws.Activate(); $xl.ActiveWindow.SplitRow = 1; $xl.ActiveWindow.FreezePanes = $true } catch { }  # cosmetico: Excel oculto a veces no lo deja
   }
   $cfg.Activate()
   $cfg.Range("pLlave").Value2 = ""          # la llave no viaja en el archivo
