@@ -80,6 +80,56 @@ def monto_mes(cuenta: str, mes_crudo, acumulado_crudo) -> Decimal:
     return signo_de(cuenta) * (-r if u < ZERO else r)
 
 
+def corregir_signos(filas: list[dict], mayor: dict, tc,
+                    tolerancia: Decimal = Decimal("1")) -> list[dict]:
+    """El signo del MES, verificado contra el mayor del mismo mes.
+
+    ⚠️ `monto_mes` le pone al mes el signo del ACUMULADO porque Integrity entrega
+    «Mes Actual» sin signo (octubre 2026: 0 negativos en 1.244 montos). Eso falla
+    cuando el mes va AL REVÉS que el año —una reversa—: entra con el signo
+    cambiado. Octubre 2026: la provisión de vacaciones 6023 revertida en ocho
+    departamentos, 5201-0151, 7400-0161 y 4000-0110 → planilla +$7.226 y el GOP
+    unos $7.600 peor. Cafetería y Lavandería «no neteaban» por esas mismas líneas.
+
+    El mayor (Auditoría del mayor) trae débito y crédito, o sea el signo de
+    verdad. Por cada fila se suma débito − crédito de esa cuenta y sus hijas; si
+    el MONTO coincide con el del archivo (± `tolerancia` colones) y el signo no,
+    manda el del mayor. Si el monto no coincide no se toca nada: no es el mismo
+    corte y no hay cómo saber cuál tiene razón.
+
+    `filas`: dicts con `cuenta`, `mes_crc` (y se reescribe `mes_usd`); se
+    modifican en el lugar. `mayor`: {cuenta completa: débito − crédito en ₡}.
+    Devuelve una entrada por fila corregida. Volver a correrla no cambia nada.
+    """
+    sumas: dict[str, Decimal] = {}
+    for cuenta, v in mayor.items():
+        partes = (cuenta or "").strip().split("-")
+        for k in range(1, len(partes) + 1):
+            pref = "-".join(partes[:k])
+            sumas[pref] = sumas.get(pref, ZERO) + Decimal(str(v or 0))
+    tol = Decimal(str(tolerancia))
+    corregidas = []
+    for f in filas:
+        cuenta = (f.get("cuenta") or "").strip()
+        m = f.get("mes_crc")
+        if not cuenta or m is None:
+            continue
+        m = Decimal(str(m))
+        firmado = signo_de(cuenta) * sumas.get(cuenta, ZERO)
+        if m == ZERO or firmado == ZERO:
+            continue
+        if abs(abs(firmado) - abs(m)) <= tol and (firmado > ZERO) != (m > ZERO):
+            antes_usd = f.get("mes_usd")
+            f["mes_crc"] = -m
+            f["mes_usd"] = a_dolares(-m, tc)
+            corregidas.append({"cuenta": cuenta, "depto": f.get("depto", ""),
+                               "descripcion": f.get("descripcion", ""),
+                               "antes_crc": m, "despues_crc": -m,
+                               "antes_usd": antes_usd, "despues_usd": f["mes_usd"],
+                               "fila": f})
+    return corregidas
+
+
 def monto_acumulado(cuenta: str, acumulado_crudo) -> Decimal:
     """Excel: ``signo * $U``  (columna Y, «Acumulado ₡ con signo»)"""
     return signo_de(cuenta) * _dec(acumulado_crudo)

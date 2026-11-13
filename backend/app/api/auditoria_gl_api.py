@@ -138,7 +138,39 @@ async def _guardar(db: AsyncSession, leido, contenido: bytes,
             moneda_archivo=(l.moneda_archivo or "COL")[:10], **sello))
     await db.commit()
     return {"guardado": True, "anio": anio, "mes": mes,
-            "movimientos": len(leido.lineas)}
+            "movimientos": len(leido.lineas),
+            "signos_del_precierre": await _corregir_el_precierre_del_mes(db, anio, mes)}
+
+
+async def _corregir_el_precierre_del_mes(db: AsyncSession, anio: int, mes: int) -> dict:
+    """Con el mayor recién guardado, corrige el signo del Pre-Cierre del mismo mes.
+
+    El owner sube el Pre-Cierre y el mayor en cualquier orden (octubre 2026: el
+    Pre-Cierre un minuto ANTES). Si la corrección solo corriera al subir el
+    Pre-Cierre, ese mes habría quedado con el signo del acumulado. Si cambió algo,
+    se vuelve a escribir el espejo. Nunca tumba la subida del mayor.
+    """
+    from app.api.precierre_api import _reflejar, corregir_signos_del_borrador
+    from app.models.precierre import Precierre
+    pc = (await db.execute(select(Precierre).where(
+        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio, Precierre.mes == mes,
+        Precierre.estado == "borrador"))).scalars().first()
+    if pc is None:
+        return {"verificado": False, "motivo": "sin_precierre_del_mes", "corregidas": 0}
+    try:
+        r = await corregir_signos_del_borrador(db, pc)
+        await db.commit()
+    except Exception as e:            # noqa: BLE001
+        await db.rollback()
+        return {"verificado": False, "motivo": "error", "error": str(e)[:300], "corregidas": 0}
+    if r.get("corregidas"):
+        try:
+            r["espejo"] = await _reflejar(db, pc, "es")
+            await db.commit()
+        except Exception as e:        # noqa: BLE001 — el borrador ya quedó corregido
+            await db.rollback()
+            r["espejo"] = {"escrito": False, "error": str(e)[:300]}
+    return r
 
 
 def _dec(v) -> Decimal:

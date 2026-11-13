@@ -180,6 +180,91 @@ class EspejoNoCuadra(Exception):
     """
 
 
+CLAVE_SIGNOS = "signo_corregido_con_el_mayor"
+
+
+async def _mayor_del_mes(db: AsyncSession, anio: int, mes: int) -> dict | None:
+    """{cuenta: débito − crédito en ₡} del mayor guardado de ese mes, o None.
+
+    Solo si el mayor está en colones: el Pre-Cierre compara en colones, y un
+    mayor en dólares daría montos que no se pueden aparear.
+    """
+    from app.models.mayor_movimiento import MayorMovimiento
+    filas = (await db.execute(select(
+        MayorMovimiento.cuenta,
+        func.sum(MayorMovimiento.debito - MayorMovimiento.credito),
+        func.max(MayorMovimiento.moneda_archivo)).where(
+        MayorMovimiento.hotel_id == HOTEL_ID, MayorMovimiento.anio == anio,
+        MayorMovimiento.mes == mes).group_by(MayorMovimiento.cuenta))).all()
+    if not filas or any((mon or "COL") != "COL" for _c, _v, mon in filas):
+        return None
+    return {c: Decimal(str(v or 0)) for c, v, _mon in filas}
+
+
+async def corregir_signos_del_borrador(db: AsyncSession, pc: Precierre) -> dict:
+    """Corrige con el mayor del mes las filas del borrador que entraron con el
+    signo del acumulado en vez del suyo (ver `integrity_final.corregir_signos`).
+
+    Owner, 2026-11-13, sobre octubre: «si dale» al arreglo de la regla del signo.
+
+    Se llama al subir el Pre-Cierre Y al subir el mayor: el owner suele subirlos
+    con un minuto de diferencia y en cualquier orden (octubre: el Pre-Cierre
+    17:13, el mayor 17:14). Si solo corriera en una de las dos puertas, el orden
+    de las subidas decidiría el resultado.
+
+    Deja un hallazgo «aviso» en el borrador con cada cuenta corregida, para que
+    se vea en la revisión, y lo reemplaza en cada vuelta (no se duplica). NO
+    escribe el espejo: eso lo hace quien llama, después.
+    """
+    mayor = await _mayor_del_mes(db, pc.anio, pc.mes)
+    if mayor is None:
+        return {"verificado": False, "motivo": "sin_mayor_del_mes", "corregidas": 0}
+    tc = Decimal(str(pc.tc))
+    corregidas: list[dict] = []
+    for modelo in (PrecierreFila, PrecierrePosicion):
+        objs = (await db.execute(select(modelo).where(
+            modelo.precierre_id == pc.id))).scalars().all()
+        vista = [{"cuenta": o.cuenta, "mes_crc": o.mes_crc, "mes_usd": o.mes_usd,
+                  "depto": getattr(o, "depto", ""), "descripcion": getattr(o, "descripcion", ""),
+                  "_o": o, "_total": modelo is PrecierreFila and getattr(o, "cuenta_base", None) is not None}
+                 for o in objs if o.mes_crc is not None]
+        for c in integrity_final.corregir_signos(vista, mayor, tc):
+            v = c["fila"]
+            v["_o"].mes_crc = v["mes_crc"]
+            v["_o"].mes_usd = v["mes_usd"]
+            if modelo is PrecierreFila:
+                corregidas.append({**c, "_total": v["_total"]})
+
+    otros = [h for h in json.loads(pc.hallazgos_archivo or "[]") if h.get("clave") != CLAVE_SIGNOS]
+    if corregidas:
+        efecto = sum((Decimal(str(c["despues_usd"])) - Decimal(str(c["antes_usd"] or 0))
+                      for c in corregidas if c["_total"]), Decimal(0))
+        de_total = [c for c in corregidas if c["_total"]]
+        from app.revision.hallazgo import hallazgo
+        h = hallazgo(
+            CLAVE_SIGNOS,
+            f"{len(de_total)} cuentas entraron con el signo cambiado y se corrigieron con el mayor",
+            "aviso",
+            "Integrity entrega «Mes Actual» sin signo y el cargador le pone el del acumulado del "
+            "año. En estas cuentas el mes fue al revés que el año (una reversa) y el mayor del "
+            "mismo mes, con débito y crédito, da el mismo monto con el signo contrario: manda el "
+            "mayor. Efecto en el resultado del mes (gasto +, ingreso −): "
+            f"{float(efecto):,.2f} USD.",
+            porque="Sin esta corrección la reversa se suma como gasto (o como ingreso) en vez de "
+                   "restarse, y el mes queda mal por el doble del monto.",
+            que_hacer="Revisar que cada cuenta sea una reversa real en Integrity. No hace falta "
+                      "tocar el archivo: la corrección ya está en el borrador.",
+            monto=efecto, nivel=2,
+            referencias=[{"cuenta": c["cuenta"], "depto": c["depto"],
+                          "antes_usd": float(c["antes_usd"] or 0),
+                          "despues_usd": float(c["despues_usd"])} for c in de_total])
+        otros.append(h.como_dict())
+    pc.hallazgos_archivo = json.dumps(otros, ensure_ascii=False)
+    await db.flush()
+    return {"verificado": True, "corregidas": len([c for c in corregidas if c["_total"]]),
+            "cuentas": [c["cuenta"] for c in corregidas if c["_total"]]}
+
+
 async def _reflejar(db: AsyncSession, pc: Precierre, idioma: str) -> dict:
     """Escribe el mes del borrador en el espejo, por la puerta de siempre.
 
@@ -377,6 +462,15 @@ async def crear(
             mes_crc=pz.get("mes_crc")))
     await db.commit()
 
+    # El signo del mes contra el mayor del mismo mes, ANTES del espejo: el
+    # espejo y «Pasar a Final» leen estas filas. Si falla, la subida ya está.
+    try:
+        signos = await corregir_signos_del_borrador(db, pc)
+        await db.commit()
+    except Exception as e:            # noqa: BLE001 — no puede tumbar la subida
+        await db.rollback()
+        signos = {"verificado": False, "motivo": "error", "error": str(e)[:300], "corregidas": 0}
+
     # El espejo, para que los 19 sub-tabs puedan mirar este mes sin pasarlo a
     # Final. Si falla, la subida ya está: se dice y se sigue.
     espejo: dict = {"escrito": False, "error": None}
@@ -392,6 +486,8 @@ async def crear(
             # A cuál reemplazó y cuántas vueltas lleva el mes. Reemplazar sin
             # decirlo sería pisar en silencio; decirlo lo vuelve historia.
             "reemplaza_a": reemplazado, "vuelta": vueltas,
+            # Las cuentas que entraron con el signo del acumulado y el mayor corrigió.
+            "signos": signos,
             # Los departamentos que nadie mapeó, CON su monto: sin eso no hay
             # forma de saber si es ruido o si falta media operación.
             "sin_mapeo": [{"depto": x["depto"], "mes_usd": float(x["mes_usd"]),
