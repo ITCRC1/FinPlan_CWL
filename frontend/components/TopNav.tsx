@@ -653,7 +653,11 @@ export default function TopNav() {
   const router = useRouter();
   const locale = useLocale();
   const tc = useTranslations("common");
-  useEffect(() => { setUser(getStoredUser()); }, []);
+  // ⚠️ Se relee en CADA cambio de ruta, no solo al montar. El login guarda la
+  // sesión y navega con `router.push` sin recargar: la barra no se vuelve a
+  // montar, se quedaba con `user = null` y mostraba «Iniciar sesión» y SIN
+  // «Usuarios» a un admin recién logueado (owner, 2026-11-16: «no lo veo»).
+  useEffect(() => { setUser(getStoredUser()); }, [pathname]);
 
   /**
    * El menú ESCONDE lo que esta persona no puede usar; no lo deshabilita.
