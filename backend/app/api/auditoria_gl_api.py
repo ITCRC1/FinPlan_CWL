@@ -152,12 +152,15 @@ async def _corregir_el_precierre_del_mes(db: AsyncSession, anio: int, mes: int) 
     """
     from app.api.precierre_api import _reflejar, corregir_signos_del_borrador
     from app.models.precierre import Precierre
-    pc = (await db.execute(select(Precierre).where(
-        Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio, Precierre.mes == mes,
-        Precierre.estado == "borrador"))).scalars().first()
-    if pc is None:
-        return {"verificado": False, "motivo": "sin_precierre_del_mes", "corregidas": 0}
+    # ⚠️ TODO va dentro del try, también la búsqueda del borrador: el mayor ya quedó
+    # guardado arriba y nada de esto puede tumbar esa subida (la prueba del mayor
+    # guardado lo corre sin la tabla del Pre-Cierre).
     try:
+        pc = (await db.execute(select(Precierre).where(
+            Precierre.hotel_id == HOTEL_ID, Precierre.anio == anio, Precierre.mes == mes,
+            Precierre.estado == "borrador"))).scalars().first()
+        if pc is None:
+            return {"verificado": False, "motivo": "sin_precierre_del_mes", "corregidas": 0}
         r = await corregir_signos_del_borrador(db, pc)
         await db.commit()
     except Exception as e:            # noqa: BLE001
