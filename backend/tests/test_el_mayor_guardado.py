@@ -838,7 +838,29 @@ def test_nadie_mas_que_la_auditoria_LEE_el_mayor_guardado():
     # La pestaña «Stats» de Estadísticas (owner, 2026-11-10: «la contabilidad
     # manda») también lo lee, pero SOLO la clase 9 —cantidades, no plata— y para
     # mirarla: no alimenta ningún total. La prueba de abajo lo amarra.
-    assert lectores == ["api/auditoria_gl_api.py", "api/stats_integrity_api.py"], lectores
+    #
+    # El Pre-Cierre (2026-11-13) lo lee para UNA cosa: el SIGNO del mes. El
+    # archivo de Integrity trae el signo del acumulado y en octubre eso volteó 11
+    # cuentas; el mayor del mismo mes dice cuál es el del mes. No suma montos del
+    # mayor al Pre-Cierre: corrige el signo del monto que ya venía del archivo.
+    #
+    # El conector de Claude (2026-11-16) lo lee para mostrarlo tal cual —la
+    # herramienta `mayor`, mismo uso que la pestaña de Auditoría— y no escribe.
+    # La prueba de abajo lo amarra.
+    assert lectores == ["api/auditoria_gl_api.py", "api/precierre_api.py",
+                        "api/stats_integrity_api.py", "claude_herramientas.py"], lectores
+
+
+def test_el_conector_de_claude_solo_MUESTRA_el_mayor():
+    """Claude lo lee en una sola herramienta y no escribe en ninguna de lectura."""
+    import inspect
+
+    from app import claude_herramientas as h
+
+    codigo = _sin_comentarios(inspect.getsource(h))
+    assert codigo.count("MayorMovimiento") == 1, "el mayor se lee solo en la herramienta `mayor`"
+    for prohibido in ("s.add(", ".commit(", "delete(", "insert(", "update("):
+        assert prohibido not in codigo, prohibido
 
 
 def test_stats_solo_lee_la_clase_9_del_mayor_y_no_escribe():

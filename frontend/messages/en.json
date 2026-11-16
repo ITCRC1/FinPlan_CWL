@@ -2195,7 +2195,11 @@
     "inviteConfirm": "Send {email} a new invitation? They will set their own password. The one they use today keeps working until they do.",
     "inviteFor": "✓ Invitation for {email}",
     "inviteNote": "Send it through a private channel. The link <b>expires in {dias} days</b> and works <b>only once</b>. The person types their own password: the server never sees it. If it gets lost, generate another from “Invite”.",
-    "inviteReemplazo": "The invitation they had pending was cancelled."
+    "inviteReemplazo": "The invitation they had pending was cancelled.",
+    "claudeAccess": "Claude access",
+    "claudeOn": "Yes",
+    "claudeOff": "No",
+    "claudeHint": "Can query FinPlan from Claude (claude.ai) with their own account. Includes payroll with salaries."
   },
   "board": {
     "title": "Budget Board",

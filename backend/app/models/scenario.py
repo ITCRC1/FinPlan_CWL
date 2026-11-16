@@ -60,6 +60,11 @@ class Scenario(Base):
     #: Uno por hotel y año, sobreescrito en cada subida. Nunca se promueve a
     #: ACTUAL: «Pasar a Final» escribe el de siempre.
     es_precierre: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Claude (el conector de claude.ai) puede MODIFICAR esta versión. Nace en
+    #: False: solo versiones de trabajo marcadas a propósito —la primera,
+    #: BUDGET 2027 «Draft1-PAN», para armar un modelo de negocio nuevo (owner,
+    #: 2026-11-16)—. Nunca un ACTUAL ni el Pre-Cierre (ver claude_herramientas). Mig 164.
+    claude_puede_editar: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     source_file: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_by: Mapped[str] = mapped_column(String(100), default="")

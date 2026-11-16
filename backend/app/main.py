@@ -235,6 +235,10 @@ app.include_router(pacing_router, prefix="/api", dependencies=_guard)
 app.include_router(informe_router, prefix="/api", dependencies=_guard)
 app.include_router(usali_router, prefix="/api", dependencies=_guard)
 app.include_router(auth_router, prefix="/api")   # público (login/bootstrap/status)
+# Conector de Claude (claude.ai): OAuth 2.1 + MCP en la RAIZ (/.well-known, /oauth, /mcp),
+# como lo espera Claude. Se autentica solo: cada ruta valida su propio token.
+from app.api.claude_mcp_api import router as claude_mcp_router  # noqa: E402
+app.include_router(claude_mcp_router)
 
 
 @app.on_event("startup")

@@ -75,6 +75,12 @@ def decode_token(token: str) -> Optional[dict]:
         body = json.loads(_b64d(seg.split(".", 1)[1]))
         if body.get("exp", 0) < time.time():
             return None
+        # ⚠️ Un token con audiencia es de OTRO consumidor —el conector de Claude
+        # (`aud=finplan-mcp`, ver claude_mcp_api)—: misma firma, otro permiso. Sin
+        # esta línea, el token que se le entrega a Claude abría también toda la API
+        # de la app, incluidas las rutas que escriben en cualquier versión.
+        if body.get("aud"):
+            return None
         return body
     except Exception:
         return None

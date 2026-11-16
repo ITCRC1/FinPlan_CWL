@@ -235,6 +235,8 @@ export interface AuthUser {
   locale?: string | null;
   /** Paleta propia. `null` = «usá la que viene por defecto». */
   tema?: string | null;
+  /** Puede consultar FinPlan desde Claude (claude.ai) con su cuenta. Lo prende un admin. */
+  acceso_claude?: boolean;
 }
 /** Lo que devuelve /auth/login y /auth/bootstrap: sesión + idioma YA RESUELTO. */
 interface SessionResponse { token: string; user: AuthUser; locale?: string; tema?: string }
@@ -369,7 +371,7 @@ export async function canjearInvitacion(
 }
 export async function updateUser(
   userId: string,
-  patch: { name?: string; role?: string; active?: boolean; password?: string },
+  patch: { name?: string; role?: string; active?: boolean; password?: string; acceso_claude?: boolean },
 ): Promise<AuthUser> {
   return api.patch<AuthUser>(`/auth/users/${userId}`, patch);
 }

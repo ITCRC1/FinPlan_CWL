@@ -83,7 +83,7 @@ export default function UsersPage() {
     } finally { setBusy(false); }
   }
 
-  async function patch(id: string, p: { name?: string; role?: string; active?: boolean; password?: string }) {
+  async function patch(id: string, p: { name?: string; role?: string; active?: boolean; password?: string; acceso_claude?: boolean }) {
     setError(null); setMsg(null);
     try { await updateUser(id, p); await load(); setMsg(t("updated")); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : tc("error")); }
@@ -204,6 +204,9 @@ export default function UsersPage() {
               <th style={{ textAlign: "left" }}>Email</th>
               <th style={{ textAlign: "left" }}>{t("role")}</th>
               <th style={{ textAlign: "left" }}>{tc("status")}</th>
+              {/* Owner, 2026-11-16: el conector de claude.ai entra con la cuenta de cada
+                  persona, y solo si esta casilla está prendida (abre la planilla con salarios). */}
+              <th style={{ textAlign: "left" }} title={t("claudeHint")}>{t("claudeAccess")}</th>
               {me?.role === "admin" && <th style={{ textAlign: "left" }}>{t("actions")}</th>}
             </tr>
           </thead>
@@ -216,6 +219,14 @@ export default function UsersPage() {
                 <td style={{ textAlign: "left" }}>{u.email}</td>
                 <td style={{ textAlign: "left" }}><span style={rolePill(u.role)}>{u.role === "admin" ? "Admin" : t("collaborator")}</span></td>
                 <td style={{ textAlign: "left", color: u.active ? "var(--accent-green, #1A7F4B)" : "var(--text-disabled)", fontSize: 12 }}>{u.active ? t("active") : t("inactive")}</td>
+                <td style={{ textAlign: "left" }}>
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12,
+                                  cursor: me?.role === "admin" ? "pointer" : "default" }} title={t("claudeHint")}>
+                    <input type="checkbox" checked={!!u.acceso_claude} disabled={me?.role !== "admin"}
+                      onChange={() => patch(u.id, { acceso_claude: !u.acceso_claude })} />
+                    {u.acceso_claude ? t("claudeOn") : t("claudeOff")}
+                  </label>
+                </td>
                 {me?.role === "admin" && (
                   <td style={{ textAlign: "left" }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>

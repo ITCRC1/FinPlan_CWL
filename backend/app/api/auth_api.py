@@ -28,7 +28,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _user_dict(u: User) -> dict:
     return {"id": u.id, "email": u.email, "name": u.name, "role": u.role,
-            "active": u.active, "locale": u.locale, "tema": u.tema}
+            "active": u.active, "locale": u.locale, "tema": u.tema,
+            "acceso_claude": bool(getattr(u, "acceso_claude", False))}
 
 
 async def _hotel_locale(db: AsyncSession) -> str | None:
@@ -253,6 +254,8 @@ class UserUpdate(BaseModel):
     role: str | None = None
     active: bool | None = None
     password: str | None = None
+    #: Puede consultar FinPlan desde Claude (claude.ai). Solo admin lo cambia (esta ruta ya exige admin).
+    acceso_claude: bool | None = None
 
 
 @router.patch("/users/{user_id}")
@@ -271,6 +274,10 @@ async def update_user(
         u.role = body.role
     if body.active is not None:
         u.active = body.active
+    if body.acceso_claude is not None:
+        # Apagarlo corta el conector en la SIGUIENTE consulta: el servidor MCP
+        # vuelve a mirar esta casilla en cada pedido y al renovar el token.
+        u.acceso_claude = body.acceso_claude
     if body.password:
         if len(body.password) < 8:
             raise ErrorApi(422, "clave.muy_corta")

@@ -2195,7 +2195,11 @@
     "inviteConfirm": "¿Enviarle una invitación nueva a {email}? Podrá poner su propia contraseña. La que usa hoy sigue funcionando hasta que lo haga.",
     "inviteFor": "✓ Invitación para {email}",
     "inviteNote": "Mándesela por un canal privado. El enlace <b>vence en {dias} días</b> y sirve <b>una sola vez</b>. La contraseña la escribe la persona: el servidor nunca la ve. Si se pierde, genere otra desde «Invitar».",
-    "inviteReemplazo": "Se anuló la invitación anterior que tenía pendiente."
+    "inviteReemplazo": "Se anuló la invitación anterior que tenía pendiente.",
+    "claudeAccess": "Acceso desde Claude",
+    "claudeOn": "Sí",
+    "claudeOff": "No",
+    "claudeHint": "Puede consultar FinPlan desde Claude (claude.ai) con su usuario. Incluye la planilla con salarios."
   },
   "board": {
     "title": "Tablero del Presupuesto",

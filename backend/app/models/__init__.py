@@ -147,3 +147,5 @@ from app.models.pacing import (
 from app.models.deposit import DepositLoad, DepositEntry  # noqa: F401
 from app.models.usali import (UsaliDefinicion, UsaliDocumento,  # noqa: F401
                               UsaliItem)
+from app.models.acceso_claude import (ClaudeCliente, ClaudeCodigo,  # noqa: F401
+                                     ClaudeRefresh, ClaudeConsulta)
