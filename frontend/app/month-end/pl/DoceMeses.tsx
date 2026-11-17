@@ -31,6 +31,9 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
 const FILAS: { code: string; label: string; fuerte?: boolean; sangria?: boolean }[] = [
   { code: "K_ROOMS_AVAIL", label: "Total Rooms Available" },
   { code: "K_ROOMS_OCC", label: "Total Rooms Occupied" },
+  // Owner, 2026-11-17: «por qué no aparece total pax, pax por mes». El dato
+  // siempre vino en `kpis.guests`; la fila nunca se puso.
+  { code: "K_GUESTS", label: "Total Guests (pax)" },
   { code: "K_OCC", label: "Occupancy %" },
   { code: "K_ADR", label: "ADR" },
   { code: "K_REVPAR", label: "RevPAR" },
@@ -48,7 +51,7 @@ const FILAS: { code: string; label: string; fuerte?: boolean; sangria?: boolean 
   { code: "NET_PROFIT", label: "Net Profit", fuerte: true },
 ];
 
-const KPI = new Set(["K_ROOMS_AVAIL", "K_ROOMS_OCC", "K_OCC", "K_ADR", "K_REVPAR"]);
+const KPI = new Set(["K_ROOMS_AVAIL", "K_ROOMS_OCC", "K_GUESTS", "K_OCC", "K_ADR", "K_REVPAR"]);
 
 const usd = (n: number) =>
   Math.abs(n) < 0.005 ? "—"
@@ -144,6 +147,7 @@ export default function DoceMeses({ escenarios, inicial, compacto = true,
       const i = m.month - 1;
       out.K_ROOMS_AVAIL[i] = m.kpis.rooms_available;
       out.K_ROOMS_OCC[i] = m.kpis.rooms_occupied;
+      out.K_GUESTS[i] = m.kpis.guests ?? 0;
       out.K_OCC[i] = m.kpis.occupancy_pct;
       out.K_ADR[i] = m.kpis.adr;
       out.K_REVPAR[i] = m.kpis.revpar;
@@ -228,7 +232,7 @@ export default function DoceMeses({ escenarios, inicial, compacto = true,
 
   const fmt = (code: string, v: number) =>
     code === "K_OCC" ? pct(v)
-      : code === "K_ROOMS_AVAIL" || code === "K_ROOMS_OCC" ? num(v)
+      : code === "K_ROOMS_AVAIL" || code === "K_ROOMS_OCC" || code === "K_GUESTS" ? num(v)
         : usd(v);
 
   const MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
