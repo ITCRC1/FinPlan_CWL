@@ -5,6 +5,7 @@ import { FAM_FB, FAM_ROOMS, familia } from "@/lib/plFamilias";
 import {
   getScenarios, getPLCompare, getPLMonthly, getPayrollDeptReport, getCashflowBudget, getPLByDept,
   getRevenueByRoomType, type RevenueByRoomType,
+  getOtbWeeks, getOnTheBooks, type OnTheBooks, type PLLine,
   type Scenario, type PLColumn, type PLMonthly, type PayrollDeptReport, type CashFlowBudget, type PLByDept,
 } from "@/lib/api";
 import { SECCIONES, type SeccionId } from "./secciones";
@@ -21,6 +22,7 @@ import { CapitalDetalle } from "./capital";
 import { OnTheBooksPanel } from "@/components/OnTheBooksPanel";
 import { HOTEL_ID } from "@/lib/hotel";
 import IrA from "@/components/IrA";
+import { semanasDe } from "@/lib/weeks";
 
 /**
  * Presentación a la Junta.
@@ -37,7 +39,9 @@ import IrA from "@/components/IrA";
 const LINEAS_INGRESO = [
   // ⚠️ Familias, no lineas sueltas: Rooms y A&B estan partidos desde el
   // 2026-08-14 y esta lista mostraba de menos. Ver `lib/plFamilias.ts`.
-  { codes: FAM_ROOMS, label: "Habitaciones" },
+  // `otb`: el On the Books trae el ingreso de habitaciones; las demás líneas
+  // no lo traen y van en «—».
+  { codes: FAM_ROOMS, label: "Habitaciones", otb: true },
   { codes: FAM_FB, label: "A&B" },
   { codes: ["REV_PRIVATE_BAR"], label: "Private Bar" },
   { codes: ["REV_TOURS"], label: "Tours y Actividades" },
@@ -71,12 +75,13 @@ const LINEAS_CAPITAL = [
 
 /** Convierte un catálogo de líneas del P&L en filas de la serie, agregando el
  *  total — que en una presentación es lo que la junta busca primero. */
-function filasDe(cat: { codes: readonly string[]; label: string; lk?: string }[],
-                 totalLabel: string, totalCode: string): FilaSerie[] {
+function filasDe(cat: { codes: readonly string[]; label: string; lk?: string; otb?: boolean }[],
+                 totalLabel: string, totalCode: string, totalOtb = false): FilaSerie[] {
   return [
-    ...cat.map(c => ({ label: c.label, lk: c.lk, formato: "dinero" as const,
+    ...cat.map(c => ({ label: c.label, lk: c.lk, formato: "dinero" as const, otb: c.otb,
                        get: (x?: PLColumn) => familia(c.codes, (k: string) => linea(x, k)) })),
     {
+      otb: totalOtb,
       // ⚠️ El total sale del MOTOR, no de sumar las filas de arriba. Sumandolas,
       // cualquier linea que faltara en el catalogo hacia que el total de la
       // presentacion saliera CORTO — y la misma presentacion se contradecia con
@@ -92,6 +97,48 @@ function filasDeGasto(cat: { code: string; label: string ; lk?: string }[],
                       totalLabel: string, totalCode: string): FilaSerie[] {
   return filasDe(cat.map(c => ({ codes: [c.code], label: c.label })),
                  totalLabel, totalCode);
+}
+
+/** Una línea del P&L sintética, para que el On the Books entre por las mismas
+ *  tablas que los escenarios. */
+const lineaOtb = (code: string, monto: number): PLLine => ({
+  line_code: code, line_name: code, section: "REVENUES", dept_code: "",
+  amount_usd: monto, is_calculated: true,
+});
+
+/** Un mes (o un año) del OTB con la forma de una columna del P&L. El ADR y el
+ *  RevPAR se REDERIVAN de las sumas: promediar los de cada mes le daría el mismo
+ *  peso a un mes lleno que a uno vacío. */
+function columnaOtb(ms: OnTheBooks["months"]): PLColumn {
+  const disp = ms.reduce((t, m) => t + (m.rooms_available || 0), 0);
+  const ocu = ms.reduce((t, m) => t + (m.rooms_occupied || 0), 0);
+  const hab = ms.reduce((t, m) => t + (m.rooms_revenue || 0), 0);
+  const tot = ms.reduce((t, m) => t + (m.total_revenue || 0), 0);
+  return {
+    kpis: {
+      rooms_available: disp, rooms_occupied: ocu,
+      guests: ms.reduce((t, m) => t + (m.guests || 0), 0),
+      occupancy_pct: disp ? ocu / disp : 0,
+      adr: ocu ? hab / ocu : 0,
+      revpar: disp ? hab / disp : 0,
+    },
+    lines: [lineaOtb("REV_ROOMS", hab), lineaOtb("TOTAL_REVENUES", tot)],
+  };
+}
+
+/** El corte de OTB que SIRVE para un año: el más nuevo que traiga ingreso de
+ *  ese año. El más nuevo a secas puede ser un archivo exportado con el rango de
+ *  otro año —pasó el 2026-11-09 en el Daily— y deja todo en cero sin avisar. */
+async function otbDelAnio(escenarioId: string, anio: number): Promise<OnTheBooks | null> {
+  const { weeks } = await getOtbWeeks(escenarioId);
+  for (const w of [...weeks].sort((a, b) => b - a).slice(0, 12)) {
+    const o = await getOnTheBooks(escenarioId, w, anio);
+    // Ingreso total Y de habitaciones: el corte de la semana 35 trae las noches
+    // con el ingreso de habitaciones en cero, y daba un ADR de $0.
+    if (o.has_data && o.months.some(m => (m.total_revenue || 0) > 0)
+        && o.months.some(m => (m.rooms_revenue || 0) > 0)) return o;
+  }
+  return null;
 }
 
 export default function JuntaPage() {
@@ -119,6 +166,12 @@ export default function JuntaPage() {
   const [porDepto, setPorDepto] = useState<Record<string, PLByDept | null>>({});
   const [cajas, setCajas] = useState<Record<string, CashFlowBudget | null>>({});
   const [dep, setDep] = useState("ROOMS");
+  // On the Books del año que se presenta (owner, 2026-11-17: «mete on the
+  // books 2027 en todas las opciones de análisis»). Va como una columna más,
+  // al final; se puede apagar para la versión que se imprime sin él.
+  const [conOtb, setConOtb] = useState(true);
+  const [otb, setOtb] = useState<OnTheBooks | null>(null);
+  const [otbEstado, setOtbEstado] = useState<"cargando" | "listo" | "sin">("cargando");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -177,10 +230,52 @@ export default function JuntaPage() {
   }, [clave, principal]);
   useEffect(() => { cargar(); }, [cargar]);
 
-  const vs: Version[] = useMemo(() => orden.map(id => {
+  const anioOtb = scenarios.find(x => x.id === principal)?.year ?? 0;
+  useEffect(() => {
+    if (!principal || !anioOtb) return;
+    let cancel = false;
+    setOtbEstado("cargando");
+    otbDelAnio(principal, anioOtb)
+      .then(o => { if (!cancel) { setOtb(o); setOtbEstado(o ? "listo" : "sin"); } })
+      .catch(() => { if (!cancel) { setOtb(null); setOtbEstado("sin"); } });
+    return () => { cancel = true; };
+  }, [principal, anioOtb]);
+
+  /** El rótulo dice DE CUÁNDO es el corte: «en libros» sin fecha no se puede
+   *  leer contra un presupuesto. La semana se nombra por el año en que se tomó
+   *  el corte, no por el año del dato. */
+  const otbLabel = useMemo(() => {
+    if (!otb) return "";
+    const sem = semanasDe(new Date().getFullYear()).find(w => w.n === otb.week);
+    return "On the Books " + otb.year + " · " + (sem ? sem.label : "sem. " + otb.week);
+  }, [otb]);
+
+  /** Las versiones SIN el OTB: departamentos, planilla, gastos, capital y caja
+   *  no tienen nada que comparar contra reservas. */
+  const vsEsc: Version[] = useMemo(() => orden.map(id => {
     const s = scenarios.find(x => x.id === id);
     return { id, label: s ? scnLabel(s) : "—", col: cols[id] };
   }), [orden, scenarios, cols]);
+
+  const vs: Version[] = useMemo(() => (conOtb && otb)
+    ? [...vsEsc, { id: "otb", label: otbLabel, col: columnaOtb(otb.months), otb: true }]
+    : vsEsc, [vsEsc, conOtb, otb, otbLabel]);
+
+  /** Los meses del OTB con la forma del mensual del P&L, para la
+   *  estacionalidad y los trimestres. */
+  const mensualesConOtb = useMemo<Record<string, PLMonthly | null>>(() => (conOtb && otb)
+    ? {
+      ...mensuales,
+      otb: {
+        scenario_id: "otb", year: otb.year, annual: {},
+        months: Array.from({ length: 12 }, (_, i) => {
+          const m = otb.months.find(x => x.month === i + 1);
+          const c = columnaOtb(m ? [m] : []);
+          return { month: i + 1, kpis: c.kpis, lines: c.lines };
+        }),
+      },
+    }
+    : mensuales, [mensuales, conOtb, otb]);
 
   const elegir = (i: number, id: string) => fijar[i]?.(id);
 
@@ -202,7 +297,7 @@ export default function JuntaPage() {
           <span style={{ color: "var(--brand)" }}>{t("titleAccent")}</span>
         </h1>
         <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 6, fontWeight: 600 }}>
-          {vs.map(v => v.label).join("  →  ")}
+          {vsEsc.map(v => v.label).join("  →  ")}
         </div>
       </div>
 
@@ -240,6 +335,16 @@ export default function JuntaPage() {
             title={t("printHint")}>
             🖨 PDF
           </button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 10, fontSize: 12, color: "var(--text-secondary)" }}>
+          {otbEstado === "cargando" ? t("otbLoading", { anio: anioOtb })
+            : otbEstado === "sin" ? t("otbNone", { anio: anioOtb })
+            : (
+              <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={conOtb} onChange={e => setConOtb(e.target.checked)} />
+                {t("otbInclude", { corte: otbLabel })}
+              </label>
+            )}
         </div>
       </div>
 
@@ -282,33 +387,33 @@ export default function JuntaPage() {
               {(documento || vistaVol === "anual") && (
                 <>
                   <TablaSerie vs={vs} filas={FILAS_VOLUMEN} primera={tc("indicator")} />
-                  <Estacionalidad mensuales={mensuales} vs={vs} modo="volumen" />
+                  <Estacionalidad mensuales={mensualesConOtb} vs={vs} modo="volumen" />
                 </>
               )}
               {(documento || vistaVol === "trimestre") && (
                 <div style={{ marginTop: documento ? 22 : 0 }}>
-                  <VolumenPorTrimestre vs={vs} mensuales={mensuales} />
+                  <VolumenPorTrimestre vs={vs} mensuales={mensualesConOtb} />
                 </div>
               )}
               {(documento || vistaVol === "tipo") && (
                 <div style={{ marginTop: documento ? 22 : 0 }}>
-                  <VolumenPorTipo datos={porTipo} vs={vs} />
+                  <VolumenPorTipo datos={porTipo} vs={vsEsc} />
                 </div>
               )}
             </>
           ) : s.id === "precio" ? (
             <>
               <TablaSerie vs={vs} filas={FILAS_PRECIO} primera={tc("indicator")} />
-              <Estacionalidad mensuales={mensuales} vs={vs} modo="precio" />
+              <Estacionalidad mensuales={mensualesConOtb} vs={vs} modo="precio" />
             </>
           ) : s.id === "ingresos" ? (
-            <TablaSerie vs={vs} filas={filasDe(LINEAS_INGRESO, t("totalRevenue"), "TOTAL_REVENUES")} primera={t("revenueLine")} />
+            <TablaSerie vs={vs} filas={filasDe(LINEAS_INGRESO, t("totalRevenue"), "TOTAL_REVENUES", true)} primera={t("revenueLine")} />
           ) : s.id === "departamentos" ? (
-            <Departamentos vs={vs} sel={dep} onSel={setDep} porDepto={porDepto} documento={documento} />
+            <Departamentos vs={vsEsc} sel={dep} onSel={setDep} porDepto={porDepto} documento={documento} />
           ) : s.id === "planilla" ? (
-            <PlanillaHeadcount vs={vs} reportes={planilla} />
+            <PlanillaHeadcount vs={vsEsc} reportes={planilla} />
           ) : s.id === "gastos" ? (
-            <TablaSerie vs={vs} filas={filasDeGasto(LINEAS_GASTO, "Total overhead", "TOTAL_OVERHEAD_EXPENSES")} primera={t("area")} />
+            <TablaSerie vs={vsEsc} filas={filasDeGasto(LINEAS_GASTO, "Total overhead", "TOTAL_OVERHEAD_EXPENSES")} primera={t("area")} />
           ) : s.id === "capital" ? (
             <>
               {/* En modo documento salen las dos: el PDF tiene que llevar el
@@ -320,7 +425,7 @@ export default function JuntaPage() {
                 ))}
               </div>
               {(documento || vistaCap === "resumen") && (
-                <TablaSerie vs={vs} filas={LINEAS_CAPITAL.map(c => ({
+                <TablaSerie vs={vsEsc} filas={LINEAS_CAPITAL.map(c => ({
                   label: c.label, lk: c.lk, formato: "dinero" as const, fuerte: c.code === "CAPITAL_EXPENSE",
                   get: (x?: PLColumn) => linea(x, c.code),
                 }))} primera={tc("concept")} />
@@ -335,7 +440,7 @@ export default function JuntaPage() {
               )}
             </>
           ) : s.id === "cashflow" ? (
-            <Caja cajas={cajas} vs={vs} />
+            <Caja cajas={cajas} vs={vsEsc} />
           ) : s.id === "otb" ? (
             <OnTheBooksPanel budgetInicial={vs[0]?.id} soloLectura />
           ) : null}

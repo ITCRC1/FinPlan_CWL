@@ -119,6 +119,9 @@ export type FilaSerie = {
    *  P&L —el desglose por departamento, p.ej.— y necesitan buscar por escenario. */
   get: (c?: PLColumn, v?: Version) => number;
   fuerte?: boolean; grupo?: string; puntos?: boolean; sangria?: boolean;
+  /** La fila se puede calcular con el On the Books (noches, huéspedes, ingreso
+   *  de habitaciones e ingreso total). Sin esta marca la columna OTB va en «—». */
+  otb?: boolean;
 };
 
 /** Tabla genérica de la serie: una fila por indicador, una columna por versión. */
@@ -146,7 +149,12 @@ export function TablaSerie({ vs, filas, primera }: { vs: Version[]; filas: FilaS
                 <td className="mono" style={{ ...td, fontWeight: f.fuerte ? 800 : 700 }}>
                   {vs[0]?.col ? fmt(f.get(vs[0].col, vs[0])) : "—"}
                 </td>
-                {vs.slice(1).map(v => (
+                {vs.slice(1).map(v => (v.otb && !f.otb) ? (
+                  <>
+                    <td key={v.id} className="mono" style={sub}>—</td>
+                    <td key={`${v.id}-d`} style={td}>—</td>
+                  </>
+                ) : (
                   <>
                     <td key={v.id} className="mono" style={sub}>{v.col ? fmt(f.get(v.col, v)) : "—"}</td>
                     {v.col && vs[0]?.col
@@ -170,15 +178,15 @@ const trevpor = (c?: PLColumn) => {
 };
 
 export const FILAS_RESUMEN: FilaSerie[] = [
-  { grupo: "Volumen", label: "Habitaciones disponibles", formato: "conteo", get: c => c?.kpis.rooms_available ?? 0 },
-  { label: "Habitaciones ocupadas", formato: "conteo", get: c => c?.kpis.rooms_occupied ?? 0 },
-  { label: "Huéspedes", lk: "@common.guests", formato: "conteo", get: c => c?.kpis.guests ?? 0 },
-  { label: "Ocupación", lk: "occupancy", formato: "pct", puntos: true, get: c => (c?.kpis.occupancy_pct ?? 0) * 100 },
-  { grupo: "Precio", label: "ADR", formato: "money2", get: c => c?.kpis.adr ?? 0 },
-  { label: "RevPAR", formato: "money2", get: c => c?.kpis.revpar ?? 0 },
-  { label: "TRevPOR", formato: "money2", get: trevpor },
-  { grupo: "Ingresos", label: "Ingreso total", formato: "dinero", fuerte: true, get: c => linea(c, "TOTAL_REVENUES") },
-  { label: "Habitaciones", formato: "dinero", get: c => linea(c, "REV_ROOMS") },
+  { grupo: "Volumen", label: "Habitaciones disponibles", otb: true, formato: "conteo", get: c => c?.kpis.rooms_available ?? 0 },
+  { label: "Habitaciones ocupadas", otb: true, formato: "conteo", get: c => c?.kpis.rooms_occupied ?? 0 },
+  { label: "Huéspedes", otb: true, lk: "@common.guests", formato: "conteo", get: c => c?.kpis.guests ?? 0 },
+  { label: "Ocupación", otb: true, lk: "occupancy", formato: "pct", puntos: true, get: c => (c?.kpis.occupancy_pct ?? 0) * 100 },
+  { grupo: "Precio", label: "ADR", otb: true, formato: "money2", get: c => c?.kpis.adr ?? 0 },
+  { label: "RevPAR", otb: true, formato: "money2", get: c => c?.kpis.revpar ?? 0 },
+  { label: "TRevPOR", otb: true, formato: "money2", get: trevpor },
+  { grupo: "Ingresos", label: "Ingreso total", otb: true, formato: "dinero", fuerte: true, get: c => linea(c, "TOTAL_REVENUES") },
+  { label: "Habitaciones", otb: true, formato: "dinero", get: c => linea(c, "REV_ROOMS") },
   { label: "A&B", formato: "dinero", get: c => linea(c, "REV_FB") },
   { label: "Resto", formato: "dinero", get: c => linea(c, "TOTAL_REVENUES") - linea(c, "REV_ROOMS") - linea(c, "REV_FB") },
   { grupo: "Resultado", label: "GOP", formato: "dinero", fuerte: true, get: c => linea(c, "GOP") },
@@ -191,20 +199,20 @@ export const FILAS_RESUMEN: FilaSerie[] = [
  *  viene y a qué precio se le vende— y mezclarlas en una tabla obliga a la junta
  *  a saltar entre unidades. En el PowerPoint también eran diapositivas aparte. */
 export const FILAS_VOLUMEN: FilaSerie[] = [
-  { label: "Habitaciones disponibles", lk: "roomsAvailable", formato: "conteo", get: c => c?.kpis.rooms_available ?? 0 },
-  { label: "Habitaciones ocupadas", lk: "roomsOccupied", formato: "conteo", fuerte: true, get: c => c?.kpis.rooms_occupied ?? 0 },
-  { label: "Huéspedes", lk: "@common.guests", formato: "conteo", get: c => c?.kpis.guests ?? 0 },
-  { label: "Ocupación", lk: "occupancy", formato: "pct", puntos: true, fuerte: true, get: c => (c?.kpis.occupancy_pct ?? 0) * 100 },
-  { label: "Huéspedes por habitación ocupada", lk: "guestsPerOccupiedRoom", formato: "razon", get: c => {
+  { label: "Habitaciones disponibles", otb: true, lk: "roomsAvailable", formato: "conteo", get: c => c?.kpis.rooms_available ?? 0 },
+  { label: "Habitaciones ocupadas", otb: true, lk: "roomsOccupied", formato: "conteo", fuerte: true, get: c => c?.kpis.rooms_occupied ?? 0 },
+  { label: "Huéspedes", otb: true, lk: "@common.guests", formato: "conteo", get: c => c?.kpis.guests ?? 0 },
+  { label: "Ocupación", otb: true, lk: "occupancy", formato: "pct", puntos: true, fuerte: true, get: c => (c?.kpis.occupancy_pct ?? 0) * 100 },
+  { label: "Huéspedes por habitación ocupada", otb: true, lk: "guestsPerOccupiedRoom", formato: "razon", get: c => {
       const o = c?.kpis.rooms_occupied ?? 0; return o ? (c?.kpis.guests ?? 0) / o : 0; } },
 ];
 
 export const FILAS_PRECIO: FilaSerie[] = [
-  { label: "ADR", formato: "money2", fuerte: true, get: c => c?.kpis.adr ?? 0 },
-  { label: "RevPAR", formato: "money2", fuerte: true, get: c => c?.kpis.revpar ?? 0 },
-  { label: "TRevPOR (ingreso total por hab. ocupada)", lk: "trevporLong", formato: "money2", get: trevpor },
-  { label: "Ingreso de habitaciones", lk: "roomsRevenue", formato: "dinero", get: c => linea(c, "REV_ROOMS") },
-  { label: "Ingreso fuera de habitación por hab. ocupada", lk: "nonRoomRevPerOccupied", formato: "money2", get: c => {
+  { label: "ADR", otb: true, formato: "money2", fuerte: true, get: c => c?.kpis.adr ?? 0 },
+  { label: "RevPAR", otb: true, formato: "money2", fuerte: true, get: c => c?.kpis.revpar ?? 0 },
+  { label: "TRevPOR (ingreso total por hab. ocupada)", otb: true, lk: "trevporLong", formato: "money2", get: trevpor },
+  { label: "Ingreso de habitaciones", otb: true, lk: "roomsRevenue", formato: "dinero", get: c => linea(c, "REV_ROOMS") },
+  { label: "Ingreso fuera de habitación por hab. ocupada", otb: true, lk: "nonRoomRevPerOccupied", formato: "money2", get: c => {
       const o = c?.kpis.rooms_occupied ?? 0;
       return o ? (linea(c, "TOTAL_REVENUES") - linea(c, "REV_ROOMS")) / o : 0; } },
 ];

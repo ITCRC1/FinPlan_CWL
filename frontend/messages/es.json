@@ -2488,7 +2488,10 @@
     "roomsAvailable": "Habitaciones disponibles",
     "roomsRevenue": "Ingreso de habitaciones",
     "trevporLong": "TRevPOR (ingreso total por hab. ocupada)",
-    "unclassified": "Sin clasificar"
+    "unclassified": "Sin clasificar",
+    "otbLoading": "Buscando el On the Books {anio}…",
+    "otbNone": "No hay On the Books {anio} cargado con ingreso: la presentación sale sin esa columna.",
+    "otbInclude": "Incluir {corte} como columna de comparación"
   },
   "occupancy": {
     "suggested": "Valores sugeridos (10%) — Guardá para fijarlos.",

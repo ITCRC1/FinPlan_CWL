@@ -16,6 +16,11 @@ export interface Version {
   id: string;
   label: string;
   col?: PLColumn;
+  /** On the Books: no es un escenario sino las reservas a la fecha de Opera.
+   *  Solo trae noches, huéspedes, ingreso de habitaciones e ingreso total, así
+   *  que las filas que no salen de ahí (A&B, GOP, costos) van en «—» y no en
+   *  cero: un cero diría «no se vendió nada», que es mentira. */
+  otb?: boolean;
 }
 
 /**

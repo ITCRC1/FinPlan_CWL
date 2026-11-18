@@ -2488,7 +2488,10 @@
     "roomsAvailable": "Rooms available",
     "roomsRevenue": "Rooms revenue",
     "trevporLong": "TRevPOR (total revenue per occupied room)",
-    "unclassified": "Unclassified"
+    "unclassified": "Unclassified",
+    "otbLoading": "Looking for the {anio} On the Books…",
+    "otbNone": "No {anio} On the Books with revenue is loaded: the deck goes out without that column.",
+    "otbInclude": "Include {corte} as a comparison column"
   },
   "occupancy": {
     "suggested": "Suggested values (10%) — Save to pin them.",
