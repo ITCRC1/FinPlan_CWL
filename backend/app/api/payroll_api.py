@@ -638,10 +638,25 @@ async def _dept_fte_override(scenario_id: str, db: AsyncSession) -> dict[str, di
 
 
 @router.get("/payroll/{scenario_id}/dept-report/")
-async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
+async def get_dept_report(scenario_id: str, por_padre: bool = False,
+                          db: AsyncSession = Depends(get_db)):
     """Reporte de planilla por departamento (USD anual): headcount (# posiciones),
     FTE promedio, salario base (S&W) y costo total con cargas. Base de los
-    reportes de Headcount / FTE / Salarios por depto."""
+    reportes de Headcount / FTE / Salarios por depto.
+
+    `por_padre=true` junta cada sub-departamento bajo su departamento RAÍZ del
+    catálogo (Cocina 0122 y Restaurante 0123 bajo A&B 0120; el Spa 0132 → 0130
+    → 0140). Owner, 2026-11-17: *«put everything under parent codes»*.
+
+    ⚠️ Sin esto, comparar versiones por departamento no cruza: el Budget se
+    arma por posición con los sub-departamentos, y el Forecast y el Actual
+    traen la planilla del mayor con el código padre. La Junta mostraba el
+    Forecast en «—» en casi todas las filas, aunque el total sí estaba.
+
+    `totals.con_posiciones` dice si la versión tiene posiciones reales. El
+    Actual y los meses cerrados del Forecast traen solo la posición sintética
+    «GL» —el monto del mayor, sin personas—, así que su headcount de 0 NO es
+    «cero personas»: es «no se sabe», y la pantalla lo tiene que decir así."""
     # En el PRE-CIERRE el gasto de allocation se ve (cae en su línea de
     # overhead) para que el detalle diga lo mismo que el P&L del mismo tab.
     # Ver `allocation_en_overhead`.
@@ -655,18 +670,30 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     )).scalars().all()
     override = await _dept_fte_override(scenario_id, db)
 
+    nombres: dict[str, str] = {}
+    if por_padre:
+        from app.engine.pl_engine import consolidate_dept_raiz
+        from app.models.department_catalog import DepartmentCatalog
+        nombres = {c.dept_code: (c.dept_name or "") for c in (await db.execute(
+            select(DepartmentCatalog))).scalars().all()}
+
     depts: dict[str, dict] = {}
     def row(code: str, name: str = "") -> dict:
+        if por_padre:
+            code = consolidate_dept_raiz(code)
+            name = nombres.get(code) or code
         return depts.setdefault(code, {
             "dept_code": code, "dept_name": name or code,
             "headcount": 0, "fte_avg": 0.0, "sw_annual": 0.0, "total_annual": 0.0})
 
+    con_posiciones = False
     for p in positions:
         if p.dept_code in excluir:
             continue  # Employee Dining / Laundry interna: allocation → fuera de planilla
         d = row(p.dept_code, p.dept_name)
         if p.position_code == "GL":
             continue  # posición sintética del GL (actuales): aporta costo, no headcount
+        con_posiciones = True
         if p.dept_code not in override:
             d["headcount"] += 1
             d["fte_avg"] += sum(float(get_fte(p, m)) for m in range(1, 13)) / 12.0
@@ -680,7 +707,10 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
     # con lo calculado): o viene de posiciones, o viene de la carga manual.
     for code, meses in override.items():
         d = row(code)
-        d["fte_avg"] = sum(meses.get(m, 0.0) for m in range(1, 13)) / 12.0
+        fte = sum(meses.get(m, 0.0) for m in range(1, 13)) / 12.0
+        # Por padre, varios overrides caen en la misma fila: se suman. Sin
+        # agrupar, cada override es dueño de su fila y la reemplaza.
+        d["fte_avg"] = (d["fte_avg"] + fte) if por_padre else fte
 
     rows = sorted(depts.values(), key=lambda r: r["dept_code"])
     totals = {
@@ -688,6 +718,7 @@ async def get_dept_report(scenario_id: str, db: AsyncSession = Depends(get_db)):
         "fte_avg": round(sum(r["fte_avg"] for r in rows), 2),
         "sw_annual": round(sum(r["sw_annual"] for r in rows), 2),
         "total_annual": round(sum(r["total_annual"] for r in rows), 2),
+        "con_posiciones": con_posiciones,
     }
     for r in rows:
         r["fte_avg"] = round(r["fte_avg"], 2)

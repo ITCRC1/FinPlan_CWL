@@ -3997,10 +3997,18 @@ export interface PayrollDeptRow {
 export interface PayrollDeptReport {
   scenario_id: string;
   depts: PayrollDeptRow[];
-  totals: { headcount: number; fte_avg: number; sw_annual: number; total_annual: number };
+  totals: {
+    headcount: number; fte_avg: number; sw_annual: number; total_annual: number;
+    /** false = la versión no tiene posiciones reales (Actual, meses cerrados del
+     *  Forecast: solo el monto del mayor). Su headcount 0 es «no se sabe». */
+    con_posiciones?: boolean;
+  };
 }
-export async function getPayrollDeptReport(scenarioId: string): Promise<PayrollDeptReport> {
-  return api.get<PayrollDeptReport>(`/payroll/${scenarioId}/dept-report/`);
+/** `porPadre`: junta los sub-departamentos bajo su departamento raíz del
+ *  catálogo. Lo usa la Junta para cruzar el Budget (por posición) con el
+ *  Forecast y el Actual (planilla del mayor, por código padre). */
+export async function getPayrollDeptReport(scenarioId: string, porPadre = false): Promise<PayrollDeptReport> {
+  return api.get<PayrollDeptReport>(`/payroll/${scenarioId}/dept-report/${porPadre ? "?por_padre=true" : ""}`);
 }
 
 export interface PayrollDeptMonthlyRow {

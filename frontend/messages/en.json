@@ -2491,7 +2491,8 @@
     "unclassified": "Unclassified",
     "otbLoading": "Looking for the {anio} On the Books…",
     "otbNone": "No {anio} On the Books with revenue is loaded: the deck goes out without that column.",
-    "otbInclude": "Include {corte} as a comparison column"
+    "otbInclude": "Include {corte} as a comparison column",
+    "noPositions": "This version has no positions: payroll comes from the ledger, with the amount but no people."
   },
   "occupancy": {
     "suggested": "Suggested values (10%) — Save to pin them.",

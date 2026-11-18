@@ -54,17 +54,23 @@ const LINEAS_INGRESO = [
   { codes: ["REV_LAUNDRY"], label: "Lavandería" },
 ];
 
-const LINEAS_GASTO = [
-  { code: "OH_MAINTENANCE", label: "Mantenimiento" },
-  { code: "OH_SALES_MARKETING", label: "Ventas y Mercadeo" },
-  { code: "OH_ADMIN", label: "Administración" },
-  { code: "OH_INFORMATION_SYSTEM", label: "Sistemas de Información" },
-  { code: "OH_UTILITIES", label: "Energéticos" },
-  { code: "OH_CAFETERIA", lk: "cafeteriaNet", label: "Cafetería (neto del reparto)" },
-  { code: "OH_LAUNDRY", lk: "laundryNet", label: "Lavandería (neto del reparto)" },
-  { code: "OH_CLARO_HUERTA", label: "Claro del Bosque / Huerta" },
-  { code: "OH_AREC", label: "Área Recreativa" },
-  { code: "OH_EMPLOYEE_BENEFITS", label: "Beneficios a colaboradores" },
+/** ⚠️ Cada área es una FAMILIA: su línea de overhead (OH_) más su costo de
+ *  overhead (COH_). Con solo la OH_, «Cafetería (neto del reparto)» mostraba
+ *  únicamente el crédito del reparto (−$118,000 en el Budget 2027) sin el
+ *  costo que reparte, y las filas sumaban $155,897 menos que el total que
+ *  traían debajo. Owner, 2026-11-17: «no están correctos». */
+const LINEAS_GASTO: { codes: string[]; label: string; lk?: string }[] = [
+  { codes: ["OH_MAINTENANCE"], label: "Mantenimiento" },
+  { codes: ["OH_SALES_MARKETING"], label: "Ventas y Mercadeo" },
+  { codes: ["OH_ADMIN"], label: "Administración" },
+  { codes: ["OH_CC_COMMISSIONS"], label: "Comisiones de tarjetas de crédito" },
+  { codes: ["OH_INFORMATION_SYSTEM", "COH_INFORMATION_SYSTEM"], label: "Sistemas de Información" },
+  { codes: ["OH_UTILITIES"], label: "Energéticos" },
+  { codes: ["OH_CAFETERIA", "COH_CAFETERIA"], lk: "cafeteriaNet", label: "Cafetería (neto del reparto)" },
+  { codes: ["OH_LAUNDRY", "COH_LAUNDRY"], lk: "laundryNet", label: "Lavandería (neto del reparto)" },
+  { codes: ["OH_CLARO_HUERTA", "COH_CLARO_HUERTA"], label: "Claro del Bosque / Huerta" },
+  { codes: ["OH_AREC", "COH_AREC"], label: "Área Recreativa" },
+  { codes: ["OH_EMPLOYEE_BENEFITS", "COH_EMPLOYEE_BENEFITS"], label: "Beneficios a colaboradores" },
 ];
 
 const LINEAS_CAPITAL = [
@@ -92,11 +98,18 @@ function filasDe(cat: { codes: readonly string[]; label: string; lk?: string; ot
   ];
 }
 
-/** Los catalogos de GASTO siguen siendo una linea por fila. */
-function filasDeGasto(cat: { code: string; label: string ; lk?: string }[],
+/** Los catálogos de GASTO, más una fila de «otros»: lo que el total del motor
+ *  trae y ninguna fila nombra. Si un día aparece una línea de overhead nueva,
+ *  sale ahí en vez de hacer que las filas no sumen el total. */
+function filasDeGasto(cat: { codes: string[]; label: string; lk?: string }[],
                       totalLabel: string, totalCode: string): FilaSerie[] {
-  return filasDe(cat.map(c => ({ codes: [c.code], label: c.label })),
-                 totalLabel, totalCode);
+  const todas = cat.flatMap(c => c.codes);
+  const filas = filasDe(cat, totalLabel, totalCode);
+  const total = filas.pop()!;
+  return [...filas, {
+    label: "Otros", formato: "dinero" as const,
+    get: (x?: PLColumn) => linea(x, totalCode) - todas.reduce((t, k) => t + linea(x, k), 0),
+  }, total];
 }
 
 /** Una línea del P&L sintética, para que el On the Books entre por las mismas
@@ -219,7 +232,7 @@ export default function JuntaPage() {
       getPLMonthly(id)
         .then(m => setMensuales(prev => ({ ...prev, [id]: m })))
         .catch(() => setMensuales(prev => ({ ...prev, [id]: null })));
-      getPayrollDeptReport(id)
+      getPayrollDeptReport(id, true)   // por departamento padre: cruza Budget con Forecast y Actual
         .then(p => setPlanilla(prev => ({ ...prev, [id]: p })))
         .catch(() => setPlanilla(prev => ({ ...prev, [id]: null })));
       getPLByDept(id, 0, false)   // 0 = año completo

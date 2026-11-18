@@ -2491,7 +2491,8 @@
     "unclassified": "Sin clasificar",
     "otbLoading": "Buscando el On the Books {anio}…",
     "otbNone": "No hay On the Books {anio} cargado con ingreso: la presentación sale sin esa columna.",
-    "otbInclude": "Incluir {corte} como columna de comparación"
+    "otbInclude": "Incluir {corte} como columna de comparación",
+    "noPositions": "Esta versión no tiene posiciones: la planilla viene del mayor, con el monto y sin personas."
   },
   "occupancy": {
     "suggested": "Valores sugeridos (10%) — Guardá para fijarlos.",

@@ -495,27 +495,47 @@ export function PlanillaHeadcount({ vs, reportes }: { vs: Version[]; reportes: R
   const ult = vs[0];
   const rep = ult && reportes[ult.id];
   if (!rep?.depts?.length) return <Vacio que={t("qPayroll")} />;
-  const orden = [...rep.depts].sort((a, b) => b.total_annual - a.total_annual);
+  // TODOS los departamentos de todas las versiones, no solo los del que se
+  // presenta: uno que solo existe en la comparación (Innoceana en 2025) se caía
+  // de la tabla y las filas dejaban de sumar el total de arriba.
+  const porCodigo = new Map<string, PayrollDeptReport["depts"][number]>();
+  for (const v of vs) for (const d of reportes[v.id]?.depts ?? []) {
+    if (!porCodigo.has(d.dept_code)) porCodigo.set(d.dept_code, { ...d, total_annual: 0 });
+  }
+  const totalDe = (code: string) => rep.depts.find(x => x.dept_code === code)?.total_annual ?? 0;
+  const orden = [...porCodigo.values()]
+    .map(d => ({ ...d, total_annual: totalDe(d.dept_code) }))
+    .sort((a, b) => b.total_annual - a.total_annual);
   return (
     <>
       <table className="fin-table" style={{ width: "100%", marginBottom: 16 }}>
         <Cabecera vs={vs} primera={tc("total")} />
         <tbody>
-          {([[t("people"), (r: PayrollDeptReport) => r.totals.headcount, conteo],
-             [t("avgFte"), (r: PayrollDeptReport) => r.totals.fte_avg, (v: number) => v.toFixed(1)],
-             [t("totalCost"), (r: PayrollDeptReport) => r.totals.total_annual, dinero]] as const).map(([lab, get, fmt]) => {
+          {([[t("people"), (r: PayrollDeptReport) => r.totals.headcount, conteo, true],
+             [t("avgFte"), (r: PayrollDeptReport) => r.totals.fte_avg, (v: number) => v.toFixed(1), true],
+             [t("totalCost"), (r: PayrollDeptReport) => r.totals.total_annual, dinero, false]] as const).map(([lab, get, fmt, dePersonas]) => {
+            // Personas y FTE salen de las POSICIONES. El Actual y los meses
+            // cerrados del Forecast solo traen el monto del mayor: ahí un 0
+            // diría «nadie trabajó», y lo cierto es que no se sabe.
+            const sabe = (r?: PayrollDeptReport | null) => !!r && (!dePersonas || r.totals.con_posiciones !== false);
             const rp = reportes[ult.id];
             const a = rp ? get(rp) : 0;
             return (
               <tr key={lab} style={{ borderTop: "1px solid var(--border-subtle)" }}>
                 <td style={{ ...tdL, fontWeight: 700 }}>{lab}</td>
-                <td className="mono" style={{ ...td, fontWeight: 800 }}>{rp ? fmt(a) : "—"}</td>
+                <td className="mono" style={{ ...td, fontWeight: 800 }}>{sabe(rp) ? fmt(a) : "—"}</td>
                 {vs.slice(1).map(v => {
                   const r = reportes[v.id];
+                  if (!sabe(r)) return (
+                    <>
+                      <td key={v.id} className="mono" style={sub} title={t("noPositions")}>—</td>
+                      <td key={`${v.id}-d`} style={td}>—</td>
+                    </>
+                  );
                   return (
                     <>
                       <td key={v.id} className="mono" style={sub}>{r ? fmt(get(r)) : "—"}</td>
-                      {r && rp
+                      {r && sabe(rp)
                         ? <CeldaVar key={`${v.id}-d`} a={a} b={get(r)} fmt={fmt} />
                         : <td key={`${v.id}-d`} style={td}>—</td>}
                     </>
@@ -545,7 +565,7 @@ export function PlanillaHeadcount({ vs, reportes }: { vs: Version[]; reportes: R
           {orden.map(dp => (
             <tr key={dp.dept_code} style={{ borderTop: "1px solid var(--border-subtle)" }}>
               <td style={tdL}>{dp.dept_name || dp.dept_code}</td>
-              <td className="mono" style={{ ...td, fontWeight: 700 }}>{dinero(dp.total_annual)}</td>
+              <td className="mono" style={{ ...td, fontWeight: 700 }}>{rep.depts.some(x => x.dept_code === dp.dept_code) ? dinero(dp.total_annual) : "—"}</td>
               {vs.slice(1).map(v => {
                 // Se cruza por CÓDIGO de departamento: el registro es distinto en
                 // cada escenario, así que por id no cruzaría nada.
