@@ -45,6 +45,13 @@ const SECTIONS: Section[] = [
     title: "Rent", subtotal: "Total Rent",
     lines: [
       { code: "RENT", name: "Rent", account_code: "8000", kind: "manual" },
+      // La 8010 —impuesto de bienes inmuebles y canon de zona marítima— cae en
+      // el MISMO renglón Rent del P&L (pl_engine.NONOP_ACCOUNT_LINE y el mapeo
+      // del seed la mandan ahí). No estaba en esta pantalla, así que no había
+      // dónde presupuestarla (owner, 2026-11-17: «no está la cuenta 8010»).
+      // Por compartir renglón, las líneas se distinguen por renglón Y cuenta:
+      // ver `lineKey` / `rowKey`.
+      { code: "RENT", name: "Municipal Taxes & Maritime Zone Canon", account_code: "8010", kind: "manual" },
     ],
   },
   {
@@ -75,6 +82,18 @@ const SECTIONS: Section[] = [
     ],
   },
 ];
+
+/** Una línea se identifica por renglón Y cuenta: la 8000 y la 8010 van las
+ *  dos a RENT. Por renglón solo, sus filas se mezclaban en las dos líneas. */
+const lineKey = (l: { code: string; account_code?: string }) => `${l.code}|${l.account_code ?? ""}`;
+/** La fila sin cuenta (guardada antes de que hubiera dos cuentas por renglón)
+ *  va a la primera línea de su renglón. */
+function rowKey(r: { report_line_code: string; account_code: string }): string {
+  const acct = r.account_code
+    || SECTIONS.flatMap(s => s.lines).find(l => l.code === r.report_line_code)?.account_code
+    || "";
+  return `${r.report_line_code}|${acct}`;
+}
 
 type Row = {
   key: string;
@@ -135,7 +154,10 @@ export default function NonOpCheckbookPage() {
         loaded.push({
           key: newKey(),
           report_line_code: grp.report_line_code,
-          account_code: grp.account_code,
+          // La cuenta de CADA fila, no la del grupo: el grupo es por renglón y
+          // RENT junta la 8000 y la 8010. Con la del grupo, al recargar la 8010
+          // se volvía 8000.
+          account_code: ln.account_code || grp.account_code,
           detail_desc: ln.detail_desc,
           months: Object.fromEntries(MONTH_KEYS.map(mk => [mk, money2(ln[mk as keyof typeof ln] as string)])),
         });
@@ -217,16 +239,16 @@ export default function NonOpCheckbookPage() {
     }
   }
 
-  function lineMonth(code: string, mk: string): number {
-    return rows.filter(r => r.report_line_code === code).reduce((s, r) => s + num(r.months[mk]), 0);
+  function lineMonth(key: string, mk: string): number {
+    return rows.filter(r => rowKey(r) === key).reduce((s, r) => s + num(r.months[mk]), 0);
   }
-  function lineAnnual(code: string): number {
-    return MONTH_KEYS.reduce((s, mk) => s + lineMonth(code, mk), 0);
+  function lineAnnual(key: string): number {
+    return MONTH_KEYS.reduce((s, mk) => s + lineMonth(key, mk), 0);
   }
 
   const grandByMonth = MONTH_KEYS.map(mk =>
     SECTIONS.flatMap(s => s.lines).filter(l => l.kind === "manual")
-      .reduce((s, l) => s + lineMonth(l.code, mk), 0)
+      .reduce((s, l) => s + lineMonth(lineKey(l), mk), 0)
   );
   const grandAnnual = grandByMonth.reduce((a, b) => a + b, 0);
 
@@ -375,7 +397,7 @@ function SectionBlock({
   onSetMonth: (key: string, mk: string, v: string) => void;
   onSetDesc: (key: string, v: string) => void;
 }) {
-  const subMonth = MONTH_KEYS.map(mk => sec.lines.reduce((s, l) => s + lineMonth(l.code, mk), 0));
+  const subMonth = MONTH_KEYS.map(mk => sec.lines.reduce((s, l) => s + lineMonth(lineKey(l), mk), 0));
   const subAnnual = subMonth.reduce((a, b) => a + b, 0);
 
   return (
@@ -390,9 +412,9 @@ function SectionBlock({
 
       {sec.lines.map(line => (
         <LineBlock
-          key={line.code}
+          key={lineKey(line)}
           line={line}
-          lineRows={rows.filter(r => r.report_line_code === line.code)}
+          lineRows={rows.filter(r => rowKey(r) === lineKey(line))}
           lineMonth={lineMonth}
           lineAnnual={lineAnnual}
           onAdd={onAdd}
@@ -468,7 +490,7 @@ function LineBlock({
     );
   }
 
-  const annual = lineAnnual(line.code);
+  const annual = lineAnnual(lineKey(line));
   return (
     <>
       {/* Manual line header (account + line total) */}
@@ -484,7 +506,7 @@ function LineBlock({
         {MONTH_KEYS.map(mk => (
           <td key={mk} className="mono" style={{
             textAlign: "right", fontSize: 11, color: "var(--text-secondary)", padding: "2px 6px",
-          }}>{fmtUsd(lineMonth(line.code, mk))}</td>
+          }}>{fmtUsd(lineMonth(lineKey(line), mk))}</td>
         ))}
         <td className="mono" style={{ textAlign: "right", fontWeight: 600, fontSize: 11, color: "var(--text-primary)" }}>
           {fmtUsd(annual)}
