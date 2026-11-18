@@ -580,6 +580,30 @@ export function PlanillaHeadcount({ vs, reportes }: { vs: Version[]; reportes: R
               })}
             </tr>
           ))}
+          {/* El total debajo de los departamentos (owner, 2026-11-17: «que sume
+              acá abajo»). Es la SUMA de las filas de arriba, así que tiene que
+              dar el «Costo total» del cuadro de arriba: si no, falta un depto. */}
+          {(() => {
+            const suma = (r?: PayrollDeptReport | null) =>
+              (r?.depts ?? []).reduce((t, d) => t + d.total_annual, 0);
+            const a = suma(rep);
+            return (
+              <tr style={{ borderTop: "2px solid var(--border-medium)", background: "var(--bg-subtle)" }}>
+                <td style={{ ...tdL, fontWeight: 800 }}>{tc("total")}</td>
+                <td className="mono" style={{ ...td, fontWeight: 800 }}>{dinero(a)}</td>
+                {vs.slice(1).map(v => {
+                  const r = reportes[v.id];
+                  if (!r) return <><td key={v.id} style={sub}>—</td><td key={`${v.id}-d`} style={td}>—</td></>;
+                  return (
+                    <>
+                      <td key={v.id} className="mono" style={{ ...sub, fontWeight: 800 }}>{dinero(suma(r))}</td>
+                      <CeldaVar key={`${v.id}-d`} a={a} b={suma(r)} fmt={dinero} />
+                    </>
+                  );
+                })}
+              </tr>
+            );
+          })()}
         </tbody>
       </table>
     </>
