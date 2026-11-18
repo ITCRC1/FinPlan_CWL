@@ -13,6 +13,7 @@ from decimal import Decimal, InvalidOperation
 from openpyxl import Workbook, load_workbook
 
 from app.export.excel_base import (
+    exigir_archivo_del_hotel,
     C, fill, font, border, align,
     merged_header, month_header_row, set_col_widths, workbook_to_bytes,
     unlock, protect_sheet,
@@ -224,6 +225,7 @@ def _columnas(ws, header_row: int) -> dict[str, int]:
 
 def import_nonop_from_excel(file_bytes: bytes) -> list[dict]:
     wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
+    exigir_archivo_del_hotel(wb)   # ver excel_base: el OPEX de Amarena que entró a CWL
     results = []
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]

@@ -604,6 +604,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "opex.sin_catalogo_de_arranque": {
         "es": "Esta propiedad no trae catálogo de arranque de OPEX. Mandá las cuentas en 'accounts': no se le sirven las de otro hotel.",
         "en": "This property ships with no OPEX starter chart of accounts. Send the accounts in 'accounts': another hotel's accounts are not served to it."},
+    "archivo.de_otro_hotel": {
+        "es": "Este archivo se bajó de FinPlan {archivo} y esta es la instancia de {hotel}. No se cargó nada: bajá la plantilla desde el FinPlan de {hotel} y volvé a subirla.",
+        "en": "This file was downloaded from FinPlan {archivo} and this is the {hotel} instance. Nothing was loaded: download the template from the {hotel} FinPlan and upload it again."},
     "opex.sin_filas_validas": {
         "es": "No se encontraron filas válidas en el archivo.",
         "en": "No valid rows were found in the file."},

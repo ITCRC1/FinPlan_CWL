@@ -16,6 +16,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 
 from app.export.excel_base import (
+    exigir_archivo_del_hotel,
     C, fill, font, border, align,
     merged_header, month_header_row, set_col_widths, workbook_to_bytes,
     unlock, protect_sheet, add_dropdown, nombre_de_hoja,
@@ -201,6 +202,7 @@ def export_costs_to_excel(
 
 def import_costs_from_excel(file_bytes: bytes) -> list[dict]:
     wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
+    exigir_archivo_del_hotel(wb)   # ver excel_base: el OPEX de Amarena que entró a CWL
     results = []
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]

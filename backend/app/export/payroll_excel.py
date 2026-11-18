@@ -29,6 +29,7 @@ from openpyxl.utils import get_column_letter
 from app.hotel_actual import HOTEL_ID
 
 from app.export.excel_base import (
+    exigir_archivo_del_hotel,
     C, fill, font, border, align,
     merged_header, set_col_widths, workbook_to_bytes,
     unlock, protect_sheet,
@@ -253,6 +254,7 @@ def export_payroll_to_excel(
 
 def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:
     wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
+    exigir_archivo_del_hotel(wb)   # ver excel_base: el OPEX de Amarena que entró a CWL
     ws = wb[wb.sheetnames[0]]
 
     # Locate header row (the one whose Puesto column says PUESTO/POSICION)

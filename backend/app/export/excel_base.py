@@ -4,6 +4,7 @@ Shared styles and helpers for all FinPlan CWL Excel exporters.
 from __future__ import annotations
 
 import io
+import re
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Side
 from openpyxl.utils import get_column_letter
@@ -263,3 +264,37 @@ def nombre_de_hoja(base: str, usados: set[str], *, sufijo: str = "") -> str:
         n += 1
     usados.add(nombre)
     return nombre
+
+
+# ── El archivo es de ESTE hotel ──────────────────────────────────────────────
+#
+# Cada export escribe en A1 «FinPlan {HOTEL_ID} — …». El 2026-11-12 se subió al
+# Budget 2027 Working de CWL un OPEX bajado de FinPlan AMARENA: los dos archivos
+# se llaman igual (`OPEX_2027_Working (N).xlsx`), el import no miraba el título,
+# y reemplazó Rooms, Administración, Ventas, Mantenimiento y Utilities con los
+# números de otro hotel —y metió su Club Madresal— sin un solo aviso. Cinco días
+# después el owner lo encontró por una línea que no tenía que estar.
+#
+# Solo se rechaza cuando el título NOMBRA otro hotel. Un archivo sin el título
+# (armado a mano, o de antes de que el export lo escribiera) sigue entrando.
+_TITULO_HOTEL = re.compile(r"^\s*FinPlan\s+([A-Za-z0-9_-]+)\s+[—-]")
+
+
+def hotel_del_archivo(wb) -> str | None:
+    """El código de hotel que dice el título del archivo, o None si no lo dice."""
+    for ws in wb.worksheets:
+        valor = ws.cell(1, 1).value
+        m = _TITULO_HOTEL.match(str(valor or ""))
+        if m:
+            return m.group(1).upper()
+    return None
+
+
+def exigir_archivo_del_hotel(wb) -> None:
+    """Rechaza (422) un archivo bajado de OTRO hotel del grupo."""
+    from app import hotel_actual          # leído al llamar: las pruebas lo cambian
+    from app.errores import ErrorApi
+    propio = (hotel_actual.HOTEL_ID or "").upper()
+    del_archivo = hotel_del_archivo(wb)
+    if del_archivo and propio and del_archivo != propio:
+        raise ErrorApi(422, "archivo.de_otro_hotel", archivo=del_archivo, hotel=propio)

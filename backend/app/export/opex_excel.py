@@ -22,7 +22,7 @@ from typing import Any
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from app.export.excel_base import nombre_de_hoja, protect_sheet, unlock
+from app.export.excel_base import exigir_archivo_del_hotel, nombre_de_hoja, protect_sheet, unlock
 from app.hotel_actual import HOTEL_ID
 
 # ── Paleta ───────────────────────────────────────────────────────────────────
@@ -384,6 +384,7 @@ def import_opex_from_excel(file_bytes: bytes) -> list[dict]:
     """
     wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
     results: list[dict] = []
+    exigir_archivo_del_hotel(wb)   # ver excel_base: el OPEX de Amarena que entró a CWL
 
     for ws in wb.worksheets:
         # El código del departamento es lo primero del título de la hoja.
