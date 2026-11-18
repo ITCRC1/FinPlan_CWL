@@ -289,6 +289,26 @@ async def _filas_propias(db: AsyncSession, esc: Scenario) -> tuple[list[dict], s
         regla, _como = resolver(f["dept_code"], f["account_code"])
         return str(regla.get("report_line_code") or "") if regla else ""
 
+    # El checkbook de gastos de propiedad abierto por CUENTA. Owner, 2026-11-17:
+    # *«puse dato en la 8010 y no baja al excel»*. La 8000 (renta) y la 8010
+    # (bienes inmuebles y zona marítima) van al MISMO renglón RENT, y el ancla
+    # mandaba los dos montos a la 8000: el P&L daba bien y el mayor por mes
+    # escondía la 8010 adentro de la 8000.
+    #
+    # Las filas de `NonOpEntry` sí traen su cuenta. Entran como detalle con el
+    # depto del ancla del renglón, y pasan por la MISMA prueba que el detalle
+    # cargado a mano (`lineas_con_detalle_fiel`): solo se usan si suman lo
+    # mismo que la línea, mes a mes. Una fila sin cuenta, o un renglón que el
+    # P&L arma con un driver (Capital Reserve por %), no cuadra y se queda el
+    # ancla. Un renglón que ya trae detalle de `belowgop_account_entries` no se
+    # toca: sumar los dos contaría el monto dos veces.
+    cubiertas = {linea_de(f) for f in detalle}
+    for f in await _nonop_por_cuenta(db, esc.id, ancla, nombres):
+        if f.pop("_linea") in cubiertas:
+            continue
+        if (f["dept_code"], f["account_code"]) not in acumulado:
+            detalle.append(f)
+
     det_por_linea: dict[str, list[dict]] = {}
     for f in detalle:
         det_por_linea.setdefault(linea_de(f), []).append(f)
@@ -426,6 +446,35 @@ async def _reglas_vigentes(db: AsyncSession) -> list[AccountMapping]:
             AccountMapping.active_status == "YES")
     )).scalars().all()
     return [m for m in filas if recalc._vigente_en(m, None)]
+
+
+async def _nonop_por_cuenta(db: AsyncSession, scenario_id: str, ancla: dict,
+                            nombres: dict[str, str]) -> list[dict]:
+    """Las filas del checkbook de gastos de propiedad, sumadas por (renglón, cuenta).
+
+    El depto es el del ancla de su renglón: `NonOpEntry` no lleva depto, y el
+    ancla es justamente a dónde iría el monto si no se abriera. Una fila sin
+    cuenta no entra (no hay dónde asentarla); su renglón no va a cuadrar y se
+    queda con el ancla.
+    """
+    filas = (await db.execute(
+        select(NonOpEntry).where(NonOpEntry.scenario_id == scenario_id)
+    )).scalars().all()
+    out: dict[tuple[str, str], dict] = {}
+    for e in filas:
+        cuenta = (e.account_code or "").strip()
+        destino = ancla.get(e.report_line_code)
+        if not cuenta or destino is None:
+            continue
+        dept = destino[0]
+        f = out.setdefault((e.report_line_code, cuenta), {
+            "dept_code": dept, "account_code": cuenta,
+            "account_name": (e.account_name or "").strip() or nombres.get(cuenta, ""),
+            "outlet": "", "_linea": e.report_line_code,
+            **{m: ZERO for m in gl.MESES}})
+        for m in gl.MESES:
+            f[m] += Decimal(str(getattr(e, m) or 0))
+    return list(out.values())
 
 
 def _como_dict(m: AccountMapping) -> dict:
