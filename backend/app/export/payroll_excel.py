@@ -298,7 +298,117 @@ def export_payroll_to_excel(
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 18
 
+    _hoja_resumen(wb, ws, positions_by_dept, dept_names, scenario_label, year,
+                  ultima_fila=max(row - 1, HEADER_ROW))
+
     return workbook_to_bytes(wb)
+
+
+# ── Pestaña «Resumen»: un renglón por depto y el gran total ──────────────────
+# Owner, 2026-11-22: «cada vez que baje la planilla, en otro tab venga un resumen
+# por departamento: total headcount, total salario, headcount por mes —donde haya
+# cero que aparezca en blanco— y al final gran total».
+#
+# Son FÓRMULAS sobre la pestaña Planilla, no números copiados: si se cambia un
+# FTE o un salario en el Excel, el resumen se mueve solo. Cubren filas de más
+# (`_FILAS_EXTRA`) para que también cuenten las posiciones que se agreguen abajo.
+# El import lee solo la PRIMERA pestaña, así que esta no se sube.
+_FILAS_EXTRA = 300
+_SIN_CERO_1 = '#,##0.0;-#,##0.0;;@'      # el cero sale en blanco
+_SIN_CERO_0 = '#,##0;-#,##0;;@'
+
+
+def _hoja_resumen(wb, ws_pl, positions_by_dept, dept_names, scenario_label, year,
+                  ultima_fila: int) -> None:
+    rs = wb.create_sheet("Resumen")
+    hoja = f"'{ws_pl.title}'"
+    r1, r2 = HEADER_ROW + 1, ultima_fila + _FILAS_EXTRA
+
+    def rng(col):
+        letra = get_column_letter(col)
+        return f"{hoja}!${letra}${r1}:${letra}${r2}"
+
+    A, G, H, U = rng(COL_DEPT), rng(COL_SALARY), rng(COL_CUR), rng(COL_REF)
+    ftes = [rng(COL_FTE_JAN + i) for i in range(12)]
+
+    # columnas del resumen
+    c_dep, c_nom, c_hc, c_crc, c_usd, c_sw = 1, 2, 3, 4, 5, 6
+    c_m1 = 7
+    ultima = c_m1 + 11
+
+    titulo = ws_pl.cell(row=1, column=1).value or f"FinPlan {HOTEL_ID} — Planilla de Personal"
+    merged_header(rs, 1, 1, ultima, f"{titulo} — Resumen por departamento", C["navy"], sz=13)
+    merged_header(rs, 2, 1, ultima, ws_pl.cell(row=2, column=1).value or "", C["navy_mid"], sz=11)
+    nota = rs.cell(row=3, column=1, value=(
+        "Headcount = posiciones con FTE en al menos un mes (las vacantes en 0 todo el año no "
+        "cuentan). Salario mensual = suma de sus salarios de tiempo completo, por moneda. SW anual US$ = la columna U de Planilla "
+        "(salario × FTE ÷ TC de cada mes). Headcount por mes = suma de FTE. Se actualiza "
+        "solo si se cambia la pestaña Planilla."))
+    nota.font = font(italic=True, color=C["text_mid"], size=9)
+    rs.merge_cells(start_row=3, start_column=1, end_row=3, end_column=ultima)
+
+    enc = [(c_dep, "Depto"), (c_nom, "Nombre"), (c_hc, "Headcount"),
+           (c_crc, "Salario mensual ₡"), (c_usd, "Salario mensual US$"),
+           (c_sw, "SW anual US$")]
+    enc += [(c_m1 + i, f"HC {m}") for i, m in enumerate(MONTHS_ES)]
+    for col, txt in enc:
+        h = rs.cell(row=HEADER_ROW, column=col, value=txt)
+        h.fill = fill(C["blue_header"] if col < c_m1 else C["amber"])
+        h.font = font(bold=True, color=C["navy"] if col < c_m1 else "FFFFFF", size=9)
+        h.alignment = align("center", wrap=True)
+        h.border = border()
+
+    fila = HEADER_ROW + 1
+    primera = fila
+    for dept_code in sorted(positions_by_dept):
+        pos = positions_by_dept[dept_code]
+        if not pos:
+            continue
+        nombre = (str(pos[0].get("dept_name") or "").strip()
+                  or (dept_names or {}).get(dept_code)
+                  or DEPT_NAMES.get(dept_code, dept_code))
+        ref = f"$A{fila}"
+        suma_fte = "+".join(f"({f})" for f in ftes)
+        valores = {
+            c_dep: dept_code,
+            c_nom: nombre,
+            c_hc: f"=SUMPRODUCT(({A}={ref})*(({suma_fte})>0))",
+            # Solo las que cuentan en el headcount: una vacante con FTE 0 todo
+            # el año trae salario pero no cuesta nada.
+            c_crc: f'=SUMPRODUCT(({A}={ref})*({H}="CRC")*(({suma_fte})>0)*{G})',
+            c_usd: f'=SUMPRODUCT(({A}={ref})*({H}="USD")*(({suma_fte})>0)*{G})',
+            c_sw: f"=SUMIFS({U},{A},{ref})",
+            **{c_m1 + i: f"=SUMIFS({ftes[i]},{A},{ref})" for i in range(12)},
+        }
+        for col, v in valores.items():
+            c = rs.cell(row=fila, column=col, value=v)
+            c.border = border(); c.font = font(size=10)
+            if col == c_dep:
+                c.alignment = align("center")
+            elif col != c_nom:
+                c.alignment = align("right")
+                c.number_format = _SIN_CERO_1 if col >= c_m1 else _SIN_CERO_0
+        fila += 1
+
+    # Gran total
+    rs.cell(row=fila, column=c_dep, value="TOTAL")
+    rs.cell(row=fila, column=c_nom, value="Gran total")
+    for col in range(c_hc, ultima + 1):
+        letra = get_column_letter(col)
+        rs.cell(row=fila, column=col,
+                value=f"=SUM({letra}{primera}:{letra}{max(fila - 1, primera)})")
+    for col in range(1, ultima + 1):
+        c = rs.cell(row=fila, column=col)
+        c.fill = fill(C["navy"]); c.font = font(bold=True, color="FFFFFF", size=10)
+        c.border = border()
+        if col >= c_hc:
+            c.alignment = align("right")
+            c.number_format = _SIN_CERO_1 if col >= c_m1 else _SIN_CERO_0
+
+    rs.freeze_panes = rs.cell(row=HEADER_ROW + 1, column=c_hc)
+    set_col_widths(rs, {c_dep: 8, c_nom: 26, c_hc: 11, c_crc: 16, c_usd: 16, c_sw: 15,
+                        **{c_m1 + i: 8 for i in range(12)}})
+    rs.row_dimensions[HEADER_ROW].height = 30
 
 
 PREFIJO_FILTRO = "Solo Categoria:"

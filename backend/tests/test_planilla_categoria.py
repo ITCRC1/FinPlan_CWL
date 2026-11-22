@@ -266,3 +266,29 @@ async def test_un_excel_viejo_no_mete_de_vuelta_al_depto_apagado(base):
     r = await _subir(base, xlsx_viejo)
     assert r["ignored_depts"] == ["260"]
     assert all(d != "260" for d, _ in await _puestos(base))
+
+
+# ── Pestaña Resumen ─────────────────────────────────────────────────────────
+# Owner, 2026-11-22: «cada vez que baje la planilla, en otro tab venga un resumen
+# por departamento… headcount por mes donde haya cero que aparezca en blanco… y al
+# final gran total».
+
+def test_el_excel_trae_la_pestana_resumen_con_gran_total():
+    xlsx, _ = _exportar()
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx))
+    assert wb.sheetnames == ["Planilla", "Resumen"]   # el import lee SOLO la primera
+    rs = wb["Resumen"]
+    filas = {rs.cell(r, 1).value: r for r in range(HEADER_ROW + 1, rs.max_row + 1)}
+    assert {"0111", "0182", "TOTAL"} <= set(filas)
+    r = filas["0111"]
+    # fórmulas sobre Planilla, no números copiados: se mueven si se edita el Excel
+    assert str(rs.cell(r, 3).value).startswith("=SUMPRODUCT(")
+    assert "'Planilla'!" in rs.cell(r, 7).value
+    # el cero sale en blanco (tercera sección del formato vacía)
+    assert rs.cell(r, 7).number_format.split(";")[2] == ""
+    assert rs.cell(filas["TOTAL"], 3).value.startswith("=SUM(")
+
+
+def test_subir_un_excel_con_resumen_no_cambia_nada():
+    xlsx, _ = _exportar()
+    assert len(import_payroll_from_excel(xlsx)) == 2
