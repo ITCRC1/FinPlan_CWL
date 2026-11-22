@@ -16,7 +16,10 @@ Columns:
     I..T = FTE_ENE..FTE_DIC   (EDITABLE)
     U  = salary_annual_usd    (computed reference, not imported)
 
-Only G (salary) and I-T (FTE) are unlocked; the rest is protected.
+Only E (employee name), G (salary) and I-T (FTE) are unlocked; the rest is
+protected. E se abrió el 2026-11-22 (owner: «necesito poder editar el nombre
+del colaborador, salario y fte») — el import ya lo leía, la plantilla no
+dejaba escribirlo.
 Import reads A..T (dept_code from col A), ignores U and blank separator rows.
 """
 from __future__ import annotations
@@ -120,7 +123,7 @@ def export_payroll_to_excel(
     tc_nota = (f"₡{tc_min:,.0f}/USD" if tc_min == tc_max
               else f"₡{tc_min:,.0f}–{tc_max:,.0f}/USD según el mes")
     note = ws.cell(row=3, column=COL_DEPT,
-                   value=(f"TC: {tc_nota}  |  SOLO editar: G (salario) y "
+                   value=(f"TC: {tc_nota}  |  SOLO editar: E (colaborador), G (salario) y "
                           "I-T (FTE por mes). El resto está bloqueado. La columna "
                           "'Departamento' se repite en cada fila para tablas dinámicas."))
     note.font = font(italic=True, color=C["text_mid"], size=9)
@@ -177,7 +180,10 @@ def export_payroll_to_excel(
             wc(COL_PCODE, p.get("position_code", ""),
                font=font(size=9, color=C["text_mid"]), alignment=align("center"))
             wc(COL_PNAME, p.get("position_name", ""), font=font(size=10))
-            wc(COL_ENAME, p.get("employee_name", "VACANTE"), font=font(size=10, color=C["text_mid"]))
+            # editable: colaborador (E). El import lo lee (`employee_name`).
+            ename_c = wc(COL_ENAME, p.get("employee_name", "VACANTE"), font=font(size=10))
+            ename_c.fill = fill(C["amber_light"])
+            unlock(ename_c)
             wc(COL_ETYPE, p.get("employee_type", "1-Permanente"),
                font=font(size=9, color=C["text_mid"]), alignment=align("center"))
 
