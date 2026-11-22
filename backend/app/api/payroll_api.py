@@ -32,14 +32,15 @@ from app.api._candado import candado
 from app.db import get_db
 from app.errores import ErrorApi
 from app.textos import Idioma, t
-from app.models.payroll_position import (PayrollPosition, categoria_de, get_fte,
+from app.models.payroll_position import (CATEGORIAS, PayrollPosition, categoria_de, get_fte,
                                          normalizar_categoria, normalizar_subcategoria,
                                          para_guardar, subcategoria_de)
 from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.actual_dept_fte import ActualDeptFte
 from app.models.scenario import Scenario
 from app.api._nombres_de_depto import nombres_de_depto
-from app.export.payroll_excel import export_payroll_to_excel, import_payroll_from_excel
+from app.export.payroll_excel import (categorias_del_archivo, export_payroll_to_excel,
+                                      import_payroll_from_excel)
 from app.models.exchange_rate import get_tc_for_month, ExchangeRate
 from app.models.payroll_params import (
     PayrollParams, DEFAULT_CCSS_RATE, DEFAULT_AGUINALDO_DIVISOR,
@@ -1412,11 +1413,28 @@ async def put_payroll_params(
 
 
 @router.get("/payroll/{scenario_id}/export/excel/")
-async def export_payroll_excel(scenario_id: str, db: AsyncSession = Depends(get_db)):
+async def export_payroll_excel(
+    scenario_id: str,
+    categoria: Optional[str] = Query(None, description="Operaciones, Administrativo, Gerencial "
+                                                       "(separadas por coma). Vacío = todas."),
+    db: AsyncSession = Depends(get_db),
+):
     from app.models.scenario import Scenario
     scenario = await db.get(Scenario, scenario_id)
     if not scenario:
         raise ErrorApi(404, "escenario.no_encontrado")
+    # Owner, 2026-11-22: «antes de bajar el Excel poder filtrar por operacional o Admin».
+    solo: list[str] = []
+    for x in (categoria or "").split(","):
+        if not x.strip():
+            continue
+        c = normalizar_categoria(x)
+        if c is None:
+            raise HTTPException(422, f"Categoria desconocida: {x.strip()!r}")
+        if c not in solo:
+            solo.append(c)
+    if len(solo) == len(CATEGORIAS):
+        solo = []          # las tres = todo: el archivo sale sin filtro
 
     positions = (await db.execute(
         select(PayrollPosition)
@@ -1426,6 +1444,9 @@ async def export_payroll_excel(scenario_id: str, db: AsyncSession = Depends(get_
 
     FTE_ATTRS = ["fte_jan","fte_feb","fte_mar","fte_apr","fte_may","fte_jun",
                  "fte_jul","fte_aug","fte_sep","fte_oct","fte_nov","fte_dec"]
+
+    if solo:
+        positions = [p for p in positions if categoria_de(p) in solo]
 
     by_dept: dict[str, list[dict]] = {}
     for p in positions:
@@ -1453,7 +1474,8 @@ async def export_payroll_excel(scenario_id: str, db: AsyncSession = Depends(get_
     label = f"{scenario.hotel_id} {scenario.version}"
     xlsx = export_payroll_to_excel(by_dept, label, scenario.year, tc_usd=tc_usd,
                                    dept_names=await nombres_de_depto(db),
-                                   tc_por_mes=tc_por_mes)
+                                   tc_por_mes=tc_por_mes,
+                                   solo_categorias=[c for c in CATEGORIAS if c in solo] or None)
     return Response(
         content=xlsx,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1478,29 +1500,30 @@ async def import_payroll_excel(
     except Exception as e:
         raise HTTPException(409, str(e))
 
-    rows = import_payroll_from_excel(await file.read())
+    contenido = await file.read()
+    rows = import_payroll_from_excel(contenido)
     if not rows:
         raise ErrorApi(422, "planilla.sin_posiciones_validas")
+    # Bajado con filtro de Categoria → se reemplazan SOLO las posiciones de esa
+    # Categoria en cada depto; las demás del depto no venían en el archivo y
+    # no se tocan (si no, subirlo las borraba).
+    solo = categorias_del_archivo(contenido)
 
     if replace:
         affected = {r["dept_code"] for r in rows}
         for dc in affected:
-            # delete concept entries first (FK), then positions
-            pos_ids = (await db.execute(
-                select(PayrollPosition.id)
+            del_depto = (await db.execute(
+                select(PayrollPosition)
                 .where(PayrollPosition.scenario_id == scenario_id,
                        PayrollPosition.dept_code == dc)
             )).scalars().all()
-            for pid in pos_ids:
-                await db.execute(
-                    delete(PayrollConceptEntry).where(PayrollConceptEntry.position_id == pid)
-                )
+            pos_ids = [p.id for p in del_depto if solo is None or categoria_de(p) in solo]
+            if not pos_ids:
+                continue
+            # delete concept entries first (FK), then positions
             await db.execute(
-                delete(PayrollPosition).where(
-                    PayrollPosition.scenario_id == scenario_id,
-                    PayrollPosition.dept_code == dc,
-                )
-            )
+                delete(PayrollConceptEntry).where(PayrollConceptEntry.position_id.in_(pos_ids)))
+            await db.execute(delete(PayrollPosition).where(PayrollPosition.id.in_(pos_ids)))
         await db.flush()
 
     FTE_ATTRS = ["fte_jan","fte_feb","fte_mar","fte_apr","fte_may","fte_jun",
