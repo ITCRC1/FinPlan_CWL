@@ -15,12 +15,18 @@ Columns:
     H  = salary_currency      (CRC / USD)
     I..T = FTE_ENE..FTE_DIC   (EDITABLE)
     U  = salary_annual_usd    (computed reference, not imported)
+    V  = Categoria     (Operaciones / Administrativo / Gerencial — EDITABLE, lista)
+    W  = SubCategoria  (On Property / Outside — EDITABLE, lista)
+    El encabezado lleva filtro: se filtra por cualquiera de las dos.
 
 Only E (employee name), G (salary) and I-T (FTE) are unlocked; the rest is
 protected. E se abrió el 2026-11-22 (owner: «necesito poder editar el nombre
 del colaborador, salario y fte») — el import ya lo leía, la plantilla no
 dejaba escribirlo.
-Import reads A..T (dept_code from col A), ignores U and blank separator rows.
+Import reads A..T (dept_code from col A) plus V and W, ignores U and blank separator rows.
+V y W van al final —no al lado del depto— para que un Excel bajado antes de que
+existieran siga subiendo igual: el import no corre ninguna columna, y las busca por
+su encabezado. Si no están o vienen vacías, la posición queda con las de su depto.
 """
 from __future__ import annotations
 
@@ -29,7 +35,10 @@ from decimal import Decimal, InvalidOperation
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 from app.hotel_actual import HOTEL_ID
+from app.models.payroll_position import (
+    CATEGORIAS, SUBCATEGORIAS, normalizar_categoria, normalizar_subcategoria)
 
 from app.export.excel_base import (
     exigir_archivo_del_hotel,
@@ -86,6 +95,9 @@ COL_SALARY   = 7   # G  (editable)
 COL_CUR      = 8   # H
 COL_FTE_JAN  = 9   # I
 COL_REF      = 21  # U  (reference-only annual, not imported)
+COL_CAT      = 22  # V  Categoria (editable)
+COL_SUBCAT   = 23  # W  SubCategoria (editable)
+COL_OPS      = COL_SUBCAT   # la última columna de la hoja
 HEADER_ROW   = 5
 
 
@@ -112,10 +124,10 @@ def export_payroll_to_excel(
     ws.title = "Planilla"
 
     # Title / subtitle / note
-    merged_header(ws, 1, COL_DEPT, COL_REF,
+    merged_header(ws, 1, COL_DEPT, COL_OPS,
                   f"FinPlan {HOTEL_ID} — Planilla de Personal | {scenario_label} {year}",
                   C["navy"], sz=13)
-    merged_header(ws, 2, COL_DEPT, COL_REF, "Todos los departamentos", C["navy_mid"], sz=11)
+    merged_header(ws, 2, COL_DEPT, COL_OPS, "Todos los departamentos", C["navy_mid"], sz=11)
     # El TC ya no es uno solo: "SW Anual USD*" usa el de CADA mes (ver
     # `tc_por_mes`), así que un rango dice más que un promedio que nadie usa
     # para calcular nada.
@@ -124,10 +136,11 @@ def export_payroll_to_excel(
               else f"₡{tc_min:,.0f}–{tc_max:,.0f}/USD según el mes")
     note = ws.cell(row=3, column=COL_DEPT,
                    value=(f"TC: {tc_nota}  |  SOLO editar: E (colaborador), G (salario) y "
-                          "I-T (FTE por mes). El resto está bloqueado. La columna "
-                          "'Departamento' se repite en cada fila para tablas dinámicas."))
+                          "I-T (FTE por mes), V (Categoria) y W (SubCategoria). El resto "
+                          "está bloqueado. Filtro en el encabezado para separar Operaciones / "
+                          "Administrativo / Gerencial y On Property / Outside."))
     note.font = font(italic=True, color=C["text_mid"], size=9)
-    ws.merge_cells(start_row=3, start_column=COL_DEPT, end_row=3, end_column=COL_REF)
+    ws.merge_cells(start_row=3, start_column=COL_DEPT, end_row=3, end_column=COL_OPS)
 
     # Headers (row 5)
     headers = [
@@ -151,6 +164,15 @@ def export_payroll_to_excel(
     ref = ws.cell(row=HEADER_ROW, column=COL_REF, value="SW Anual USD*")
     ref.fill = fill(C["blue_header"]); ref.font = font(bold=True, color=C["navy"], size=9)
     ref.alignment = align("center"); ref.border = border()
+    listas = {}
+    for col, titulo, valores in ((COL_CAT, "Categoria", CATEGORIAS),
+                                 (COL_SUBCAT, "SubCategoria", SUBCATEGORIAS)):
+        h = ws.cell(row=HEADER_ROW, column=col, value=titulo)
+        h.fill = fill(C["amber"]); h.font = font(bold=True, color="FFFFFF", size=9)
+        h.alignment = align("center"); h.border = border()
+        listas[col] = DataValidation(type="list", formula1='"' + ",".join(valores) + '"',
+                                     allow_blank=True)
+        ws.add_data_validation(listas[col])
 
     row = HEADER_ROW + 1
     for dept_code in sorted(positions_by_dept):
@@ -240,17 +262,33 @@ def export_payroll_to_excel(
             rc.font = font(bold=True, color=C["navy"], size=10); rc.alignment = align("right")
             rc.border = border()
 
+            # editable: Categoria (V) y SubCategoria (W). Salen las que valen —las
+            # fijadas o las del depto—, nunca vacías: si no, el filtro las escondería.
+            for col, clave, defecto in ((COL_CAT, "categoria", CATEGORIAS[0]),
+                                        (COL_SUBCAT, "subcategoria", SUBCATEGORIAS[0])):
+                oc = ws.cell(row=row, column=col, value=p.get(clave) or defecto)
+                oc.fill = fill(C["amber_light"]); oc.font = font(size=9)
+                oc.alignment = align("center"); oc.border = border()
+                listas[col].add(oc)
+                unlock(oc)
+
             row += 1
 
         row += 1  # blank separator row between departments
 
+    # Filtro en el encabezado. `protect_sheet` deja usarlo con la hoja protegida.
+    ws.auto_filter.ref = f"A{HEADER_ROW}:{get_column_letter(COL_OPS)}{max(row - 1, HEADER_ROW)}"
     protect_sheet(ws)
+    # En openpyxl `True` en estas dos quiere decir «bloqueado con la hoja
+    # protegida»: sin esto la flecha del filtro aparece pero no deja filtrar.
+    ws.protection.autoFilter = False
+    ws.protection.sort = False
     ws.freeze_panes = ws.cell(row=HEADER_ROW + 1, column=COL_FTE_JAN)
     set_col_widths(ws, {
         COL_DEPT: 12, COL_DEPTNAME: 22, COL_PCODE: 8, COL_PNAME: 30, COL_ENAME: 22,
         COL_ETYPE: 12, COL_SALARY: 13, COL_CUR: 8,
         **{COL_FTE_JAN + i: 8 for i in range(12)},
-        COL_REF: 14,
+        COL_REF: 14, COL_CAT: 15, COL_SUBCAT: 14,
     })
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 18
@@ -272,6 +310,13 @@ def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:
             break
     if header_row is None:
         return []
+    # Categoria y SubCategoria se buscan por su encabezado: un Excel bajado antes
+    # de que existieran no las trae, y ahí la posición queda con las de su depto.
+    def _col(titulo):
+        return next((c for c in range(COL_REF + 1, COL_REF + 8)
+                     if str(ws.cell(row=header_row, column=c).value or "").strip().lower()
+                     .replace(" ", "") == titulo), None)
+    col_cat, col_subcat = _col("categoria"), _col("subcategoria")
 
     results: list[dict] = []
     for r in range(header_row + 1, ws.max_row + 1):
@@ -304,6 +349,10 @@ def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:
             "employee_type": str(ws.cell(row=r, column=COL_ETYPE).value or "1-Permanente").strip(),
             "salary_amount": salary,
             "salary_currency": cur,
+            "categoria": (normalizar_categoria(ws.cell(row=r, column=col_cat).value)
+                          if col_cat else None),
+            "subcategoria": (normalizar_subcategoria(ws.cell(row=r, column=col_subcat).value)
+                             if col_subcat else None),
         }
         for i, attr in enumerate(FTE_ATTRS):
             raw = ws.cell(row=r, column=COL_FTE_JAN + i).value

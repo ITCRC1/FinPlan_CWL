@@ -40,6 +40,12 @@ class PayrollPosition(Base):
     class_code: Mapped[str] = mapped_column(String(10), default="013")    # 013=Line, 012=Supervisor
     category_code: Mapped[str] = mapped_column(String(10), default="015") # 015=Local Perm, 010=Expat
 
+    # Categoria (Operaciones | Administrativo | Gerencial) y SubCategoria
+    # (On Property | Outside), como el archivo de RRHH. Vacío = la del depto
+    # (`categoria_de` / `subcategoria_de`, al final de este archivo).
+    categoria: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    subcategoria: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     # Salary (full-time monthly)
     salary_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))
     salary_currency: Mapped[str] = mapped_column(String(3), default="CRC")  # 'CRC' | 'USD'
@@ -66,6 +72,85 @@ class PayrollPosition(Base):
 
     def __repr__(self) -> str:
         return f"<PayrollPosition {self.dept_code}/{self.position_code} {self.position_name[:30]}>"
+
+
+# ── Categoria y SubCategoria de cada posición ─────────────────────────────────
+# Owner, 2026-11-22: «necesito categorizar cada posición o por departamento entre
+# Operations and Non Operation» y, con el archivo de RRHH en la mano («revisa la
+# columna C y D»), que queden LAS DOS tal cual ese archivo:
+#   Categoria    → Operaciones | Administrativo | Gerencial
+#   SubCategoria → On Property | Outside
+# Vacío en la base = la del departamento (abajo). Se guarda solo la excepción, así
+# una posición nueva —del botón, del Excel o de una copia— nace bien sola.
+OPERACIONES, ADMINISTRATIVO, GERENCIAL = "Operaciones", "Administrativo", "Gerencial"
+ON_PROPERTY, OUTSIDE = "On Property", "Outside"
+CATEGORIAS = (OPERACIONES, ADMINISTRATIVO, GERENCIAL)
+SUBCATEGORIAS = (ON_PROPERTY, OUTSIDE)
+
+# Lo que dice el archivo de RRHH (payroll al 20/11/2026) para cada departamento,
+# por mayoría. Los que no están acá son Operaciones / On Property. 0112 y 0184 no
+# vienen en el archivo: son de oficina, como Finanzas.
+DEFECTO_POR_DEPTO: dict[str, tuple[str, str]] = {
+    "0181": (GERENCIAL, OUTSIDE),          # Management
+    "0112": (ADMINISTRATIVO, OUTSIDE),     # Reservations
+    "0182": (ADMINISTRATIVO, OUTSIDE),     # Finance
+    "0183": (ADMINISTRATIVO, OUTSIDE),     # Purchasing
+    "0184": (ADMINISTRATIVO, OUTSIDE),     # Human Resources
+    "0190": (ADMINISTRATIVO, OUTSIDE),     # Sales & Marketing
+    "0191": (ADMINISTRATIVO, OUTSIDE),
+    "0230": (ADMINISTRATIVO, OUTSIDE),     # Information System
+}
+
+
+def _llano(valor) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(valor or "")).encode("ascii", "ignore").decode()
+    return " ".join(t.lower().replace("-", " ").replace("_", " ").split())
+
+
+def normalizar_categoria(valor) -> Optional[str]:
+    """Lo escrito a mano → la Categoria canónica, o None si viene vacío o no se entiende."""
+    t = _llano(valor)
+    if t.startswith(("oper", "ops")):
+        return OPERACIONES
+    if t.startswith(("admin",)):
+        return ADMINISTRATIVO
+    if t.startswith(("geren", "manag")):
+        return GERENCIAL
+    return None
+
+
+def normalizar_subcategoria(valor) -> Optional[str]:
+    t = _llano(valor)
+    if t.startswith(("on prop", "onprop", "on site", "dentro", "en propiedad", "propiedad")):
+        return ON_PROPERTY
+    if t.startswith(("outside", "out", "fuera", "remot", "off")):
+        return OUTSIDE
+    return None
+
+
+def defecto_del_depto(dept_code) -> tuple[str, str]:
+    return DEFECTO_POR_DEPTO.get(str(dept_code or "").strip(), (OPERACIONES, ON_PROPERTY))
+
+
+def categoria_de(position) -> str:
+    """La Categoria que vale: la fijada en la posición, o la de su depto."""
+    return (normalizar_categoria(getattr(position, "categoria", None))
+            or defecto_del_depto(getattr(position, "dept_code", ""))[0])
+
+
+def subcategoria_de(position) -> str:
+    return (normalizar_subcategoria(getattr(position, "subcategoria", None))
+            or defecto_del_depto(getattr(position, "dept_code", ""))[1])
+
+
+def para_guardar(dept_code, categoria, subcategoria) -> tuple[Optional[str], Optional[str]]:
+    """Lo que se guarda: None donde coincide con el depto (así sigue a su depto).
+    El Excel trae SIEMPRE las dos escritas —salen llenas para que el filtro sirva—,
+    y guardarlas tal cual congelaría la regla del depto en cada posición."""
+    dc, ds = defecto_del_depto(dept_code)
+    c, s = normalizar_categoria(categoria), normalizar_subcategoria(subcategoria)
+    return (None if c in (None, dc) else c), (None if s in (None, ds) else s)
 
 
 def get_fte(position: PayrollPosition, month: int) -> Decimal:

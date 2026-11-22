@@ -32,7 +32,9 @@ from app.api._candado import candado
 from app.db import get_db
 from app.errores import ErrorApi
 from app.textos import Idioma, t
-from app.models.payroll_position import PayrollPosition, get_fte
+from app.models.payroll_position import (PayrollPosition, categoria_de, get_fte,
+                                         normalizar_categoria, normalizar_subcategoria,
+                                         para_guardar, subcategoria_de)
 from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.actual_dept_fte import ActualDeptFte
 from app.models.scenario import Scenario
@@ -88,6 +90,10 @@ class PositionCreate(BaseModel):
     employee_type: str = "1-Permanente"
     class_code: str = "013"
     category_code: str = "015"
+    #: Operaciones | Administrativo | Gerencial · On Property | Outside.
+    #: Vacío = la del departamento.
+    categoria: Optional[str] = None
+    subcategoria: Optional[str] = None
     salary_amount: Decimal = Decimal("0")
     salary_currency: str = "CRC"
     fte_jan: Decimal = Decimal("1.0")
@@ -120,11 +126,33 @@ class PositionCreate(BaseModel):
             raise ValueError("salary_currency must be 'CRC' or 'USD'")
         return v
 
+    @field_validator("categoria", mode="before")
+    @classmethod
+    def validar_categoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_categoria(v)
+        if n is None:
+            raise ValueError("categoria debe ser Operaciones, Administrativo o Gerencial")
+        return n
+
+    @field_validator("subcategoria", mode="before")
+    @classmethod
+    def validar_subcategoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_subcategoria(v)
+        if n is None:
+            raise ValueError("subcategoria debe ser On Property u Outside")
+        return n
+
 
 class PositionUpdate(BaseModel):
     position_name: Optional[str] = None
     employee_name: Optional[str] = None
     employee_type: Optional[str] = None
+    categoria: Optional[str] = None
+    subcategoria: Optional[str] = None
     salary_amount: Optional[Decimal] = None
     salary_currency: Optional[str] = None
     fte_jan: Optional[Decimal] = None
@@ -151,6 +179,26 @@ class PositionUpdate(BaseModel):
         if v < Decimal("0") or v > Decimal("1"):
             raise ValueError("FTE must be between 0.00 and 1.00")
         return v
+
+    @field_validator("categoria", mode="before")
+    @classmethod
+    def validar_categoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_categoria(v)
+        if n is None:
+            raise ValueError("categoria debe ser Operaciones, Administrativo o Gerencial")
+        return n
+
+    @field_validator("subcategoria", mode="before")
+    @classmethod
+    def validar_subcategoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_subcategoria(v)
+        if n is None:
+            raise ValueError("subcategoria debe ser On Property u Outside")
+        return n
 
 
 class BaseConceptsUpdate(BaseModel):
@@ -316,6 +364,8 @@ async def get_dept_checkbook(
             "position_name": pos.position_name,
             "employee_name": pos.employee_name,
             "employee_type": pos.employee_type,
+            "categoria": categoria_de(pos),
+            "subcategoria": subcategoria_de(pos),
             "salary_amount": float(pos.salary_amount),
             "salary_currency": pos.salary_currency,
             "months": months_data,
@@ -917,6 +967,8 @@ class PayrollBulkRow(BaseModel):
     employee_type: str = "1-Permanente"
     class_code: str = "013"
     category_code: str = "015"
+    categoria: Optional[str] = None
+    subcategoria: Optional[str] = None
     salary_amount: Decimal = Decimal("0")
     salary_currency: str = "CRC"
     fte_jan: Decimal = Decimal("1.0"); fte_feb: Decimal = Decimal("1.0")
@@ -932,6 +984,26 @@ class PayrollBulkRow(BaseModel):
         if v is not None and (v < 0 or v > 1):
             raise ValueError("FTE debe estar entre 0 y 1")
         return v
+
+    @field_validator("categoria", mode="before")
+    @classmethod
+    def validar_categoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_categoria(v)
+        if n is None:
+            raise ValueError("categoria debe ser Operaciones, Administrativo o Gerencial")
+        return n
+
+    @field_validator("subcategoria", mode="before")
+    @classmethod
+    def validar_subcategoria(cls, v):
+        if v in (None, ""):
+            return None
+        n = normalizar_subcategoria(v)
+        if n is None:
+            raise ValueError("subcategoria debe ser On Property u Outside")
+        return n
 
 
 class SalaryRow(BaseModel):
@@ -1363,6 +1435,8 @@ async def export_payroll_excel(scenario_id: str, db: AsyncSession = Depends(get_
             "position_name": p.position_name,
             "employee_name": p.employee_name,
             "employee_type": p.employee_type,
+            "categoria": categoria_de(p),
+            "subcategoria": subcategoria_de(p),
             "salary_amount": float(p.salary_amount or 0),
             "salary_currency": p.salary_currency,
             **{attr: float(getattr(p, attr) or 0) for attr in FTE_ATTRS},
@@ -1443,6 +1517,8 @@ async def import_payroll_excel(
             position_name=r["position_name"],
             employee_name=r.get("employee_name", "VACANTE"),
             employee_type=r.get("employee_type", "1-Permanente"),
+            **dict(zip(("categoria", "subcategoria"),
+                       para_guardar(r["dept_code"], r.get("categoria"), r.get("subcategoria")))),
             salary_amount=r.get("salary_amount", Decimal("0")),
             salary_currency=r.get("salary_currency", "CRC"),
             **{attr: r.get(attr, Decimal("0")) for attr in FTE_ATTRS},
@@ -1802,6 +1878,8 @@ async def get_posiciones_de_varias_versiones(
                 "position_name": str(p.position_name or ""),
                 "employee_name": str(p.employee_name or ""),
                 "employee_type": str(p.employee_type or ""),
+                "categoria": categoria_de(p),
+                "subcategoria": subcategoria_de(p),
                 "salary_amount": float(p.salary_amount or 0),
                 "salary_currency": str(p.salary_currency or ""),
                 "fte": [float(getattr(p, f"fte_{m}", 0) or 0) for m in MESES_FTE],
