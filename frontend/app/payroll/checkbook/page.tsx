@@ -357,7 +357,11 @@ export default function PayrollCheckbookPage() {
 
         {/* Excel + add-positions actions */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <RecalcButton scenarioId={scenarioId} />
+          {/* Al terminar, volver a leer el depto: subir el Excel recrea las
+              posiciones SIN sus 12 filas de conceptos (las crea el recálculo), así
+              que hasta recargar la vista «Totales dept» quedaba vacía. */}
+          <RecalcButton scenarioId={scenarioId}
+            onDone={() => { if (selectedDept) loadDept(selectedDept); }} />
           <button onClick={() => setAddModal(true)} disabled={!!busy}
             style={{ padding: "5px 12px", fontSize: 12, borderRadius: 4, cursor: "pointer",
               background: "var(--bg-surface)", color: "var(--text-primary)",
