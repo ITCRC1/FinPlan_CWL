@@ -714,6 +714,9 @@ TEXTOS: dict[str, dict[str, str]] = {
     "planilla.recalcular_despues_del_import": {
         "es": "Recalculá la planilla después del import.",
         "en": "Recalculate payroll after the import."},
+    "planilla.deptos_apagados_ignorados": {
+        "es": "Se ignoraron las filas de {deptos}: están apagados en el provisionamiento.",
+        "en": "Rows for {deptos} were ignored: they are turned off in provisioning."},
     "planilla.recalcular_para_que_apliquen": {
         "es": "Apretá «Recalcular y empujar al P&L» para que se apliquen.",
         "en": "Press “Recalculate and push to the P&L” so they take effect."},

@@ -1847,7 +1847,7 @@ export async function uploadPayrollExcel(scenarioId: string, file: File) {
   fd.append("file", file);
   const res = await fetch(`${base}/payroll/${scenarioId}/import/excel/`, { method: "POST", body: fd, headers: authHeaders() });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<{ imported?: number }>;
+  return res.json() as Promise<{ imported?: number; ignored_depts?: string[]; note?: string }>;
 }
 
 // Agrega N personas SIN tocar el resto de la planilla. No usar `bulkPayroll`

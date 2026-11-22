@@ -1447,6 +1447,12 @@ async def export_payroll_excel(
 
     if solo:
         positions = [p for p in positions if categoria_de(p) in solo]
+    # Los deptos apagados en el provisionamiento (Club Madresal 260, Área
+    # Recreativa 270) no salen: owner, 2026-11-22, «ellos acá no existen».
+    from app.api.provisioning_api import depts_habilitados
+    apagados = await depts_habilitados(db, scenario.hotel_id, "PAYROLL") or set()
+    if apagados:
+        positions = [p for p in positions if p.dept_code not in apagados]
 
     by_dept: dict[str, list[dict]] = {}
     for p in positions:
@@ -1502,6 +1508,13 @@ async def import_payroll_excel(
 
     contenido = await file.read()
     rows = import_payroll_from_excel(contenido)
+    # Un Excel bajado antes de apagar un depto todavía lo trae: sus filas se
+    # ignoran. Owner, 2026-11-22: borré el Club y el Área Recreativa, él subió
+    # un Excel de antes y los 19 volvieron. «Para que no salga más».
+    from app.api.provisioning_api import depts_habilitados
+    apagados = await depts_habilitados(db, scenario.hotel_id, "PAYROLL") or set()
+    ignoradas = sorted({r["dept_code"] for r in rows if r["dept_code"] in apagados})
+    rows = [r for r in rows if r["dept_code"] not in apagados]
     if not rows:
         raise ErrorApi(422, "planilla.sin_posiciones_validas")
     # Bajado con filtro de Categoria → se reemplazan SOLO las posiciones de esa
@@ -1548,8 +1561,11 @@ async def import_payroll_excel(
         ))
 
     await db.commit()
-    return {"imported": len(rows), "scenario_id": scenario_id,
-            "note": t(idioma, "planilla.recalcular_despues_del_import")}
+    nota = t(idioma, "planilla.recalcular_despues_del_import")
+    if ignoradas:
+        nota += " " + t(idioma, "planilla.deptos_apagados_ignorados", deptos=", ".join(ignoradas))
+    return {"imported": len(rows), "scenario_id": scenario_id, "ignored_depts": ignoradas,
+            "note": nota}
 
 
 # ── Reparto de beneficios ─────────────────────────────────────────────────────

@@ -218,7 +218,9 @@ export default function PayrollCheckbookPage() {
       const d = withExtraDepts(await getPayrollDepts(scenarioId));
       setDepts(d);
       if (selectedDept) await loadDept(selectedDept);
-      flash(t("payrollUpdated", { n: res.imported ?? "" }));
+      // Filas de deptos apagados (Club, Área Recreativa) que traía un Excel viejo
+      const ign = res.ignored_depts?.length ? ` · ${res.note ?? ""}` : "";
+      flash(t("payrollUpdated", { n: res.imported ?? "" }) + ign);
     } catch (e) {
       flash(e instanceof Error ? e.message : t("errorUploading"));
     } finally { setBusy(null); }

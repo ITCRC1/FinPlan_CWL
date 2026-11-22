@@ -128,6 +128,7 @@ async def base():
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from app.models.department_catalog import DepartmentCatalog
+    from app.models.dept_enablement import DeptEnablement
     from app.models.exchange_rate import ExchangeRate
     from app.models.hotel import Hotel
     from app.models.payroll_concept_entry import PayrollConceptEntry
@@ -136,7 +137,7 @@ async def base():
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as c:
         for m in (Hotel, Scenario, PayrollPosition, PayrollConceptEntry, ExchangeRate,
-                  DepartmentCatalog):
+                  DepartmentCatalog, DeptEnablement):
             await c.run_sync(lambda s, m=m: m.__table__.create(s))
     hacer = async_sessionmaker(eng, expire_on_commit=False)
     async with hacer() as db:
@@ -223,3 +224,45 @@ async def test_subir_el_completo_sigue_reemplazando_el_depto(base):
     buf = io.BytesIO(); wb.save(buf)
     await _subir(base, buf.getvalue())
     assert ("0111", "Front Office Manager") not in await _puestos(base)
+
+
+# ── Deptos apagados: ni salen ni vuelven a entrar ──────────────────────────
+# Owner, 2026-11-22: se borraron el Club (260) y el Área Recreativa (270), él subió
+# un Excel bajado antes y los 19 volvieron. «Quita esos departamentos… para que no
+# salga más».
+
+async def _apagar_260(db):
+    from app.models.dept_enablement import DeptEnablement
+    db.add(DeptEnablement(id="e1", hotel_id="CWL", scope_kind="DEPT", scope_key="260",
+                          dimension="PAYROLL", enabled=False))
+    db.add(PayrollPosition(id="club", scenario_id="sc-1", hotel_id="CWL", dept_code="260",
+                           position_name="HOST CLUB MADRESAL", salary_amount=0))
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_el_depto_apagado_no_sale_en_el_excel(base):
+    await _apagar_260(base)
+    ws = openpyxl.load_workbook(io.BytesIO(await _bajar(base))).active
+    assert "260" not in {str(ws.cell(r, 1).value) for r in range(HEADER_ROW + 1, ws.max_row + 1)}
+
+
+@pytest.mark.asyncio
+async def test_un_excel_viejo_no_mete_de_vuelta_al_depto_apagado(base):
+    xlsx_viejo = None
+    from app.models.dept_enablement import DeptEnablement  # noqa: F401
+    # el Excel viejo: bajado cuando el Club todavía estaba
+    base.add(PayrollPosition(id="club", scenario_id="sc-1", hotel_id="CWL", dept_code="260",
+                             position_name="HOST CLUB MADRESAL", salary_amount=0))
+    await base.commit()
+    xlsx_viejo = await _bajar(base)
+    # se apaga y se borra
+    from sqlalchemy import delete
+    await base.execute(delete(PayrollPosition).where(PayrollPosition.dept_code == "260"))
+    from app.models.dept_enablement import DeptEnablement as DE
+    base.add(DE(id="e1", hotel_id="CWL", scope_kind="DEPT", scope_key="260",
+                dimension="PAYROLL", enabled=False))
+    await base.commit()
+    r = await _subir(base, xlsx_viejo)
+    assert r["ignored_depts"] == ["260"]
+    assert all(d != "260" for d, _ in await _puestos(base))
