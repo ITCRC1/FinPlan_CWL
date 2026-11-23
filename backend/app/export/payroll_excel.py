@@ -109,6 +109,7 @@ def export_payroll_to_excel(
     dept_names: dict[str, str] | None = None,
     tc_por_mes: list[float] | None = None,
     solo_categorias: list[str] | None = None,
+    solo_subcategorias: list[str] | None = None,
 ) -> bytes:
     """
     ⚠️ `tc_por_mes` (12 valores, enero primero) es lo que hace que «SW Anual
@@ -131,8 +132,8 @@ def export_payroll_to_excel(
     # Bajado con filtro de Categoria: la fila 2 lo dice, y el import la lee para
     # reemplazar SOLO esas posiciones (ver `categorias_del_archivo`).
     merged_header(ws, 2, COL_DEPT, COL_OPS,
-                  (f"{PREFIJO_FILTRO} {', '.join(solo_categorias)}" if solo_categorias
-                   else "Todos los departamentos"), C["navy_mid"], sz=11)
+                  texto_del_filtro(solo_categorias, solo_subcategorias) or "Todos los departamentos",
+                  C["navy_mid"], sz=11)
     # El TC ya no es uno solo: "SW Anual USD*" usa el de CADA mes (ver
     # `tc_por_mes`), así que un rango dice más que un promedio que nadie usa
     # para calcular nada.
@@ -412,22 +413,43 @@ def _hoja_resumen(wb, ws_pl, positions_by_dept, dept_names, scenario_label, year
 
 
 PREFIJO_FILTRO = "Solo Categoria:"
+PREFIJO_FILTRO_SUB = "Solo SubCategoria:"
+
+
+def texto_del_filtro(cats, subs) -> str:
+    """Lo que va en la fila 2 de un Excel bajado con filtro. El import lo lee."""
+    partes = []
+    if cats:
+        partes.append(f"{PREFIJO_FILTRO} {', '.join(cats)}")
+    if subs:
+        partes.append(f"{PREFIJO_FILTRO_SUB} {', '.join(subs)}")
+    return " | ".join(partes)
+
+
+def filtro_del_archivo(file_bytes: bytes) -> tuple[set[str] | None, set[str] | None]:
+    """(Categorias, SubCategorias) con que se bajó el Excel; None = sin ese filtro.
+
+    ⚠️ Importa: subir reemplaza CADA depto del archivo. Un Excel bajado solo «On
+    Property» trae, de Gerencia (0181), nada, y de Recepción a todos; uno «Solo
+    Operaciones» trae de Recepción a todos menos los dos Gerencial. Si se
+    reemplazara el depto entero, subirlo borraría a los que no venían. Con el
+    filtro, el import borra y recrea solo las posiciones que cumplen el filtro."""
+    wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
+    texto = str(wb[wb.sheetnames[0]].cell(row=2, column=COL_DEPT).value or "").strip()
+    cats = subs = None
+    for parte in texto.split("|"):
+        parte = parte.strip()
+        if parte.startswith(PREFIJO_FILTRO):
+            cats = {normalizar_categoria(x) for x in parte[len(PREFIJO_FILTRO):].split(",")}
+            cats.discard(None)
+        elif parte.startswith(PREFIJO_FILTRO_SUB):
+            subs = {normalizar_subcategoria(x) for x in parte[len(PREFIJO_FILTRO_SUB):].split(",")}
+            subs.discard(None)
+    return (cats or None), (subs or None)
 
 
 def categorias_del_archivo(file_bytes: bytes) -> set[str] | None:
-    """Las Categorias con que se bajó el Excel, o None si se bajó completo.
-
-    ⚠️ Importa: subir reemplaza CADA depto del archivo. Un Excel bajado solo con
-    «Operaciones» trae, de Recepción (0111), a todos menos los dos Gerencial; si se
-    reemplazara el depto entero, subirlo los borraría. Con el filtro, el import
-    borra y recrea solo las posiciones de esa Categoria."""
-    wb = load_workbook(io.BytesIO(file_bytes), data_only=True)
-    texto = str(wb[wb.sheetnames[0]].cell(row=2, column=COL_DEPT).value or "").strip()
-    if not texto.startswith(PREFIJO_FILTRO):
-        return None
-    cats = {normalizar_categoria(x) for x in texto[len(PREFIJO_FILTRO):].split(",")}
-    cats.discard(None)
-    return cats or None
+    return filtro_del_archivo(file_bytes)[0]
 
 
 def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:

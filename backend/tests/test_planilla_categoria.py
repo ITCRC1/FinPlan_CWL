@@ -157,9 +157,10 @@ async def base():
     await eng.dispose()
 
 
-async def _bajar(db, categoria=None):
+async def _bajar(db, categoria=None, subcategoria=None):
     from app.api.payroll_api import export_payroll_excel
-    return (await export_payroll_excel("sc-1", categoria=categoria, db=db)).body
+    return (await export_payroll_excel("sc-1", categoria=categoria, subcategoria=subcategoria,
+                                       db=db)).body
 
 
 async def _subir(db, xlsx):
@@ -292,3 +293,46 @@ def test_el_excel_trae_la_pestana_resumen_con_gran_total():
 def test_subir_un_excel_con_resumen_no_cambia_nada():
     xlsx, _ = _exportar()
     assert len(import_payroll_from_excel(xlsx)) == 2
+
+
+
+# ── Filtro por SubCategoria ─────────────────────────────────────────────────
+# Owner, 2026-11-22: «yo quiero un filtro solo on site ambos, y solo
+# administrativo ambos». En la base de prueba: Front Desk Agent (Operaciones, On
+# Property), Front Office Manager (Gerencial, On Property por su depto) y
+# Contador (Administrativo, Outside por su depto 0182).
+
+@pytest.mark.asyncio
+async def test_on_property_trae_operativos_y_gerenciales_en_sitio(base):
+    from app.export.payroll_excel import filtro_del_archivo
+    xlsx = await _bajar(base, subcategoria="On Property")
+    ws = openpyxl.load_workbook(io.BytesIO(xlsx)).active
+    puestos = {ws.cell(r, 4).value for r in range(HEADER_ROW + 1, ws.max_row + 1)} - {None}
+    assert puestos == {"Front Desk Agent", "Front Office Manager"}
+    assert filtro_del_archivo(xlsx) == (None, {ON_PROPERTY})
+
+
+@pytest.mark.asyncio
+async def test_outside_trae_solo_los_de_afuera(base):
+    ws = openpyxl.load_workbook(io.BytesIO(await _bajar(base, subcategoria="Outside"))).active
+    puestos = {ws.cell(r, 4).value for r in range(HEADER_ROW + 1, ws.max_row + 1)} - {None}
+    assert puestos == {"Contador"}
+
+
+@pytest.mark.asyncio
+async def test_subir_el_de_outside_no_toca_a_los_de_sitio(base):
+    antes = await _puestos(base)
+    await _subir(base, await _bajar(base, subcategoria="Outside"))
+    assert await _puestos(base) == antes
+
+
+@pytest.mark.asyncio
+async def test_subir_on_property_sin_un_puesto_lo_borra_solo_a_el(base):
+    xlsx = await _bajar(base, subcategoria="On Property")
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx)); ws = wb.active
+    for r in range(HEADER_ROW + 1, ws.max_row + 1):
+        if ws.cell(r, 4).value == "Front Office Manager":
+            ws.cell(r, 4).value = None
+    buf = io.BytesIO(); wb.save(buf)
+    await _subir(base, buf.getvalue())
+    assert await _puestos(base) == [("0111", "Front Desk Agent"), ("0182", "Contador")]

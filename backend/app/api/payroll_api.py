@@ -32,14 +32,14 @@ from app.api._candado import candado
 from app.db import get_db
 from app.errores import ErrorApi
 from app.textos import Idioma, t
-from app.models.payroll_position import (CATEGORIAS, PayrollPosition, categoria_de, get_fte,
+from app.models.payroll_position import (CATEGORIAS, SUBCATEGORIAS, PayrollPosition, categoria_de, get_fte,
                                          normalizar_categoria, normalizar_subcategoria,
                                          para_guardar, subcategoria_de)
 from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.actual_dept_fte import ActualDeptFte
 from app.models.scenario import Scenario
 from app.api._nombres_de_depto import nombres_de_depto
-from app.export.payroll_excel import (categorias_del_archivo, export_payroll_to_excel,
+from app.export.payroll_excel import (export_payroll_to_excel, filtro_del_archivo,
                                       import_payroll_from_excel)
 from app.models.exchange_rate import get_tc_for_month, ExchangeRate
 from app.models.payroll_params import (
@@ -1417,6 +1417,7 @@ async def export_payroll_excel(
     scenario_id: str,
     categoria: Optional[str] = Query(None, description="Operaciones, Administrativo, Gerencial "
                                                        "(separadas por coma). Vacío = todas."),
+    subcategoria: Optional[str] = Query(None, description="On Property, Outside. Vacío = las dos."),
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.scenario import Scenario
@@ -1425,7 +1426,7 @@ async def export_payroll_excel(
         raise ErrorApi(404, "escenario.no_encontrado")
     # Owner, 2026-11-22: «antes de bajar el Excel poder filtrar por operacional o Admin».
     solo: list[str] = []
-    for x in (categoria or "").split(","):
+    for x in (categoria if isinstance(categoria, str) else "").split(","):
         if not x.strip():
             continue
         c = normalizar_categoria(x)
@@ -1435,6 +1436,21 @@ async def export_payroll_excel(
             solo.append(c)
     if len(solo) == len(CATEGORIAS):
         solo = []          # las tres = todo: el archivo sale sin filtro
+    # Y por SubCategoria. Owner, mismo día: «yo quiero un filtro solo on site
+    # ambos, y solo administrativo ambos» — On Property trae Operaciones y los
+    # Gerencial en sitio; Outside, Administrativo y los Gerencial de afuera.
+    solo_sub: list[str] = []
+    # (isinstance: llamada directa desde Python, sin FastAPI, deja el Query() como default)
+    for x in (subcategoria if isinstance(subcategoria, str) else "").split(","):
+        if not x.strip():
+            continue
+        c = normalizar_subcategoria(x)
+        if c is None:
+            raise HTTPException(422, f"SubCategoria desconocida: {x.strip()!r}")
+        if c not in solo_sub:
+            solo_sub.append(c)
+    if len(solo_sub) == len(SUBCATEGORIAS):
+        solo_sub = []
 
     positions = (await db.execute(
         select(PayrollPosition)
@@ -1447,6 +1463,8 @@ async def export_payroll_excel(
 
     if solo:
         positions = [p for p in positions if categoria_de(p) in solo]
+    if solo_sub:
+        positions = [p for p in positions if subcategoria_de(p) in solo_sub]
     # Los deptos apagados en el provisionamiento (Club Madresal 260, Área
     # Recreativa 270) no salen: owner, 2026-11-22, «ellos acá no existen».
     from app.api.provisioning_api import depts_habilitados
@@ -1481,7 +1499,8 @@ async def export_payroll_excel(
     xlsx = export_payroll_to_excel(by_dept, label, scenario.year, tc_usd=tc_usd,
                                    dept_names=await nombres_de_depto(db),
                                    tc_por_mes=tc_por_mes,
-                                   solo_categorias=[c for c in CATEGORIAS if c in solo] or None)
+                                   solo_categorias=[c for c in CATEGORIAS if c in solo] or None,
+                                   solo_subcategorias=[c for c in SUBCATEGORIAS if c in solo_sub] or None)
     return Response(
         content=xlsx,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1520,7 +1539,7 @@ async def import_payroll_excel(
     # Bajado con filtro de Categoria → se reemplazan SOLO las posiciones de esa
     # Categoria en cada depto; las demás del depto no venían en el archivo y
     # no se tocan (si no, subirlo las borraba).
-    solo = categorias_del_archivo(contenido)
+    solo, solo_sub = filtro_del_archivo(contenido)
 
     if replace:
         affected = {r["dept_code"] for r in rows}
@@ -1530,7 +1549,9 @@ async def import_payroll_excel(
                 .where(PayrollPosition.scenario_id == scenario_id,
                        PayrollPosition.dept_code == dc)
             )).scalars().all()
-            pos_ids = [p.id for p in del_depto if solo is None or categoria_de(p) in solo]
+            pos_ids = [p.id for p in del_depto
+                       if (solo is None or categoria_de(p) in solo)
+                       and (solo_sub is None or subcategoria_de(p) in solo_sub)]
             if not pos_ids:
                 continue
             # delete concept entries first (FK), then positions

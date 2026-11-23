@@ -1822,9 +1822,13 @@ export async function downloadOwnerReportExcel(
 // `categoria`: "Operaciones", "Administrativo", "Gerencial" o varias separadas por
 // coma; vacío = todas. Un Excel bajado filtrado, al subirlo, reemplaza SOLO las
 // posiciones de esa Categoria (las demás del depto no se tocan).
-export async function downloadPayrollExcel(scenarioId: string, categoria = ""): Promise<Blob> {
+// `filtro`: "cat:Operaciones" (Categoria) o "sub:On Property" (SubCategoria);
+// vacío = todo. Sin prefijo se toma como Categoria.
+export async function downloadPayrollExcel(scenarioId: string, filtro = ""): Promise<Blob> {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
-  const q = categoria ? `?categoria=${encodeURIComponent(categoria)}` : "";
+  const [clave, valor] = filtro.startsWith("sub:") ? ["subcategoria", filtro.slice(4)]
+    : ["categoria", filtro.replace(/^cat:/, "")];
+  const q = valor ? `?${clave}=${encodeURIComponent(valor)}` : "";
   const res = await fetch(`${base}/payroll/${scenarioId}/export/excel/${q}`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.blob();

@@ -199,7 +199,7 @@ export default function PayrollCheckbookPage() {
       const blob = await downloadPayrollExcel(scenarioId, excelCat);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const sufijo = excelCat ? `_${excelCat.replace(/,/g, "_")}` : "";
+      const sufijo = excelCat ? `_${excelCat.replace(/^(cat|sub):/, "").replace(/[ ,]+/g, "_")}` : "";
       a.href = url; a.download = `Planilla_${hotelSlug()}${sufijo}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
@@ -374,11 +374,11 @@ export default function PayrollCheckbookPage() {
               background: "var(--bg-input)", color: "var(--text-primary)",
               border: "1px solid var(--border-medium)" }}>
             <option value="">{t("excelCatAll")}</option>
-            <option value="Operaciones">{t("excelCatOps")}</option>
-            <option value="Operaciones,Gerencial">{t("excelCatOpsGer")}</option>
-            <option value="Administrativo,Gerencial">{t("excelCatAdminGer")}</option>
-            <option value="Administrativo">{t("excelCatAdmin")}</option>
-            <option value="Gerencial">{t("excelCatGer")}</option>
+            <option value="sub:On Property">{t("excelSubOnProperty")}</option>
+            <option value="sub:Outside">{t("excelSubOutside")}</option>
+            <option value="cat:Operaciones">{t("excelCatOps")}</option>
+            <option value="cat:Administrativo">{t("excelCatAdmin")}</option>
+            <option value="cat:Gerencial">{t("excelCatGer")}</option>
           </select>
           <button onClick={handleDownload} disabled={!!busy}
             style={{ padding: "5px 12px", fontSize: 12, borderRadius: 4, cursor: "pointer",
