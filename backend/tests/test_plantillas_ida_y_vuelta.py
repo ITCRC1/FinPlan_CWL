@@ -194,3 +194,21 @@ def test_opex_las_cuentas_de_21_detalles_bajan_de_800_a_820():
     assert seg("7065") == [str(n) for n in range(800, 811)]
     vuelta = {(f["account_code"], f["detail_code"]) for f in import_opex_from_excel(xlsx)}
     assert ("7150", "012") in vuelta          # 812 vuelve como el detalle 012
+
+
+def test_opex_baja_las_cuentas_del_catalogo_que_el_escenario_no_tiene():
+    """Owner, 2026-11-23: la 7475 Photography de Ventas «sí existe en el
+    catálogo» y no salía en el Excel porque el Working no la tenía abierta."""
+    import io
+    from openpyxl import load_workbook
+    ent = {"0190": [_opex_entry("7000", "Agency Fees", "Agencia", "", 100.0)]}
+    xlsx = export_opex_to_excel(ent, "BUDGET v1 2027", 2027, dept_names={"0190": "Ventas"},
+                                catalogo={"0190": {"7000": "Agency Fees", "7475": "Photography"}})
+    ws = load_workbook(io.BytesIO(xlsx)).worksheets[0]
+    cuentas = {str(ws.cell(r, 1).value) for r in range(6, ws.max_row + 1)}
+    assert "7475-0190-800-000-000-00-00" in cuentas
+    assert "7475-0190-810-000-000-00-00" in cuentas
+    vuelta = import_opex_from_excel(xlsx)
+    # La 7475 vacía vuelve con su línea principal en cero: la cuenta queda abierta.
+    assert [(f["account_code"], f["detail_code"]) for f in vuelta if f["account_code"] == "7475"] == [("7475", "")]
+    assert sum(float(f["jan"]) for f in vuelta) == 100.0

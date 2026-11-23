@@ -139,6 +139,24 @@ def cuenta_contable(account_code: str, dept_code: str, detail_code: str) -> str:
 _CUENTA_LARGA = re.compile(r"^(\d{4})-(\d{3,4})-(\d{3})(?:-|$)")
 
 
+def con_cuentas_del_catalogo(entries: list[dict], cuentas: dict[str, str]) -> list[dict]:
+    """Agrega, en blanco, las cuentas 7xxx del catálogo del depto que el
+    escenario todavía no tiene abiertas.
+
+    Owner, 2026-11-23, por la 7475 Photography de Ventas: «sí existe en el
+    catálogo». El Excel solo bajaba las cuentas con alguna línea en la base, y
+    en el Budget 2027 Working faltaban 173 de las del catálogo —18 en Ventas—:
+    no había dónde presupuestarlas. El catálogo es `account_mapping`, que es lo
+    que dice a qué renglón del P&L va cada cuenta de cada depto.
+    """
+    tiene = {e["account_code"] for e in entries}
+    extra = [{"account_code": a, "account_name": n or "", "detail_desc": "",
+              "detail_code": "", "currency": "USD",
+              **{m: 0 for m in MONTH_ATTRS}, **{f"crc_{m}": 0 for m in MONTH_ATTRS}}
+             for a, n in sorted(cuentas.items()) if a not in tiene]
+    return list(entries) + extra
+
+
 def desplegar(entries: list[dict]) -> list[dict]:
     """Las líneas de una cuenta, completas: la principal y 001…010, las que
     no existan en blanco (con la moneda de la principal). Los códigos raros que
@@ -194,6 +212,7 @@ def export_opex_to_excel(
     scenario_label: str,
     year: int,
     dept_names: dict[str, str] | None = None,
+    catalogo: dict[str, dict[str, str]] | None = None,
 ) -> bytes:
     """
     entries_by_dept: {dept_code: [entry_dict, ...]}
@@ -206,7 +225,8 @@ def export_opex_to_excel(
 
     usados: set[str] = set()
     for dept_code in sorted(entries_by_dept):
-        entries = entries_by_dept[dept_code]
+        entries = con_cuentas_del_catalogo(entries_by_dept[dept_code],
+                                           (catalogo or {}).get(dept_code, {}))
         dept_name = (dept_names or {}).get(dept_code) or DEPT_NAMES.get(dept_code, dept_code)
         sheet_name = nombre_de_hoja(f"{dept_code} {dept_name}", usados, sufijo=dept_code)
         ws = wb.create_sheet(title=sheet_name)

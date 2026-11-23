@@ -352,10 +352,24 @@ async def export_opex_excel(scenario_id: str, db: AsyncSession = Depends(get_db)
             **{f"crc_{mk}": float(getattr(e, f"crc_{mk}") or 0) for mk in MONTH_ATTRS},
         })
 
+    # Owner, 2026-11-23: «asegúrate que siempre bajen las cuentas asignadas para el
+    # departamento». Un depto con cuentas en el catálogo baja con su hoja aunque el
+    # escenario no tenga ninguna línea (0116, 0121, 0155, 0162, 0165, 0205 en el
+    # Working 2027). Los apagados en el provisionamiento (Club, Área Recreativa,
+    # Crowther) no salen.
+    from app.api.provisioning_api import depts_habilitados
+    apagados = await depts_habilitados(db, scenario.hotel_id, "OPEX") or set()
+    catalogo = await _catalogo_opex(db)
+    for d in catalogo:
+        if d not in apagados:
+            by_dept.setdefault(d, [])
+    by_dept = {d: v for d, v in by_dept.items() if d not in apagados or v}
+
     label = f"{scenario.type.title()} {scenario.year} · {scenario.version}"
     try:
         xlsx_bytes = export_opex_to_excel(by_dept, label, scenario.year,
-                                          dept_names=await nombres_de_depto(db))
+                                          dept_names=await nombres_de_depto(db),
+                                          catalogo=catalogo)
     except Exception as exc:
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}\n\n{tb}")
@@ -366,6 +380,25 @@ async def export_opex_excel(scenario_id: str, db: AsyncSession = Depends(get_db)
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+async def _catalogo_opex(db: AsyncSession) -> dict[str, dict[str, str]]:
+    """`{depto: {cuenta 7xxx: nombre}}` según el mapeo ACTIVO (el catálogo de
+    FinPlan: cada cuenta con su renglón del P&L).
+
+    Las reglas en NO quedan afuera a propósito: hoy son 11 de Utilities (0210)
+    que el owner desactivó el 2026-08-18 porque ese depto no usa esas cuentas.
+    Bajarlas invitaría a presupuestar en una cuenta que el P&L no rutea."""
+    from app.models.mapping import AccountMapping
+    out: dict[str, dict[str, str]] = {}
+    for m in (await db.execute(select(AccountMapping).where(
+            AccountMapping.active_status == "YES",
+            AccountMapping.account_code.like("7%"),
+            AccountMapping.dept_code.is_not(None)))).scalars():
+        cod = (m.account_code or "").strip()
+        if len(cod) == 4 and cod.isdigit() and (m.dept_code or "").strip():
+            out.setdefault(m.dept_code.strip(), {}).setdefault(cod, (m.account_name_example or "").strip())
+    return out
 
 
 def asignar_detail_codes(rows: list[dict]) -> list[str]:
