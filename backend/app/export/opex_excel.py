@@ -95,8 +95,19 @@ HEADER_ROW = 5
 #
 # En Integrity el tercer segmento de una cuenta 7xxx es el DETALLE, de 800 a 810
 # (`7105-0110-801-000-000-00-00`). En FinPlan la línea principal tiene código
-# vacío y las sub-líneas 001…010: 800 ↔ «», 801 ↔ 001 … 810 ↔ 010.
+# vacío y las sub-líneas 001…010: 800 ↔ «», 801 ↔ 001 … 810 ↔ 010 (y hasta
+# 820 ↔ 020 en las cuentas de `DETALLES_HASTA_820`).
 CODIGOS_DETALLE = [""] + [f"{n:03d}" for n in range(1, 11)]
+
+# Cuentas que llevan 21 detalles, de 800 a 820 (owner, 2026-11-23). Integrity ya
+# usa el 812 en la 7150 y el 811 y 812 en la 7625.
+DETALLES_HASTA_820 = {"7150", "7625", "7660", "7670", "7675"}
+
+
+def codigos_de(account_code: str) -> list[str]:
+    """Los códigos de detalle de una cuenta: 800–810, o 800–820 en las de arriba."""
+    tope = 20 if str(account_code).strip() in DETALLES_HASTA_820 else 10
+    return [""] + [f"{n:03d}" for n in range(1, tope + 1)]
 
 
 def seg3_de(detail_code: str) -> str:
@@ -136,7 +147,7 @@ def desplegar(entries: list[dict]) -> list[dict]:
     base = por_codigo.get("") or entries[0]
     moneda = base.get("currency") or "USD"
     salida = []
-    for c in CODIGOS_DETALLE:
+    for c in codigos_de(base["account_code"]):
         e = por_codigo.pop(c, None)
         salida.append(e if e is not None else {
             "account_code": base["account_code"], "account_name": base.get("account_name", ""),

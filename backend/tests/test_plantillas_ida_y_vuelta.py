@@ -178,3 +178,19 @@ def test_opex_un_archivo_sin_la_columna_del_numero_sigue_subiendo():
     # segmento y la línea conserva SU número igual.
     assert {f["detail_desc"]: f["detail_code"] for f in viejo} == {
         "Detergente": "003", "Cloro": "007", "Varios": "001"}
+
+
+def test_opex_las_cuentas_de_21_detalles_bajan_de_800_a_820():
+    """Owner, 2026-11-23: 7150, 7625, 7660, 7670 y 7675 van de 800 a 820; el resto, a 810."""
+    import io
+    from openpyxl import load_workbook
+    ent = {"0190": [_opex_entry("7150", "Dues", "Cuota", "012", 5.0),
+                    _opex_entry("7065", "Cleaning", "Cloro", "", 1.0)]}
+    xlsx = export_opex_to_excel(ent, "BUDGET v1 2027", 2027, dept_names={"0190": "Ventas"})
+    ws = load_workbook(io.BytesIO(xlsx)).worksheets[0]
+    cuentas = [str(ws.cell(r, 1).value) for r in range(6, ws.max_row + 1)]
+    seg = lambda a: sorted(c.split("-")[2] for c in cuentas if c.startswith(a + "-"))
+    assert seg("7150") == [str(n) for n in range(800, 821)]
+    assert seg("7065") == [str(n) for n in range(800, 811)]
+    vuelta = {(f["account_code"], f["detail_code"]) for f in import_opex_from_excel(xlsx)}
+    assert ("7150", "012") in vuelta          # 812 vuelve como el detalle 012
