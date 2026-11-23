@@ -1421,6 +1421,7 @@
     "errorUploading": "Error al subir",
     "excelCatAll": "Todas las categorías",
     "excelCatOps": "Solo Operaciones",
+    "excelCatOpsGer": "Operaciones + Gerencial",
     "excelCatAdminGer": "Administrativo + Gerencial",
     "excelCatAdmin": "Solo Administrativo",
     "excelCatGer": "Solo Gerencial",

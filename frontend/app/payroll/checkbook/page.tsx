@@ -375,6 +375,7 @@ export default function PayrollCheckbookPage() {
               border: "1px solid var(--border-medium)" }}>
             <option value="">{t("excelCatAll")}</option>
             <option value="Operaciones">{t("excelCatOps")}</option>
+            <option value="Operaciones,Gerencial">{t("excelCatOpsGer")}</option>
             <option value="Administrativo,Gerencial">{t("excelCatAdminGer")}</option>
             <option value="Administrativo">{t("excelCatAdmin")}</option>
             <option value="Gerencial">{t("excelCatGer")}</option>
