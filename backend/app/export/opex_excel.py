@@ -88,6 +88,63 @@ COL_NUM    = 18  # R — detail_code
 # Row where column headers live (1-based)
 HEADER_ROW = 5
 
+# ── Cada cuenta, desplegada en sus 11 líneas ──────────────────────────────────
+# Owner, 2026-11-23: «necesito bajar el checkbook de OPEX con todos los detalles
+# desplegados y la cuenta contable… voy a subir con detalles los gastos. Quiero que
+# quede así hasta que yo te diga lo contrario».
+#
+# En Integrity el tercer segmento de una cuenta 7xxx es el DETALLE, de 800 a 810
+# (`7105-0110-801-000-000-00-00`). En FinPlan la línea principal tiene código
+# vacío y las sub-líneas 001…010: 800 ↔ «», 801 ↔ 001 … 810 ↔ 010.
+CODIGOS_DETALLE = [""] + [f"{n:03d}" for n in range(1, 11)]
+
+
+def seg3_de(detail_code: str) -> str:
+    """Código de detalle de FinPlan → tercer segmento de Integrity (800–810)."""
+    c = str(detail_code or "").strip()
+    if not c:
+        return "800"
+    if len(c) == 3 and c.startswith("8"):
+        return c
+    try:
+        return f"8{int(c):02d}"
+    except ValueError:
+        return "800"
+
+
+def detalle_de_seg3(seg3: str) -> str:
+    """Al revés: 800 → «», 801 → «001» … 810 → «010»."""
+    try:
+        n = int(seg3) - 800
+    except (TypeError, ValueError):
+        return ""
+    return "" if n <= 0 else f"{n:03d}"
+
+
+def cuenta_contable(account_code: str, dept_code: str, detail_code: str) -> str:
+    return f"{account_code}-{dept_code}-{seg3_de(detail_code)}-000-000-00-00"
+
+
+_CUENTA_LARGA = re.compile(r"^(\d{4})-(\d{3,4})-(\d{3})(?:-|$)")
+
+
+def desplegar(entries: list[dict]) -> list[dict]:
+    """Las líneas de una cuenta, completas: la principal y 001…010, las que
+    no existan en blanco (con la moneda de la principal). Los códigos raros que
+    ya estuvieran se conservan al final."""
+    por_codigo = {str(e.get("detail_code") or "").strip(): e for e in entries}
+    base = por_codigo.get("") or entries[0]
+    moneda = base.get("currency") or "USD"
+    salida = []
+    for c in CODIGOS_DETALLE:
+        e = por_codigo.pop(c, None)
+        salida.append(e if e is not None else {
+            "account_code": base["account_code"], "account_name": base.get("account_name", ""),
+            "detail_desc": "", "detail_code": c, "currency": moneda,
+            **{m: 0 for m in MONTH_ATTRS}, **{f"crc_{m}": 0 for m in MONTH_ATTRS}})
+    salida.extend(por_codigo.values())
+    return salida
+
 # Dept display names
 # Nombres de departamento. **NO se escriben acá.**
 #
@@ -158,7 +215,7 @@ def _write_dept_sheet(
     year: int,
 ) -> None:
     # ── Column widths ────────────────────────────────────────────────────────
-    ws.column_dimensions["A"].width = 10   # account
+    ws.column_dimensions["A"].width = 27   # cuenta contable completa
     ws.column_dimensions["B"].width = 28   # account name
     ws.column_dimensions["C"].width = 32   # detail
     for col in range(COL_JAN, COL_DEC + 1):
@@ -184,7 +241,8 @@ def _write_dept_sheet(
     # ── Row 3: subtitle ───────────────────────────────────────────────────────
     ws.row_dimensions[3].height = 14
     ws.merge_cells(f"A3:{get_column_letter(COL_TOTAL)}3")
-    c = ws.cell(3, 1, "Importar: no modificar columnas A-C · solo editar celdas de meses (D-O)")
+    c = ws.cell(3, 1, "Cada cuenta va desplegada en sus 11 detalles (800 a 810). Editar: C (detalle), "
+                     "D-O (meses) y Q (moneda). Al subir entran solo las líneas con detalle o con montos.")
     c.font = _font(italic=True, color=_C["text_mid"], size=8)
     c.fill = _fill(_C["blue_header"])
     c.alignment = _CENTER
@@ -197,6 +255,7 @@ def _write_dept_sheet(
     # ── Row 5: Column headers ─────────────────────────────────────────────────
     ws.row_dimensions[5].height = 20
     headers = ["Cuenta", "Nombre de Cuenta", "Descripción / Detalle"] + MONTHS_ES + ["TOTAL"]
+    # (la «Cuenta» es la contable completa de Integrity: 7105-0110-801-000-000-00-00)
     aligns = [_CENTER, _LEFT, _LEFT] + [_CENTER] * 12 + [_CENTER]
     for col, (h, al) in enumerate(zip(headers, aligns), start=1):
         c = ws.cell(5, col, h)
@@ -215,14 +274,15 @@ def _write_dept_sheet(
     subtotal_rows_by_account: dict[str, int] = {}
 
     for acct_code in sorted(by_account):
-        acct_entries = by_account[acct_code]
-        acct_name = acct_entries[0]["account_name"]
+        acct_entries = desplegar(by_account[acct_code])
+        acct_name = next((e["account_name"] for e in acct_entries if e.get("account_name")), "")
         detail_rows: list[int] = []
 
         for entry in acct_entries:
             ws.row_dimensions[row].height = 16
-            # A: account code (gray, not editable intent)
-            c = ws.cell(row, COL_ACCT, acct_code)
+            # A: la cuenta contable completa de Integrity (cuenta-depto-detalle)
+            c = ws.cell(row, COL_ACCT, cuenta_contable(acct_code, dept_code,
+                                                       entry.get("detail_code", "")))
             c.font = _font(color=_C["text_mid"], size=9)
             c.alignment = _CENTER
             c.border = _border(_C["border"])
@@ -422,7 +482,14 @@ def import_opex_from_excel(file_bytes: bytes) -> list[dict]:
             # Skip blank or structural rows
             if not acct_raw:
                 continue
-            acct_str = str(acct_raw).strip().split(".")[0]  # handle float "7065.0"
+            # La cuenta viene completa (`7105-0110-801-000-000-00-00`) desde el
+            # 2026-11-23; los archivos de antes traen solo `7105`.
+            seg3 = None
+            larga = _CUENTA_LARGA.match(str(acct_raw).strip())
+            if larga:
+                acct_str, seg3 = larga.group(1), larga.group(3)
+            else:
+                acct_str = str(acct_raw).strip().split(".")[0]  # handle float "7065.0"
             if not re.match(r"^\d{3,5}$", acct_str):
                 continue
             detail_str = str(detail_raw).strip() if detail_raw else ""
@@ -432,6 +499,8 @@ def import_opex_from_excel(file_bytes: bytes) -> list[dict]:
             detail_code = ""
             if len(row) >= COL_NUM and row[COL_NUM - 1] not in (None, ""):
                 detail_code = str(row[COL_NUM - 1]).strip().split(".")[0]
+            elif seg3:
+                detail_code = detalle_de_seg3(seg3)
 
             moneda = "USD"
             if len(row) >= COL_MONEDA:
@@ -462,4 +531,31 @@ def import_opex_from_excel(file_bytes: bytes) -> list[dict]:
                 **months,
             })
 
-    return results
+    return sin_lineas_vacias(results)
+
+
+def _vacia(r: dict) -> bool:
+    return not r["detail_desc"] and not any(
+        v for k, v in r.items() if k in MONTH_ATTRS or k.startswith("crc_"))
+
+
+def sin_lineas_vacias(filas: list[dict]) -> list[dict]:
+    """Saca las líneas desplegadas que nadie llenó (sin detalle y en cero).
+
+    El Excel baja cada cuenta en sus 11 líneas; guardarlas vacías llenaría la
+    pantalla de renglones en cero, y una principal que no existía aparecería
+    sola. Pero una cuenta que viene TODA vacía conserva una línea —la principal,
+    o la primera—: es la que hace que la cuenta exista en el departamento, y
+    sin ella bajar y subir el archivo le borraría cuentas al checkbook.
+    """
+    grupos: dict[tuple, list[dict]] = {}
+    for r in filas:
+        grupos.setdefault((r["dept_code"], r["account_code"]), []).append(r)
+    quedan: set[int] = set()
+    for g in grupos.values():
+        llenas = [r for r in g if not _vacia(r)]
+        if llenas:
+            quedan.update(id(r) for r in llenas)
+        else:
+            quedan.add(id(next((r for r in g if not r["detail_code"]), g[0])))
+    return [r for r in filas if id(r) in quedan]

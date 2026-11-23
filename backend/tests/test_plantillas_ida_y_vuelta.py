@@ -173,4 +173,8 @@ def test_opex_un_archivo_sin_la_columna_del_numero_sigue_subiendo():
 
     assert len(viejo) == 3, "el archivo viejo dejó de subir"
     assert {f["detail_desc"] for f in viejo} == {"Detergente", "Cloro", "Varios"}
-    assert all(f["detail_code"] == "" for f in viejo)
+    # Desde 2026-11-23 la columna A trae la cuenta contable completa
+    # (`7065-0110-803-…`): sin la columna R, el detalle sale de su tercer
+    # segmento y la línea conserva SU número igual.
+    assert {f["detail_desc"]: f["detail_code"] for f in viejo} == {
+        "Detergente": "003", "Cloro": "007", "Varios": "001"}
