@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.importers.registro_dep import registro_de_subida
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._candado import candado
@@ -151,6 +151,10 @@ class PositionCreate(BaseModel):
 
 
 class PositionUpdate(BaseModel):
+    # Owner, 2026-11-22: «necesito poder regresar a la posición una vez que es
+    # creada para poder editar o cambiar». Código y depto también se editan.
+    dept_code: Optional[str] = None
+    position_code: Optional[str] = None
     position_name: Optional[str] = None
     employee_name: Optional[str] = None
     employee_type: Optional[str] = None
@@ -446,6 +450,30 @@ async def update_position(
     await candado(db, scenario_id)
     pos = await _get_position_or_404(db, scenario_id, position_id)
     changed = body.model_dump(exclude_none=True)
+    # Mudarla de depto: sus 12 filas de conceptos se mudan con ella (si no, la
+    # planilla queda en el depto viejo y la posición en el nuevo).
+    nuevo_depto = (changed.pop("dept_code", None) or "").strip()
+    if nuevo_depto and nuevo_depto != pos.dept_code:
+        pos.dept_name = (await nombres_de_depto(db)).get(nuevo_depto, pos.dept_name)
+        pos.dept_code = nuevo_depto
+        await db.execute(update(PayrollConceptEntry)
+                         .where(PayrollConceptEntry.position_id == pos.id)
+                         .values(dept_code=nuevo_depto))
+    if "position_code" in changed:
+        cod = (changed["position_code"] or "").strip()
+        usado = (await db.execute(select(PayrollPosition).where(
+            PayrollPosition.scenario_id == scenario_id,
+            PayrollPosition.position_code == cod,
+            PayrollPosition.id != pos.id))).scalars().first() if cod else None
+        if usado:
+            raise ErrorApi(409, "posicion.codigo_ya_usado", codigo=cod,
+                           puesto=usado.position_name, empleado=usado.employee_name)
+        changed["position_code"] = cod
+    # Categoria/SubCategoria: se guarda solo la excepción a la regla del depto.
+    if "categoria" in changed or "subcategoria" in changed:
+        c, s_ = para_guardar(pos.dept_code, changed.pop("categoria", None) or categoria_de(pos),
+                             changed.pop("subcategoria", None) or subcategoria_de(pos))
+        pos.categoria, pos.subcategoria = c, s_
     for field, value in changed.items():
         setattr(pos, field, value)
     # Si tocó salario/moneda/FTE, recalcular SW+CCSS+aguinaldo de esa posición.

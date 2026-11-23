@@ -336,3 +336,44 @@ async def test_subir_on_property_sin_un_puesto_lo_borra_solo_a_el(base):
     buf = io.BytesIO(); wb.save(buf)
     await _subir(base, buf.getvalue())
     assert await _puestos(base) == [("0111", "Front Desk Agent"), ("0182", "Contador")]
+
+
+# ── Editar una posición ya creada ───────────────────────────────────────────
+# Owner, 2026-11-22: «necesito poder regresar a la posición una vez que es creada
+# para poder editar o cambiar».
+
+async def _editar(db, pid, **campos):
+    from app.api.payroll_api import PositionUpdate, update_position
+    return await update_position("sc-1", pid, PositionUpdate(**campos), db=db)
+
+
+@pytest.mark.asyncio
+async def test_editar_muda_de_depto_con_sus_conceptos(base):
+    from sqlalchemy import select
+    from app.models.payroll_concept_entry import PayrollConceptEntry as CE
+    base.add(CE(scenario_id="sc-1", position_id="p0", dept_code="0111", month=1, year=2027))
+    await base.commit()
+    await _editar(base, "p0", dept_code="0182", position_name="Contador B")
+    p = await base.get(PayrollPosition, "p0")
+    assert (p.dept_code, p.position_name) == ("0182", "Contador B")
+    filas = (await base.execute(select(CE).where(CE.position_id == "p0"))).scalars().all()
+    assert {f.dept_code for f in filas} == {"0182"}
+
+
+@pytest.mark.asyncio
+async def test_editar_no_deja_repetir_un_codigo(base):
+    from app.errores import ErrorApi
+    base.add(PayrollPosition(id="px", scenario_id="sc-1", hotel_id="CWL", dept_code="0111",
+                             position_code="0111-09", position_name="X", salary_amount=0))
+    await base.commit()
+    with pytest.raises(ErrorApi):
+        await _editar(base, "p0", position_code="0111-09")
+
+
+@pytest.mark.asyncio
+async def test_editar_la_categoria_guarda_solo_la_excepcion(base):
+    await _editar(base, "p0", categoria="Gerencial")
+    p = await base.get(PayrollPosition, "p0")
+    assert (p.categoria, p.subcategoria) == (GERENCIAL, None)     # On Property = la del depto
+    await _editar(base, "p0", categoria="Operaciones")
+    assert (await base.get(PayrollPosition, "p0")).categoria is None

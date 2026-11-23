@@ -278,6 +278,26 @@ export default function PayrollCheckbookPage() {
     }
   }, [scenarioId]);
 
+  // Editar una posición ya creada (owner, 2026-11-22: «necesito poder regresar a
+  // la posición una vez que es creada para poder editar o cambiar»).
+  const [editPos, setEditPos] = useState<Position | null>(null);
+  const handleSaveEdit = useCallback(async (pos: Position, fields: Record<string, string | number | boolean>) => {
+    if (!scenarioId) return;
+    setBusy("edit");
+    try {
+      await updatePosition(scenarioId, pos.id, fields);
+      const destino = (fields.dept_code as string) || pos.dept_code;
+      if (destino !== pos.dept_code) {
+        setDepts(withExtraDepts(await getPayrollDepts(scenarioId)));
+      }
+      if (selectedDept) await loadDept(selectedDept);
+      setEditPos(null);
+      flash(t("positionSaved"));
+    } catch (e) {
+      flash(e instanceof Error ? `⚠ ${e.message}` : `⚠ ${tc("error")}`);
+    } finally { setBusy(null); }
+  }, [scenarioId, selectedDept, loadDept]);
+
   const handleDeletePos = useCallback(async (pos: Position) => {
     if (!scenarioId) return;
     setPositions(prev => prev.filter(p => p.id !== pos.id));  // optimista
@@ -298,9 +318,10 @@ export default function PayrollCheckbookPage() {
     setPositions(prev => prev.map(p => p.id === pos.id ? { ...p, ...fields } : p));
     try {
       await updatePosition(scenarioId, pos.id, fields);
-      // Marcar/desmarcar Contract Labour mueve el salario entre 6000 y 6031 y
-      // prende o apaga las cargas: hay que volver a leer los montos.
-      if ("contract_labour" in fields && selectedDept) loadDept(selectedDept);
+      // Contract Labour, salario y moneda cambian los montos de los 12 meses (el
+      // backend recalcula la posición): hay que volver a leerlos.
+      if (("contract_labour" in fields || "salary_amount" in fields || "salary_currency" in fields)
+          && selectedDept) loadDept(selectedDept);
     } catch (e) {
       flash(e instanceof Error ? e.message : t("errorEditing"));
       if (selectedDept) loadDept(selectedDept);
@@ -444,6 +465,16 @@ export default function PayrollCheckbookPage() {
         </div>
       )}
 
+      {editPos && (
+        <EditPositionModal
+          pos={editPos}
+          depts={depts}
+          busy={busy === "edit"}
+          onClose={() => setEditPos(null)}
+          onSave={fields => handleSaveEdit(editPos, fields)}
+        />
+      )}
+
       {addModal && (
         <AddPositionsModal
           depts={depts}
@@ -561,9 +592,31 @@ export default function PayrollCheckbookPage() {
                           onBlurCapture={e => e.target.style.border = "1px solid transparent"} />
                       </td>
                       <td className="mono" style={{ whiteSpace: "nowrap" }}>
-                        {pos.salary_currency === "CRC"
-                          ? "₡" + Math.round(pos.salary_amount).toLocaleString("es-CR")
-                          : "$" + pos.salary_amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {/* Editable: al salir del campo se guarda y FinPlan recalcula la
+                            posición. Cambiá primero la moneda y después el monto. */}
+                        <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                          {pos.salary_currency === "CRC" ? "₡" : "$"}
+                        </span>
+                        <input
+                          key={`${pos.id}-${pos.salary_currency}-${pos.salary_amount}`}
+                          defaultValue={pos.salary_currency === "CRC"
+                            ? Math.round(pos.salary_amount).toLocaleString("es-CR")
+                            : pos.salary_amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          title={t("salaryEditHint")}
+                          onBlur={e => {
+                            // Acepta «2 000 000», «2,000,000», «2500.50» o «2.500,50».
+                            let s = e.target.value.replace(/[\s₡$]/g, "");
+                            if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+                            else s = s.replace(/,/g, "");
+                            const v = Number(s);
+                            if (!Number.isFinite(v) || v < 0) { e.target.value = String(pos.salary_amount); return; }
+                            if (Math.abs(v - pos.salary_amount) > 0.001) handleEditPos(pos, { salary_amount: v });
+                          }}
+                          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          className="mono"
+                          style={{ width: 92, textAlign: "right", background: "transparent", fontSize: 12,
+                            color: "var(--text-primary)", border: "1px solid var(--border-medium)",
+                            borderRadius: 4, padding: "2px 4px" }} />
                         <select value={pos.salary_currency}
                           onChange={e => handleEditPos(pos, { salary_currency: e.target.value })}
                           title={t("personCurrency")}
@@ -599,6 +652,13 @@ export default function PayrollCheckbookPage() {
                         </div>
                       </td>
                       <td style={{ whiteSpace: "nowrap", textAlign: "center" }}>
+                        <button title={t("editPosition")} onClick={() => setEditPos(pos)}
+                          disabled={!!busy}
+                          style={{ marginRight: 4, padding: "2px 7px", fontSize: 12, cursor: "pointer",
+                            background: "var(--bg-surface)", color: "var(--text-primary)",
+                            border: "1px solid var(--border-medium)", borderRadius: 4 }}>
+                          ✎
+                        </button>
                         <button title={t("duplicate")} onClick={() => handleDuplicate(pos)}
                           disabled={!!busy}
                           style={{ padding: "2px 8px", fontSize: 13, fontWeight: 700, cursor: "pointer",
@@ -633,6 +693,173 @@ export default function PayrollCheckbookPage() {
 }
 
 // ── Add positions modal ────────────────────────────────────────────────────────
+const MESES_FTE = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+
+function EditPositionModal({
+  pos, depts, busy, onClose, onSave,
+}: {
+  pos: Position;
+  depts: Dept[];
+  busy: boolean;
+  onClose: () => void;
+  onSave: (fields: Record<string, string | number | boolean>) => void;
+}) {
+  const t = useTranslations("payrollCb");
+  const tc = useTranslations("common");
+  const tm = useTranslations("months");
+  const [dept, setDept] = useState(pos.dept_code);
+  const [code, setCode] = useState(pos.position_code ?? "");
+  const [name, setName] = useState(pos.position_name ?? "");
+  const [empleado, setEmpleado] = useState(pos.employee_name ?? "");
+  const [tipo, setTipo] = useState(pos.employee_type ?? "1-Permanente");
+  const [salario, setSalario] = useState(String(pos.salary_amount ?? 0));
+  const [moneda, setMoneda] = useState(pos.salary_currency ?? "CRC");
+  const [cl, setCl] = useState(!!pos.contract_labour);
+  const [cat, setCat] = useState(pos.categoria ?? "Operaciones");
+  const [sub, setSub] = useState(pos.subcategoria ?? "On Property");
+  const [fte, setFte] = useState<string[]>(MESES_FTE.map((_, i) =>
+    String(pos.months.find(m => m.month === i + 1)?.fte ?? 0)));
+
+  const inp: React.CSSProperties = {
+    background: "var(--bg-input)", color: "var(--text-primary)",
+    border: "1px solid var(--border-medium)", borderRadius: 4,
+    padding: "6px 10px", fontSize: 13, width: "100%",
+  };
+  const lbl: React.CSSProperties = { fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, display: "block" };
+
+  const salarioNum = Number(salario.replace(/[\s,₡$]/g, ""));
+  const fteNum = fte.map(Number);
+  const fteMal = fteNum.some(v => !Number.isFinite(v) || v < 0 || v > 1);
+  const puede = name.trim() && Number.isFinite(salarioNum) && salarioNum >= 0 && !fteMal;
+
+  function guardar() {
+    // Solo lo que cambió: así no se pisa nada que no se tocó.
+    const f: Record<string, string | number | boolean> = {};
+    if (dept !== pos.dept_code) f.dept_code = dept;
+    if (code.trim() !== (pos.position_code ?? "")) f.position_code = code.trim();
+    if (name.trim() !== pos.position_name) f.position_name = name.trim();
+    if (empleado.trim() !== (pos.employee_name ?? "")) f.employee_name = empleado.trim() || "VACANTE";
+    if (tipo !== pos.employee_type) f.employee_type = tipo;
+    if (Math.abs(salarioNum - (pos.salary_amount ?? 0)) > 0.001) f.salary_amount = salarioNum;
+    if (moneda !== pos.salary_currency) f.salary_currency = moneda;
+    if (cl !== !!pos.contract_labour) f.contract_labour = cl;
+    if (cat !== pos.categoria) f.categoria = cat;
+    if (sub !== pos.subcategoria) f.subcategoria = sub;
+    MESES_FTE.forEach((m, i) => {
+      const antes = pos.months.find(x => x.month === i + 1)?.fte ?? 0;
+      if (Math.abs(fteNum[i] - antes) > 0.0001) f[`fte_${m}`] = fteNum[i];
+    });
+    if (Object.keys(f).length === 0) { onClose(); return; }
+    onSave(f);
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: "var(--bg-surface)", border: "1px solid var(--border-medium)",
+        borderRadius: 8, padding: 20, width: 620, maxWidth: "94vw", maxHeight: "92vh", overflowY: "auto",
+      }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 16, color: "var(--text-primary)" }}>
+          {t("editPosition")} · {pos.position_code}
+        </h3>
+        <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--text-secondary)" }}>{t("editPositionHelp")}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ gridColumn: "1 / 3" }}>
+            <label style={lbl}>{tc("department")}</label>
+            <select value={dept} onChange={e => setDept(e.target.value)} style={inp}>
+              {depts.map(d => <option key={d.dept_code} value={d.dept_code}>{d.dept_code} — {d.dept_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>{tc("code")}</label>
+            <input value={code} onChange={e => setCode(e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>{t("positionName")}</label>
+            <input value={name} onChange={e => setName(e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>{t("employeeLabel")}</label>
+            <input value={empleado} onChange={e => setEmpleado(e.target.value)} style={inp} />
+          </div>
+          <div>
+            <label style={lbl}>{t("typeLabel")}</label>
+            <select value={tipo} onChange={e => setTipo(e.target.value)} style={inp}>
+              {["1-Permanente", "2-Temporal", "3-Estacional", "4-Contrato"].map(x =>
+                <option key={x} value={x}>{x}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>{t("baseSalary")}</label>
+            <input value={salario} onChange={e => setSalario(e.target.value)} style={inp} className="mono" />
+          </div>
+          <div>
+            <label style={lbl}>{tc("currency")}</label>
+            <select value={moneda} onChange={e => setMoneda(e.target.value)} style={inp}>
+              <option value="CRC">CRC</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Categoria</label>
+            <select value={cat} onChange={e => setCat(e.target.value)} style={inp}>
+              {["Operaciones", "Administrativo", "Gerencial"].map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>SubCategoria</label>
+            <select value={sub} onChange={e => setSub(e.target.value)} style={inp}>
+              {["On Property", "Outside"].map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+          </div>
+          <label style={{ gridColumn: "1 / 3", display: "flex", gap: 8, alignItems: "flex-start",
+            fontSize: 12.5, color: "var(--text-primary)", cursor: "pointer" }}>
+            <input type="checkbox" checked={cl} onChange={e => setCl(e.target.checked)} style={{ marginTop: 2 }} />
+            <span>
+              <b>Contract Labour</b>
+              <span style={{ display: "block", fontSize: 11, color: "var(--text-secondary)" }}>
+                {t("contractLabourHint")}
+              </span>
+            </span>
+          </label>
+          <div style={{ gridColumn: "1 / 3" }}>
+            <label style={lbl}>FTE (0.00 – 1.00)</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: 4 }}>
+              {MESES_FTE.map((m, i) => (
+                <div key={m} style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "var(--text-secondary)" }}>{((tm.raw("short") as string[]) ?? MONTHS_FALLBACK)[i]}</div>
+                  <input value={fte[i]} className="mono"
+                    onChange={e => setFte(prev => prev.map((v, k) => k === i ? e.target.value : v))}
+                    style={{ ...inp, padding: "4px 2px", textAlign: "center", fontSize: 12,
+                      borderColor: (Number(fte[i]) < 0 || Number(fte[i]) > 1 || !Number.isFinite(Number(fte[i])))
+                        ? "var(--negative)" : "var(--border-medium)" }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+          <button onClick={onClose} disabled={busy} style={{
+            padding: "7px 14px", fontSize: 13, borderRadius: 5, cursor: "pointer",
+            background: "var(--bg-surface)", color: "var(--text-secondary)",
+            border: "1px solid var(--border-medium)" }}>{tc("cancel")}</button>
+          <button onClick={guardar} disabled={!puede || busy}
+            style={{
+              padding: "7px 16px", fontSize: 13, borderRadius: 5, fontWeight: 600,
+              cursor: puede && !busy ? "pointer" : "not-allowed",
+              background: puede && !busy ? "var(--brand)" : "var(--bg-surface)",
+              color: puede && !busy ? "#fff" : "var(--text-disabled)", border: "none" }}>
+            {busy ? "…" : tc("save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddPositionsModal({
   depts, defaultDept, scenarioId, busy, onClose, onAdd,
 }: {

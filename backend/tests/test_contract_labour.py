@@ -125,3 +125,21 @@ def test_el_excel_trae_la_columna_x_y_vuelve_a_subir():
     assert ws.cell(HEADER_ROW, COL_CL).value == "Contract Labour"
     filas = {r["position_name"]: r["contract_labour"] for r in import_payroll_from_excel(xlsx)}
     assert filas == {"IT Support": True, "IT Manager": False}
+
+
+def test_la_moneda_del_excel_se_puede_cambiar_y_entra():
+    """«Cómo le cambio la moneda y el monto del salario»: la H estaba bloqueada."""
+    from app.export.payroll_excel import COL_CUR
+    p = {"dept_name": "", "position_code": "0190-02", "position_name": "Director",
+         "employee_name": "X", "employee_type": "1-Permanente", "salary_amount": 2000000,
+         "salary_currency": "CRC", "contract_labour": True, **{f"fte_{m}": 1.0 for m in MESES}}
+    wb = openpyxl.load_workbook(io.BytesIO(export_payroll_to_excel(
+        {"0190": [p]}, "CWL Working", 2027, tc_por_mes=[500.0] * 12)))
+    ws = wb.worksheets[0]
+    fila = HEADER_ROW + 1
+    assert ws.cell(fila, COL_CUR).protection.locked is False
+    ws.cell(fila, COL_CUR).value = "USD"
+    ws.cell(fila, 7).value = 4000
+    buf = io.BytesIO(); wb.save(buf)
+    r = import_payroll_from_excel(buf.getvalue())[0]
+    assert r["salary_currency"] == "USD" and float(r["salary_amount"]) == 4000

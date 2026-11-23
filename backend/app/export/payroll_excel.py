@@ -143,7 +143,7 @@ def export_payroll_to_excel(
     tc_nota = (f"₡{tc_min:,.0f}/USD" if tc_min == tc_max
               else f"₡{tc_min:,.0f}–{tc_max:,.0f}/USD según el mes")
     note = ws.cell(row=3, column=COL_DEPT,
-                   value=(f"TC: {tc_nota}  |  SOLO editar: E (colaborador), G (salario) y "
+                   value=(f"TC: {tc_nota}  |  SOLO editar: E (colaborador), G (salario), H (moneda) y "
                           "I-T (FTE por mes), V (Categoria), W (SubCategoria) y X (Contract Labour). El resto "
                           "está bloqueado. Filtro en el encabezado para separar Operaciones / "
                           "Administrativo / Gerencial y On Property / Outside."))
@@ -172,6 +172,9 @@ def export_payroll_to_excel(
     ref = ws.cell(row=HEADER_ROW, column=COL_REF, value="SW Anual USD*")
     ref.fill = fill(C["blue_header"]); ref.font = font(bold=True, color=C["navy"], size=9)
     ref.alignment = align("center"); ref.border = border()
+    lista_moneda = DataValidation(type="list", formula1='"' + ",".join(CURRENCIES) + '"',
+                                  allow_blank=False)
+    ws.add_data_validation(lista_moneda)
     listas = {}
     for col, titulo, valores in ((COL_CAT, "Categoria", CATEGORIAS),
                                  (COL_SUBCAT, "SubCategoria", SUBCATEGORIAS),
@@ -224,8 +227,13 @@ def export_payroll_to_excel(
             sal_c.fill = fill(C["amber_light"]); sal_c.font = font(bold=True, color=C["amber"], size=10)
             unlock(sal_c)
 
-            # locked: currency (H)
-            wc(COL_CUR, cur, alignment=align("center"), font=font(size=9, color=C["text_mid"]))
+            # editable: currency (H). Owner, 2026-11-22: «cómo le cambio la moneda y
+            # el monto del salario» — los contratistas suelen cobrar en dólares. El
+            # import ya la leía; solo estaba bloqueada.
+            cur_c = wc(COL_CUR, cur, alignment=align("center"), font=font(size=9, bold=True))
+            cur_c.fill = fill(C["amber_light"])
+            lista_moneda.add(cur_c)
+            unlock(cur_c)
 
             # editable: FTE (I-T)
             for i, attr in enumerate(FTE_ATTRS):

@@ -1737,6 +1737,7 @@ export interface Position {
   salary_amount: number; salary_currency: string;
   /** Contract Labour: su salario va a 6031 y no genera cargas. */
   contract_labour?: boolean;
+  categoria?: string; subcategoria?: string;
   months: { month: number; fte: number; entry: ConceptEntry | null }[];
 }
 
@@ -1983,7 +1984,9 @@ export async function deletePosition(scenarioId: string, positionId: string) {
 export async function updatePosition(
   scenarioId: string, positionId: string,
   fields: Partial<{ position_name: string; employee_name: string;
-    salary_amount: number; salary_currency: string; contract_labour: boolean }>,
+    salary_amount: number; salary_currency: string; contract_labour: boolean;
+    dept_code: string; position_code: string; employee_type: string;
+    categoria: string; subcategoria: string } & Record<string, string | number | boolean>>,
 ) {
   return api.put<{ id: string; updated: boolean }>(
     `/payroll/${scenarioId}/position/${positionId}/`, fields);
