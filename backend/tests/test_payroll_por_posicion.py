@@ -16,9 +16,9 @@ from app.api.payroll_position_report_api import (
 
 # ── los 17 conceptos ──────────────────────────────────────────────────────────
 def test_estan_los_17_conceptos_sin_repetir():
-    assert len(CONCEPTOS) == 17
-    assert len(set(COLS)) == 17
-    assert len({c[1] for c in CONCEPTOS}) == 17     # códigos GL distintos
+    assert len(CONCEPTOS) == 18
+    assert len(set(COLS)) == 18
+    assert len({c[1] for c in CONCEPTOS}) == 18     # códigos GL distintos
 
 
 def test_cada_concepto_cae_en_un_grupo_conocido():

@@ -95,6 +95,8 @@ class PositionCreate(BaseModel):
     #: Vacío = la del departamento.
     categoria: Optional[str] = None
     subcategoria: Optional[str] = None
+    #: Contract Labour: su salario va a 6031 y no genera cargas.
+    contract_labour: bool = False
     salary_amount: Decimal = Decimal("0")
     salary_currency: str = "CRC"
     fte_jan: Decimal = Decimal("1.0")
@@ -154,6 +156,7 @@ class PositionUpdate(BaseModel):
     employee_type: Optional[str] = None
     categoria: Optional[str] = None
     subcategoria: Optional[str] = None
+    contract_labour: Optional[bool] = None
     salary_amount: Optional[Decimal] = None
     salary_currency: Optional[str] = None
     fte_jan: Optional[Decimal] = None
@@ -367,6 +370,7 @@ async def get_dept_checkbook(
             "employee_type": pos.employee_type,
             "categoria": categoria_de(pos),
             "subcategoria": subcategoria_de(pos),
+            "contract_labour": bool(pos.contract_labour),
             "salary_amount": float(pos.salary_amount),
             "salary_currency": pos.salary_currency,
             "months": months_data,
@@ -379,6 +383,7 @@ def _entry_to_dict(e: PayrollConceptEntry) -> dict:
         "id": e.id,
         "month": e.month,
         "c6000_sw": float(e.c6000_sw),
+        "c6031_contract_labour": float(e.c6031_contract_labour or 0),
         "c6001_overtime": float(e.c6001_overtime),
         "c6002_day_off": float(e.c6002_day_off),
         "c6003_working_holiday": float(e.c6003_working_holiday),
@@ -445,7 +450,8 @@ async def update_position(
         setattr(pos, field, value)
     # Si tocó salario/moneda/FTE, recalcular SW+CCSS+aguinaldo de esa posición.
     n = 0
-    if any(k in changed for k in ("salary_amount", "salary_currency", *_FTE_MONTHS)):
+    if any(k in changed for k in ("salary_amount", "salary_currency", "contract_labour",
+                                   *_FTE_MONTHS)):
         await db.flush()
         n = await _recalc_positions(db, scenario_id, [pos])
     await db.commit()
@@ -603,6 +609,7 @@ async def get_dept_summary(
             "c6023": float(s.c6023), "c6025": float(s.c6025),
             "c6026": float(s.c6026), "c6028": float(s.c6028),
             "c6029": float(s.c6029), "c6030": float(s.c6030),
+            "c6031": float(s.c6031),
             "total": float(s.total),
         })
     # Los repartos de PLANILLA (clase 6) de este departamento: cafetería 6025 y
@@ -970,6 +977,8 @@ class PayrollBulkRow(BaseModel):
     category_code: str = "015"
     categoria: Optional[str] = None
     subcategoria: Optional[str] = None
+    #: Contract Labour: su salario va a 6031 y no genera cargas.
+    contract_labour: bool = False
     salary_amount: Decimal = Decimal("0")
     salary_currency: str = "CRC"
     fte_jan: Decimal = Decimal("1.0"); fte_feb: Decimal = Decimal("1.0")
@@ -1111,6 +1120,8 @@ class PositionsAdd(BaseModel):
     count: int = 1
     salary_amount: Decimal = Decimal("0")
     salary_currency: str = "CRC"
+    #: El check «Contract Labour» del modal de agregar posiciones.
+    contract_labour: bool = False
 
 
 @router.post("/payroll/{scenario_id}/positions/add/", status_code=201)
@@ -1169,6 +1180,7 @@ async def add_positions(
             position_code=cod, position_name=body.position_name,
             employee_name=f"VACANTE {i}" if len(codigos) > 1 else "VACANTE",
             salary_amount=body.salary_amount, salary_currency=body.salary_currency,
+            contract_labour=body.contract_labour,
             **{f"fte_{m}": Decimal("1.0") for m in
                ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]},
         )
@@ -1482,6 +1494,7 @@ async def export_payroll_excel(
             "employee_type": p.employee_type,
             "categoria": categoria_de(p),
             "subcategoria": subcategoria_de(p),
+            "contract_labour": bool(p.contract_labour),
             "salary_amount": float(p.salary_amount or 0),
             "salary_currency": p.salary_currency,
             **{attr: float(getattr(p, attr) or 0) for attr in FTE_ATTRS},
@@ -1578,6 +1591,7 @@ async def import_payroll_excel(
                        para_guardar(r["dept_code"], r.get("categoria"), r.get("subcategoria")))),
             salary_amount=r.get("salary_amount", Decimal("0")),
             salary_currency=r.get("salary_currency", "CRC"),
+            contract_labour=bool(r.get("contract_labour", False)),
             **{attr: r.get(attr, Decimal("0")) for attr in FTE_ATTRS},
         ))
 
@@ -1940,6 +1954,7 @@ async def get_posiciones_de_varias_versiones(
                 "employee_type": str(p.employee_type or ""),
                 "categoria": categoria_de(p),
                 "subcategoria": subcategoria_de(p),
+                "contract_labour": bool(p.contract_labour),
                 "salary_amount": float(p.salary_amount or 0),
                 "salary_currency": str(p.salary_currency or ""),
                 "fte": [float(getattr(p, f"fte_{m}", 0) or 0) for m in MESES_FTE],

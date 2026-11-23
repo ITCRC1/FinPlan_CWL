@@ -47,6 +47,8 @@ function withExtraDepts(dbDepts: Dept[]): Dept[] {
 
 const CONCEPTS: { key: keyof DeptSummaryMonth; label: string; group: "base"|"auto"|"benefit" }[] = [
   { key: "c6000", label: "S&W",            group: "base" },
+  // Contract Labour (6031): salario, pero FUERA de la BASE — no genera CCSS ni aguinaldo.
+  { key: "c6031", label: "Contract Labour", group: "benefit" },
   { key: "c6001", label: "Overtime",        group: "base" },
   { key: "c6002", label: "Day Off",         group: "base" },
   { key: "c6003", label: "Work Holiday",    group: "base" },
@@ -229,7 +231,7 @@ export default function PayrollCheckbookPage() {
   // Append N copies of a position to the current roster (bulk = current + new)
   const handleAddPositions = useCallback(async (
     deptCode: string, positionName: string, positionCode: string, count: number,
-    salary: number, currency: string,
+    salary: number, currency: string, contractLabour: boolean,
   ) => {
     if (!scenarioId) return;
     setBusy("add");
@@ -243,6 +245,7 @@ export default function PayrollCheckbookPage() {
         dept_code: deptCode, dept_name: dn,
         position_name: positionName, position_code: positionCode,
         count, salary_amount: salary || 0, salary_currency: currency,
+        contract_labour: contractLabour,
       });
       const d = withExtraDepts(await getPayrollDepts(scenarioId));
       setDepts(d);
@@ -288,12 +291,16 @@ export default function PayrollCheckbookPage() {
 
   // Edit a position field in the app (currency / employee / salary) — optimistic
   const handleEditPos = useCallback(async (
-    pos: Position, fields: Partial<{ employee_name: string; salary_amount: number; salary_currency: string }>,
+    pos: Position, fields: Partial<{ employee_name: string; salary_amount: number;
+      salary_currency: string; contract_labour: boolean }>,
   ) => {
     if (!scenarioId) return;
     setPositions(prev => prev.map(p => p.id === pos.id ? { ...p, ...fields } : p));
     try {
       await updatePosition(scenarioId, pos.id, fields);
+      // Marcar/desmarcar Contract Labour mueve el salario entre 6000 y 6031 y
+      // prende o apaga las cargas: hay que volver a leer los montos.
+      if ("contract_labour" in fields && selectedDept) loadDept(selectedDept);
     } catch (e) {
       flash(e instanceof Error ? e.message : t("errorEditing"));
       if (selectedDept) loadDept(selectedDept);
@@ -304,7 +311,7 @@ export default function PayrollCheckbookPage() {
 
   // Annual total per concept
   function annualTotal(key: keyof DeptSummaryMonth) {
-    return summary.reduce((s, m) => s + (m[key] as number), 0);
+    return summary.reduce((s, m) => s + ((m[key] as number) ?? 0), 0);
   }
 
   return (
@@ -498,7 +505,7 @@ export default function PayrollCheckbookPage() {
                                c.group === "benefit" ? "var(--text-secondary)" : undefined,
                         fontWeight: isTotal || isBase ? 600 : 400,
                       }}>
-                        {fmtUsd(m[c.key] as number)}
+                        {fmtUsd((m[c.key] as number) ?? 0)}
                       </td>
                     ))}
                     <td className="mono" style={{ fontWeight: 600, color: isTotal ? "var(--positive)" : undefined }}>
@@ -535,7 +542,7 @@ export default function PayrollCheckbookPage() {
               <tbody>
                 {positions.map(pos => {
                   const annualSw = pos.months.reduce((s, m) =>
-                    s + (m.entry?.c6000_sw ?? 0), 0);
+                    s + (m.entry?.c6000_sw ?? 0) + (m.entry?.c6031_contract_labour ?? 0), 0);
                   const annualTotal = pos.months.reduce((s, m) =>
                     s + (m.entry?.total ?? 0), 0);
                   return (
@@ -566,13 +573,21 @@ export default function PayrollCheckbookPage() {
                           <option value="CRC">CRC</option>
                           <option value="USD">USD</option>
                         </select>
+                        <label title={t("contractLabourHint")}
+                          style={{ marginLeft: 6, fontSize: 10, color: "var(--text-secondary)",
+                            cursor: "pointer", whiteSpace: "nowrap" }}>
+                          <input type="checkbox" checked={!!pos.contract_labour}
+                            onChange={e => handleEditPos(pos, { contract_labour: e.target.checked })}
+                            style={{ verticalAlign: "middle", marginRight: 2 }} />
+                          CL
+                        </label>
                       </td>
                       {pos.months.map(mdata => (
                         <td key={mdata.month} style={{ padding: "4px 8px" }}>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                             <span className="mono" style={{ fontSize: 11 }}>{fmtFte(mdata.fte)}</span>
                             <span className="mono" style={{ fontSize: 10, color: "var(--text-secondary)" }}>
-                              {mdata.entry ? fmtUsd(mdata.entry.c6000_sw) : "—"}
+                              {mdata.entry ? fmtUsd(mdata.entry.c6000_sw + (mdata.entry.c6031_contract_labour ?? 0)) : "—"}
                             </span>
                           </div>
                         </td>
@@ -626,7 +641,8 @@ function AddPositionsModal({
   scenarioId: string;
   busy: boolean;
   onClose: () => void;
-  onAdd: (dept: string, name: string, code: string, count: number, salary: number, currency: string) => void;
+  onAdd: (dept: string, name: string, code: string, count: number, salary: number,
+          currency: string, contractLabour: boolean) => void;
 }) {
   const t = useTranslations("payrollCb");
   const tc = useTranslations("common");
@@ -636,6 +652,7 @@ function AddPositionsModal({
   const [count, setCount] = useState(1);
   const [salary, setSalary] = useState(0);
   const [currency, setCurrency] = useState("CRC");
+  const [contractLabour, setContractLabour] = useState(false);
   // Los códigos que va a asignar el backend, mostrados ANTES de agregar: el
   // código es la llave de los reportes de planilla, así que el usuario tiene
   // que ver cuál le toca a cada quien mientras todavía puede cambiarlo.
@@ -709,6 +726,22 @@ function AddPositionsModal({
               <option value="USD">USD</option>
             </select>
           </div>
+          <label style={{ gridColumn: "1 / 3", display: "flex", gap: 8, alignItems: "flex-start",
+            fontSize: 12.5, color: "var(--text-primary)", cursor: "pointer" }}>
+            <input type="checkbox" checked={contractLabour}
+              onChange={e => {
+                setContractLabour(e.target.checked);
+                // Los contratistas suelen cobrar en dólares.
+                if (e.target.checked) setCurrency("USD");
+              }}
+              style={{ marginTop: 2 }} />
+            <span>
+              <b>Contract Labour</b>
+              <span style={{ display: "block", fontSize: 11, color: "var(--text-secondary)" }}>
+                {t("contractLabourHint")}
+              </span>
+            </span>
+          </label>
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
           <button onClick={onClose} disabled={busy} style={{
@@ -716,7 +749,7 @@ function AddPositionsModal({
             background: "var(--bg-surface)", color: "var(--text-secondary)",
             border: "1px solid var(--border-medium)" }}>{tc("cancel")}</button>
           <button
-            onClick={() => onAdd(dept, name.trim(), code.trim(), count, salary, currency)}
+            onClick={() => onAdd(dept, name.trim(), code.trim(), count, salary, currency, contractLabour)}
             disabled={!canSave || busy}
             style={{
               padding: "7px 16px", fontSize: 13, borderRadius: 5, fontWeight: 600,

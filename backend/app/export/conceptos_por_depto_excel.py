@@ -49,6 +49,7 @@ from app.export.excel_base import (C, align, border, fill, font, MONTHS_ES,
 #: fila: `sub` es un subtotal (BASE), `tot` el total del departamento.
 FILAS = [
     ("c6000", "6000", "Salary and Wages",   "dato"),
+    ("c6031", "6031", "Contract Labour",    "dato"),
     ("c6001", "6001", "Overtime",           "dato"),
     ("c6002", "6002", "Day Off",            "dato"),
     ("c6003", "6003", "Working Holiday",    "dato"),
@@ -96,6 +97,7 @@ def _drivers(p) -> dict[str, str]:
     div = float(p.aguinaldo_divisor or 0)
     return {
         "c6000": "digitado — salario × FTE ÷ TC del mes",
+        "c6031": "posiciones Contract Labour — salario × FTE ÷ TC, fuera de la BASE",
         "c6001": si(float(p.overtime_pct or 0) > 0,
                     f"{pct(p.overtime_pct)} sobre S&W"),
         "c6002": "calendario de días libres del escenario",

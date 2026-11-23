@@ -416,6 +416,12 @@ def test_todas_las_cuentas_de_planilla_tienen_regla_en_cada_depto(mappings, repo
             acct = pl_engine.payroll_account_for_column(col)
             if acct in HUECO_CERRADO_POR_MIG_071:
                 continue
+            # 6031 Contract Labour (2026-11-22) no está en el Excel histórico de
+            # mapeo: en la base la siembra el JSON, y si faltara, el motor la
+            # rutea como la 6000 del mismo depto (`CUENTA_ALIAS`).
+            alias = pl_engine.CUENTA_ALIAS.get(acct)
+            if alias and (dept, alias) in exact:
+                continue
             if (dept, acct) not in exact:
                 faltan.append(f"{dept}/{acct}")
     assert not faltan, f"sin regla exacta (depto/cuenta): {faltan[:20]}"

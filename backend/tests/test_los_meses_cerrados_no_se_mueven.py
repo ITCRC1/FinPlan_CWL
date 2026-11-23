@@ -185,7 +185,7 @@ def test_no_se_inventa_planilla_en_un_mes_cerrado(planilla):
 def test_la_foto_de_la_planilla_cubre_los_17_conceptos(planilla):
     """Congelar solo algunos dejaría el resto moviéndose sin que nada lo diga."""
     assert "PAYROLL_ALL_COLS" in planilla
-    assert len(recalc.PAYROLL_ALL_COLS) == 17
+    assert len(recalc.PAYROLL_ALL_COLS) == 18   # 17 + 6031 Contract Labour (2026-11-22)
 
 
 # ── El tipo de cambio ────────────────────────────────────────────────────────

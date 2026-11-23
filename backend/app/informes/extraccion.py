@@ -28,6 +28,7 @@ MESES_COL = ["jan", "feb", "mar", "apr", "may", "jun",
 #: `payroll_catalog_importer.CONCEPTO_NOMBRES`.
 CONCEPTOS = [
     ("c6000_sw", "6000", "Salarios y jornales", "devengado"),
+    ("c6031_contract_labour", "6031", "Contract Labour", "devengado"),
     ("c6001_overtime", "6001", "Horas extra", "devengado"),
     ("c6002_day_off", "6002", "Dia libre laborado", "devengado"),
     ("c6003_working_holiday", "6003", "Feriado trabajado", "devengado"),

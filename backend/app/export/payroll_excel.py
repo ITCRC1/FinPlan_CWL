@@ -38,7 +38,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from app.hotel_actual import HOTEL_ID
 from app.models.payroll_position import (
-    CATEGORIAS, SUBCATEGORIAS, normalizar_categoria, normalizar_subcategoria)
+    CATEGORIAS, SUBCATEGORIAS, a_bool, normalizar_categoria, normalizar_subcategoria)
 
 from app.export.excel_base import (
     exigir_archivo_del_hotel,
@@ -97,7 +97,9 @@ COL_FTE_JAN  = 9   # I
 COL_REF      = 21  # U  (reference-only annual, not imported)
 COL_CAT      = 22  # V  Categoria (editable)
 COL_SUBCAT   = 23  # W  SubCategoria (editable)
-COL_OPS      = COL_SUBCAT   # la última columna de la hoja
+COL_CL       = 24  # X  Contract Labour Sí/No (editable) — cuenta 6031, sin cargas
+COL_OPS      = COL_CL       # la última columna de la hoja
+SI_NO        = ("Sí", "No")
 HEADER_ROW   = 5
 
 
@@ -142,7 +144,7 @@ def export_payroll_to_excel(
               else f"₡{tc_min:,.0f}–{tc_max:,.0f}/USD según el mes")
     note = ws.cell(row=3, column=COL_DEPT,
                    value=(f"TC: {tc_nota}  |  SOLO editar: E (colaborador), G (salario) y "
-                          "I-T (FTE por mes), V (Categoria) y W (SubCategoria). El resto "
+                          "I-T (FTE por mes), V (Categoria), W (SubCategoria) y X (Contract Labour). El resto "
                           "está bloqueado. Filtro en el encabezado para separar Operaciones / "
                           "Administrativo / Gerencial y On Property / Outside."))
     note.font = font(italic=True, color=C["text_mid"], size=9)
@@ -172,7 +174,8 @@ def export_payroll_to_excel(
     ref.alignment = align("center"); ref.border = border()
     listas = {}
     for col, titulo, valores in ((COL_CAT, "Categoria", CATEGORIAS),
-                                 (COL_SUBCAT, "SubCategoria", SUBCATEGORIAS)):
+                                 (COL_SUBCAT, "SubCategoria", SUBCATEGORIAS),
+                                 (COL_CL, "Contract Labour", SI_NO)):
         h = ws.cell(row=HEADER_ROW, column=col, value=titulo)
         h.fill = fill(C["amber"]); h.font = font(bold=True, color="FFFFFF", size=9)
         h.alignment = align("center"); h.border = border()
@@ -277,6 +280,13 @@ def export_payroll_to_excel(
                 oc.alignment = align("center"); oc.border = border()
                 listas[col].add(oc)
                 unlock(oc)
+            # editable: Contract Labour (X). «Sí» = el salario va a 6031 y la
+            # posición no genera CCSS, aguinaldo ni beneficios.
+            cl = ws.cell(row=row, column=COL_CL, value="Sí" if p.get("contract_labour") else "No")
+            cl.fill = fill(C["amber_light"]); cl.alignment = align("center"); cl.border = border()
+            cl.font = font(size=9, bold=bool(p.get("contract_labour")))
+            listas[COL_CL].add(cl)
+            unlock(cl)
 
             row += 1
 
@@ -294,7 +304,7 @@ def export_payroll_to_excel(
         COL_DEPT: 12, COL_DEPTNAME: 22, COL_PCODE: 8, COL_PNAME: 30, COL_ENAME: 22,
         COL_ETYPE: 12, COL_SALARY: 13, COL_CUR: 8,
         **{COL_FTE_JAN + i: 8 for i in range(12)},
-        COL_REF: 14, COL_CAT: 15, COL_SUBCAT: 14,
+        COL_REF: 14, COL_CAT: 15, COL_SUBCAT: 14, COL_CL: 11,
     })
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 18
@@ -473,6 +483,7 @@ def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:
                      if str(ws.cell(row=header_row, column=c).value or "").strip().lower()
                      .replace(" ", "") == titulo), None)
     col_cat, col_subcat = _col("categoria"), _col("subcategoria")
+    col_cl = _col("contractlabour")
 
     results: list[dict] = []
     for r in range(header_row + 1, ws.max_row + 1):
@@ -509,6 +520,8 @@ def import_payroll_from_excel(file_bytes: bytes) -> list[dict]:
                           if col_cat else None),
             "subcategoria": (normalizar_subcategoria(ws.cell(row=r, column=col_subcat).value)
                              if col_subcat else None),
+            # Sin la columna (Excel viejo) la posición sale sin el check.
+            "contract_labour": a_bool(ws.cell(row=r, column=col_cl).value) if col_cl else False,
         }
         for i, attr in enumerate(FTE_ATTRS):
             raw = ws.cell(row=r, column=COL_FTE_JAN + i).value

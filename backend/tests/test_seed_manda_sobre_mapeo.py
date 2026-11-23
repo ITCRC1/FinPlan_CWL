@@ -185,7 +185,7 @@ def test_los_hijos_conservan_las_17_cuentas_de_planilla(reglas, hijo):
     en Habitaciones — que es de dónde salió la migración 092."""
     planilla = {r["account_code"] for r in _por_dept(reglas, hijo)
                 if r["account_code"].startswith("6")}
-    assert len(planilla) == 17, f"el {hijo} tiene {len(planilla)} cuentas de planilla"
+    assert len(planilla) == 18, f"el {hijo} tiene {len(planilla)} cuentas de planilla"
 
 
 def test_la_gerencia_0181_suma_en_administracion(reglas):

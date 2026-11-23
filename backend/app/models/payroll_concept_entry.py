@@ -49,6 +49,13 @@ class PayrollConceptEntry(Base):
     c6024_vacations_taken: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))  # manual
     c6027_incentive_bonus: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))  # manual
 
+    # ── CONTRACT LABOUR (6031) — salario, pero FUERA de la BASE ─────────────
+    # Owner, 2026-11-22: «no forme parte del cálculo de la CCSS y Aguinaldo pero
+    # que agrupe en Salaries». La llena el motor para las posiciones con el
+    # check «Contract Labour» (salario × FTE ÷ TC); esas posiciones no llevan 6000 ni cargas.
+    c6031_contract_labour: Mapped[Decimal] = mapped_column(
+        Numeric(14, 4), default=Decimal("0"), server_default="0")              # AUTO
+
     # ── AUTOMÁTICOS (calculados desde BASE, no editables por el usuario) ────
     c6020_ccss: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))        # AUTO
     c6021_aguinaldo: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))   # AUTO

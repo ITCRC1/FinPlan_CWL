@@ -543,7 +543,8 @@ async def _derivadas_del_club(s, scenario_id: str, por_codigo) -> dict:
         # El BRUTO gravable: lo que el owner llama «Total Salary».
         salario[i] += sum(float(getattr(e, c) or 0) for c in (
             "c6000_sw", "c6001_overtime", "c6002_day_off", "c6003_working_holiday",
-            "c6010_commissions", "c6024_vacations_taken", "c6027_incentive_bonus"))
+            "c6010_commissions", "c6024_vacations_taken", "c6027_incentive_bonus",
+            "c6031_contract_labour"))
         # Las CARGAS de ley: CCSS y aguinaldo son las dos que el motor calcula.
         cargas[i] += sum(float(getattr(e, c) or 0) for c in (
             "c6020_ccss", "c6021_aguinaldo", "c6022_occ_hazard",

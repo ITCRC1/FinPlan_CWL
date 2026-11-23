@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
-from app.models.payroll_position import PayrollPosition, get_fte
+from app.models.payroll_position import PayrollPosition, es_contrato, get_fte
 from app.models.payroll_concept_entry import PayrollConceptEntry
 
 CCSS_RATE = Decimal("0.2683")
@@ -36,6 +36,17 @@ def calc_sw(position: PayrollPosition, month: int, tc: Decimal) -> Decimal:
             raise ValueError(f"TC for month {month} is zero — cannot convert CRC salary")
         return (position.salary_amount * fte / tc).quantize(CENT, ROUND_HALF_UP)
     return (position.salary_amount * fte).quantize(CENT, ROUND_HALF_UP)
+
+
+# Las 18 columnas de concepto. 6031 Contract Labour es salario pero NO entra a la
+# BASE (ni a CCSS, ni a aguinaldo, ni a provisiones).
+CONCEPT_COLS = [
+    "c6000_sw", "c6001_overtime", "c6002_day_off", "c6003_working_holiday",
+    "c6004_disabilities", "c6010_commissions", "c6020_ccss", "c6021_aguinaldo",
+    "c6022_occ_hazard", "c6023_vacation_prov", "c6024_vacations_taken",
+    "c6025_cafeteria", "c6026_severance", "c6027_incentive_bonus",
+    "c6028_housing", "c6029_transport", "c6030_other", "c6031_contract_labour",
+]
 
 
 def _q(x: Decimal) -> Decimal:
@@ -93,7 +104,18 @@ def recalculate_entry(
       6022 INS y 6025 Cafetería — vienen del REPARTO, no de una tasa.
 
     Devuelve la misma fila, modificada.
+
+    **Posición de contrato** (check «Contract Labour»): su salario × FTE va a 6031
+    Contract Labour y TODO lo demás queda en cero — no cotiza CCSS, no lleva
+    aguinaldo, vacaciones, cesantía ni beneficios. Owner, 2026-11-22: «que no
+    forme parte del cálculo de la CCSS y Aguinaldo pero que agrupe en Salaries».
     """
+    if es_contrato(position):
+        for col in CONCEPT_COLS:
+            setattr(entry, col, ZERO)
+        entry.c6031_contract_labour = calc_sw(position, month, tc)
+        return entry
+    entry.c6031_contract_labour = ZERO
     entry.c6000_sw = calc_sw(position, month, tc)
 
     # Conceptos por driver. El ORDEN importa: overtime, feriados y bono entran a la
@@ -176,6 +198,9 @@ def repartir_beneficio(
         return ZERO
     for e, _ in filas:
         setattr(e, columna, ZERO)
+    # Un contratista no recibe beneficios repartidos (INS, cafetería…): su fila
+    # quedó en cero arriba y no pesa en el denominador.
+    filas = [(e, p) for e, p in filas if not es_contrato(p)]
     if not filas or monto_anual_crc <= ZERO:
         return ZERO
 
@@ -224,9 +249,10 @@ def repartir_ins(filas, monto_anual_crc, tc_por_mes) -> Decimal:
 
 
 def total_entry(entry: PayrollConceptEntry) -> Decimal:
-    """Sum all 17 concepts for one position × month."""
+    """Sum all 18 concepts for one position × month."""
     return (
         _v(entry.c6000_sw)
+        + _v(entry.c6031_contract_labour)
         + _v(entry.c6001_overtime)
         + _v(entry.c6002_day_off)
         + _v(entry.c6003_working_holiday)
@@ -270,6 +296,7 @@ class DeptPayrollSummary:
     c6028: Decimal = ZERO
     c6029: Decimal = ZERO
     c6030: Decimal = ZERO
+    c6031: Decimal = ZERO      # Contract Labour: salario fuera de la BASE
     total: Decimal = ZERO
 
 
@@ -302,12 +329,14 @@ def summarize_dept(
         s.c6028 += e.c6028_housing
         s.c6029 += e.c6029_transport
         s.c6030 += e.c6030_other
+        s.c6031 += _v(e.c6031_contract_labour)
 
     s.base = s.c6000 + s.c6001 + s.c6002 + s.c6003 + s.c6010 + s.c6024 + s.c6027
     s.total = (
         s.c6000 + s.c6001 + s.c6002 + s.c6003 + s.c6010 + s.c6024 + s.c6027
         + s.c6020 + s.c6021
         + s.c6004 + s.c6022 + s.c6023 + s.c6025 + s.c6026 + s.c6028 + s.c6029 + s.c6030
+        + s.c6031
     )
     return s
 

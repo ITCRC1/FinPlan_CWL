@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy import String, Numeric, Integer, ForeignKey, DateTime
+from sqlalchemy import Boolean, String, Numeric, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
@@ -45,6 +45,12 @@ class PayrollPosition(Base):
     # (`categoria_de` / `subcategoria_de`, al final de este archivo).
     categoria: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     subcategoria: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # Contract Labour (owner, 2026-11-22): «cuando se crea la posición debe haber
+    # un check donde se indique que es contract labour». Su salario va a 6031 y
+    # no genera cargas (ver `es_contrato`).
+    contract_labour: Mapped[bool] = mapped_column(Boolean, default=False,
+                                                  server_default="false")
 
     # Salary (full-time monthly)
     salary_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=Decimal("0"))
@@ -151,6 +157,24 @@ def para_guardar(dept_code, categoria, subcategoria) -> tuple[Optional[str], Opt
     dc, ds = defecto_del_depto(dept_code)
     c, s = normalizar_categoria(categoria), normalizar_subcategoria(subcategoria)
     return (None if c in (None, dc) else c), (None if s in (None, ds) else s)
+
+
+# ── Contract Labour (6031) ───────────────────────────────────────────────────
+# Owner, 2026-11-22. Una posición marcada «Contract Labour» (el check) va a la
+# cuenta 6031 y no genera cargas sociales ni beneficios. Es su propio campo, no el
+# Tipo: un contrato puede ser permanente o temporal igual que cualquiera.
+def es_contrato(position) -> bool:
+    # `is True` y no `bool(...)`: un objeto de prueba (MagicMock) devuelve un
+    # atributo «verdadero» para cualquier nombre y pasaría por contratista.
+    return getattr(position, "contract_labour", False) is True
+
+
+def a_bool(valor) -> bool:
+    """Lo que venga del Excel o del front → bool. «Sí», «x», «1», True…"""
+    if isinstance(valor, bool):
+        return valor
+    t = str(valor or "").strip().lower()
+    return t in {"si", "sí", "s", "x", "1", "true", "yes", "y", "✓", "✔"}
 
 
 def get_fte(position: PayrollPosition, month: int) -> Decimal:

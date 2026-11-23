@@ -84,7 +84,7 @@ PAYROLL_ALL_COLS = [
     "c6004_disabilities", "c6010_commissions", "c6020_ccss", "c6021_aguinaldo",
     "c6022_occ_hazard", "c6023_vacation_prov", "c6024_vacations_taken",
     "c6025_cafeteria", "c6026_severance", "c6027_incentive_bonus",
-    "c6028_housing", "c6029_transport", "c6030_other",
+    "c6028_housing", "c6029_transport", "c6030_other", "c6031_contract_labour",
 ]
 
 

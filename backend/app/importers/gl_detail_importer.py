@@ -69,7 +69,7 @@ CONCEPT_BY_ACCT = {
     "6024": "c6024_vacations_taken", "6025": "c6025_cafeteria",
     "6026": "c6026_severance", "6027": "c6027_incentive_bonus",
     "6028": "c6028_housing", "6029": "c6029_transport",
-    "6030": "c6030_other", "6031": "c6030_other",
+    "6030": "c6030_other", "6031": "c6031_contract_labour",
 }
 
 # Cuenta clase 9 (estadística) → campo de ScenarioStat. Rooms disponibles/ocupadas y

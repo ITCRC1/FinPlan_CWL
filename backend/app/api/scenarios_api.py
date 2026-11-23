@@ -2627,7 +2627,7 @@ _PAYROLL_NAMES = {
     "6020": "Social Security", "6021": "Christmas bonus", "6022": "Work Risk Policy",
     "6023": "Vacation Provision", "6024": "Vacations Taken", "6025": "Cafeteria",
     "6026": "Notice and Severance Pay", "6027": "Incentive Bonus", "6028": "Housing",
-    "6029": "Transport", "6030": "Employee Benefit Others",
+    "6029": "Transport", "6030": "Employee Benefit Others", "6031": "Contract Labour",
 }
 
 

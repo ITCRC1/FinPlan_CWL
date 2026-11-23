@@ -52,6 +52,7 @@ CODIGO_GL = "GL"
 # (columna, código GL, etiqueta, grupo)
 CONCEPTOS: list[tuple[str, str, str, str]] = [
     ("c6000_sw",              "6000", "Salario bruto",         "DEVENGADO"),
+    ("c6031_contract_labour", "6031", "Contract Labour",       "DEVENGADO"),
     ("c6001_overtime",        "6001", "Horas extra",           "DEVENGADO"),
     ("c6002_day_off",         "6002", "Día libre",             "DEVENGADO"),
     ("c6003_working_holiday", "6003", "Feriado laborado",      "DEVENGADO"),

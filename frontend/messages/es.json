@@ -1419,6 +1419,7 @@
     "errorDuplicating": "Error al duplicar",
     "errorEditing": "Error al editar",
     "errorUploading": "Error al subir",
+    "contractLabourHint": "El salario va a la cuenta 6031 Contract Labour (agrupa en Salaries) y no genera CCSS, aguinaldo, vacaciones, INS ni beneficios.",
     "excelCatAll": "Todas las categorías",
     "excelSubOnProperty": "On Property (operativos + gerenciales en sitio)",
     "excelSubOutside": "Outside (administrativos + gerenciales fuera)",

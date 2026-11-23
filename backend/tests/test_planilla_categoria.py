@@ -72,7 +72,7 @@ def test_el_excel_trae_las_dos_columnas_con_filtro_que_funciona():
     filas = [r for r in range(HEADER_ROW + 1, ws.max_row + 1) if ws.cell(r, 4).value]
     assert [(ws.cell(r, COL_CAT).value, ws.cell(r, COL_SUBCAT).value) for r in filas] == \
         [(OPERACIONES, ON_PROPERTY), (ADMINISTRATIVO, OUTSIDE)]
-    assert ws.auto_filter.ref.startswith(f"A{HEADER_ROW}:W")
+    assert ws.auto_filter.ref.startswith(f"A{HEADER_ROW}:X")   # W SubCategoria + X Contract Labour
     # con la hoja protegida, filtrar tiene que estar permitido
     assert ws.protection.sheet and ws.protection.autoFilter is False
     for col in (COL_CAT, COL_SUBCAT):

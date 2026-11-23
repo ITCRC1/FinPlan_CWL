@@ -62,6 +62,7 @@ def _meses(idioma: str) -> list[str]:
 # cualquier otro, y no una columna que hay que saber que existe.
 CONCEPTOS = [
     ("c6000_sw", "6000", "Salary and Wages"),
+    ("c6031_contract_labour", "6031", "Contract Labour"),
     ("c6001_overtime", "6001", "Overtime"),
     ("c6002_day_off", "6002", "Day Off"),
     ("c6003_working_holiday", "6003", "Working Holiday"),

@@ -36,7 +36,7 @@ def test_las_17_cuentas_son_exactamente_las_que_suma_el_total():
     from app.engine.payroll_calculator import total_entry
     from app.models.payroll_concept_entry import PayrollConceptEntry
 
-    assert len(CONCEPTOS) == 17
+    assert len(CONCEPTOS) == 18   # 17 + 6031 Contract Labour (2026-11-22)
 
     # Una entrada con un valor distinto en cada concepto: si `total_entry` se
     # saltara uno, la suma no daria.
