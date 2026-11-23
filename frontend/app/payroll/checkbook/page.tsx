@@ -754,7 +754,11 @@ function EditPositionModal({
   }
 
   return (
-    <div onClick={onClose} style={{
+    // Sin cerrar al hacer clic afuera (owner, 2026-11-22: «la ventana se cambia y
+    // no hay forma de cambiar el monto… debe quedarse para poder cambiar y
+    // grabar todo»). Al seleccionar el monto y soltar el mouse fuera del recuadro,
+    // el clic caía en el fondo y cerraba sin guardar. Se cierra con Cancelar o Guardar.
+    <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50,
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
@@ -794,7 +798,8 @@ function EditPositionModal({
           </div>
           <div>
             <label style={lbl}>{t("baseSalary")}</label>
-            <input value={salario} onChange={e => setSalario(e.target.value)} style={inp} className="mono" />
+            <input value={salario} onChange={e => setSalario(e.target.value)} style={inp} className="mono"
+              inputMode="decimal" onFocus={e => e.target.select()} />
           </div>
           <div>
             <label style={lbl}>{tc("currency")}</label>
@@ -903,7 +908,11 @@ function AddPositionsModal({
   const canSave = dept && name.trim() && count >= 1;
 
   return (
-    <div onClick={onClose} style={{
+    // Sin cerrar al hacer clic afuera (owner, 2026-11-22: «la ventana se cambia y
+    // no hay forma de cambiar el monto… debe quedarse para poder cambiar y
+    // grabar todo»). Al seleccionar el monto y soltar el mouse fuera del recuadro,
+    // el clic caía en el fondo y cerraba sin guardar. Se cierra con Cancelar o Guardar.
+    <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50,
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
