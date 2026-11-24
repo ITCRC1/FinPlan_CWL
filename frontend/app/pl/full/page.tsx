@@ -15,8 +15,33 @@ import IrA from "@/components/IrA";
 
 const MONTHS_FALLBACK = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
+/** Los departamentos de overhead que se REPARTEN (Cafetería, Lavandería…) tienen
+ *  dos renglones en el motor: `OH_X` (planilla + gastos − el reparto completo) y
+ *  `COH_X` (su costo de ventas, p. ej. los alimentos 5700). Mostrados por separado
+ *  salían negativos sueltos —Cafeteria (118,000) en Overhead y +118,000 en Overhead
+ *  Cost of Sales— que juntos dan cero. Owner, 2026-11-23: «no entiendo tantos
+ *  números negativos… se juntan alimentos, planilla y gastos, se reparte y queda en
+ *  0». Se muestra UN renglón por depto: OH_X + COH_X. Los totales no cambian
+ *  (TOTAL_OVERHEAD ya suma las dos). */
+function pareja(code: string): string | null {
+  return code.startsWith("COH_") ? "OH_" + code.slice(4) : null;
+}
+
 function templateLines(data: PLMonthly | null): PLLine[] {
-  return data?.months[0]?.lines ?? [];
+  const lines = data?.months[0]?.lines ?? [];
+  const tiene = new Set(lines.map(l => l.line_code));
+  return lines.filter(l => { const oh = pareja(l.line_code); return !(oh && tiene.has(oh)); });
+}
+
+function fundirCostoDeOverhead(map: Record<string, number>): Record<string, number> {
+  for (const k of Object.keys(map)) {
+    const oh = pareja(k);
+    if (oh) {
+      map[oh] = (map[oh] ?? 0) + map[k];
+      delete map[k];
+    }
+  }
+  return map;
 }
 
 function byCodeMap(
@@ -34,7 +59,7 @@ function byCodeMap(
     for (const ln of data.months.find((x) => x.month === month)?.lines ?? [])
       map[ln.line_code] = ln.amount_usd;
   }
-  return map;
+  return fundirCostoDeOverhead(map);
 }
 
 const EXPENSE_SECTIONS = new Set(["OPEXP", "OVERHEAD", "NON_OP"]);
