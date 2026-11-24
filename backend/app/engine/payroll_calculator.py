@@ -49,6 +49,18 @@ CONCEPT_COLS = [
 ]
 
 
+def es_sintetica(position) -> bool:
+    """La posición «GL (Actual GL)»: la planilla real importada del mayor (y en el
+    Forecast, la proyectada) por depto. Tiene FTE 0 a propósito y NO es una
+    vacante: sus montos no se tocan."""
+    return str(getattr(position, "position_code", "") or "").strip().upper() == "GL"
+
+
+def sin_gente(position, month: int) -> bool:
+    """¿Ese mes la posición no tiene a nadie (FTE 0)? Las sintéticas no cuentan."""
+    return not es_sintetica(position) and get_fte(position, month) == ZERO
+
+
 def _q(x: Decimal) -> Decimal:
     """Redondeo a centavo, igual que el resto del motor."""
     return Decimal(x).quantize(CENT, ROUND_HALF_UP)
@@ -110,6 +122,13 @@ def recalculate_entry(
     aguinaldo, vacaciones, cesantía ni beneficios. Owner, 2026-11-22: «que no
     forme parte del cálculo de la CCSS y Aguinaldo pero que agrupe en Salaries».
     """
+    if sin_gente(position, month):
+        # FTE 0 = no hay nadie ese mes: ni salario, ni horas extra, ni cargas.
+        # Owner, 2026-11-24: «el headcount es 0, no debería tomarse en cuenta».
+        # Antes una hora extra digitada en un mes vacante seguía generando CCSS.
+        for col in CONCEPT_COLS:
+            setattr(entry, col, ZERO)
+        return entry
     if es_contrato(position):
         for col in CONCEPT_COLS:
             setattr(entry, col, ZERO)

@@ -51,7 +51,7 @@ from app.models.scenario_stat import ScenarioStat
 
 from app.engine.revenue_calculator import calculate_revenue, RevenueResult
 from app.engine.payroll_calculator import (
-    recalculate_entry, total_entry, repartir_beneficio,
+    recalculate_entry, total_entry, repartir_beneficio, sin_gente,
 )
 from app.engine.tarifas_del_paquete import sincronizar_tarifas_del_motor
 from app.engine.allocation_calculator import (
@@ -1067,6 +1067,7 @@ async def _recalc_payroll(session, scenario: Scenario,
     )).scalars().all()
     updated = 0
     protegidas = 0
+    sin_nadie = 0
     para_ins: list[tuple[PayrollConceptEntry, PayrollPosition]] = []
     # Foto de las filas de meses cerrados, para devolverlas tal cual después del
     # reparto. Se guardan los 17 conceptos: son los únicos que tocan
@@ -1094,6 +1095,19 @@ async def _recalc_payroll(session, scenario: Scenario,
             # números (planilla importada del GL, p.ej.), recalcular la borraría.
             # Se respeta lo que hay y se avisa; el salario en blanco es un dato que
             # falta, no una instrucción de poner la planilla en cero.
+            # FTE 0 = no hay nadie ese mes: la fila queda en cero (también lo
+            # digitado) y no pesa en los repartos. Owner, 2026-11-24: «el headcount
+            # es 0, no debería tomarse en cuenta y distribuirse en las otras
+            # posiciones». Va ANTES de la protección de abajo: una vacante sin
+            # salario no es una planilla importada.
+            if sin_gente(pos, month):
+                if entry is not None and total_entry(entry):
+                    for c in PAYROLL_ALL_COLS:
+                        setattr(entry, c, ZERO)
+                    sin_nadie += 1
+                if entry is not None:
+                    para_ins.append((entry, pos))   # pesa 0: el reparto la deja en 0
+                continue
             if entry is not None and sin_salario and total_entry(entry):
                 protegidas += 1
                 # Igual entra al reparto: proteger la fila es no PISAR su planilla
@@ -1158,6 +1172,10 @@ async def _recalc_payroll(session, scenario: Scenario,
             f"—{len(congeladas)} filas—." +
             (f" El recálculo habría cambiado {movidas} conceptos." if movidas else ""))
 
+    if sin_nadie:
+        avisos.append(
+            f"{sin_nadie} filas de planilla en meses con FTE 0 quedaron en cero: "
+            f"sin gente ese mes no hay costo (horas extra o cargas que traían se borraron).")
     if protegidas:
         avisos.append(
             f"{protegidas} filas de planilla se dejaron como estaban: traen números "

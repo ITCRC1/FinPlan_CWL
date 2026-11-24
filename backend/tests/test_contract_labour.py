@@ -143,3 +143,26 @@ def test_la_moneda_del_excel_se_puede_cambiar_y_entra():
     buf = io.BytesIO(); wb.save(buf)
     r = import_payroll_from_excel(buf.getvalue())[0]
     assert r["salary_currency"] == "USD" and float(r["salary_amount"]) == 4000
+
+
+# ── FTE 0 = no hay nadie ese mes ─────────────────────────────────────────────
+# Owner, 2026-11-24, por el JORNALERO de 0205 (salario 0, FTE 0, con $3,408 de
+# horas extra y cargas): «el headcount es 0, no debería tomarse en cuenta».
+
+def test_un_mes_con_fte_cero_queda_todo_en_cero_aunque_traiga_horas_extra():
+    p = _pos(False, "430000", "CRC")
+    p.fte_may = CERO
+    e = _fila()
+    e.c6001_overtime = Decimal("382.65")
+    recalculate_entry(e, p, 5, Decimal("500"))
+    assert total_entry(e) == CERO
+    assert e.c6020_ccss == CERO and e.c6001_overtime == CERO
+
+
+def test_la_posicion_sintetica_gl_no_se_toca():
+    """La planilla real importada vive en la posición «GL» con FTE 0: no es una vacante."""
+    from app.engine.payroll_calculator import sin_gente
+    gl = _pos(False, "0")
+    gl.position_code = "GL"
+    gl.fte_jan = CERO
+    assert not sin_gente(gl, 1)
