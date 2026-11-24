@@ -718,3 +718,132 @@ async def consolidado_repartos(
         nombres = dict((await session.execute(
             select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
     return {**_cabecera(esc, tipo), "lineas": filas_repartos(entradas, nombres)}
+
+
+# ── El checkbook de OPEX en el formato del owner ──────────────────────────────
+# Owner, 2026-11-23, con «FORMATO DE CHECKBOOK Budget 2027.xlsx»: «quiero
+# automatizar este mismo formato… para que yo pueda actualizar desde Excel y tenga
+# los datos ahí mismo». Una hoja por depto; por cuenta, tres filas de año (Actual
+# 2025 · Forecast 2026 · Budget 2027), los detalles 800–810 (u 820) del Budget y,
+# en la fila TOTAL, el Actual 2026 YTD y el Forecast 2026 del año.
+#
+# ⚠️ El real va por CUENTA, no por detalle: el mayor con detalle (seg3) solo está
+# cargado desde agosto 2026; antes el real entró por cuenta × depto.
+#
+# Las cifras salen de los MISMOS armados que las pantallas: el Budget de
+# `opex_entries` (el checkbook), el real y el forecast de `gl_api._grilla` (el
+# reporte «GL Accounts by Month»), y el esqueleto —qué cuentas y qué detalles
+# tiene cada hoja— de las MISMAS reglas que el Excel de subida de OPEX.
+
+def _hoja_de(dept: str, hojas: set[str]) -> str:
+    """El depto de la hoja donde cae un depto del mayor: él mismo, o su primer
+    padre que tenga hoja (0191 Marketing → 0190 Ventas, 0182 Finanzas → 0180)."""
+    from app.engine import pl_engine
+    if dept in hojas:
+        return dept
+    for padre in pl_engine._cadena_de_padres(dept):
+        if padre in hojas:
+            return padre
+    return dept
+
+
+@router.get("/consolidado/checkbook-opex/")
+async def consolidado_checkbook_opex(
+    year: int = Query(2027, ge=2000, le=2100, description="Año del Budget"),
+    version: str = Query("Working", description="Versión del Budget"),
+    fcst_version: str | None = Query(None, description="Versión del Forecast del año anterior; por defecto ★ Current"),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Esqueleto + series del checkbook de OPEX para el formato del owner."""
+    from app.api import gl_api
+    from app.api.opex_api import _catalogo_opex
+    from app.api.provisioning_api import depts_habilitados
+    from app.export.opex_excel import codigos_de, seg3_de
+    from app.models.department_catalog import DepartmentCatalog
+    from app.models.opex_entry import OpexEntry
+
+    async with get_session() as session:
+        bud = await _escenario(session, year, "BUDGET", version)
+        entradas = (await session.execute(
+            select(OpexEntry).where(OpexEntry.scenario_id == bud.id))).scalars().all()
+        nombres = dict((await session.execute(
+            select(DepartmentCatalog.dept_code, DepartmentCatalog.dept_name))).all())
+        catalogo = await _catalogo_opex(session)
+        apagados = await depts_habilitados(session, bud.hotel_id, "OPEX") or set()
+
+        # Esqueleto: las mismas hojas y cuentas que el Excel de subida de OPEX.
+        cuentas: dict[str, dict[str, str]] = {}
+        for e in entradas:
+            cuentas.setdefault(e.dept_code, {}).setdefault(e.account_code, e.account_name or "")
+        for d, cs in catalogo.items():
+            if d in apagados:
+                continue
+            for a, n in cs.items():
+                cuentas.setdefault(d, {}).setdefault(a, n)
+                if not cuentas[d][a]:
+                    cuentas[d][a] = n
+        cuentas = {d: v for d, v in cuentas.items()
+                   if d not in apagados or any(e.dept_code == d for e in entradas)}
+        hojas_set = set(cuentas)
+
+        filas: list[dict] = []
+
+        def fila(serie, dept, cuenta, detalle, meses, desc=""):
+            meses = [round(float(x or 0), 2) for x in meses]
+            filas.append({"clave": f"{dept}|{cuenta}|{detalle}|{serie}", "serie": serie,
+                          "dept": dept, "cuenta": cuenta, "detalle": detalle,
+                          "desc": desc, "meses": meses, "anual": round(sum(meses), 2)})
+
+        # Budget por detalle (800–820).
+        for e in entradas:
+            fila("BUD", e.dept_code, e.account_code, seg3_de(e.detail_code),
+                 [e.get_month(m) for m in range(1, 13)], e.detail_desc or "")
+
+        # Real año-2, Forecast año-1 (★) y Real año-1 (YTD), por cuenta.
+        series = (("ACT", year - 2, "ACTUAL", None),
+                  ("FCT", year - 1, "FORECAST", fcst_version),
+                  ("YTD", year - 1, "ACTUAL", None))
+        info = {}
+        for serie, anio, tipo, ver in series:
+            try:
+                esc = await _escenario(session, anio, tipo, ver)
+            except Exception:
+                info[serie] = None
+                continue
+            grilla = (await gl_api._grilla(session, esc))[0]
+            acum: dict[tuple, list[float]] = {}
+            for r in grilla:
+                cta = str(r["account_code"] or "")
+                if not (cta.startswith("7") and len(cta) == 4):
+                    continue
+                k = (_hoja_de(str(r["dept_code"] or ""), hojas_set), cta)
+                v = acum.setdefault(k, [0.0] * 12)
+                for i, x in enumerate(r["meses"][:12]):
+                    v[i] += float(x or 0)
+            for (d, cta), meses in acum.items():
+                fila(serie, d, cta, "", meses)
+            info[serie] = {"year": anio, "tipo": tipo, "version": esc.version,
+                           "actuals_through": esc.actuals_through or 0}
+
+    # Todos los detalles ACTIVOS de cada cuenta (owner, 2026-11-23: «deben salir
+    # todos los detalles activos de las cuentas»): el rango de la cuenta
+    # (800–810, o 800–820) + cualquier otro que use el Budget o el mayor.
+    usados: dict[tuple, set[str]] = {}
+    for f in filas:
+        if f["serie"] == "BUD":
+            usados.setdefault((f["dept"], f["cuenta"]), set()).add(f["detalle"])
+    async with get_session() as session:
+        from sqlalchemy import text as _sql
+        for seg2, seg1, seg3 in (await session.execute(_sql(
+                "select distinct seg2, seg1, split_part(cuenta, '-', 3) from mayor_movimientos "
+                "where hotel_id = :h and seg1 like '7%'"), {"h": HOTEL_ID})).all():
+            if seg3 and seg3.isdigit() and len(seg3) == 3:
+                usados.setdefault((_hoja_de(seg2, hojas_set), seg1), set()).add(seg3)
+    hojas = []
+    for d in sorted(cuentas):
+        cs = []
+        for a, n in sorted(cuentas[d].items()):
+            det = {seg3_de(c) for c in codigos_de(a)} | usados.get((d, a), set())
+            cs.append({"cuenta": a, "nombre": n, "detalles": sorted(det)})
+        hojas.append({"dept": d, "dept_name": nombres.get(d, d), "cuentas": cs})
+    return {**_cabecera(bud, "BUDGET"), "series": info, "hojas": hojas, "filas": filas}
