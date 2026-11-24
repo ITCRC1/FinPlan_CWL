@@ -759,11 +759,28 @@ async def consolidado_checkbook_opex(
     from app.api.opex_api import _catalogo_opex
     from app.api.provisioning_api import depts_habilitados
     from app.export.opex_excel import codigos_de, seg3_de
+    from app.models.cost_entry import CostEntry
     from app.models.department_catalog import DepartmentCatalog
+    from app.models.mapping import AccountMapping
     from app.models.opex_entry import OpexEntry
 
     async with get_session() as session:
         bud = await _escenario(session, year, "BUDGET", version)
+        costos = (await session.execute(
+            select(CostEntry).where(CostEntry.scenario_id == bud.id))).scalars().all()
+        # Las cuentas 5 asignadas a cada depto (owner, 2026-11-23: «usualmente
+        # están también las cuentas de costos… abajo de cada checkbook»).
+        cat_costo: dict[str, dict[str, str]] = {}
+        for m in (await session.execute(select(AccountMapping).where(
+                AccountMapping.active_status == "YES",
+                AccountMapping.account_code.like("5%"),
+                AccountMapping.dept_code.is_not(None)))).scalars():
+            cod = (m.account_code or "").strip()
+            if len(cod) == 4 and cod.isdigit() and (m.dept_code or "").strip():
+                cat_costo.setdefault(m.dept_code.strip(), {}).setdefault(
+                    cod, (m.account_name_example or "").strip())
+        for c in costos:
+            cat_costo.setdefault(c.dept_code, {}).setdefault(c.account_code, c.account_name or "")
         entradas = (await session.execute(
             select(OpexEntry).where(OpexEntry.scenario_id == bud.id))).scalars().all()
         nombres = dict((await session.execute(
@@ -798,6 +815,11 @@ async def consolidado_checkbook_opex(
         for e in entradas:
             fila("BUD", e.dept_code, e.account_code, seg3_de(e.detail_code),
                  [e.get_month(m) for m in range(1, 13)], e.detail_desc or "")
+        # Costo de ventas: el checkbook de costos va por CUENTA (sin detalle).
+        for c in costos:
+            if c.dept_code in hojas_set:
+                fila("BUD", c.dept_code, c.account_code, "",
+                     [c.get_month(m) for m in range(1, 13)])
 
         # Real año-2, Forecast año-1 (★) y Real año-1 (YTD), por cuenta.
         series = (("ACT", year - 2, "ACTUAL", None),
@@ -814,7 +836,7 @@ async def consolidado_checkbook_opex(
             acum: dict[tuple, list[float]] = {}
             for r in grilla:
                 cta = str(r["account_code"] or "")
-                if not (cta.startswith("7") and len(cta) == 4):
+                if not (cta[:1] in ("5", "7") and len(cta) == 4):
                     continue
                 k = (_hoja_de(str(r["dept_code"] or ""), hojas_set), cta)
                 v = acum.setdefault(k, [0.0] * 12)
@@ -845,5 +867,6 @@ async def consolidado_checkbook_opex(
         for a, n in sorted(cuentas[d].items()):
             det = {seg3_de(c) for c in codigos_de(a)} | usados.get((d, a), set())
             cs.append({"cuenta": a, "nombre": n, "detalles": sorted(det)})
-        hojas.append({"dept": d, "dept_name": nombres.get(d, d), "cuentas": cs})
+        costo = [{"cuenta": a, "nombre": n} for a, n in sorted(cat_costo.get(d, {}).items())]
+        hojas.append({"dept": d, "dept_name": nombres.get(d, d), "cuentas": cs, "costos": costo})
     return {**_cabecera(bud, "BUDGET"), "series": info, "hojas": hojas, "filas": filas}
