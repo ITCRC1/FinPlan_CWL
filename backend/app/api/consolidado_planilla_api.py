@@ -750,7 +750,7 @@ def _hoja_de(dept: str, hojas: set[str]) -> str:
 #: Los cinco lugares del libro (owner, 2026-11-23: «cuando ya empiece el año, pongo
 #: forecast en los meses y budget viene donde está YTD y forecast»). Cada uno se
 #: elige en Config con tipo · año · versión (· hasta mes, en V y W).
-LUGARES = ("MES", "F1", "F2", "V", "W")
+LUGARES = ("MES", "F1", "F2", "V", "W", "X")   # X: el Budget del mes (owner, 2026-11-23)
 
 
 async def _serie_del_lugar(session, esc, hojas_set):
@@ -836,7 +836,7 @@ def _lugares_por_defecto(year: int, version: str, fcst_version):
     """Lo que el libro mostraba antes de poder elegir (y lo que pide un libro viejo)."""
     return {"MES": ("BUDGET", year, version, 12), "F1": ("ACTUAL", year - 2, None, 12),
             "F2": ("FORECAST", year - 1, fcst_version, 12), "V": ("ACTUAL", year - 1, None, 12),
-            "W": ("FORECAST", year - 1, fcst_version, 12)}
+            "W": ("FORECAST", year - 1, fcst_version, 12), "X": ("BUDGET", year - 1, None, 12)}
 
 
 @router.get("/consolidado/checkbook-opex/")
@@ -851,6 +851,8 @@ async def consolidado_checkbook_opex(
     v_hasta: int | None = None, v_modo: str | None = None,
     w_tipo: str | None = None, w_anio: int | None = None, w_ver: str | None = None,
     w_hasta: int | None = None, w_modo: str | None = None,
+    x_tipo: str | None = None, x_anio: int | None = None, x_ver: str | None = None,
+    x_hasta: int | None = None, x_modo: str | None = None,
     quien: str = Depends(lector_del_consolidado),
 ):
     """Esqueleto + series del checkbook de OPEX y costo para el formato del owner.
@@ -876,14 +878,15 @@ async def consolidado_checkbook_opex(
     lugares = _lugares_por_defecto(year, version, fcst_version)
     pedidos = {"MES": (m_tipo, m_anio, m_ver, None), "F1": (f1_tipo, f1_anio, f1_ver, None),
                "F2": (f2_tipo, f2_anio, f2_ver, None), "V": (v_tipo, v_anio, v_ver, v_hasta),
-               "W": (w_tipo, w_anio, w_ver, w_hasta)}
+               "W": (w_tipo, w_anio, w_ver, w_hasta), "X": (x_tipo, x_anio, x_ver, x_hasta)}
     for k, (t, a, ver, h) in pedidos.items():
         if t and t.strip():
             lugares[k] = (t.strip().upper(), int(a or year), _ver(ver), int(h or 12))
     # V y W: el MES solo, o ACUMULADO de enero al mes. El Pre-Cierre trae solo el
     # mes que se está cerrando (owner, 2026-11-23: «precierre solo sirve para
     # revisar mes, no sirve para acumulado»): con él manda el mes, diga lo que diga.
-    modos = {"V": (v_modo or "ACUMULADO").strip().upper(), "W": (w_modo or "ACUMULADO").strip().upper()}
+    modos = {"V": (v_modo or "ACUMULADO").strip().upper(), "W": (w_modo or "ACUMULADO").strip().upper(),
+             "X": (x_modo or "ACUMULADO").strip().upper()}
     for k in modos:
         if (lugares[k][2] or "").lower().replace("-", "").replace(" ", "") == "precierre":
             modos[k] = "MES"
