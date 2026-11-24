@@ -21,13 +21,19 @@ export default function RecalcButton({
   const t = useTranslations("common");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [detalle, setDetalle] = useState<string>("");
 
   async function run() {
     if (!scenarioId) return;
-    setBusy(true); setMsg(null);
+    setBusy(true); setMsg(null); setDetalle("");
     try {
       const r = await recalculateScenario(scenarioId);
       const avisos: string[] = r?.avisos ?? [];
+      // Las notas cuentan lo que el recálculo hizo (colones reexpresados, INS
+      // repartido…). Owner, 2026-11-24: «esto volvió a salir» — salían en
+      // amarillo junto a los avisos de verdad. Ahora van al pasar el mouse.
+      const notas: string[] = r?.notas ?? [];
+      setDetalle(notas.join("\n"));
       if (avisos.length) {
         // Algo no se pudo recalcular (p.ej. escenario sin tipo de cambio). Antes
         // esto salía en silencio y el mensaje decía "recalculado" igual.
@@ -64,7 +70,7 @@ export default function RecalcButton({
         {busy ? t("recalc.running") : (label ?? t("recalc.button"))}
       </button>
       {msg && (
-        <span style={{
+        <span title={detalle || undefined} style={{
           fontSize: 12, maxWidth: 480,
           color: msg.startsWith("✓") ? "var(--accent-green, #1A7F4B)"
             : msg.startsWith("⚠") ? "var(--accent-gold, #856404)"

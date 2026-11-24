@@ -413,6 +413,8 @@ export async function recalculateScenario(scenarioId: string) {
     scenario_id: string; pl_lines: number; status: string;
     // Lo que NO se pudo recalcular (p.ej. escenario sin tipo de cambio).
     avisos?: string[];
+    // Lo que el recálculo HIZO (reexpresar colones, repartir el INS…): detalle, no alarma.
+    notas?: string[];
   }>(`/pl/${scenarioId}/recalculate/`);
 }
 

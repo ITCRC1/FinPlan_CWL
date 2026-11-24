@@ -1017,6 +1017,27 @@ async def _derivar_monedas(session, scenario: Scenario,
     return tocadas
 
 
+class Nota(str):
+    """Un mensaje del recálculo que INFORMA, no que avisa de un problema.
+
+    Owner, 2026-11-24, señalando el texto amarillo junto al botón: *«esto volvió
+    a salir»*. Decía que una línea en colones se reexpresó y que el INS se
+    repartió por FTE — las dos cosas son el recálculo haciendo su trabajo, pero
+    salían con el mismo ⚠ que «no hay tipo de cambio». Un aviso que aparece
+    siempre deja de leerse, y entonces tampoco se lee el que importa.
+
+    Viaja en la misma lista que los avisos (así las etapas no cambian de firma)
+    y `recalculate_scenario` la separa al final: `avisos` = lo que hay que mirar,
+    `notas` = el detalle de lo que se hizo.
+    """
+
+
+def separar_notas(mensajes: list[str]) -> tuple[list[str], list[str]]:
+    avisos = [str(m) for m in mensajes if not isinstance(m, Nota)]
+    notas = [str(m) for m in mensajes if isinstance(m, Nota)]
+    return avisos, notas
+
+
 # ─── Orchestration steps ──────────────────────────────────────────────────────
 async def _recalc_payroll(session, scenario: Scenario,
                           avisos: list[str] | None = None,
@@ -1153,9 +1174,9 @@ async def _recalc_payroll(session, scenario: Scenario,
             repartido = repartir_beneficio(
                 para_ins, cfg.columna, monto, tc_mes, base=cfg.basis, en_usd=en_usd)
             if repartido:
-                avisos.append(
+                avisos.append(Nota(
                     f"{cfg.label or cfg.account} repartido por {cfg.basis} entre "
-                    f"{len(para_ins)} filas de planilla: ${repartido:,.2f}.")
+                    f"{len(para_ins)} filas de planilla: ${repartido:,.2f}."))
     # Devolver los meses cerrados a como estaban. Va DESPUÉS del reparto a
     # propósito: durante el reparto tenían que estar, para que el denominador
     # fuera el del año entero.
@@ -1167,15 +1188,15 @@ async def _recalc_payroll(session, scenario: Scenario,
             setattr(entry, col, valor)
     if congeladas:
         meses = ", ".join(str(m) for m in sorted(cerrados))
-        avisos.append(
+        avisos.append(Nota(
             f"Planilla: los meses cerrados ({meses}) se dejaron como estaban "
             f"—{len(congeladas)} filas—." +
-            (f" El recálculo habría cambiado {movidas} conceptos." if movidas else ""))
+            (f" El recálculo habría cambiado {movidas} conceptos." if movidas else "")))
 
     if sin_nadie:
-        avisos.append(
+        avisos.append(Nota(
             f"{sin_nadie} filas de planilla en meses con FTE 0 quedaron en cero: "
-            f"sin gente ese mes no hay costo (horas extra o cargas que traían se borraron).")
+            f"sin gente ese mes no hay costo (horas extra o cargas que traían se borraron)."))
     if protegidas:
         avisos.append(
             f"{protegidas} filas de planilla se dejaron como estaban: traen números "
@@ -1334,9 +1355,9 @@ async def _recalc_allocations(session, scenario: Scenario,
         .where(AllocationEntry.scenario_id == sid)
     )).scalar_one() if protegidos else 0
     if protegidos:
-        avisos.append(
+        avisos.append(Nota(
             f"Repartos: los meses cerrados ({', '.join(str(m) for m in sorted(protegidos))}) "
-            f"se dejaron como estaban — {conservados} asientos.")
+            f"se dejaron como estaban — {conservados} asientos."))
 
     caf_cfg = {c.dept_code: c for c in (await session.execute(
         select(CafeteriaAllocationConfig).where(CafeteriaAllocationConfig.scenario_id == sid)
@@ -1848,6 +1869,7 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
             # Vacío, pero presente: las dos ramas devuelven la misma forma, así
             # que quien consuma esto no tiene que adivinar si la llave existe.
             "avisos": [],
+            "notas": [],
             "status": "recalculated",
         }
 
@@ -1858,16 +1880,16 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     # borrado y la escritura protegieran meses distintos.
     cerrados = await meses_cerrados_de(session, scenario)
     if cerrados:
-        avisos.append(
+        avisos.append(Nota(
             f"Meses cerrados: {', '.join(str(m) for m in sorted(cerrados))}. El "
-            f"recálculo no los toca.")
+            f"recálculo no los toca."))
 
     # Primero las monedas: si una línea está en colones, su dólar depende del TC
     # del mes y todo lo de abajo lee dólares.
     en_crc = await _derivar_monedas(session, scenario, cerrados, avisos)
     if en_crc:
-        avisos.append(f"{en_crc} líneas del checkbook están en colones: se "
-                      f"reexpresaron con el tipo de cambio de cada mes.")
+        avisos.append(Nota(f"{en_crc} líneas del checkbook están en colones: se "
+                           f"reexpresaron con el tipo de cambio de cada mes."))
     await session.flush()
 
     payroll_updated = await _recalc_payroll(session, scenario, avisos, cerrados)
@@ -1886,9 +1908,9 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     # edición falsa. Misma regla que `sincronizar_ingreso_al_checkbook`.
     tarifas_movidas = await sincronizar_tarifas_del_motor(session, scenario)
     if tarifas_movidas:
-        avisos.append(
+        avisos.append(Nota(
             "Tarifas del paquete bajadas al motor: "
-            + ", ".join(_describir_tarifa(m) for m in tarifas_movidas) + ".")
+            + ", ".join(_describir_tarifa(m) for m in tarifas_movidas) + "."))
     await session.flush()
 
     revenue_results = await load_revenue_results(session, scenario)
@@ -1898,17 +1920,17 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
     sincronizadas = await sincronizar_ingreso_al_checkbook(
         session, scenario, revenue_results, cerrados)
     if sincronizadas:
-        avisos.append(
+        avisos.append(Nota(
             f"Ingreso sincronizado al checkbook: {sincronizadas} línea(s). El "
-            f"sub-mayor de ingresos refleja el modelo vivo.")
+            f"sub-mayor de ingresos refleja el modelo vivo."))
     # Y las NOCHES viajan con la plata. Ver `sincronizar_noches`: sin esto el
     # ingreso queda fresco y el ADR, la ocupación y el equilibrio en noches
     # siguen sobre una foto vieja, en la misma pantalla.
     noches = await sincronizar_noches(session, scenario, revenue_results, cerrados)
     if noches:
-        avisos.append(
+        avisos.append(Nota(
             f"Noches sincronizadas: {noches} mes(es). El ADR, la ocupación y el "
-            f"equilibrio en noches ya salen del modelo vivo.")
+            f"equilibrio en noches ya salen del modelo vivo."))
     pl_lines = await _persist_pl(session, scenario, revenue_results, cerrados)
 
     # Marca de recálculo: se compara contra el updated_at de planilla / tipos de
@@ -1921,6 +1943,7 @@ async def recalculate_scenario(session, scenario_id: str) -> dict:
         "payroll_entries_updated": payroll_updated,
         "allocation_entries": alloc_entries,
         "pl_lines": pl_lines,
-        "avisos": avisos,
+        "avisos": separar_notas(avisos)[0],
+        "notas": separar_notas(avisos)[1],
         "status": "recalculated",
     }
