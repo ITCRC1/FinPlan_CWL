@@ -165,7 +165,11 @@ export default function AllocationsConfigPage() {
     if (!scenarioId) { setFuente(null); return; }
     const dept = tab === "cafeteria" ? "0220" : "0161";
     getCostoAReparto(scenarioId, dept).then(setFuente).catch(() => setFuente(null));
-    getFtePorDepto(scenarioId).then(setFteMes).catch(() => setFteMes(null));
+    // La base del reparto es la gente EN el hotel: sin contrato ni Outside,
+    // igual que el motor (`fuera_del_hotel`). El headcount completo es otra cosa.
+    getFtePorDepto(scenarioId)
+      .then(r => setFteMes({ ...r, by_dept: r.en_hotel_by_dept ?? r.by_dept }))
+      .catch(() => setFteMes(null));
     cargarDepartamentos();
   }, [scenarioId, tab, calcResult]);
 

@@ -21,7 +21,7 @@ from sqlalchemy import select, delete, func
 
 from app.models.scenario import Scenario, actual_de_verdad
 from app.models.exchange_rate import ExchangeRate, get_tc_for_month
-from app.models.payroll_position import PayrollPosition
+from app.models.payroll_position import PayrollPosition, fuera_del_hotel
 from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.cost_entry import CostEntry
 from app.models.opex_entry import OpexEntry
@@ -1478,9 +1478,11 @@ async def _recalc_allocations(session, scenario: Scenario,
                     ))
 
         # cafetería distributed by FTE
+        # Sin los que están fuera del hotel (contrato u Outside): no comen a
+        # cuenta del hotel. Ver `fuera_del_hotel`.
         fte_by_dept: dict[str, Decimal] = {}
         for p in positions:
-            if p.dept_code not in participating_caf:
+            if p.dept_code not in participating_caf or fuera_del_hotel(p):
                 continue
             fte_by_dept[p.dept_code] = fte_by_dept.get(p.dept_code, ZERO) + (
                 getattr(p, fte_attr) or ZERO)
@@ -1499,7 +1501,8 @@ async def _recalc_allocations(session, scenario: Scenario,
         # huéspedes 5301 COGS va al 0162)
         uni_fte: dict[str, Decimal] = {}
         for p in positions:
-            if p.dept_code not in participating_lau_depts:
+            # Uniformes: igual que la cafetería, solo la gente en el hotel.
+            if p.dept_code not in participating_lau_depts or fuera_del_hotel(p):
                 continue
             uni_fte[p.dept_code] = uni_fte.get(p.dept_code, ZERO) + (
                 getattr(p, fte_attr) or ZERO)

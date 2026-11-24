@@ -704,6 +704,17 @@ async def get_fte_report(
         },
         "totals": {str(m): float(fte) for m, fte in report.totals.items()},
         "annual_avg": {dept: float(avg) for dept, avg in report.annual_avg.items()},
+        # Contract Labour, aparte: no suman en `by_dept` ni en `totals`.
+        "externos_by_dept": {
+            dept: {str(m): float(fte) for m, fte in months.items()}
+            for dept, months in report.externos_by_dept.items()
+        },
+        "externos_totals": {str(m): float(fte) for m, fte in report.externos_totals.items()},
+        # La base de cafetería y uniformes: sin contrato ni Outside.
+        "en_hotel_by_dept": {
+            dept: {str(m): float(fte) for m, fte in months.items()}
+            for dept, months in report.en_hotel_by_dept.items()
+        },
     }
 
 

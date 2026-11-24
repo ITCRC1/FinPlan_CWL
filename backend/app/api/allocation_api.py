@@ -27,7 +27,7 @@ from app.models.laundry_allocation_config import LaundryAllocationConfig, DEFAUL
 from app.models.laundry_params import LaundryParams
 from app.models.opex_entry import OpexEntry
 from app.models.cost_entry import CostEntry
-from app.models.payroll_position import PayrollPosition
+from app.models.payroll_position import PayrollPosition, fuera_del_hotel
 from app.models.payroll_concept_entry import PayrollConceptEntry
 from app.models.salary_allocation_config import SalaryAllocationConfig
 from app.models.rooms_allocation_config import RoomsAllocationConfig
@@ -190,8 +190,13 @@ async def _get_dept_total_cost(session, scenario_id: str, dept_code: str, month:
 
 
 async def _get_fte_by_dept(session, scenario_id: str, month: int,
-                            participating_depts: set[str]) -> dict[str, Decimal]:
-    """Sum FTE per dept for a given month, filtered to participating depts."""
+                            participating_depts: set[str],
+                            sin_externos: bool = False) -> dict[str, Decimal]:
+    """Sum FTE per dept for a given month, filtered to participating depts.
+
+    `sin_externos`: deja fuera a quien está fuera del hotel (contrato u
+    Outside): ni cafetería ni uniformes, igual que en
+    `recalculate._recalc_allocations`."""
     fte_attr = f"fte_{MONTH_ATTRS[month - 1]}"
     res = await session.execute(
         select(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id)
@@ -199,6 +204,8 @@ async def _get_fte_by_dept(session, scenario_id: str, month: int,
     totals: dict[str, Decimal] = {}
     for pos in res.scalars():
         if pos.dept_code not in participating_depts:
+            continue
+        if sin_externos and fuera_del_hotel(pos):
             continue
         val = getattr(pos, fte_attr) or Decimal("0")
         totals[pos.dept_code] = totals.get(pos.dept_code, Decimal("0")) + val
@@ -487,7 +494,8 @@ async def _calculate_allocations_legacy(scenario_id: str):
         for month in range(1, 13):
             # ── Cafetería ─────────────────────────────────────────────────────
             caf_cost = await _get_dept_total_cost(session, scenario_id, "0220", month)
-            fte_by_dept = await _get_fte_by_dept(session, scenario_id, month, participating_caf)
+            fte_by_dept = await _get_fte_by_dept(session, scenario_id, month, participating_caf,
+                                                 sin_externos=True)
             caf_rows = calculate_cafeteria_distribution(caf_cost, fte_by_dept)
 
             for row in caf_rows:
@@ -513,7 +521,8 @@ async def _calculate_allocations_legacy(scenario_id: str):
 
             # ── Lavandería (3 vías: linen/uniformes/huéspedes) — kilos por mes ─
             lau_cost = await _get_dept_total_cost(session, scenario_id, "0161", month)
-            uni_fte = await _get_fte_by_dept(session, scenario_id, month, participating_lau_depts)
+            uni_fte = await _get_fte_by_dept(session, scenario_id, month, participating_lau_depts,
+                                             sin_externos=True)
             linen_kilos = {dc: cfg.kilos_for(month) for dc, cfg in participating_lau_cfgs.items()}
             kilos_uni = lau_params.uniformes_for(month)
             kilos_gst = lau_params.huespedes_for(month)

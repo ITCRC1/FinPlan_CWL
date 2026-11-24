@@ -166,3 +166,74 @@ def test_la_posicion_sintetica_gl_no_se_toca():
     gl.position_code = "GL"
     gl.fte_jan = CERO
     assert not sin_gente(gl, 1)
+
+
+# ── 2026-11-24: comisiones, headcount y cafetería de los externos ───────────
+# Owner: «yo había puesto comisiones al departamento 0190 en payroll pero ya no
+# están» (el Director de Ventas es de contrato) y «tienen FTE, cuentan, pero son
+# externos».
+
+def test_contrato_respeta_comisiones_y_bono():
+    from decimal import Decimal as D
+    from unittest.mock import MagicMock
+    from app.engine.payroll_calculator import recalculate_entry, CONCEPT_COLS
+    pos = MagicMock()
+    pos.contract_labour = True
+    pos.position_code = "0190-02"
+    pos.salary_amount = D("8763"); pos.salary_currency = "USD"
+    for m in ("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"):
+        setattr(pos, f"fte_{m}", D("1"))
+    entry = MagicMock()
+    for c in CONCEPT_COLS:
+        setattr(entry, c, D("0"))
+    entry.c6010_commissions = D("1500")
+    entry.c6027_incentive_bonus = D("200")
+    entry.c6001_overtime = D("99")
+    recalculate_entry(entry, pos, month=1, tc=D("500"))
+    assert entry.c6010_commissions == D("1500")
+    assert entry.c6027_incentive_bonus == D("200")
+    assert entry.c6001_overtime == 0
+    assert entry.c6020_ccss == 0 and entry.c6021_aguinaldo == 0
+    assert entry.c6031_contract_labour == D("8763")
+
+
+def test_reporte_fte_pone_los_externos_aparte():
+    from decimal import Decimal as D
+    from types import SimpleNamespace
+    from app.engine.payroll_calculator import build_fte_report
+    meses = ("jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec")
+    def pos(code, cl):
+        return SimpleNamespace(scenario_id="s", dept_code="0190", position_code=code,
+                               contract_labour=cl, **{f"fte_{m}": D("1") for m in meses})
+    r = build_fte_report([pos("0190-01", False), pos("0190-02", True), pos("0190-03", True)])
+    assert r.by_dept["0190"][1] == D("1")
+    assert r.totals[1] == D("1")
+    assert r.externos_by_dept["0190"][1] == D("2")
+    assert r.externos_totals[1] == D("2")
+
+
+def test_cafeteria_no_reparte_a_externos():
+    import inspect
+    from app.engine import recalculate
+    src = inspect.getsource(recalculate._recalc_allocations)
+    i = src.index("# cafetería distributed by FTE")
+    assert "fuera_del_hotel(p)" in src[i:i + 600]
+
+
+def test_uniformes_no_se_reparten_a_los_de_afuera():
+    import inspect
+    from app.engine import recalculate
+    src = inspect.getsource(recalculate._recalc_allocations)
+    i = src.index("uni_fte: dict[str, Decimal] = {}")
+    assert "fuera_del_hotel(p)" in src[i:i + 400]
+
+
+def test_fuera_del_hotel():
+    from types import SimpleNamespace as N
+    from app.models.payroll_position import fuera_del_hotel
+    # contrato, aunque su depto sea On Property
+    assert fuera_del_hotel(N(contract_labour=True, subcategoria=None, dept_code="0111"))
+    # Sistemas: no es contrato, pero Outside
+    assert fuera_del_hotel(N(contract_labour=False, subcategoria="Outside", dept_code="0230"))
+    # gente de planta en el hotel
+    assert not fuera_del_hotel(N(contract_labour=False, subcategoria="On Property", dept_code="0111"))

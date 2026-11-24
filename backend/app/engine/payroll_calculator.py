@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
-from app.models.payroll_position import PayrollPosition, es_contrato, get_fte
+from app.models.payroll_position import PayrollPosition, es_contrato, fuera_del_hotel, get_fte
 from app.models.payroll_concept_entry import PayrollConceptEntry
 
 CCSS_RATE = Decimal("0.2683")
@@ -47,6 +47,11 @@ CONCEPT_COLS = [
     "c6025_cafeteria", "c6026_severance", "c6027_incentive_bonus",
     "c6028_housing", "c6029_transport", "c6030_other", "c6031_contract_labour",
 ]
+
+
+# Lo que una posición de contrato conserva al recalcular: lo digitado a mano que
+# no es una carga. Todo lo demás queda en cero (ver `recalculate_entry`).
+CONTRATO_RESPETA = frozenset({"c6010_commissions", "c6027_incentive_bonus"})
 
 
 def es_sintetica(position) -> bool:
@@ -130,8 +135,13 @@ def recalculate_entry(
             setattr(entry, col, ZERO)
         return entry
     if es_contrato(position):
+        # Comisiones (6010) y bono (6027) se respetan: son plata que se le paga
+        # aparte del contrato. Owner, 2026-11-24: «yo había puesto comisiones al
+        # 0190… ya no están» — el Director de Ventas es de contrato y esta rama
+        # se las borraba en cada recálculo. Siguen sin CCSS ni aguinaldo.
         for col in CONCEPT_COLS:
-            setattr(entry, col, ZERO)
+            if col not in CONTRATO_RESPETA:
+                setattr(entry, col, ZERO)
         entry.c6031_contract_labour = calc_sw(position, month, tc)
         return entry
     entry.c6031_contract_labour = ZERO
@@ -366,6 +376,13 @@ class FTEReport:
     by_dept: dict[str, dict[int, Decimal]] = field(default_factory=dict)
     totals: dict[int, Decimal] = field(default_factory=dict)
     annual_avg: dict[str, Decimal] = field(default_factory=dict)
+    # Contract Labour: tienen FTE (con él se calcula lo que cobran) pero son
+    # externos — no entran en `by_dept` ni en `totals`. Owner, 2026-11-24.
+    externos_by_dept: dict[str, dict[int, Decimal]] = field(default_factory=dict)
+    externos_totals: dict[int, Decimal] = field(default_factory=dict)
+    # FTE de la gente que está EN el hotel (sin contrato ni Outside): la base
+    # de la cafetería y los uniformes. Ver `fuera_del_hotel`.
+    en_hotel_by_dept: dict[str, dict[int, Decimal]] = field(default_factory=dict)
 
 
 def build_fte_report(
@@ -378,10 +395,19 @@ def build_fte_report(
     report = FTEReport(scenario_id=positions[0].scenario_id if positions else "")
     for pos in positions:
         dept = pos.dept_code
-        if dept not in report.by_dept:
-            report.by_dept[dept] = {m: ZERO for m in range(1, 13)}
+        destino = report.externos_by_dept if es_contrato(pos) else report.by_dept
+        if dept not in destino:
+            destino[dept] = {m: ZERO for m in range(1, 13)}
         for month in range(1, 13):
-            report.by_dept[dept][month] += get_fte(pos, month)
+            destino[dept][month] += get_fte(pos, month)
+        if not fuera_del_hotel(pos):
+            eh = report.en_hotel_by_dept.setdefault(dept, {m: ZERO for m in range(1, 13)})
+            for month in range(1, 13):
+                eh[month] += get_fte(pos, month)
+    report.externos_totals = {
+        m: sum(report.externos_by_dept[d][m] for d in report.externos_by_dept)
+        for m in range(1, 13)
+    }
 
     report.totals = {
         m: sum(report.by_dept[d][m] for d in report.by_dept)

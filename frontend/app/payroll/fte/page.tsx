@@ -81,16 +81,77 @@ export default function FteReportPage() {
     }
   }
 
-  // Group rows by dept
-  const byDept: Record<string, { name: string; rows: FteReportRow[] }> = {};
-  for (const row of rows) {
-    if (!byDept[row.dept_code]) byDept[row.dept_code] = { name: row.dept_name, rows: [] };
-    byDept[row.dept_code].rows.push(row);
-  }
+  // Contract Labour aparte. Owner, 2026-11-24: «tienen FTE, cuentan, pero son
+  // externos». Su FTE sirve para calcular lo que cobran (6031), pero no se
+  // suma al headcount de planta: van en su propio bloque con su propio total.
+  const planta = rows.filter(r => !r.contract_labour);
+  const externos = rows.filter(r => r.contract_labour);
+  const agrupar = (lista: FteReportRow[]) => {
+    const g: Record<string, { name: string; rows: FteReportRow[] }> = {};
+    for (const row of lista) {
+      if (!g[row.dept_code]) g[row.dept_code] = { name: row.dept_name, rows: [] };
+      g[row.dept_code].rows.push(row);
+    }
+    return g;
+  };
+  const byDept = agrupar(planta);
+  const byDeptExt = agrupar(externos);
+  const sumar = (lista: FteReportRow[]) => MONTHS.map((_, i) =>
+    lista.reduce((s, r) => s + (r.fte_by_month[i] ?? 0), 0));
+  const totals = sumar(planta);
+  const totalsExt = sumar(externos);
 
-  const totals = MONTHS.map((_, i) =>
-    rows.reduce((s, r) => s + (r.fte_by_month[i] ?? 0), 0)
-  );
+  const filasDe = (grupos: Record<string, { name: string; rows: FteReportRow[] }>, pref = "") =>
+    Object.entries(grupos).map(([deptCode, dept]) => {
+                const deptTotals = MONTHS.map((_, i) =>
+                  dept.rows.reduce((s, r) => s + (r.fte_by_month[i] ?? 0), 0)
+                );
+                const deptAnnual = deptTotals.reduce((s, v) => s + v, 0);
+                return [
+                  <tr key={`${pref}dept-${deptCode}`} style={{ background: "var(--bg-elevated)" }}>
+                    <td colSpan={3} style={{
+                      color: "var(--brand)", fontWeight: 600, fontSize: 12,
+                      borderTop: "1px solid var(--border-medium)",
+                    }}>
+                      {deptCode} — {dept.name}
+                    </td>
+                    {deptTotals.map((v, i) => (
+                      <td key={i} className="mono" style={{
+                        textAlign: "center", fontWeight: 600,
+                        color: v === 0 ? "var(--text-disabled)" : "var(--brand)",
+                        borderTop: "1px solid var(--border-medium)",
+                      }}>
+                        {v === 0 ? "—" : v.toFixed(1)}
+                      </td>
+                    ))}
+                    <td className="mono" style={{
+                      textAlign: "center", fontWeight: 700, color: "var(--brand)",
+                      borderTop: "1px solid var(--border-medium)",
+                    }}>
+                      {deptAnnual.toFixed(1)}
+                    </td>
+                  </tr>,
+                  ...dept.rows.map(row => {
+                    const annual = row.fte_by_month.reduce((s, v) => s + v, 0);
+                    return (
+                      <tr key={row.position_id}>
+                        <td style={{ color: "var(--text-secondary)", fontSize: 11, paddingLeft: 20 }}>{deptCode}</td>
+                        <td style={{ color: "var(--text-primary)" }}>{row.position_name}</td>
+                        <td style={{ color: row.employee_name === "VACANTE" ? "var(--text-disabled)" : "var(--text-secondary)" }}>
+                          {row.employee_name}
+                        </td>
+                        {row.fte_by_month.map((fte, i) => <FteCell key={i} fte={fte} />)}
+                        <td className="mono" style={{
+                          textAlign: "center", fontWeight: 600,
+                          color: annual === 0 ? "var(--text-disabled)" : "var(--text-primary)",
+                        }}>
+                          {annual === 0 ? "—" : annual.toFixed(1)}
+                        </td>
+                      </tr>
+                    );
+                  }),
+                ];
+              });
 
   return (
     <div className="pag pag-ancha">
@@ -175,58 +236,9 @@ export default function FteReportPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(byDept).map(([deptCode, dept]) => {
-                const deptTotals = MONTHS.map((_, i) =>
-                  dept.rows.reduce((s, r) => s + (r.fte_by_month[i] ?? 0), 0)
-                );
-                const deptAnnual = deptTotals.reduce((s, v) => s + v, 0);
-                return [
-                  <tr key={`dept-${deptCode}`} style={{ background: "var(--bg-elevated)" }}>
-                    <td colSpan={3} style={{
-                      color: "var(--brand)", fontWeight: 600, fontSize: 12,
-                      borderTop: "1px solid var(--border-medium)",
-                    }}>
-                      {deptCode} — {dept.name}
-                    </td>
-                    {deptTotals.map((v, i) => (
-                      <td key={i} className="mono" style={{
-                        textAlign: "center", fontWeight: 600,
-                        color: v === 0 ? "var(--text-disabled)" : "var(--brand)",
-                        borderTop: "1px solid var(--border-medium)",
-                      }}>
-                        {v === 0 ? "—" : v.toFixed(1)}
-                      </td>
-                    ))}
-                    <td className="mono" style={{
-                      textAlign: "center", fontWeight: 700, color: "var(--brand)",
-                      borderTop: "1px solid var(--border-medium)",
-                    }}>
-                      {deptAnnual.toFixed(1)}
-                    </td>
-                  </tr>,
-                  ...dept.rows.map(row => {
-                    const annual = row.fte_by_month.reduce((s, v) => s + v, 0);
-                    return (
-                      <tr key={row.position_id}>
-                        <td style={{ color: "var(--text-secondary)", fontSize: 11, paddingLeft: 20 }}>{deptCode}</td>
-                        <td style={{ color: "var(--text-primary)" }}>{row.position_name}</td>
-                        <td style={{ color: row.employee_name === "VACANTE" ? "var(--text-disabled)" : "var(--text-secondary)" }}>
-                          {row.employee_name}
-                        </td>
-                        {row.fte_by_month.map((fte, i) => <FteCell key={i} fte={fte} />)}
-                        <td className="mono" style={{
-                          textAlign: "center", fontWeight: 600,
-                          color: annual === 0 ? "var(--text-disabled)" : "var(--text-primary)",
-                        }}>
-                          {annual === 0 ? "—" : annual.toFixed(1)}
-                        </td>
-                      </tr>
-                    );
-                  }),
-                ];
-              })}
+              {filasDe(byDept)}
               <tr className="total">
-                <td colSpan={3} style={{ color: "var(--text-primary)", fontWeight: 700 }}>TOTAL FTE</td>
+                <td colSpan={3} style={{ color: "var(--text-primary)", fontWeight: 700 }}>TOTAL FTE (planta)</td>
                 {totals.map((v, i) => (
                   <td key={i} className="mono" style={{ textAlign: "center", fontWeight: 700, color: "var(--positive)" }}>
                     {v === 0 ? "—" : v.toFixed(1)}
@@ -236,6 +248,32 @@ export default function FteReportPage() {
                   {totals.reduce((s, v) => s + v, 0).toFixed(1)}
                 </td>
               </tr>
+              {externos.length > 0 && (
+                <tr>
+                  <td colSpan={3 + MONTHS.length + 1} style={{
+                    paddingTop: 22, fontWeight: 700, fontSize: 12, color: "var(--text-secondary)",
+                  }}>
+                    EXTERNOS — Contract Labour
+                    <span style={{ fontWeight: 400, marginLeft: 8 }}>
+                      (cuenta 6031 · fuera del headcount de planta y de los repartos de cafetería y uniformes)
+                    </span>
+                  </td>
+                </tr>
+              )}
+              {externos.length > 0 && filasDe(byDeptExt, "ext-")}
+              {externos.length > 0 && (
+                <tr className="total">
+                  <td colSpan={3} style={{ color: "var(--text-primary)", fontWeight: 700 }}>TOTAL EXTERNOS</td>
+                  {totalsExt.map((v, i) => (
+                    <td key={i} className="mono" style={{ textAlign: "center", fontWeight: 700, color: "var(--text-secondary)" }}>
+                      {v === 0 ? "—" : v.toFixed(1)}
+                    </td>
+                  ))}
+                  <td className="mono" style={{ textAlign: "center", fontWeight: 700, color: "var(--text-secondary)" }}>
+                    {totalsExt.reduce((s, v) => s + v, 0).toFixed(1)}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

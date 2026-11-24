@@ -1760,6 +1760,8 @@ export interface FteReportRow {
   dept_code: string; dept_name: string;
   position_id: string; position_name: string; employee_name: string;
   fte_by_month: number[];  // index 0 = Jan
+  /** Contract Labour: tiene FTE pero es externo — va aparte del headcount. */
+  contract_labour?: boolean;
 }
 
 export async function getPayrollDepts(scenarioId: string): Promise<Dept[]> {
@@ -2004,6 +2006,7 @@ export async function getFteReport(scenarioId: string): Promise<FteReportRow[]> 
     position_id: p.id,
     position_name: p.position_name,
     employee_name: p.employee_name,
+    contract_labour: !!p.contract_labour,
     fte_by_month: Array.from({ length: 12 }, (_, i) =>
       (p.months ?? []).find(m => m.month === i + 1)?.fte ?? 0),
   }));
@@ -4360,6 +4363,11 @@ export interface FtePorDepto {
   by_dept: Record<string, Record<string, number>>;  // dept → { "1".."12" }
   totals: Record<string, number>;
   annual_avg?: Record<string, number>;
+  // Contract Labour: no suman en by_dept ni en totals.
+  externos_by_dept?: Record<string, Record<string, number>>;
+  externos_totals?: Record<string, number>;
+  // FTE en el hotel (sin contrato ni Outside): la base de cafetería y uniformes.
+  en_hotel_by_dept?: Record<string, Record<string, number>>;
 }
 
 export async function getFtePorDepto(scenarioId: string): Promise<FtePorDepto> {

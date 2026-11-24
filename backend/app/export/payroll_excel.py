@@ -362,7 +362,8 @@ def _hoja_resumen(wb, ws_pl, positions_by_dept, dept_names, scenario_label, year
         "Headcount = posiciones con FTE en al menos un mes (las vacantes en 0 todo el año no "
         "cuentan). Salario mensual = suma de sus salarios de tiempo completo, por moneda. SW anual US$ = la columna U de Planilla "
         "(salario × FTE ÷ TC de cada mes). Headcount por mes = suma de FTE. Se actualiza "
-        "solo si se cambia la pestaña Planilla."))
+        "solo si se cambia la pestaña Planilla. Las posiciones de Contract Labour (columna X = Sí) "
+        "van aparte, en el bloque de externos."))
     nota.font = font(italic=True, color=C["text_mid"], size=9)
     rs.merge_cells(start_row=3, start_column=1, end_row=3, end_column=ultima)
 
@@ -377,52 +378,75 @@ def _hoja_resumen(wb, ws_pl, positions_by_dept, dept_names, scenario_label, year
         h.alignment = align("center", wrap=True)
         h.border = border()
 
-    fila = HEADER_ROW + 1
-    primera = fila
-    for dept_code in sorted(positions_by_dept):
-        pos = positions_by_dept[dept_code]
-        if not pos:
-            continue
-        nombre = (str(pos[0].get("dept_name") or "").strip()
-                  or (dept_names or {}).get(dept_code)
-                  or DEPT_NAMES.get(dept_code, dept_code))
-        ref = f"$A{fila}"
-        suma_fte = "+".join(f"({f})" for f in ftes)
-        valores = {
-            c_dep: dept_code,
-            c_nom: nombre,
-            c_hc: f"=SUMPRODUCT(({A}={ref})*(({suma_fte})>0))",
-            # Solo las que cuentan en el headcount: una vacante con FTE 0 todo
-            # el año trae salario pero no cuesta nada.
-            c_crc: f'=SUMPRODUCT(({A}={ref})*({H}="CRC")*(({suma_fte})>0)*{G})',
-            c_usd: f'=SUMPRODUCT(({A}={ref})*({H}="USD")*(({suma_fte})>0)*{G})',
-            c_sw: f"=SUMIFS({U},{A},{ref})",
-            **{c_m1 + i: f"=SUMIFS({ftes[i]},{A},{ref})" for i in range(12)},
-        }
-        for col, v in valores.items():
-            c = rs.cell(row=fila, column=col, value=v)
-            c.border = border(); c.font = font(size=10)
-            if col == c_dep:
-                c.alignment = align("center")
-            elif col != c_nom:
+    X = rng(COL_CL)
+    suma_fte = "+".join(f"({f})" for f in ftes)
+
+    def bloque(fila: int, externos: bool, rotulo: str, titulo_total: str) -> int:
+        """Una fila por depto y su total. `externos` = solo las posiciones de
+        Contract Labour; si no, solo la planta.
+
+        Owner, 2026-11-24: los de contrato «tienen FTE, cuentan, pero son
+        externos». El FTE sigue (con él se calcula lo que cobran), pero no se
+        mezclan con el headcount de planta: van en su propio bloque."""
+        op, val = ('=', '"Sí"') if externos else ('<>', '"Sí"')
+        crit = f'"{op}Sí"'
+        primera = fila
+        for dept_code in sorted(positions_by_dept):
+            pos = [q for q in positions_by_dept[dept_code]
+                   if bool(q.get("contract_labour")) == externos]
+            if not pos:
+                continue
+            nombre = (str(positions_by_dept[dept_code][0].get("dept_name") or "").strip()
+                      or (dept_names or {}).get(dept_code)
+                      or DEPT_NAMES.get(dept_code, dept_code))
+            ref = f"$A{fila}"
+            es = f"({X}{op}{val})"
+            valores = {
+                c_dep: dept_code,
+                c_nom: nombre,
+                c_hc: f"=SUMPRODUCT(({A}={ref})*{es}*(({suma_fte})>0))",
+                # Solo las que cuentan en el headcount: una vacante con FTE 0 todo
+                # el año trae salario pero no cuesta nada.
+                c_crc: f'=SUMPRODUCT(({A}={ref})*{es}*({H}="CRC")*(({suma_fte})>0)*{G})',
+                c_usd: f'=SUMPRODUCT(({A}={ref})*{es}*({H}="USD")*(({suma_fte})>0)*{G})',
+                c_sw: f"=SUMIFS({U},{A},{ref},{X},{crit})",
+                **{c_m1 + i: f"=SUMIFS({ftes[i]},{A},{ref},{X},{crit})" for i in range(12)},
+            }
+            for col, v in valores.items():
+                c = rs.cell(row=fila, column=col, value=v)
+                c.border = border(); c.font = font(size=10)
+                if col == c_dep:
+                    c.alignment = align("center")
+                elif col != c_nom:
+                    c.alignment = align("right")
+                    c.number_format = _SIN_CERO_1 if col >= c_m1 else _SIN_CERO_0
+            fila += 1
+
+        rs.cell(row=fila, column=c_dep, value=rotulo)
+        rs.cell(row=fila, column=c_nom, value=titulo_total)
+        for col in range(c_hc, ultima + 1):
+            letra = get_column_letter(col)
+            rs.cell(row=fila, column=col,
+                    value=f"=SUM({letra}{primera}:{letra}{max(fila - 1, primera)})"
+                    if fila > primera else 0)
+        for col in range(1, ultima + 1):
+            c = rs.cell(row=fila, column=col)
+            c.fill = fill(C["navy"] if not externos else C["navy_mid"])
+            c.font = font(bold=True, color="FFFFFF", size=10)
+            c.border = border()
+            if col >= c_hc:
                 c.alignment = align("right")
                 c.number_format = _SIN_CERO_1 if col >= c_m1 else _SIN_CERO_0
-        fila += 1
+        return fila
 
-    # Gran total
-    rs.cell(row=fila, column=c_dep, value="TOTAL")
-    rs.cell(row=fila, column=c_nom, value="Gran total")
-    for col in range(c_hc, ultima + 1):
-        letra = get_column_letter(col)
-        rs.cell(row=fila, column=col,
-                value=f"=SUM({letra}{primera}:{letra}{max(fila - 1, primera)})")
-    for col in range(1, ultima + 1):
-        c = rs.cell(row=fila, column=col)
-        c.fill = fill(C["navy"]); c.font = font(bold=True, color="FFFFFF", size=10)
-        c.border = border()
-        if col >= c_hc:
-            c.alignment = align("right")
-            c.number_format = _SIN_CERO_1 if col >= c_m1 else _SIN_CERO_0
+    fila = bloque(HEADER_ROW + 1, False, "TOTAL", "Gran total (planta)")
+    if any(q.get("contract_labour") for pos in positions_by_dept.values() for q in pos):
+        fila += 2
+        t = rs.cell(row=fila, column=c_dep, value="EXTERNOS — Contract Labour (cuenta 6031, "
+                    "no cuentan en el headcount de planta ni en cafetería ni uniformes)")
+        t.font = font(bold=True, color=C["navy"], size=10)
+        rs.merge_cells(start_row=fila, start_column=c_dep, end_row=fila, end_column=ultima)
+        bloque(fila + 1, True, "EXT", "Total externos")
 
     rs.freeze_panes = rs.cell(row=HEADER_ROW + 1, column=c_hc)
     set_col_widths(rs, {c_dep: 8, c_nom: 26, c_hc: 11, c_crc: 16, c_usd: 16, c_sw: 15,

@@ -169,6 +169,17 @@ def es_contrato(position) -> bool:
     return getattr(position, "contract_labour", False) is True
 
 
+def fuera_del_hotel(position) -> bool:
+    """No come en el hotel ni usa uniforme del hotel: no recibe cafetería ni
+    lavado de uniformes (los dos repartos que van por FTE).
+
+    Es de contrato, o su SubCategoria es Outside. Owner, 2026-11-24: los de
+    contrato «tienen FTE, cuentan, pero son externos», «uniformes es lo mismo»,
+    y Sistemas «no es contract y él está fuera del hotel». Su FTE sigue contando
+    para lo demás (su salario, su headcount)."""
+    return es_contrato(position) or subcategoria_de(position) == OUTSIDE
+
+
 def a_bool(valor) -> bool:
     """Lo que venga del Excel o del front → bool. «Sí», «x», «1», True…"""
     if isinstance(valor, bool):
