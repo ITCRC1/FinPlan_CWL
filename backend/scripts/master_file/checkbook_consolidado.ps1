@@ -10,7 +10,7 @@
 #   1) Hoja «Config Checkbook»: los lugares del libro (Meses, Fila 1, Fila 2, V,
 #      W, X) con tipo · año · versión · hasta · período, y sus nombres pM_*, pF1_*…
 #      La URL y la llave son las de Config (pURL / pLlave): una sola llave.
-#   2) Hoja oculta «Datos» con la consulta CheckbookOPEX (tabla tDatos), la misma
+#   2) Hoja oculta «Datos» con la consulta CheckbookConsolidado (tabla tDatos), la misma
 #      del checkbook en vivo: /api/consolidado/checkbook-opex/. No lee el GL.
 #   3) Cambia el vínculo externo por este mismo libro: [1]Datos!G:G -> Datos!G:G.
 $ErrorActionPreference = 'Stop'
@@ -33,7 +33,7 @@ try {
   }
 
   # 1) Config Checkbook
-  foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq 'Config Checkbook') { $s.Delete() } }
+  foreach ($s in @($wb.Worksheets)) { if ($s.Name -ceq 'Config Checkbook') { $s.Delete() } }
   $cb = $wb.Worksheets.Item('Checkbook Consolidado')
   $cfg = $wb.Worksheets.Add($cb)
   $cfg.Name = 'Config Checkbook'
@@ -90,17 +90,21 @@ try {
   $cfg.Range('C5:G10').Interior.Color = 0xE1F5FF
 
   # 2) Datos + consulta
-  foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq 'Datos') { $s.Delete() } }
-  foreach ($qq in @($wb.Queries)) { if ($qq.Name -eq 'CheckbookOPEX') { $qq.Delete() } }
-  $wb.Queries.Add('CheckbookOPEX', $m, 'Checkbook de OPEX y costo por depto, cuenta y detalle (para Checkbook Consolidado)') | Out-Null
+  # ⚠️ El Master File YA tiene una consulta «CheckbookOpex» (la de Checkbook Gastos)
+  # y Power Query no distingue mayúsculas: llamar a esta «CheckbookOPEX» (y borrar con
+  # -eq, que en PowerShell tampoco distingue) le borró la suya al owner el 2026-11-24 y
+  # su tabla quedó en «The query 'CheckbookOpex' was not found». Nombre propio y -ceq.
+  foreach ($s in @($wb.Worksheets)) { if ($s.Name -ceq 'Datos') { $s.Delete() } }
+  foreach ($qq in @($wb.Queries)) { if ($qq.Name -ceq 'CheckbookConsolidado') { $qq.Delete() } }
+  $wb.Queries.Add('CheckbookConsolidado', $m, 'Checkbook de OPEX y costo por depto, cuenta y detalle (para Checkbook Consolidado)') | Out-Null
   $ws = $wb.Worksheets.Add([Type]::Missing, $wb.Worksheets.Item($wb.Worksheets.Count))
   $ws.Name = 'Datos'
-  $conn = "OLEDB;Provider=Microsoft.Mashup.OleDb.1;Data Source=`$Workbook`$;Location=CheckbookOPEX;Extended Properties=$q$q"
+  $conn = "OLEDB;Provider=Microsoft.Mashup.OleDb.1;Data Source=`$Workbook`$;Location=CheckbookConsolidado;Extended Properties=$q$q"
   $lo = $ws.ListObjects.Add(0, $conn, $null, 1, $ws.Range('A1'))
   $lo.Name = 'tDatos'
   $qt = $lo.QueryTable
   $qt.CommandType = 2
-  $qt.CommandText = 'SELECT * FROM [CheckbookOPEX]'
+  $qt.CommandText = 'SELECT * FROM [CheckbookConsolidado]'
   $qt.BackgroundQuery = $false
   $qt.RefreshStyle = 0            # xlOverwriteCells: no corre las referencias
   $qt.PreserveColumnInfo = $true
