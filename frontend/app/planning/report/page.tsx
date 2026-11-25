@@ -45,6 +45,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getAllocationSummary, getDetalleDeCelda, getEstadisticasCierre,
   getGastoPorClase, getPLDetail, getPLPorCategoria, getPosiciones, getScenarios,
+  getLibroBudgetPackage, libroUrl,
   type AllocationSummary, type DetalleCelda, type EstadisticasCierre,
   type GastoEscenario, type PLDetail, type PLPorCategoria,
   type PosicionesVersion, type Scenario,
@@ -462,6 +463,28 @@ export default function PlanningReportPage() {
    * paquete que junte las hojas por su cuenta sería una segunda definición de
    * cada una, y la que se manda a revisión es justamente ésta.
    */
+  // El botón azul baja el libro que el owner colgó en «Mis libros», TAL CUAL
+  // (con su Power Query). Owner, 2026-11-24: «solo quiero colgarlo ahí… yo lo
+  // bajo y lo corro como siempre». El paquete que arma la app sigue en el botón
+  // de al lado: no se quitó nada.
+  async function bajarLibroColgado() {
+    setBajando("libro");
+    setError(null);
+    try {
+      const l = await getLibroBudgetPackage();
+      if (!l.existe) {
+        setError("Todavía no hay un libro «Budget Package (todo en un libro)» en Mis libros. "
+          + "Subilo en Planning → Mis libros.");
+        return;
+      }
+      window.location.href = libroUrl(l.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "no se pudo bajar el libro");
+    } finally {
+      setBajando("");
+    }
+  }
+
   async function bajarPaquete() {
     if (!principal) return;
     setBajando("paquete");
@@ -510,14 +533,22 @@ export default function PlanningReportPage() {
           doce meses de una versión · el año, de todas
         </span>
 
-        <button onClick={bajarPaquete} disabled={!principal || !!bajando}
+        <button onClick={bajarLibroColgado} disabled={!!bajando}
+          title="Baja tu libro de Mis libros tal cual, con su Power Query"
           style={{ padding: "6px 14px", fontSize: 12.5, borderRadius: 4,
-                   fontWeight: 700, border: "none",
-                   cursor: principal ? "pointer" : "not-allowed",
+                   fontWeight: 700, border: "none", cursor: "pointer",
                    background: "var(--brand)", color: "#fff" }}>
-          {bajando === "paquete" ? "Armando el paquete…"
-            : "⬇ Budget Package (todo en un libro)"}
+          {bajando === "libro" ? "Bajando…" : "⬇ Budget Package (todo en un libro)"}
         </button>
+        <button onClick={bajarPaquete} disabled={!principal || !!bajando}
+          title="El paquete que arma la app con las vistas de esta pantalla (el de antes)"
+          style={{ padding: "5px 10px", fontSize: 11.5, borderRadius: 4, fontWeight: 600,
+                   border: "1px solid var(--border-medium)",
+                   cursor: principal ? "pointer" : "not-allowed",
+                   background: "var(--bg-surface)", color: "var(--text-primary)" }}>
+          {bajando === "paquete" ? "Armando el paquete…" : "⬇ Paquete armado por la app"}
+        </button>
+        <a href="/libros" style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>Mis libros →</a>
         <button onClick={bajar} disabled={!cuadro || !!bajando}
           style={{ padding: "5px 12px", fontSize: 12, borderRadius: 4, fontWeight: 600,
                    border: "none", cursor: cuadro ? "pointer" : "not-allowed",

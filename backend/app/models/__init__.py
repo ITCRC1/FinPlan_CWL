@@ -149,3 +149,4 @@ from app.models.usali import (UsaliDefinicion, UsaliDocumento,  # noqa: F401
                               UsaliItem)
 from app.models.acceso_claude import (ClaudeCliente, ClaudeCodigo,  # noqa: F401
                                      ClaudeRefresh, ClaudeConsulta)
+from app.models.libro_colgado import LibroColgado  # noqa: F401

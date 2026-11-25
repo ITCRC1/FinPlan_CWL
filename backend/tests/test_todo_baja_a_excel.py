@@ -33,6 +33,7 @@ APP = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "app"
 # trabajo que no se hizo.
 SIN_EXCEL_A_PROPOSITO = {
     "admin/users": "lista de usuarios — no es un cuadro financiero y llevaría correos a un archivo suelto",
+    "libros": "Mis libros — la tabla ES la lista de Excels para bajar: cada fila tiene su ⬇ Bajar del archivo tal cual",
     "operation-insight/on-the-books": "puerto fiel de Tab 8 de DAILY-OPS — el original exporta por Ctrl+P (Imprimir PDF), no Excel; se preservó tal cual, sin agregar algo que la fuente no tiene",
 }
 

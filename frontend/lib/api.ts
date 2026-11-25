@@ -6900,3 +6900,41 @@ export async function saveScenarioDriverRates(
   // ninguno: llamarlo desde el checkbook se los borraría al escenario.
   return api.put(`/scenarios/${scenarioId}/driver-rates/`, { tarifas });
 }
+
+// ── Mis libros: los Excels del owner en un solo lugar ─────────────────────────
+// Owner, 2026-11-24: «quiero ir a un lugar solo y bajar mis proyectos, mis
+// creaciones, pero que no se rompa nada» y «no quiero llenarme de versiones».
+// El archivo se guarda y se baja TAL CUAL (con su Power Query). Uno por título:
+// subir con el mismo título lo reemplaza y guarda solo la versión anterior.
+export interface Libro {
+  id: string; titulo: string; nombre_archivo: string; tamano: number;
+  nota: string | null; subido_por: string | null; subido_el: string | null;
+  anterior: { nombre_archivo: string; tamano: number;
+              subido_por: string | null; subido_el: string | null } | null;
+}
+export const TITULO_BUDGET_PACKAGE = "Budget Package (todo en un libro)";
+
+export async function getLibros(): Promise<Libro[]> {
+  return api.get<Libro[]>("/libros/");
+}
+export async function getLibroBudgetPackage(): Promise<({ existe: true } & Libro) | { existe: false }> {
+  return api.get("/libros/budget-package/");
+}
+export function libroUrl(id: string, anterior = false): string {
+  return dlUrl(`/libros/${id}/descargar/${anterior ? "anterior/" : ""}`);
+}
+export async function subirLibro(titulo: string, file: File, nota = ""): Promise<Libro> {
+  const form = new FormData();
+  form.append("titulo", titulo);
+  form.append("nota", nota);
+  form.append("file", file);
+  const res = await fetch(`${BASE}/libros/`, { method: "POST", body: form, headers: authHeaders() });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+export async function volverLibroAAnterior(id: string): Promise<Libro> {
+  return api.post<Libro>(`/libros/${id}/volver-a-anterior/`);
+}
+export async function quitarLibro(id: string): Promise<void> {
+  await api.delete(`/libros/${id}/`);
+}

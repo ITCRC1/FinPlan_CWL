@@ -77,6 +77,7 @@ from app.api.cierre_periodos_api import router as cierre_router
 from app.api.guillermo_api import router as guillermo_router
 from app.api.informe_api import router as informe_router
 from app.api.usali_api import router as usali_router
+from app.api.libros_colgados_api import router as libros_router
 from app.api.pacing_api import router as pacing_router
 from app.api.deposits_api import router as deposits_router
 from app.hotel_actual import HOTEL_ID, HOTEL_NAME
@@ -234,6 +235,7 @@ app.include_router(guillermo_router, prefix="/api", dependencies=_guard)
 app.include_router(pacing_router, prefix="/api", dependencies=_guard)
 app.include_router(informe_router, prefix="/api", dependencies=_guard)
 app.include_router(usali_router, prefix="/api", dependencies=_guard)
+app.include_router(libros_router, prefix="/api", dependencies=_guard)
 app.include_router(auth_router, prefix="/api")   # público (login/bootstrap/status)
 # Conector de Claude (claude.ai): OAuth 2.1 + MCP en la RAIZ (/.well-known, /oauth, /mcp),
 # como lo espera Claude. Se autentica solo: cada ruta valida su propio token.

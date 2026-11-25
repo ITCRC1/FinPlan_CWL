@@ -217,6 +217,10 @@ NO_REGISTRAN = {
     # reservas trae y de qué corte es, y no guarda una sola fila. El `upload`,
     # que sí escribe, está cubierto.
     "deposits_api.py:preview",
+    # Mis libros guarda el Excel del owner TAL CUAL para bajarlo después: no
+    # entra ningún número a ningún escenario. Y el registro frenaría con 409 subir
+    # el mismo archivo otra vez, que acá es legítimo (volver a colgarlo).
+    "libros_colgados_api.py:subir_libro",
     "auditoria_gl_api.py:revisar",
     "auditoria_gl_api.py:excel",
     "auditoria_gl_api.py:_revisar",

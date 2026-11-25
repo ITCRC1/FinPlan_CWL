@@ -81,6 +81,7 @@ export const NAV: NavGroup[] = [
       { key: "budget", header: true },
       { key: "bigPicture", href: "/planning/big-picture" },
       { key: "planningReport", href: "/planning/report" },
+      { key: "misLibros", href: "/libros" },
       { key: "yearSetup", header: true },
       { key: "yearMasterData", href: "/revenue/master" },
       { key: "revenue", header: true },
