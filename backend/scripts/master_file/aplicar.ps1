@@ -26,9 +26,10 @@ try {
   $existen = @{}; foreach ($s in @($wb.Worksheets)) { $existen[$s.Name] = $true }
   $saltar = @{}; foreach ($h in $hojas) { if ($h.conservar -and $existen.ContainsKey($h.nombre)) { $saltar[$h.nombre] = $true } }
   foreach ($h in $hojas) { if ($saltar.ContainsKey($h.nombre)) { continue }; foreach ($s in @($wb.Worksheets)) { if ($s.Name -eq $h.nombre) { $s.Delete() } } }
-  # Y las de una corrida anterior aunque se llamaran distinto (p. ej. en otro idioma): todo
-  # lo que sea reporte se rehace; las tablas de datos y Config no se tocan.
-  foreach ($s in @($wb.Worksheets)) { if ($s.Name -match '^(AM\d\d |00 |Report)') { $s.Delete() } }
+  # Solo se borran las hojas que ESTE plano rehace (arriba, por nombre). Antes se borraba
+  # todo lo que empezara con «AM## », «00 » o «Report» y eso se llevaba las pestañas que el
+  # owner agrego a mano: AM14..AM23, «My analisis», «Checkbook Consolidado» (2026-11-24).
+  # Esas hojas, «Config Checkbook» y «Datos» (ver checkbook_consolidado.ps1) se respetan.
   $ant = $null
   foreach ($h in $hojas) {
     if ($saltar.ContainsKey($h.nombre)) { $ant = $wb.Worksheets.Item($h.nombre); continue }
