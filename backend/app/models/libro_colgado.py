@@ -12,6 +12,16 @@ nada»* y *«no quiero llenarme de versiones»*.
   volver atrás si se subió algo mal. Nada más se acumula.
 - El botón «Budget Package (todo en un libro)» baja el libro con el título
   `TITULO_BUDGET_PACKAGE`.
+
+Owner, 2026-11-24: *«podemos crear sub tabs acá… y que pueda subir archivos
+mensuales para Cierre, Budget o Forecast y otros, ya si no se mezclan»* y *«es
+un mismo repositorio solo que organizado por estos sub tabs»*.
+
+- La **carpeta** es solo para ordenar la vista. El repositorio sigue siendo uno:
+  el título manda igual que antes, y por eso **un mismo título no puede estar
+  dos veces aunque sea en carpetas distintas** — mover de carpeta no clona ni
+  duplica nada, solo cambia en cuál tab se ve.
+- Un libro se puede mover de carpeta cuando sea, sin volver a subirlo.
 """
 import uuid
 from datetime import datetime
@@ -25,6 +35,18 @@ from app.hotel_actual import HOTEL_ID
 
 TITULO_BUDGET_PACKAGE = "Budget Package (todo en un libro)"
 
+#: Las carpetas (los sub-tabs), en el orden en que se muestran. La clave es lo
+#: que se guarda; el rótulo, lo que se lee en pantalla.
+CARPETAS: dict[str, str] = {
+    "CIERRE": "Cierre de mes",
+    "BUDGET": "Budget",
+    "FORECAST": "Forecast",
+    "OTROS": "Otros",
+}
+#: Dónde cae un libro que no dice carpeta, y dónde quedaron los ya subidos.
+CARPETA_POR_DEFECTO = "OTROS"
+ORDEN_CARPETA = {c: i for i, c in enumerate(CARPETAS)}
+
 
 class LibroColgado(Base):
     __tablename__ = "libros_colgados"
@@ -34,6 +56,9 @@ class LibroColgado(Base):
                                     default=lambda: str(uuid.uuid4()))
     hotel_id: Mapped[str] = mapped_column(String(10), default=lambda: HOTEL_ID)
     titulo: Mapped[str] = mapped_column(String(160))
+    # Solo ordena la vista: NO entra en la llave única — ver el docstring.
+    carpeta: Mapped[str] = mapped_column(String(16), default=CARPETA_POR_DEFECTO,
+                                         server_default=CARPETA_POR_DEFECTO)
     nombre_archivo: Mapped[str] = mapped_column(String(200))
     # deferred: la lista no carga los megas de cada archivo; solo la descarga.
     contenido: Mapped[bytes] = deferred(mapped_column(LargeBinary))

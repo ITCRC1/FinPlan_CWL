@@ -10,12 +10,17 @@ llenarme de versiones»*.
   versión anterior (una sola) para volver atrás.
 
     GET    /libros/                         → los libros (sin el archivo)
+    GET    /libros/carpetas/                 → los sub-tabs y cuántos hay en cada uno
     GET    /libros/budget-package/          → el del botón (o {existe: false})
     GET    /libros/{id}/descargar/          → el archivo tal cual
     GET    /libros/{id}/descargar/anterior/ → la versión anterior
     POST   /libros/                         → subir o reemplazar — solo admin
     POST   /libros/{id}/volver-a-anterior/  → deshacer la última subida — solo admin
+    POST   /libros/{id}/carpeta/            → moverlo de sub-tab — solo admin
     DELETE /libros/{id}/                    → quitarlo — solo admin
+
+La **carpeta** solo ordena la vista: el repositorio sigue siendo uno y la llave
+única sigue siendo `hotel_id + titulo`. Mover un libro no toca el archivo.
 """
 from datetime import datetime, timezone
 
@@ -28,7 +33,9 @@ from app.auth import get_current_admin
 from app.db import get_session
 from app.errores import ErrorApi
 from app.hotel_actual import HOTEL_ID
-from app.models.libro_colgado import TITULO_BUDGET_PACKAGE, LibroColgado
+from app.models.libro_colgado import (CARPETA_POR_DEFECTO, CARPETAS,
+                                      ORDEN_CARPETA, TITULO_BUDGET_PACKAGE,
+                                      LibroColgado)
 
 router = APIRouter(tags=["libros"])
 
@@ -48,9 +55,25 @@ def limpiar_titulo(titulo: str) -> str:
     return " ".join((titulo or "").split())[:160]
 
 
+def limpiar_carpeta(carpeta: str | None) -> str:
+    """La carpeta que mande el cliente, o la de por defecto si no la conoce.
+
+    Cae en OTROS en vez de rebotar: una carpeta desconocida es un libro mal
+    clasificado —se mueve con un clic— y no vale perder la subida por eso.
+    """
+    # Llamada derecho (las pruebas) y sin pasar el argumento: lo que llega es el
+    # `Form(...)` de FastAPI, no un texto. Eso es «no dijo carpeta».
+    if not isinstance(carpeta, str):
+        return CARPETA_POR_DEFECTO
+    c = carpeta.strip().upper()
+    return c if c in CARPETAS else CARPETA_POR_DEFECTO
+
+
 def _fila(l: LibroColgado) -> dict:
     iso = lambda d: d.isoformat() if d else None  # noqa: E731
-    return {"id": l.id, "titulo": l.titulo, "nombre_archivo": l.nombre_archivo,
+    return {"id": l.id, "titulo": l.titulo,
+            "carpeta": l.carpeta or CARPETA_POR_DEFECTO,
+            "nombre_archivo": l.nombre_archivo,
             "tamano": l.tamano, "nota": l.nota, "subido_por": l.subido_por,
             "subido_el": iso(l.subido_el),
             "anterior": None if not l.anterior_nombre else {
@@ -81,9 +104,28 @@ async def listar_libros():
     async with get_session() as s:
         filas = (await s.execute(select(LibroColgado).where(
             LibroColgado.hotel_id == HOTEL_ID))).scalars().all()
-    # El Budget Package primero: es el del botón.
-    filas = sorted(filas, key=lambda l: (l.titulo != TITULO_BUDGET_PACKAGE, l.titulo.lower()))
+    # Por carpeta en el orden de los tabs y, adentro, el Budget Package primero
+    # (es el del botón) y el resto por nombre.
+    filas = sorted(filas, key=lambda l: (
+        ORDEN_CARPETA.get(l.carpeta or CARPETA_POR_DEFECTO, len(ORDEN_CARPETA)),
+        l.titulo != TITULO_BUDGET_PACKAGE, l.titulo.lower()))
     return [_fila(l) for l in filas]
+
+
+@router.get("/libros/carpetas/")
+async def listar_carpetas():
+    """Los sub-tabs con su rótulo y cuántos libros tiene cada uno.
+
+    Salen los cuatro siempre, con cero incluido: un tab que aparece y desaparece
+    según si hay archivos obliga a adivinar dónde subir el primero.
+    """
+    async with get_session() as s:
+        filas = (await s.execute(select(LibroColgado).where(
+            LibroColgado.hotel_id == HOTEL_ID))).scalars().all()
+    cuantos: dict[str, int] = {c: 0 for c in CARPETAS}
+    for l in filas:
+        cuantos[limpiar_carpeta(l.carpeta)] += 1
+    return [{"clave": c, "rotulo": r, "libros": cuantos[c]} for c, r in CARPETAS.items()]
 
 
 @router.get("/libros/budget-package/")
@@ -114,7 +156,12 @@ async def descargar_anterior(libro_id: str):
 
 @router.post("/libros/")
 async def subir_libro(titulo: str = Form(...), nota: str = Form(""),
-                      file: UploadFile = File(...), user=Depends(get_current_admin)):
+                      file: UploadFile = File(...),
+                      user=Depends(get_current_admin),
+                      # Último a propósito: las pruebas llaman por posición
+                      # (titulo, nota, archivo, admin) y meterlo antes les
+                      # correría los argumentos sin que nada avise.
+                      carpeta: str = Form(CARPETA_POR_DEFECTO)):
     titulo = limpiar_titulo(titulo)
     if not titulo:
         raise ErrorApi(422, "libro.sin_titulo")
@@ -129,7 +176,8 @@ async def subir_libro(titulo: str = Form(...), nota: str = Form(""),
              .where(LibroColgado.hotel_id == HOTEL_ID,
                     LibroColgado.titulo == titulo))).scalar_one_or_none()
         if l is None:
-            l = LibroColgado(hotel_id=HOTEL_ID, titulo=titulo)
+            l = LibroColgado(hotel_id=HOTEL_ID, titulo=titulo,
+                             carpeta=limpiar_carpeta(carpeta))
             s.add(l)
         else:
             # La que estaba pasa a ser «la anterior»; la de antes de esa se va.
@@ -140,6 +188,26 @@ async def subir_libro(titulo: str = Form(...), nota: str = Form(""),
         l.nota = (nota or "").strip()[:500] or None
         l.subido_por = getattr(user, "email", None)
         l.subido_el = datetime.now(timezone.utc)
+        await s.commit()
+        await s.refresh(l)
+        return _fila(l)
+
+
+@router.post("/libros/{libro_id}/carpeta/")
+async def mover_libro(libro_id: str, carpeta: str = Form(...),
+                      _=Depends(get_current_admin)):
+    """Cambia de sub-tab un libro ya subido. No toca el archivo ni su anterior.
+
+    Una carpeta que no existe sí rebota acá —a diferencia de la subida—: mover
+    es un clic sobre una lista cerrada, así que un valor raro es un error de
+    programación, no un libro mal clasificado.
+    """
+    c = (carpeta or "").strip().upper()
+    if c not in CARPETAS:
+        raise ErrorApi(422, "libro.carpeta_invalida", carpetas=", ".join(CARPETAS))
+    async with get_session() as s:
+        l = await _libro(s, libro_id)
+        l.carpeta = c
         await s.commit()
         await s.refresh(l)
         return _fila(l)

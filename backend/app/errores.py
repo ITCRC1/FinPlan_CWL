@@ -371,6 +371,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "libro.muy_grande": {
         "es": "El archivo pasa de 40 MB",
         "en": "The file is larger than 40 MB"},
+    "libro.carpeta_invalida": {
+        "es": "Esa carpeta no existe. Son: {carpetas}",
+        "en": "No such folder. They are: {carpetas}"},
     "auth.requiere_admin": {
         "es": "Requiere rol admin",
         "en": "Requires the admin role"},

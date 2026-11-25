@@ -113,3 +113,82 @@ def test_subir_y_quitar_son_solo_admin():
     from app.api import libros_colgados_api as mod
     for fn in (mod.subir_libro, mod.volver_a_anterior, mod.quitar_libro):
         assert "get_current_admin" in inspect.getsource(fn)
+
+
+# ── Los sub-tabs (carpetas) ───────────────────────────────────────────────────
+# Owner, 2026-11-24: «podemos crear sub tabs acá… ya si no se mezclan» y «es un
+# mismo repositorio solo que organizado por estos sub tabs».
+
+@pytest.mark.asyncio
+async def test_el_libro_queda_en_la_carpeta_que_se_eligio(api):
+    r = await api.subir_libro("Cierre octubre", "", _Archivo("o.xlsx", _xlsx(b"o")),
+                              ADMIN, "CIERRE")
+    assert r["carpeta"] == "CIERRE"
+    assert (await api.listar_libros())[0]["carpeta"] == "CIERRE"
+
+
+@pytest.mark.asyncio
+async def test_sin_carpeta_cae_en_otros(api):
+    """Los que ya estaban subidos no tienen carpeta: no pueden desaparecer."""
+    r = await api.subir_libro("Viejo", "", _Archivo("v.xlsx", _xlsx(b"v")), ADMIN)
+    assert r["carpeta"] == "OTROS"
+
+
+@pytest.mark.asyncio
+async def test_una_carpeta_desconocida_no_pierde_la_subida(api):
+    r = await api.subir_libro("Raro", "", _Archivo("r.xlsx", _xlsx(b"r")), ADMIN, "INVENTADA")
+    assert r["carpeta"] == "OTROS"      # se clasifica solo, no rebota
+
+
+@pytest.mark.asyncio
+async def test_mover_de_carpeta_no_toca_el_archivo(api):
+    datos = _xlsx(b"m")
+    r = await api.subir_libro("Forecast nov", "", _Archivo("f.xlsx", datos), ADMIN, "OTROS")
+    m = await api.mover_libro(r["id"], "FORECAST", ADMIN)
+    assert m["id"] == r["id"] and m["carpeta"] == "FORECAST"
+    assert (await api.descargar_libro(r["id"])).body == datos   # byte por byte
+    assert len(await api.listar_libros()) == 1                  # no se clonó
+
+
+@pytest.mark.asyncio
+async def test_mover_a_una_carpeta_que_no_existe_rebota(api):
+    from app.errores import ErrorApi
+    r = await api.subir_libro("X", "", _Archivo("x.xlsx", _xlsx(b"x")), ADMIN)
+    with pytest.raises(ErrorApi):
+        await api.mover_libro(r["id"], "NO_EXISTE", ADMIN)
+
+
+@pytest.mark.asyncio
+async def test_el_titulo_sigue_siendo_la_llave_entre_carpetas(api):
+    """Un mismo nombre en dos tabs NO son dos libros: el repositorio es uno."""
+    a = await api.subir_libro("Cierre octubre", "", _Archivo("a.xlsx", _xlsx(b"a")),
+                              ADMIN, "CIERRE")
+    b = await api.subir_libro("Cierre octubre", "", _Archivo("b.xlsx", _xlsx(b"b")),
+                              ADMIN, "BUDGET")
+    assert b["id"] == a["id"]
+    assert len(await api.listar_libros()) == 1
+    # Y se queda donde estaba: reemplazar un archivo no lo cambia de tab.
+    assert b["carpeta"] == "CIERRE"
+
+
+@pytest.mark.asyncio
+async def test_las_cuatro_carpetas_salen_siempre_aunque_esten_vacias(api):
+    await api.subir_libro("Uno", "", _Archivo("u.xlsx", _xlsx(b"u")), ADMIN, "CIERRE")
+    cs = await api.listar_carpetas()
+    assert [c["clave"] for c in cs] == ["CIERRE", "BUDGET", "FORECAST", "OTROS"]
+    assert {c["clave"]: c["libros"] for c in cs} == {
+        "CIERRE": 1, "BUDGET": 0, "FORECAST": 0, "OTROS": 0}
+
+
+@pytest.mark.asyncio
+async def test_el_budget_package_sigue_siendo_el_del_boton_este_donde_este(api):
+    r = await api.subir_libro("Budget Package (todo en un libro)", "",
+                              _Archivo("bp.xlsx", _xlsx(b"bp")), ADMIN, "CIERRE")
+    bp = await api.budget_package()
+    assert bp["existe"] and bp["id"] == r["id"]
+
+
+def test_mover_es_solo_admin():
+    import inspect
+    from app.api import libros_colgados_api as mod
+    assert "get_current_admin" in inspect.getsource(mod.mover_libro)
