@@ -365,9 +365,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "libro.sin_titulo": {
         "es": "Ponele un nombre al libro",
         "en": "Give the workbook a name"},
-    "libro.no_es_excel": {
-        "es": "El archivo no es un Excel (.xlsx o .xlsm)",
-        "en": "The file is not an Excel workbook (.xlsx or .xlsm)"},
+    "libro.vacio": {
+        "es": "El archivo está vacío",
+        "en": "The file is empty"},
     "libro.muy_grande": {
         "es": "El archivo pasa de 40 MB",
         "en": "The file is larger than 40 MB"},

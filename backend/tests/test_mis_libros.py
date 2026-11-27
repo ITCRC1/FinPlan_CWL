@@ -91,12 +91,27 @@ async def test_volver_a_la_anterior(api):
 
 
 @pytest.mark.asyncio
-async def test_solo_entra_un_excel(api):
+async def test_entra_cualquier_archivo_y_sale_como_descarga(api):
+    """Owner, 2026-11-26: «que acepte todo tipo de archivos». Word, PDF, lo que sea;
+    pero siempre se entrega como descarga y con nosniff (nunca se abre en la app)."""
+    w = await api.subir_libro("Resumen Ejecutivo budget 2027", "", _Archivo("Resumen.docx", b"PKword"), ADMIN)
+    resp = await api.descargar_libro(w["id"])
+    assert resp.body == b"PKword"
+    assert "wordprocessingml" in resp.media_type
+    assert resp.headers["content-disposition"].startswith("attachment")
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    p = await api.subir_libro("Informe", "", _Archivo("informe.pdf", b"%PDF-1.7"), ADMIN)
+    assert (await api.descargar_libro(p["id"])).media_type == "application/pdf"
+    h = await api.subir_libro("Pagina", "", _Archivo("x.html", b"<script>alert(1)</script>"), ADMIN)
+    rh = await api.descargar_libro(h["id"])
+    assert rh.headers["content-disposition"].startswith("attachment")
+
+
+@pytest.mark.asyncio
+async def test_no_entra_vacio_ni_sin_nombre(api):
     from app.errores import ErrorApi
     with pytest.raises(ErrorApi):
-        await api.subir_libro("x", "", _Archivo("x.xlsx", b"no soy zip"), ADMIN)
-    with pytest.raises(ErrorApi):
-        await api.subir_libro("x", "", _Archivo("x.pdf", _xlsx(b"x")), ADMIN)
+        await api.subir_libro("x", "", _Archivo("x.pdf", b""), ADMIN)
     with pytest.raises(ErrorApi):
         await api.subir_libro("   ", "", _Archivo("x.xlsx", _xlsx(b"x")), ADMIN)
 

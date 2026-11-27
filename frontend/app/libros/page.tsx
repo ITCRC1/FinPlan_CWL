@@ -100,8 +100,9 @@ export default function MisLibrosPage() {
     <div className="pag" style={{ padding: "18px 22px", maxWidth: 1100 }}>
       <h1 style={{ fontSize: 19, fontWeight: 700, margin: "0 0 4px" }}>Mis libros</h1>
       <p style={{ fontSize: 12.5, color: "var(--text-secondary)", margin: "0 0 16px" }}>
-        Tus Excels en un solo lugar. Se guardan y se bajan tal cual, con su Power Query:
-        los abrís, pegás la llave y hacés «Actualizar todo» como siempre. Uno por nombre:
+        Tus archivos en un solo lugar: Excel, Word, PDF, PowerPoint o cualquier otro. Se guardan y se
+        bajan tal cual; un Excel con Power Query se abre, se pega la llave y se hace «Actualizar todo»
+        como siempre. Uno por nombre:
         subir uno nuevo con el mismo nombre lo reemplaza y guarda solo el anterior.
         Los tabs de abajo <b>solo organizan la vista</b>: es un mismo repositorio, y un
         libro se mueve de tab sin volver a subirlo.
@@ -137,7 +138,7 @@ export default function MisLibrosPage() {
             style={{ flex: "1 1 200px", padding: "5px 8px", fontSize: 12.5, borderRadius: 4,
                      border: "1px solid var(--border-medium)", background: "var(--bg-input)",
                      color: "var(--text-primary)" }} />
-          <input ref={archivo} type="file" accept=".xlsx,.xlsm" style={{ display: "none" }}
+          <input ref={archivo} type="file" style={{ display: "none" }}
             onChange={e => { const f = e.target.files?.[0]; if (f) subir(f, titulo); }} />
           <button onClick={() => archivo.current?.click()} disabled={subiendo} style={boton()}>
             {subiendo ? "Subiendo…" : "↑ Elegir archivo y subir"}
@@ -159,7 +160,7 @@ export default function MisLibrosPage() {
         </p>
       )}
 
-      <input ref={reemplazarRef} type="file" accept=".xlsx,.xlsm" style={{ display: "none" }}
+      <input ref={reemplazarRef} type="file" style={{ display: "none" }}
         onChange={e => {
           const f = e.target.files?.[0];
           const l = libros?.find(x => x.titulo === aReemplazar);

@@ -41,14 +41,22 @@ router = APIRouter(tags=["libros"])
 
 #: El v13 pesa ~5 MB; con 40 hay aire sin abrir la puerta a cualquier cosa.
 MAX_BYTES = 40 * 1024 * 1024
-XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-XLSM = "application/vnd.ms-excel.sheet.macroEnabled.12"
+# Owner, 2026-11-26: «cambia para que acepte todo tipo de archivos» (quería subir el
+# Resumen Ejecutivo en Word). Entra cualquier archivo; lo que lo hace seguro es cómo
+# se ENTREGA: siempre como descarga (attachment) y con nosniff, así el navegador
+# nunca abre ni ejecuta lo que se subió (un .html, por ejemplo) dentro de la app.
+GENERICO = "application/octet-stream"
 
 
-def es_excel(nombre: str, contenido: bytes) -> bool:
-    """Un .xlsx/.xlsm es un ZIP: empieza con «PK». Sin esto se colaba cualquier
-    archivo con la extensión cambiada."""
-    return nombre.lower().endswith((".xlsx", ".xlsm")) and contenido[:2] == b"PK"
+def tipo_de(nombre: str) -> str:
+    """El tipo por la extensión (xlsx, docx, pdf, pptx…); si no se conoce, binario."""
+    import mimetypes
+    extra = {".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+             ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+             ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"}
+    ext = "." + nombre.rsplit(".", 1)[-1].lower() if "." in nombre else ""
+    return extra.get(ext) or mimetypes.guess_type(nombre)[0] or GENERICO
 
 
 def limpiar_titulo(titulo: str) -> str:
@@ -82,10 +90,13 @@ def _fila(l: LibroColgado) -> dict:
 
 
 def _archivo(nombre: str, contenido: bytes) -> Response:
-    nombre = (nombre or "libro.xlsx").replace('"', "")
-    return Response(content=contenido,
-                    media_type=XLSM if nombre.lower().endswith(".xlsm") else XLSX,
-                    headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+    nombre = (nombre or "archivo").replace('"', "")
+    from urllib.parse import quote
+    return Response(content=contenido, media_type=tipo_de(nombre),
+                    headers={"Content-Disposition":
+                             f"attachment; filename=\"{nombre.encode('ascii', 'replace').decode()}\"; "
+                             f"filename*=UTF-8''{quote(nombre)}",
+                             "X-Content-Type-Options": "nosniff"})
 
 
 async def _libro(s, libro_id: str, *campos) -> LibroColgado:
@@ -166,9 +177,9 @@ async def subir_libro(titulo: str = Form(...), nota: str = Form(""),
     if not titulo:
         raise ErrorApi(422, "libro.sin_titulo")
     contenido = await file.read()
-    nombre = (file.filename or "libro.xlsx").replace("\\", "/").split("/")[-1][:200]
-    if not es_excel(nombre, contenido):
-        raise ErrorApi(422, "libro.no_es_excel")
+    nombre = (file.filename or "archivo").replace("\\", "/").split("/")[-1][:200]
+    if not contenido:
+        raise ErrorApi(422, "libro.vacio")
     if len(contenido) > MAX_BYTES:
         raise ErrorApi(422, "libro.muy_grande")
     async with get_session() as s:
