@@ -119,15 +119,23 @@ export default function PayrollParamsPage() {
       });
       setSeeded(false); setDirty(false);
       setMsg(t("saved"));
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : t("errorSaving")); }
-    finally { setSaving(false); }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("errorSaving"));
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    // Guardar recalcula solo. Owner, 2026-11-27: «debería ser lógico que si se pone
+    // en 0, automáticamente hay que recalcular». Un parámetro guardado sin recalcular
+    // deja la planilla y el P&L con el valor viejo, y nada lo avisa en el P&L.
+    await handleRecalc(false);
   }
 
-  async function handleRecalc() {
+  async function handleRecalc(guardarAntes = true) {
     if (!scenarioId) return;
+    if (guardarAntes && dirty) { await handleSave(); return; }
     setRecalc(true); setMsg(null);
     try {
-      if (dirty) await handleSave();
       const aviso = await recalcularYContar(scenarioId, t("recalcDone"));
       setMsg(aviso);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : t("errorRecalc")); }
@@ -255,7 +263,7 @@ export default function PayrollParamsPage() {
             <button onClick={handleSave} disabled={saving || !dirty || sel?.is_locked} style={btn(!saving && dirty && !sel?.is_locked)}>
               {saving ? tc("saving") : dirty ? tc("save") : t("savedBtn")}
             </button>
-            <button onClick={handleRecalc} disabled={recalc || sel?.is_locked} style={btn(!recalc && !sel?.is_locked)}>
+            <button onClick={() => handleRecalc()} disabled={recalc || sel?.is_locked} style={btn(!recalc && !sel?.is_locked)}>
               {recalc ? tc("recalc.running") : t("recalcBtn")}
             </button>
           </div>

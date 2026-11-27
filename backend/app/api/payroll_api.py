@@ -1407,6 +1407,45 @@ DRIVERS_NUM = ["overtime_pct", "bonus_pct", "vacaciones_rate", "severance_annual
                "other_monthly_crc", "ins_annual_crc"]
 DRIVERS_CAL = ["working_days", "holidays", "days_off", "calendar_days"]
 
+#: Qué concepto calcula cada driver. Si el driver pasa de un valor a CERO, lo que
+#: había calculado se borra al guardar. Owner, 2026-11-27, con la provisión de
+#: vacaciones: «debería ser lógico que si se pone en 0, automáticamente hay que
+#: recalcular». Antes el 0 significaba «ahora es manual» y el monto viejo quedaba
+#: (US$ 61,010 de 6023 en el Budget 2027 Working que nadie había cargado a mano).
+#: Un driver que YA estaba en 0 no se toca: ahí sí puede haber montos digitados.
+CONCEPTO_DEL_DRIVER = {
+    "overtime_pct": "c6001_overtime", "bonus_pct": "c6027_incentive_bonus",
+    "vacaciones_rate": "c6023_vacation_prov", "severance_annual_rate": "c6026_severance",
+    "cafeteria_daily_crc": "c6025_cafeteria", "transport_monthly_crc": "c6029_transport",
+    "housing_monthly_crc": "c6028_housing", "other_monthly_crc": "c6030_other",
+    "ins_annual_crc": "c6022_occ_hazard",
+}
+#: Igual por mes: un mes de feriados o días libres que pasa a 0 borra ese mes.
+CONCEPTO_DEL_CALENDARIO = {"holidays": "c6003_working_holiday", "days_off": "c6002_day_off"}
+
+
+def drivers_apagados(antes: dict, despues: dict) -> tuple[list[str], dict[str, list[int]]]:
+    """(conceptos a borrar todo el año, {concepto: meses a borrar}).
+
+    `antes` / `despues`: valores de los drivers (números y listas de 12)."""
+    def _num(v):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    anual = [col for drv, col in CONCEPTO_DEL_DRIVER.items()
+             if drv in despues and _num(antes.get(drv)) != 0 and _num(despues.get(drv)) == 0]
+    por_mes: dict[str, list[int]] = {}
+    for drv, col in CONCEPTO_DEL_CALENDARIO.items():
+        a, d = antes.get(drv) or [], despues.get(drv)
+        if d is None:
+            continue
+        meses = [m + 1 for m in range(12)
+                 if m < len(a) and m < len(d) and _num(a[m]) != 0 and _num(d[m]) == 0]
+        if meses:
+            por_mes[col] = meses
+    return anual, por_mes
+
 
 @router.get("/scenarios/{scenario_id}/payroll/params/")
 async def get_payroll_params(scenario_id: str, db: AsyncSession = Depends(get_db)):
@@ -1445,6 +1484,9 @@ async def put_payroll_params(
         pp = PayrollParams(scenario_id=scenario_id)
         db.add(pp)
     import json as _json
+    antes = {c: getattr(pp, c, None) for c in DRIVERS_NUM}
+    for c in CONCEPTO_DEL_CALENDARIO:
+        antes[c] = [pp.mes(c, m) for m in range(1, 13)] if pp.id else []
     pp.ccss_rate = body.ccss_rate
     pp.aguinaldo_divisor = body.aguinaldo_divisor
     for c in DRIVERS_NUM:
@@ -1457,8 +1499,33 @@ async def put_payroll_params(
             if len(v) != 12:
                 raise ErrorApi(422, "driver.doce_valores", driver=c)
             setattr(pp, c, _json.dumps([int(x) for x in v]))
+    despues = {c: getattr(body, c) for c in DRIVERS_NUM if getattr(body, c) is not None}
+    for c in CONCEPTO_DEL_CALENDARIO:
+        if getattr(body, c) is not None:
+            despues[c] = list(getattr(body, c))
+    anual, por_mes = drivers_apagados(antes, despues)
+    borrados = []
+    if anual or por_mes:
+        from app.engine.meses_cerrados import meses_cerrados
+        esc = await db.get(Scenario, scenario_id)
+        cerrados = await meses_cerrados(db, esc) if esc else set()
+        abiertos = [m for m in range(1, 13) if m not in cerrados]
+        for col in anual:
+            await db.execute(update(PayrollConceptEntry)
+                             .where(PayrollConceptEntry.scenario_id == scenario_id,
+                                    PayrollConceptEntry.month.in_(abiertos))
+                             .values({col: Decimal("0")}))
+            borrados.append(col)
+        for col, meses in por_mes.items():
+            ok = [m for m in meses if m not in cerrados]
+            if ok:
+                await db.execute(update(PayrollConceptEntry)
+                                 .where(PayrollConceptEntry.scenario_id == scenario_id,
+                                        PayrollConceptEntry.month.in_(ok))
+                                 .values({col: Decimal("0")}))
+                borrados.append(col)
     await db.commit()
-    return {"saved": True, "scenario_id": scenario_id,
+    return {"saved": True, "scenario_id": scenario_id, "borrados": borrados,
             "ccss_rate": str(pp.ccss_rate), "aguinaldo_divisor": str(pp.aguinaldo_divisor),
             "aviso": t(idioma, "planilla.drivers_guardados_falta_recalcular")}
 
