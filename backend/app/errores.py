@@ -515,6 +515,9 @@ MENSAJES: dict[str, dict[str, str]] = {
     "pl.linea_invalida": {
         "es": "line inválida (REVENUE/OPEX/OVERHEAD/NONALLOC)",
         "en": "Invalid line (REVENUE/OPEX/OVERHEAD/NONALLOC)"},
+    "planilla.confirmar_borrado": {
+        "es": "Poner en 0 esta tasa borra montos que hoy están en la planilla: {lista}. Confirmá para borrarlos.",
+        "en": "Setting this rate to 0 deletes amounts that are in the payroll today: {lista}. Confirm to delete them."},
     "planilla.sin_posiciones_validas": {
         "es": "No se encontraron posiciones válidas.",
         "en": "No valid positions were found."},

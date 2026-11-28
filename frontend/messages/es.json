@@ -633,7 +633,9 @@
     "saved": "✓ Parámetros guardados. Recalculá la planilla para aplicarlos.",
     "savedBtn": "Guardado",
     "vacationHint": "6023 = BASE del mes × %. La BASE es el bruto que cotiza: salario + feriados + día libre + horas extra + comisiones + bono.",
-    "vacationLabel": "Provisión de vacaciones"
+    "vacationLabel": "Provisión de vacaciones",
+    "confirmarBorrado": "Poner en 0 esta tasa borra montos que hoy están en la planilla:\n\n{lista}\n\n¿Borrarlos?",
+    "borradoCancelado": "No se guardó: la tasa en 0 habría borrado montos de la planilla."
   },
   "costs": {
     "loadingDept": "Cargando departamento…",

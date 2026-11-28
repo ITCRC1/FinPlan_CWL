@@ -24,6 +24,7 @@ from app.models.spa_budget import SpaBudget
 from app.models.historical_kpi import HistoricalKpi
 from app.models.payroll_position import PayrollPosition, get_fte
 from app.models.payroll_concept_entry import PayrollConceptEntry
+from app.models.payroll_concepto_borrado import PayrollConceptoBorrado
 from app.models.payroll_params import PayrollParams
 from app.models.cost_entry import CostEntry
 from app.models.opex_entry import OpexEntry

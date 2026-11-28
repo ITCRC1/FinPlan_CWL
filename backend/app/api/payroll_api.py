@@ -29,6 +29,8 @@ from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._candado import candado
+from app.auth import get_current_user
+from app.engine import conservar_conceptos as CC
 from app.db import get_db
 from app.errores import ErrorApi
 from app.textos import Idioma, t
@@ -535,10 +537,14 @@ async def delete_position(
     scenario_id: str,
     position_id: str,
     db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     # Una version enllavada no se puede editar.
     await candado(db, scenario_id)
     pos = await _get_position_or_404(db, scenario_id, position_id)
+    # Lo digitado que se va con la posición queda registrado (owner, 2026-11-27).
+    perdido = CC.resumen_perdido(await CC.foto(db, scenario_id, [pos]))
+    await CC.registrar(db, scenario_id, pos.hotel_id, getattr(user, "email", ""), "posicion_borrada", perdido)
     await db.execute(
         delete(PayrollConceptEntry).where(PayrollConceptEntry.position_id == position_id)
     )
@@ -1238,6 +1244,7 @@ async def bulk_replace_payroll(
     scenario_id: str,
     rows: list[PayrollBulkRow],
     db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     """REEMPLAZA la planilla entera (para la carga desde Excel).
 
@@ -1256,6 +1263,9 @@ async def bulk_replace_payroll(
         raise ErrorApi(404, "escenario.no_encontrado")
     # Una versión enllavada no se puede sobreescribir.
     scenario.assert_editable()
+    # Owner, 2026-11-27: los conceptos digitados ya no se pierden al reemplazar.
+    viejas = (await db.execute(select(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id))).scalars().all()
+    foto_vieja = await CC.foto(db, scenario_id, viejas)
     await db.execute(
         delete(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id)
     )
@@ -1269,12 +1279,17 @@ async def bulk_replace_payroll(
         )
         db.add(p)
         created.append(p)
-    # Reemplazo masivo → generar SW/CCSS/aguinaldo de las posiciones nuevas.
+    # Reemplazo masivo → devolver lo digitado a las posiciones que siguen y luego
+    # generar SW/CCSS/aguinaldo (la base ya incluye las horas extra devueltas).
     await db.flush()
+    conservados, pierde = await CC.restaurar(db, scenario_id, scenario.year, created, foto_vieja)
+    perdido = CC.resumen_perdido(pierde)
+    await CC.registrar(db, scenario_id, scenario.hotel_id, getattr(user, "email", ""), "bulk_sin_posicion", perdido)
     entries = await _recalc_positions(db, scenario_id, created)
     await db.commit()
     return {"imported": len(rows), "scenario_id": scenario_id,
-            "entries_recalculated": entries}
+            "entries_recalculated": entries, "conceptos_conservados": conservados,
+            "conceptos_sin_posicion": [{**f, "monto": float(f["monto"])} for f in perdido]}
 
 
 @router.post("/payroll/{scenario_id}/import-codificacion/")
@@ -1282,6 +1297,7 @@ async def import_codificacion_endpoint(
     scenario_id: str,
     db: AsyncSession = Depends(get_db),
     idioma: str = Idioma,
+    user=Depends(get_current_user),
 ):
     """
     Import position templates from the Codificacion Planilla Excel.
@@ -1296,15 +1312,22 @@ async def import_codificacion_endpoint(
     if not xlsx_path.exists():
         raise ErrorApi(404, "codificacion.archivo_no_encontrado", ruta=str(xlsx_path))
 
-    # Clear existing positions (cascades to concept entries)
+    # Clear existing positions (cascades to concept entries). Lo digitado se
+    # devuelve a las plantillas con la misma llave y lo demás queda registrado.
+    viejas = (await db.execute(select(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id))).scalars().all()
+    foto_vieja = await CC.foto(db, scenario_id, viejas)
     await db.execute(
         delete(PayrollPosition).where(PayrollPosition.scenario_id == scenario_id)
     )
-    await db.commit()
+    await db.flush()
 
     positions = import_codificacion(str(xlsx_path), scenario_id, scenario.hotel_id)
     for pos in positions:
         db.add(pos)
+    await db.flush()
+    _, pierde = await CC.restaurar(db, scenario_id, scenario.year, positions, foto_vieja)
+    await CC.registrar(db, scenario_id, scenario.hotel_id, getattr(user, "email", ""), "codificacion_sin_posicion",
+                       CC.resumen_perdido(pierde))
     await db.commit()
 
     return {
@@ -1400,6 +1423,9 @@ class PayrollParamsBody(BaseModel):
     holidays: Optional[list[int]] = None
     days_off: Optional[list[int]] = None
     calendar_days: Optional[list[int]] = None
+    # Una tasa que pasa a 0 borra lo que calculaba. Sin esta confirmación, guardar
+    # contesta 409 con la lista de lo que se borraría (owner, 2026-11-27).
+    confirmar_borrado: bool = False
 
 
 DRIVERS_NUM = ["overtime_pct", "bonus_pct", "vacaciones_rate", "severance_annual_rate",
@@ -1473,7 +1499,7 @@ async def get_payroll_params(scenario_id: str, db: AsyncSession = Depends(get_db
 @router.put("/scenarios/{scenario_id}/payroll/params/")
 async def put_payroll_params(
     scenario_id: str, body: PayrollParamsBody, db: AsyncSession = Depends(get_db),
-    idioma: str = Idioma,
+    idioma: str = Idioma, user=Depends(get_current_user),
 ):
     # Una version enllavada no se puede editar.
     await candado(db, scenario_id)
@@ -1510,6 +1536,28 @@ async def put_payroll_params(
         esc = await db.get(Scenario, scenario_id)
         cerrados = await meses_cerrados(db, esc) if esc else set()
         abiertos = [m for m in range(1, 13) if m not in cerrados]
+        # Cuánto se borraría, por cuenta. Si hay plata de por medio y no vino la
+        # confirmación, no se guarda nada: se contesta qué se borraría.
+        a_borrar = []
+        filas_e = (await db.execute(select(PayrollConceptEntry).where(
+            PayrollConceptEntry.scenario_id == scenario_id))).scalars().all()
+        for col in anual:
+            monto = sum((Decimal(getattr(e, col) or 0) for e in filas_e if e.month in abiertos), Decimal("0"))
+            if monto:
+                a_borrar.append({"cuenta": CC.cuenta_de(col), "concepto": CC.NOMBRE.get(col, col), "col": col,
+                                 "meses": len(abiertos), "monto": monto})
+        for col, meses in por_mes.items():
+            ok_m = [m for m in meses if m not in cerrados]
+            monto = sum((Decimal(getattr(e, col) or 0) for e in filas_e if e.month in ok_m), Decimal("0"))
+            if monto:
+                a_borrar.append({"cuenta": CC.cuenta_de(col), "concepto": CC.NOMBRE.get(col, col), "col": col,
+                                 "meses": len(ok_m), "monto": monto})
+        if a_borrar and not body.confirmar_borrado:
+            lista = "; ".join(f"{f['cuenta']} {f['concepto']} US$ {f['monto']:,.2f}" for f in a_borrar)
+            raise ErrorApi(409, "planilla.confirmar_borrado", lista=lista,
+                           extra={"borrar": [{**f, "monto": float(f["monto"])} for f in a_borrar]})
+        await CC.registrar(db, scenario_id, getattr(esc, "hotel_id", "") if esc else "", getattr(user, "email", ""),
+                           "parametro_en_cero", a_borrar)
         for col in anual:
             await db.execute(update(PayrollConceptEntry)
                              .where(PayrollConceptEntry.scenario_id == scenario_id,
@@ -1634,6 +1682,7 @@ async def import_payroll_excel(
     replace: bool = True,
     db: AsyncSession = Depends(get_db),
     idioma: str = Idioma,
+    user=Depends(get_current_user),
 ):
     from app.models.scenario import Scenario
     scenario = await db.get(Scenario, scenario_id)
@@ -1660,6 +1709,7 @@ async def import_payroll_excel(
     # no se tocan (si no, subirlo las borraba).
     solo, solo_sub = filtro_del_archivo(contenido)
 
+    foto_vieja: dict = {}
     if replace:
         affected = {r["dept_code"] for r in rows}
         for dc in affected:
@@ -1673,6 +1723,9 @@ async def import_payroll_excel(
                        and (solo_sub is None or subcategoria_de(p) in solo_sub)]
             if not pos_ids:
                 continue
+            # Owner, 2026-11-27: antes de borrar, foto de lo digitado (horas extra,
+            # comisiones…) para devolverlo a la posición nueva con la misma llave.
+            foto_vieja.update(await CC.foto(db, scenario_id, [p for p in del_depto if p.id in pos_ids]))
             # delete concept entries first (FK), then positions
             await db.execute(
                 delete(PayrollConceptEntry).where(PayrollConceptEntry.position_id.in_(pos_ids)))
@@ -1682,8 +1735,9 @@ async def import_payroll_excel(
     FTE_ATTRS = ["fte_jan","fte_feb","fte_mar","fte_apr","fte_may","fte_jun",
                  "fte_jul","fte_aug","fte_sep","fte_oct","fte_nov","fte_dec"]
 
+    nuevas = []
     for r in rows:
-        db.add(PayrollPosition(
+        nuevas.append(PayrollPosition(
             id=str(uuid.uuid4()),
             scenario_id=scenario_id,
             hotel_id=scenario.hotel_id,
@@ -1700,13 +1754,24 @@ async def import_payroll_excel(
             contract_labour=bool(r.get("contract_labour", False)),
             **{attr: r.get(attr, Decimal("0")) for attr in FTE_ATTRS},
         ))
+        db.add(nuevas[-1])
 
+    await db.flush()
+    conservados, pierde = await CC.restaurar(db, scenario_id, scenario.year, nuevas, foto_vieja)
+    perdido = CC.resumen_perdido(pierde)
+    await CC.registrar(db, scenario_id, scenario.hotel_id, getattr(user, "email", ""), "excel_sin_posicion", perdido)
     await db.commit()
     nota = t(idioma, "planilla.recalcular_despues_del_import")
+    if conservados:
+        nota += " " + t(idioma, "planilla.conceptos_conservados", n=conservados)
+    if perdido:
+        nota += " " + t(idioma, "planilla.conceptos_sin_posicion", n=len(perdido),
+                        monto=f"{sum(float(f['monto']) for f in perdido):,.2f}")
     if ignoradas:
         nota += " " + t(idioma, "planilla.deptos_apagados_ignorados", deptos=", ".join(ignoradas))
     return {"imported": len(rows), "scenario_id": scenario_id, "ignored_depts": ignoradas,
-            "note": nota}
+            "note": nota, "conceptos_conservados": conservados,
+            "conceptos_sin_posicion": [{**f, "monto": float(f["monto"])} for f in perdido]}
 
 
 # ── Reparto de beneficios ─────────────────────────────────────────────────────

@@ -130,8 +130,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     // que error fue no puede mirar la prosa, que cambia de idioma. Ver
     // `backend/app/errores.py`.
     let clave: string | undefined;
-    try { clave = JSON.parse(text)?.clave; } catch { /* no era JSON */ }
-    throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave });
+    let detail: unknown;
+    try { const j = JSON.parse(text); clave = j?.clave; detail = j?.detail; } catch { /* no era JSON */ }
+    throw Object.assign(new Error(`API ${res.status}: ${text}`), { clave, detail, status: res.status });
   }
   // ⚠️ **Una respuesta SIN cuerpo no es JSON.**
   //
@@ -1639,12 +1640,17 @@ export async function getPayrollParams(scenarioId: string): Promise<PayrollParam
   return api.get<PayrollParamsResponse>(`/scenarios/${scenarioId}/payroll/params/`);
 }
 
+/** Lo que se borraría al poner una tasa en 0 (el backend contesta 409 sin confirmación). */
+export interface ConceptoABorrar { cuenta: string; concepto: string; col: string; meses: number; monto: number; }
+
 export async function savePayrollParams(
   scenarioId: string, ccssRate: number, aguinaldoDivisor: number,
   drivers?: Partial<Record<keyof PayrollDrivers, number | number[]>>,
-): Promise<{ saved: boolean; ccss_rate: string; aguinaldo_divisor: string; aviso?: string }> {
+  confirmarBorrado = false,
+): Promise<{ saved: boolean; ccss_rate: string; aguinaldo_divisor: string; aviso?: string; borrados?: string[] }> {
   return api.put(`/scenarios/${scenarioId}/payroll/params/`, {
     ccss_rate: ccssRate, aguinaldo_divisor: aguinaldoDivisor, ...(drivers ?? {}),
+    confirmar_borrado: confirmarBorrado,
   });
 }
 

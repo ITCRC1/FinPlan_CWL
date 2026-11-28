@@ -633,7 +633,9 @@
     "saved": "✓ Parameters saved. Recalculate the payroll to apply them.",
     "savedBtn": "Saved",
     "vacationHint": "6023 = the month's BASE × %. The BASE is the contributory gross: salary + holidays + day off + overtime + commissions + bonus.",
-    "vacationLabel": "Vacation accrual"
+    "vacationLabel": "Vacation accrual",
+    "confirmarBorrado": "Setting this rate to 0 deletes amounts that are in the payroll today:\n\n{lista}\n\nDelete them?",
+    "borradoCancelado": "Not saved: the rate at 0 would have deleted payroll amounts."
   },
   "costs": {
     "loadingDept": "Loading department…",

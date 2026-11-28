@@ -87,6 +87,10 @@ NO_VIAJAN = {
     # copiada es peor que ninguna.
     "import_batches": "traza de quien subio que — es del escenario que lo recibio",
     "import_files": "identidad del archivo — misma razon que import_batches",
+    # Registro de conceptos de planilla borrados (owner, 2026-11-27): dice QUE SE
+    # BORRO en ESE escenario. Copiarlo haría que la versión nueva muestre borrados
+    # que nunca le pasaron.
+    "payroll_conceptos_borrados": "traza de borrados de planilla — es del escenario donde pasaron",
 }
 
 

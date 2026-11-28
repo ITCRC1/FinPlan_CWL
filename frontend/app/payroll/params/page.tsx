@@ -102,7 +102,7 @@ export default function PayrollParamsPage() {
     try {
       const pct = (k: string) => (parseFloat(drv[k]) || 0) / 100;
       const crc = (k: string) => parseFloat(drv[k]) || 0;
-      await savePayrollParams(scenarioId, ccssFrac, agu, {
+      const drivers = {
         overtime_pct: pct("overtime_pct"),
         bonus_pct: pct("bonus_pct"),
         vacaciones_rate: pct("vacaciones_rate"),
@@ -116,7 +116,21 @@ export default function PayrollParamsPage() {
         holidays: cal.holidays,
         days_off: cal.days_off,
         calendar_days: cal.calendar_days,
-      });
+      };
+      try {
+        await savePayrollParams(scenarioId, ccssFrac, agu, drivers);
+      } catch (e: unknown) {
+        // Una tasa que pasa a 0 borra lo que calculaba: el backend contesta 409 con
+        // la lista y no guarda nada hasta que se confirme (owner, 2026-11-27).
+        const err = e as { clave?: string; detail?: { borrar?: { cuenta: string; concepto: string; monto: number }[] } };
+        if (err?.clave !== "planilla.confirmar_borrado") throw e;
+        const lista = (err.detail?.borrar ?? [])
+          .map(f => `${f.cuenta} ${f.concepto}: US$ ${f.monto.toLocaleString("en-US", { maximumFractionDigits: 2 })}`).join("\n");
+        if (!window.confirm(t("confirmarBorrado", { lista }))) {
+          setError(t("borradoCancelado")); setSaving(false); return;
+        }
+        await savePayrollParams(scenarioId, ccssFrac, agu, drivers, true);
+      }
       setSeeded(false); setDirty(false);
       setMsg(t("saved"));
     } catch (e: unknown) {

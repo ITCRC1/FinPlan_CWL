@@ -702,6 +702,12 @@ TEXTOS: dict[str, dict[str, str]] = {
     "planilla.driver_pisa_lo_manual": {
         "es": "{columna}: hay una tasa cargada en Parámetros de Planilla, así que la fórmula manda y va a pisar estos montos al recalcular. Poné esa tasa en CERO si querés que valga lo que subiste.",
         "en": "{columna}: there is a rate loaded under Payroll Parameters, so the formula wins and will overwrite these amounts on the next recalculation. Set that rate to ZERO if you want what you uploaded to stand."},
+    "planilla.conceptos_conservados": {
+        "es": "Se conservaron {n} montos digitados (horas extra, comisiones, beneficios…) de las posiciones que siguen en el archivo.",
+        "en": "{n} manually entered amounts (overtime, commissions, benefits…) were kept for the positions still in the file."},
+    "planilla.conceptos_sin_posicion": {
+        "es": "{n} conceptos digitados (US$ {monto}) eran de posiciones que ya no vienen en el archivo y se borraron; quedaron registrados.",
+        "en": "{n} manually entered concepts (US$ {monto}) belonged to positions no longer in the file and were deleted; they were logged."},
     "planilla.drivers_guardados_falta_recalcular": {
         "es": "Los drivers ya quedaron guardados. Apretá «Recalcular y empujar al P&L» en Planilla para que se apliquen a todas las posiciones.",
         "en": "The drivers are saved. Press “Recalculate and push to the P&L” under Payroll so they apply to every position."},
