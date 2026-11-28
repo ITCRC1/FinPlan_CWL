@@ -230,3 +230,178 @@ async def channel_mix(year: int = Query(..., ge=2000, le=2100), metric: str = Qu
         })
     return {"contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME, "year": year,
             "metric": metric, "scenarios": salida, "leido_por": quien}
+
+
+# ── Los supuestos del ingreso, para reconstruirlo en el Excel ────────────────
+#
+# Owner, 2026-11-28, sobre el libro que reconstruye cada línea de ingreso del
+# Budget 2027 (Standard vs Villas): *«como puedo mantener este excel para correr
+# cuando yo quiera pero que la informacion se calcule en forma automatica»*, y
+# después *«metelo en el master file»*.
+#
+# Esta ruta entrega los INSUMOS, no el resultado: ocupación %, rack, neta fijada
+# a mano, pax por habitación, unidades, meses abiertos, factor neto, las
+# perillas del Revenue Checkbook, y lo guardado en el checkbook para cuadrar.
+# El cálculo lo hace el libro con fórmulas, y por eso el owner puede poner sus
+# propios supuestos al lado sin tocar FinPlan.
+#
+# La forma es una tabla LARGA `clave · valor · texto`: el libro lee por clave
+# con INDEX/MATCH y no depende del orden. Las claves:
+#
+#     INFO|<campo>|0                texto del escenario (fuente, versión…)
+#     ORDEN|<n>|0                   texto = código de la categoría n (1, 2, …)
+#     UNID|<cod>|0 · NOMBRE|<cod>|0 · SET|<cod>|0
+#     OCC|<cod>|<m> · RACK|<cod>|<m> · PAX|<cod>|<m>
+#     NETMAN|<cod>|<m>              solo si la neta está fijada a mano
+#     DIAS|-|<m> · ABRE|-|<m> (1/0) · NF|-|<m> (factor neto de canales)
+#     CANAL|<n>|0 · MIX|<canal>|<m> · COM|<canal>|<m>
+#     PERILLA|<nombre>|0            food, tours, transport, nights_per_stay…
+#     CB|<LÍNEA>|<m>                lo guardado en el Revenue Checkbook
+#     OTRO|<LÍNEA>|<m>              montos de `revenue_other`
+#
+# ⚠️ Las perillas siguen el MISMO orden que la pantalla del checkbook: semilla
+# del hotel, luego paquete del escenario, luego lo guardado a mano. Si el libro
+# las tomara de otro lado, «Fill from drivers» y el Excel dirían cosas distintas.
+
+def nombre_del_set(dept_code: str | None) -> str:
+    """El set de una categoría, con el mismo criterio del Revenue Checkbook:
+    lo que no es Villas ni Residencias cae en Standard, asignado o no."""
+    dc = (dept_code or "").strip()
+    return {"0115": "Villas", "0116": "Residences"}.get(dc, "Standard")
+
+
+def filas_supuestos(info: dict, tipos: list[dict], por_tipo_mes: dict, dias: list[int],
+                    abiertos: list[int], canales: list[dict], factor_neto: list[float],
+                    perillas: dict, checkbook: dict, otros: dict) -> list[dict]:
+    """La tabla larga. Puro, sin base, para poder probarlo solo.
+
+    `tipos`: [{codigo, nombre, depto, unidades}] en el orden de la pantalla.
+    `por_tipo_mes[(codigo, mes)]`: {occ, rack, pax, neta, manual}.
+    """
+    filas: list[dict] = []
+
+    def add(clave: str, valor=None, texto=None):
+        filas.append({"clave": clave,
+                      "valor": None if valor is None else float(valor),
+                      "texto": texto})
+
+    for k, v in info.items():
+        add(f"INFO|{k}|0", None, None if v is None else str(v))
+    for n, t in enumerate(tipos, start=1):
+        c = t["codigo"]
+        add(f"ORDEN|{n}|0", None, c)
+        add(f"UNID|{c}|0", t["unidades"])
+        add(f"NOMBRE|{c}|0", None, t["nombre"])
+        add(f"SET|{c}|0", None, nombre_del_set(t.get("depto")))
+        for m in range(1, 13):
+            d = por_tipo_mes.get((c, m)) or {}
+            add(f"OCC|{c}|{m}", d.get("occ") or 0)
+            add(f"RACK|{c}|{m}", d.get("rack") or 0)
+            add(f"PAX|{c}|{m}", d.get("pax") or 0)
+            if d.get("manual"):
+                add(f"NETMAN|{c}|{m}", d.get("neta") or 0)
+    for m in range(1, 13):
+        add(f"DIAS|-|{m}", dias[m - 1])
+        add(f"ABRE|-|{m}", abiertos[m - 1])
+        add(f"NF|-|{m}", factor_neto[m - 1])
+    for n, ch in enumerate(canales, start=1):
+        add(f"CANAL|{n}|0", None, ch["channel"])
+        for m in range(1, 13):
+            add(f"MIX|{ch['channel']}|{m}", ch["mix"][m - 1])
+            add(f"COM|{ch['channel']}|{m}", ch["comm"][m - 1])
+    for k, v in perillas.items():
+        add(f"PERILLA|{k}|0", v)
+    for linea, meses in checkbook.items():
+        for m in range(1, 13):
+            add(f"CB|{linea}|{m}", meses[m - 1])
+    for linea, meses in otros.items():
+        for m in range(1, 13):
+            add(f"OTRO|{linea}|{m}", meses[m - 1])
+    return filas
+
+
+@router.get("/consolidado/revenue-supuestos/")
+async def revenue_supuestos(
+    year: int = Query(..., ge=2000, le=2100),
+    tipo: str = Query("BUDGET", description="BUDGET · FORECAST"),
+    version: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    quien: str = Depends(lector_del_consolidado),
+):
+    """Los insumos del ingreso de un escenario, en tabla larga clave · valor · texto."""
+    import calendar
+    import datetime as _dt
+
+    from app.api import revenue_api as rv
+    from app.api.consolidado_planilla_api import _escenario
+    from app.engine.tarifas_del_paquete import experiencias_del_escenario, tarifas_del_paquete
+    from app.models.occupancy_budget import OccupancyBudget
+    from app.models.rate_card import RateCard
+    from app.models.revenue_entry import REVENUE_LINES, RevenueEntry
+    from app.models.revenue_other import RevenueOther
+    from app.models.scenario_master import ScenarioMaster
+    from app.seed_data import semilla
+
+    esc = await _escenario(db, year, tipo, version)
+    rt = await rv.get_room_types(HOTEL_ID, scenario_id=esc.id, include_inactive=False, db=db)
+    tipos = [{"codigo": r["code"] or r["id"], "nombre": r["name"], "depto": r["dept_code"],
+              "unidades": int(r["units"] or 0), "id": r["id"]}
+             for r in rt["room_types"] if r.get("active", True) and int(r["units"] or 0) > 0]
+    codigo_de = {t["id"]: t["codigo"] for t in tipos}
+
+    por_tipo_mes: dict = {}
+    for rc in (await db.execute(select(RateCard).where(RateCard.scenario_id == esc.id))).scalars():
+        c = codigo_de.get(rc.room_type_id)
+        if c:
+            por_tipo_mes.setdefault((c, rc.month), {}).update({
+                "rack": rc.rack_rate, "pax": rc.pax_per_room, "neta": rc.net_rate,
+                "manual": bool(getattr(rc, "net_rate_manual", False))})
+    for ob in (await db.execute(select(OccupancyBudget).where(
+            OccupancyBudget.scenario_id == esc.id))).scalars():
+        c = codigo_de.get(ob.room_type_id)
+        if c:
+            por_tipo_mes.setdefault((c, ob.month), {})["occ"] = ob.occupancy_pct
+
+    cerrados = set(rt["closed_months"] or [])
+    dias = [calendar.monthrange(esc.year, m)[1] for m in range(1, 13)]
+    abiertos = [0 if m in cerrados else 1 for m in range(1, 13)]
+    ch = await rv.get_channels_config(esc.id, db)
+    canales = [{"channel": c["channel"], "mix": [float(x) for x in c["mix"]],
+                "comm": [float(x) for x in c["comm"]]} for c in ch["channels"]]
+    factor_neto = [float(x) for x in ch["net_factor"]]
+
+    # Perillas: semilla, luego paquete, luego guardadas, como la pantalla.
+    perillas: dict = {k: float(v) for k, v in
+                      (((semilla("driver_rates") or {}).get("tarifas")) or {}).items()
+                      if k in rv.PERILLAS and isinstance(v, (int, float))}
+    paquete = tarifas_del_paquete(await experiencias_del_escenario(db, esc.id))
+    if paquete.get("disponible"):
+        for k in ("food", "tours", "transport", "sust_rate", "nights_per_stay"):
+            v = (paquete.get("tarifas") or {}).get(k)
+            if v is not None:
+                perillas[k] = float(v)
+    sm = (await db.execute(select(ScenarioMaster).where(
+        ScenarioMaster.scenario_id == esc.id))).scalar_one_or_none()
+    perillas.update(rv._perillas_guardadas(sm))
+    for k in rv.PERILLAS:
+        perillas.setdefault(k, 0.0)
+
+    entradas = {e.line.upper(): e for e in (await db.execute(
+        select(RevenueEntry).where(RevenueEntry.scenario_id == esc.id))).scalars()}
+    checkbook = {ln: [float(entradas[ln].get_month(m)) if ln in entradas else 0.0
+                      for m in range(1, 13)] for ln in REVENUE_LINES}
+    otros: dict = {}
+    for o in (await db.execute(select(RevenueOther).where(
+            RevenueOther.scenario_id == esc.id))).scalars():
+        otros.setdefault(o.line.upper(), [0.0] * 12)[o.month - 1] += float(o.amount_usd or 0)
+
+    info = {"escenario": f"{esc.type} {esc.version} {esc.year}", "tipo": esc.type,
+            "version": esc.version, "anio": esc.year,
+            "fuente": getattr(esc, "revenue_source", "drivers") or "drivers",
+            "categorias": len(tipos),
+            "leido": _dt.datetime.now().strftime("%Y-%m-%d %H:%M")}
+    return {"contrato": CONTRATO, "hotel_id": HOTEL_ID, "hotel_name": HOTEL_NAME,
+            "escenario": {"id": esc.id, "year": esc.year, "type": esc.type, "version": esc.version},
+            "filas": filas_supuestos(info, tipos, por_tipo_mes, dias, abiertos, canales,
+                                     factor_neto, perillas, checkbook, otros),
+            "leido_por": quien}
