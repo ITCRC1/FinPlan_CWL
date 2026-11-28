@@ -574,4 +574,12 @@ for k, f in enumerate(MUESTRA, start=2):
 D.column_dimensions["A"].width = 26; D.column_dimensions["C"].width = 30
 
 wb.save(OUT)
+
+# Dónde quedó cada dato de RV3 Inputs, para `cablear_revision.py`: las pestañas
+# de revisión del owner leen de su «Supuestos» y esa hoja pasa a leer de acá.
+json.dump({
+    "MROW": MROW, "DAYS": DAYS, "OPEN": OPEN, "NF": NF,
+    "knobs": {k: int(KN[k].split("$")[-1]) for k in KN},
+    "cat": CAT, "grids": G, "used_cols": USED, "used_units_col": "F",
+}, open(OUT.rsplit(".", 1)[0] + "_mapa.json", "w", encoding="utf-8"), indent=1)
 print("ok", OUT, "| RV3 filas", I.max_row, "| RV4", R.max_row, "| RV5", Lw.max_row)

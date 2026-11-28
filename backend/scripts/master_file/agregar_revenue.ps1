@@ -1,5 +1,6 @@
 ﻿param([string]$Libro, [string]$Hojas, [string]$Salida,
-      [string]$TestUrl = "", [string]$TestKey = "", [switch]$Refrescar)
+      [string]$TestUrl = "", [string]$TestKey = "", [switch]$Refrescar,
+      [string[]]$Copiar = @())
 # Mete las pestañas RV (ingreso reconstruido, Standard vs Villas) en el Master File.
 #
 # Owner, 2026-11-28: «metelo en el master file». Un solo «Actualizar todo» tiene
@@ -14,6 +15,10 @@
 #   4) Consulta «RevenueSupuestos» -> tabla tRevSup en la hoja oculta «RV Data».
 #      URL y llave son las de Config (pURL / pLlave): una sola llave.
 #   5) Agrega las RV al «00 Index».
+#
+# -Copiar elige cuáles de las seis van (por defecto todas). Con las pestañas de
+# revisión del owner (cablear_revision.py) alcanza con RV3 Inputs y RV Data: su
+# Resumen, Cadena, 1 Rooms y 2 Lineas hacen lo de RV1, RV2, RV4 y RV5.
 #
 # ⚠️ No toca Config. -TestUrl/-TestKey son SOLO para probar contra un backend
 # local en una copia de trabajo: nunca se usan sobre el libro que se entrega.
@@ -38,7 +43,8 @@ try {
   $src = $xl.Workbooks.Open($Hojas, 0)
   $destino = $null
   foreach ($s in @($wb.Worksheets)) { if ($s.Name -ceq 'AM97 Controls') { $destino = $s } }
-  $grupo = $src.Worksheets.Item([object[]]$nombres)
+  $van = if ($Copiar.Count -gt 0) { $Copiar } else { $nombres }
+  $grupo = $src.Worksheets.Item([object[]]$van)
   if ($destino) { $grupo.Copy($destino) } else { $grupo.Copy([Type]::Missing, $wb.Worksheets.Item($wb.Worksheets.Count)) }
   $rutaHojas = $src.FullName
   $src.Close($false)
@@ -92,6 +98,7 @@ try {
       $n0 = $ix.Cells.Item($ult, 1).Value2
       $r = $ult + 1
       foreach ($f in $filas) {
+        if (-not ($van -ccontains $f[0])) { continue }
         # .Formula y no .Value2: un numero sacado de un arreglo COM no se deja asignar.
         if ($n0 -is [double]) { $n0 = [int]$n0 + 1; $ix.Cells.Item($r, 1).Formula = "$n0" }
         $ix.Cells.Item($r, 2).Formula = "$($f[0])"; $ix.Cells.Item($r, 3).Formula = "$($f[1])"; $r++
@@ -101,7 +108,7 @@ try {
 
   $xl.Calculation = -4105      # automatico
   $xl.CalculateFull()
-  $wb.Worksheets.Item('RV1 Revenue Build').Activate()
+  $wb.Worksheets.Item($van[0]).Activate()
   $wb.Save()
   $quedan = $wb.LinkSources(1); $n = 0; if ($null -ne $quedan) { foreach ($x in $quedan) { $n++; Write-Host "vinculo externo: $x" } }
   Write-Host "listo: $Salida  (vinculos externos: $n)"
