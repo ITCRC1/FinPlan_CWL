@@ -199,6 +199,12 @@ def import_beneficios(contenido: bytes) -> tuple[dict[str, list[dict]], list[str
                     meses.append(Decimal("0"))
                     avisos.append(f"{hoja}: valor no numerico en {dept}/{code}, mes {m + 1}.")
             if any(v != 0 for v in meses):
-                filas.append({"dept_code": dept, "position_code": code, "meses": meses})
+                # Puesto y empleado viajan también: hay códigos repetidos dentro de
+                # un depto (0150-13 ×3, 0183-02 ×2) y con solo depto + código las
+                # filas de esos se pisaban entre sí en una sola posición.
+                filas.append({"dept_code": dept, "position_code": code,
+                              "position_name": str(r[3] or "") if len(r) > 3 else "",
+                              "employee_name": str(r[4] or "") if len(r) > 4 else "",
+                              "meses": meses})
         out[columna] = filas
     return out, avisos

@@ -1865,6 +1865,47 @@ from app.export.beneficios_excel import (            # noqa: E402
 )
 
 
+def _nombre(s) -> str:
+    return " ".join(str(s or "").upper().split())
+
+
+def posicion_de_la_fila(fila: dict, posiciones: list, usadas: set):
+    """La posición a la que va una fila del Excel de beneficios, o None.
+
+    La llave es depto + código. Pero el código se repite dentro de un depto
+    (0150-13 tiene a Aldo, María del Mar y un Nature Guide): con la llave sola,
+    las tres filas caían en la MISMA posición y cada una pisaba a la anterior, así
+    que dos personas quedaban sin su monto y nada avisaba. Owner, 2026-11-28, al
+    cargar el overtime del B27: se perdían US$ 2,715 sin rastro.
+
+    Cuando la llave se repite se desempata por empleado + puesto, después por
+    empleado y después por puesto; y una posición ya usada en la misma hoja no se
+    vuelve a usar. Si aun así no queda exactamente una, None: mejor avisar que
+    adivinar.
+    """
+    cands = [p for p in posiciones
+             if (p.dept_code or "").strip() == fila["dept_code"]
+             and (p.position_code or "").strip() == fila["position_code"]
+             and p.id not in usadas]
+    if len(cands) <= 1:
+        return cands[0] if cands else None
+    emp, puesto = _nombre(fila.get("employee_name")), _nombre(fila.get("position_name"))
+    iguales = [p for p in cands
+               if _nombre(p.employee_name) == emp and _nombre(p.position_name) == puesto]
+    if iguales:
+        # Dos «TBD» del mismo puesto son indistinguibles: va a la primera libre, y
+        # la siguiente fila igual toma la otra (por eso se lleva `usadas`).
+        return iguales[0]
+    for filtro in (lambda p: _nombre(p.employee_name) == emp,
+                   lambda p: _nombre(p.position_name) == puesto):
+        elegidas = [p for p in cands if filtro(p)]
+        if len(elegidas) == 1:
+            return elegidas[0]
+        if elegidas:
+            cands = elegidas
+    return None
+
+
 async def _posiciones_ordenadas(db, scenario_id: str):
     return (await db.execute(
         select(PayrollPosition)
@@ -1930,8 +1971,6 @@ async def subir_beneficios_excel(
 
     datos, avisos = import_beneficios(await file.read())
     posiciones = await _posiciones_ordenadas(db, scenario_id)
-    por_llave = {((p.dept_code or "").strip(), (p.position_code or "").strip()): p
-                 for p in posiciones}
 
     ccss, agu, pp = await _payroll_cfg(db, scenario_id)
     rates = await _get_exchange_rates(db, scenario_id)
@@ -1954,8 +1993,11 @@ async def subir_beneficios_excel(
             continue
         if pp is not None and getattr(pp, driver_de.get(columna, ""), None):
             avisos.append(t(idioma, "planilla.driver_pisa_lo_manual", columna=columna))
+        usadas: set[str] = set()      # por hoja: la misma persona no recibe dos filas
         for f in filas:
-            pos = por_llave.get((f["dept_code"], f["position_code"]))
+            pos = posicion_de_la_fila(f, posiciones, usadas)
+            if pos is not None:
+                usadas.add(pos.id)
             if pos is None:
                 sin_match.append(f"{f['dept_code']}/{f['position_code']}")
                 continue
